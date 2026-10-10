@@ -4,7 +4,7 @@ A simple personal portfolio tracker. **You enter your own transactions** (buys, 
 
 Asset types: Polish treasury and corporate bonds (GPW / Catalyst), Polish retail treasury bonds (obligacje detaliczne), UCITS ETFs on EU exchanges, EU government bonds at IBKR, plus manually valued assets and cash.
 
-Status (2026-10-10): **design + PoC** (`poc/gpw-history`). **Current focus: Polish bonds.**
+Status (2026-10-10): **phase 1 built and deployed to the `dev` stage** (treasury bonds on GPW: import, backfill, daily jobs, valuation, API, dashboard; unit, integration and E2E tests). Retail bond calculator exists in `core` but isn't wired in yet (needs your series). See the root [README](../README.md) for how to run it.
 
 | Document | Contents |
 |---|---|
@@ -50,8 +50,8 @@ Latest versions as of 2026-10-10; check `npm view <pkg> version` before adding a
 | Data | DynamoDB + S3 via `@aws-sdk/client-dynamodb`, `@aws-sdk/lib-dynamodb` | 3.1149.0 |
 | XLS parsing | SheetJS (`xlsx`, vendored tarball from cdn.sheetjs.com) | 0.20.3 |
 | UI | Vite + React | 8.3.4 / 19.3.0 |
-| Table / charts | TanStack Table / Recharts | 9.2.8 / 3.10.1 |
-| Tests | Vitest | 5.0.3 |
+| Charts | Recharts (table is plain React: TanStack Table v9 has a new API not worth adopting for one table) | 3.10.1 |
+| Tests | Vitest / Playwright | 5.0.3 / 1.64.0 |
 
 Repo layout:
 
@@ -87,13 +87,15 @@ Docs/
 ## Open decisions / to verify
 
 Phase 1:
-- [ ] Your holdings and transactions (export of the sheet) and retail bond series with purchase dates.
+- [ ] Your holdings and transactions (export of the sheet) and retail bond series with purchase dates. Until then the dev stage holds `data/transactions.sample.json` (made-up).
+- [ ] Wire the retail bond calculator (`core/bonds/retail.ts`) into instruments/valuation once the series are known; needs a CPI y/y source (GUS).
+- [ ] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
 - [ ] Terms of each corporate bond held: fixed or floating, rate/margin, coupon dates, nominal.
 - [ ] Source of floating coupon rates per period: manual entry vs scraping the Catalyst interest tables.
 - [ ] Bossa EOD files: log in and check whether Catalyst bonds are included (corporate backfill).
 - [ ] Catalyst scraper PoC (cells don't line up with headers; read by position).
-- [ ] SST `Cron`: check whether schedules can use Europe/Warsaw or only UTC (times would shift by an hour with DST).
-- [ ] Confirm that GUS's monthly CPI m/m (one decimal) equals the `WR_k` in the MF calculator for recent months.
+- [x] SST: `CronV2` (EventBridge Scheduler) takes `timezone: "Europe/Warsaw"`.
+- [ ] Confirm that GUS's monthly CPI m/m (one decimal) equals the `WR_k` in the MF calculator for recent months, and the BDL variable id used in `packages/jobs/src/lib/gus.ts` (needs a GUS key: `sst secret set GusApiKey`).
 - [ ] Confirm the Catalyst page still shows D-1 at 07:15 on a weekday (seen on a Saturday only).
 - [x] GPW archive: full history per bond, or one file per day for all treasury bonds; no "last N" option (PoC, 2026-10-10).
 - [x] Corporate bonds: not in the GPW archive; gpwcatalyst.pl lists all corporate bonds, snapshot only.

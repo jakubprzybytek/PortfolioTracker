@@ -12,3 +12,4 @@ export * from "./valuation/positions.ts";
 export * from "./valuation/valuePortfolio.ts";
 export * from "./transactions/schema.ts";
 export * from "./instruments/schema.ts";
+export * from "./bonds/retail.ts";
