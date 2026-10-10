@@ -3,7 +3,6 @@ temp/
 
 # SST
 .sst/
-sst-env.d.ts
 
 # Local env / secrets
 .env
