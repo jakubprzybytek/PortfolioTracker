@@ -36,7 +36,9 @@ S3 upload imports/… ──────────► Lambda import (Bossa / C
                                                                                                  │
 every job ──► S3 raw archive (sst.aws.Bucket, write-only originals)                              │
                                                                                                  │
-React UI (sst.aws.StaticSite) ──► sst.aws.ApiGatewayV2 ──► Lambda api ───────────────────────────┘
+<stage>.portfoliotracker.albedoonline.com (sst.aws.Router/CloudFront)                                 │
+   ├─ /*     ──► React UI (sst.aws.StaticSite)                                                  │
+   └─ /api/* ──► sst.aws.ApiGatewayV2 ──► Lambda api ─────────────────────────────────────────┘
 ```
 
 ## Stack
@@ -62,6 +64,10 @@ packages/web    Vite + React UI
 sst.config.ts
 Docs/
 ```
+
+## Delivery
+
+GitHub Actions on `main`: deploy `int` → integration + E2E tests → deploy `prod` → tag `v0.N` (see the root README). Stages `int` and `prod` are deployed for real (`sst deploy`); `dev` and personal stages are for `sst dev`.
 
 ## Key decisions
 

@@ -16,7 +16,15 @@ interface InstrumentOut {
 
 describe(`API ${API}`, () => {
   beforeAll(async () => {
-    // Seed: the import is idempotent (ids derive from row contents), so re-uploading is safe.
+    // Seed, in dependency order; every import is idempotent, so re-running on a seeded stage is safe.
+    // 1. MF calculator (reference index + bond terms) — instruments with terms "mf" need it first.
+    const mfKey = await uploadImport("mf-calculator", "kalkulatorodsetek.xlsm", readFileSync(path.join(repoRoot, "packages/core/test/fixtures/kalkulatorodsetek.xlsm")));
+    await waitFor(async () => {
+      const r = await get<{ jobs: Record<string, { status: string; note?: string; finishedAt?: string } | null> }>("/status");
+      const run = r.body.jobs["import"];
+      return run?.status === "ok" && run.note?.includes(mfKey) ? true : undefined;
+    }, 180_000);
+    // 2. Instruments (starts the GPW backfill), 3. transactions (starts the valuation).
     await uploadImport("instruments", "instruments.json", readFileSync(path.join(repoRoot, "data/instruments.json")));
     await uploadImport("transactions", "sample.json", readFileSync(path.join(repoRoot, "data/transactions.sample.json")));
     await waitFor(async () => {

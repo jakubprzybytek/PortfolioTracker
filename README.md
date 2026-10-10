@@ -27,6 +27,27 @@ npm run deploy -- --stage dev     # real deployment: Lambdas and crons run in AW
 
 `sst dev` runs the functions **on your machine**: the scheduled jobs only fire while it's running. Use `deploy` for unattended daily collection. Outputs (API URL, bucket, table) are printed and saved in `.sst/outputs.json`.
 
+## Domains
+
+Each stage gets one domain (Route 53 zone `albedoonline.com` in this account; SST issues the certificate):
+
+| Stage | Site | API |
+|---|---|---|
+| `prod` | `https://portfoliotracker.albedoonline.com` | `https://portfoliotracker.albedoonline.com/api/…` |
+| any other, e.g. `int`, `dev` | `https://<stage>.portfoliotracker.albedoonline.com` | `https://<stage>.portfoliotracker.albedoonline.com/api/…` |
+
+The API lives under `/api` on the same domain (a CloudFront `Router` strips the prefix and forwards to API Gateway), so the site and API share one certificate and origin and need no CORS.
+
+## Continuous delivery
+
+`.github/workflows/cd.yml` runs on every push to `main`:
+
+1. **version** – next minor tag: `v0.1`, `v0.2`, … (latest `v0.*` tag + 1).
+2. **int** – type-check and unit tests, `sst deploy --stage int`, integration tests against `https://int.portfoliotracker.albedoonline.com/api`, Playwright E2E against the int site. The tests seed `int` with `data/instruments.json` and the sample transactions.
+3. **prod** – only if int passed: `sst deploy --stage prod`, then the version tag is pushed. The version shows in the page footer.
+
+AWS access uses the OIDC role in [infra/github/README.md](infra/github/README.md). Runs are serialised (`concurrency: cd`).
+
 First-time data load (see [data/README.md](data/README.md)):
 
 ```sh

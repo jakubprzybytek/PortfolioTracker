@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "./api.ts";
+import { api, APP_VERSION } from "./api.ts";
 import { fmtPct, fmtPln, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
 import { HoldingsTable } from "./HoldingsTable.tsx";
 import { PortfolioChart } from "./PortfolioChart.tsx";
@@ -127,6 +127,9 @@ export function App() {
           </tbody>
         </table>
       </div>
+      <footer className="muted" style={{ marginTop: 24, fontSize: "0.8rem" }} data-testid="version">
+        Portfolio Tracker {APP_VERSION}
+      </footer>
     </main>
   );
 }

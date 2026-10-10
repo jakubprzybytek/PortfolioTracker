@@ -5,6 +5,10 @@
 
 const WARSAW = "Europe/Warsaw";
 
+// prod → portfoliotracker.albedoonline.com, any other stage → <stage>.portfoliotracker.albedoonline.com
+const ROOT_DOMAIN = "portfoliotracker.albedoonline.com";
+const stageDomain = (stage: string) => (stage === "prod" ? ROOT_DOMAIN : `${stage}.${ROOT_DOMAIN}`);
+
 export default $config({
   app(input) {
     return {
@@ -94,16 +98,29 @@ export default $config({
     api.route("GET /instruments/{isin}/transactions", apiHandler);
     api.route("GET /status", apiHandler);
 
+    // One domain per stage: the site at "/", the API at "/api/*" (same origin, one certificate).
+    const domain = stageDomain($app.stage);
+    const router = new sst.aws.Router("Router", { domain });
+    router.route("/api", api.url, { rewrite: { regex: "^/api/(.*)$", to: "/$1" } });
+    const publicApiUrl = $interpolate`https://${domain}/api`;
+
     const web = new sst.aws.StaticSite("Web", {
       path: "packages/web",
       build: { command: "npm run build", output: "dist" },
-      environment: { VITE_API_URL: api.url },
+      router: { instance: router },
+      environment: {
+        // In `sst dev` the site runs on localhost, so it talks to API Gateway directly.
+        VITE_API_URL: $dev ? api.url : publicApiUrl,
+        VITE_APP_VERSION: process.env["APP_VERSION"] ?? `${$app.stage}-local`,
+      },
       dev: { command: "npm run dev", title: "web" },
     });
 
     return {
-      api: api.url,
-      web: web.url,
+      api: publicApiUrl,
+      apiGateway: api.url,
+      web: $interpolate`https://${domain}`,
+      webUrl: web.url,
       table: table.name,
       files: files.name,
       backfillFunction: backfill.name,

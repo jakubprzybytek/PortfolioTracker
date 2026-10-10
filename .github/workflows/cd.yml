@@ -1,0 +1,104 @@
+# Continuous delivery: every push to main deploys `int`, runs the tests against it,
+# then deploys `prod` and tags the commit with the next minor version (v0.1, v0.2, …).
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cd
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # OIDC → AWS
+  contents: write # push the version tag
+
+env:
+  AWS_REGION: eu-west-1
+  AWS_ROLE: arn:aws:iam::198805281865:role/GitHub-PortfolioTracker
+  NODE_VERSION: "24"
+
+jobs:
+  version:
+    name: Next version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: next
+        run: |
+          latest=$(git tag --list 'v0.*' --sort=-v:refname | head -n1)
+          if [ -z "$latest" ]; then next="v0.1"; else next="v0.$(( ${latest#v0.} + 1 ))"; fi
+          echo "latest=${latest:-none} next=$next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
+  int:
+    name: Deploy int + test
+    needs: version
+    runs-on: ubuntu-latest
+    environment: int
+    env:
+      APP_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy int
+        run: npx sst deploy --stage int
+      - name: Integration tests (API)
+        run: npm run test:integration
+        env:
+          API_URL: https://int.portfoliotracker.albedoonline.com/api
+      - run: npx playwright install --with-deps chromium
+      - name: E2E tests (UI)
+        run: npm run test:e2e
+        env:
+          WEB_URL: https://int.portfoliotracker.albedoonline.com
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: packages/web/test-results
+          retention-days: 7
+
+  prod:
+    name: Deploy prod + tag
+    needs: [version, int]
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      APP_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ env.AWS_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy prod
+        run: npx sst deploy --stage prod
+      - name: Tag ${{ env.APP_VERSION }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$APP_VERSION" -m "Release $APP_VERSION"
+          git push origin "$APP_VERSION"
