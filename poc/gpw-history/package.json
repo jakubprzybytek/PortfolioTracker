@@ -1,0 +1,21 @@
+{
+  "name": "gpw-history-poc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PoC: download historical daily prices of GPW-listed treasury bonds from the GPW quotation archive",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "fetch": "node src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
+  }
+}

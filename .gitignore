@@ -1,0 +1,19 @@
+node_modules/
+temp/
+
+# SST
+.sst/
+sst-env.d.ts
+
+# Local env / secrets
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Personal notes (holdings), kept local only
+Docs/Research.md
