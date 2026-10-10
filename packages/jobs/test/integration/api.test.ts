@@ -24,14 +24,22 @@ describe(`API ${API}`, () => {
       const run = r.body.jobs["import"];
       return run?.status === "ok" && run.note?.includes(mfKey) ? true : undefined;
     }, 180_000);
-    // 2. Instruments (starts the GPW backfill), 3. transactions (starts the valuation).
+    // 2. Instruments: starts the GPW history backfill; wait for it so the valuation sees prices and names.
     await uploadImport("instruments", "instruments.json", readFileSync(path.join(repoRoot, "data/instruments.json")));
-    await uploadImport("transactions", "sample.json", readFileSync(path.join(repoRoot, "data/transactions.sample.json")));
     await waitFor(async () => {
       const inst = await get<InstrumentOut[]>("/instruments");
       const ok = inst.status === 200 && [IZ, DS].every((i) => inst.body.find((x) => x.isin === i)?.backfill?.status === "done");
       return ok ? true : undefined;
     }, 240_000);
+    // 3. Transactions: triggers the valuation. Wait for a snapshot that knows both instruments.
+    await uploadImport("transactions", "sample.json", readFileSync(path.join(repoRoot, "data/transactions.sample.json")));
+    await waitFor(async () => {
+      const r = await get<SnapshotItem>("/holdings");
+      if (r.status !== 200) return undefined;
+      const codes = new Set(r.body.holdings.map((h) => h.code));
+      const clean = r.body.holdings.every((h) => !h.flags.includes("unknown_instrument") && !h.flags.includes("no_price"));
+      return codes.has("DS0432") && codes.has("IZ0836") && clean ? true : undefined;
+    }, 180_000);
   });
 
   it("GET /status lists the last run of every job", async () => {
