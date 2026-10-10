@@ -1,23 +1,88 @@
 {
   "Version": "2012-10-17",
   "Statement": [
-    { "Sid": "Identity", "Effect": "Allow", "Action": ["sts:GetCallerIdentity"], "Resource": "*" },
-    { "Sid": "SstState", "Effect": "Allow", "Action": ["ssm:GetParameter", "ssm:GetParameters", "ssm:PutParameter", "ssm:DeleteParameter"], "Resource": "arn:aws:ssm:*:198805281865:parameter/sst/*" },
-    { "Sid": "ApiGateway", "Effect": "Allow", "Action": ["apigateway:*"], "Resource": "arn:aws:apigateway:*::/*" },
-    { "Sid": "Compute", "Effect": "Allow", "Action": ["lambda:*", "scheduler:*", "logs:*", "events:*"], "Resource": "*" },
-    { "Sid": "Data", "Effect": "Allow", "Action": ["dynamodb:*", "s3:*"], "Resource": "*" },
-    { "Sid": "Edge", "Effect": "Allow", "Action": ["cloudfront:*", "cloudfront-keyvaluestore:*", "acm:*", "route53:*"], "Resource": "*" },
+    {
+      "Sid": "Identity",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SstState",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "ssm:PutParameter",
+        "ssm:DeleteParameter"
+      ],
+      "Resource": "arn:aws:ssm:*:198805281865:parameter/sst/*"
+    },
+    {
+      "Sid": "ApiGateway",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:*"
+      ],
+      "Resource": "arn:aws:apigateway:*::/*"
+    },
+    {
+      "Sid": "Compute",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:*",
+        "scheduler:*",
+        "logs:*",
+        "events:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Data",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:*",
+        "s3:*"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Edge",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:*",
+        "cloudfront-keyvaluestore:*",
+        "acm:*",
+        "route53:*"
+      ],
+      "Resource": "*"
+    },
     {
       "Sid": "Roles",
       "Effect": "Allow",
       "Action": [
-        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy",
-        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy", "iam:ListRolePolicies",
-        "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies", "iam:ListInstanceProfilesForRole",
-        "iam:TagRole", "iam:UntagRole", "iam:ListRoleTags", "iam:PassRole", "iam:CreateServiceLinkedRole"
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:UpdateRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListInstanceProfilesForRole",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:ListRoleTags",
+        "iam:PassRole",
+        "iam:CreateServiceLinkedRole"
       ],
       "Resource": "*"
-    },
-    { "Sid": "Iot", "Effect": "Allow", "Action": ["iot:DescribeEndpoint"], "Resource": "*" }
+    }
   ]
 }
