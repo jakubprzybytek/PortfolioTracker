@@ -46,7 +46,9 @@ The API lives under `/api` on the same domain (a CloudFront `Router` strips the 
 2. **int** – type-check and unit tests, `sst deploy --stage int`, integration tests against `https://int.portfoliotracker.albedoonline.com/api`, Playwright E2E against the int site. The tests seed `int` with `data/instruments.json` and the sample transactions.
 3. **prod** – only if int passed: `sst deploy --stage prod`, then the version tag is pushed. The version shows in the page footer.
 
-AWS access uses the OIDC role in [infra/github/README.md](infra/github/README.md). Runs are serialised (`concurrency: cd`).
+AWS access uses the OIDC role in [infra/github/README.md](infra/github/README.md). Runs are serialised (`concurrency: cd`). A failed `int` stops the run: nothing reaches prod and no tag is created. Re-run failed runs from the Actions tab.
+
+Generated type declarations (`sst-env.d.ts`, root and per package) are committed: CI type-checks before deploying, so it can't rely on SST regenerating them. They change when resources are added to `sst.config.ts`; commit the regenerated files with that change.
 
 First-time data load (see [data/README.md](data/README.md)):
 

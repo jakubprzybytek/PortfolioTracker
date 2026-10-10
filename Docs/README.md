@@ -4,7 +4,7 @@ A simple personal portfolio tracker. **You enter your own transactions** (buys, 
 
 Asset types: Polish treasury and corporate bonds (GPW / Catalyst), Polish retail treasury bonds (obligacje detaliczne), UCITS ETFs on EU exchanges, EU government bonds at IBKR, plus manually valued assets and cash.
 
-Status (2026-10-10): **phase 1 built and deployed to the `dev` stage** (treasury bonds on GPW: import, backfill, daily jobs, valuation, API, dashboard; unit, integration and E2E tests). Retail bond calculator exists in `core` but isn't wired in yet (needs your series). See the root [README](../README.md) for how to run it.
+Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotracker.albedoonline.com (treasury bonds on GPW: import, backfill, daily jobs, valuation, API, dashboard; unit, integration and E2E tests). Every push to `main` goes through `int` to `prod` automatically. Retail bond calculator exists in `core` but isn't wired in yet (needs your series). See the root [README](../README.md) for how to run it.
 
 | Document | Contents |
 |---|---|
@@ -67,7 +67,15 @@ Docs/
 
 ## Delivery
 
-GitHub Actions on `main`: deploy `int` → integration + E2E tests → deploy `prod` → tag `v0.N` (see the root README). Stages `int` and `prod` are deployed for real (`sst deploy`); `dev` and personal stages are for `sst dev`.
+GitHub Actions on `main`: deploy `int` → integration + E2E tests → deploy `prod` → tag `v0.N` (see the root README).
+
+| Stage | Deployed by | Data | URL |
+|---|---|---|---|
+| `prod` | CD, after `int` passes | yours (starts empty) | https://portfoliotracker.albedoonline.com |
+| `int` | CD, every push to `main` | sample data, re-seeded by the tests | https://int.portfoliotracker.albedoonline.com |
+| `dev` | you (`npm run dev -- --stage dev` or `npm run deploy -- --stage dev`) | sample data | https://dev.portfoliotracker.albedoonline.com |
+
+Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Router, same origin). Versions are minor tags `v0.1`, `v0.2`, …; the deployed version shows in the page footer.
 
 ## Key decisions
 
@@ -93,7 +101,7 @@ GitHub Actions on `main`: deploy `int` → integration + E2E tests → deploy `p
 ## Open decisions / to verify
 
 Phase 1:
-- [ ] Your holdings and transactions (export of the sheet) and retail bond series with purchase dates. Until then the dev stage holds `data/transactions.sample.json` (made-up).
+- [ ] Load `prod`: MF calculator, `data/instruments.json`, and your real transactions (export of the sheet), plus retail bond series with purchase dates. `int` and `dev` hold `data/transactions.sample.json` (made-up).
 - [ ] Wire the retail bond calculator (`core/bonds/retail.ts`) into instruments/valuation once the series are known; needs a CPI y/y source (GUS).
 - [ ] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
 - [ ] Terms of each corporate bond held: fixed or floating, rate/margin, coupon dates, nominal.
@@ -107,6 +115,7 @@ Phase 1:
 - [x] Corporate bonds: not in the GPW archive; gpwcatalyst.pl lists all corporate bonds, snapshot only.
 - [x] IZ indexed nominal and accrued interest: computed with the Ministry's method; exact match with published values.
 - [x] IaC: SST v4.
+- [x] Custom domains per stage and CD (int → tests → prod → tag); first release `v0.1` on 2026-10-11.
 
 Later phases:
 - [ ] EODHD: confirm the EOD plan includes the delayed live endpoint and enough daily calls.
