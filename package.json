@@ -1,0 +1,30 @@
+{
+  "name": "portfolio-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "sst dev",
+    "deploy": "sst deploy",
+    "shell": "sst shell",
+    "typecheck": "tsc -b packages/core packages/jobs && npm run typecheck -w @portfolio/web",
+    "test": "vitest run --project unit",
+    "test:unit": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:e2e": "playwright test -c packages/web/playwright.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^24.19.2",
+    "sst": "^4.17.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

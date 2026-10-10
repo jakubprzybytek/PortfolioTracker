@@ -1,0 +1,61 @@
+// Backfills one instrument's history. Triggered either by the DynamoDB stream when a new
+// instrument item appears, or manually with { isin } (see Docs/backfill.md).
+
+import type { DynamoDBStreamEvent } from "aws-lambda";
+import { Resource } from "sst";
+import { invokeAsync, repo, runJob } from "../lib/context.ts";
+import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
+
+export interface BackfillEvent {
+  isin: string;
+  /** Re-run the valuation afterwards (default true). */
+  revalue?: boolean;
+}
+
+function isinsFromEvent(event: BackfillEvent | DynamoDBStreamEvent): string[] {
+  if ("Records" in event) {
+    return event.Records.flatMap((r) => {
+      const isin = r.dynamodb?.NewImage?.["isin"]?.S;
+      // MF-TERMS is the imported Ministry calculator data stored as a pseudo-instrument, not a holding.
+      return r.eventName === "INSERT" && isin && isin !== "MF-TERMS" ? [isin] : [];
+    });
+  }
+  return [event.isin];
+}
+
+export async function backfillInstrument(isin: string): Promise<{ status: string; rows?: number; from?: string; to?: string }> {
+  const inst = await repo.getInstrument(isin);
+  if (!inst) throw new Error(`Unknown instrument ${isin}`);
+
+  if (inst.sourceIds[GPW_SOURCE_ID]) {
+    await repo.putBackfillStatus({ isin, status: "running", source: GPW_SOURCE_ID });
+    try {
+      const result = await backfillGpwHistory(inst);
+      await repo.putBackfillStatus({ isin, status: "done", source: GPW_SOURCE_ID, ...result });
+      return { status: "done", ...result };
+    } catch (err) {
+      await repo.putBackfillStatus({ isin, status: "failed", source: GPW_SOURCE_ID, note: String((err as Error).message) });
+      throw err;
+    }
+  }
+
+  // No source can provide history for this instrument (e.g. Catalyst corporate bonds): say so.
+  await repo.putBackfillStatus({ isin, status: "no_history", note: "No history source for this instrument; daily collection only" });
+  return { status: "no_history" };
+}
+
+export async function handler(event: BackfillEvent | DynamoDBStreamEvent) {
+  const isins = isinsFromEvent(event);
+  const revalue = "Records" in event ? true : (event.revalue ?? true);
+  return runJob("backfill", async () => {
+    const results: Record<string, unknown> = {};
+    let itemsWritten = 0;
+    for (const isin of isins) {
+      const r = await backfillInstrument(isin);
+      results[isin] = r;
+      itemsWritten += r.rows ?? 0;
+    }
+    if (revalue && itemsWritten > 0) await invokeAsync(Resource.Valuation.name, { reason: "backfill", isins });
+    return { itemsWritten, note: JSON.stringify(results) };
+  });
+}

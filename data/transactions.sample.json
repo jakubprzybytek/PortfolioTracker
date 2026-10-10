@@ -1,0 +1,8 @@
+[
+  { "date": "2025-02-03", "account": "broker", "type": "DEPOSIT", "amount": 30000, "note": "sample data" },
+  { "date": "2025-02-05", "account": "broker", "type": "BUY", "isin": "PL0000113783", "quantity": 20, "price": 79.5, "amount": -15900, "fee": 31.8 },
+  { "date": "2025-04-28", "account": "broker", "type": "COUPON", "isin": "PL0000113783", "amount": 350, "note": "DS0432 coupon 17.50 × 20" },
+  { "date": "2025-06-10", "account": "broker", "type": "BUY", "isin": "PL0000117024", "quantity": 10, "price": 89.2, "amount": -9542.46, "fee": 19.08, "note": "clean 89.20 % × indexed nominal 1069.78" },
+  { "date": "2025-08-26", "account": "broker", "type": "COUPON", "isin": "PL0000117024", "amount": 214.2, "note": "IZ0836 coupon 21.42 × 10" },
+  { "date": "2026-04-27", "account": "broker", "type": "COUPON", "isin": "PL0000113783", "amount": 350 }
+]

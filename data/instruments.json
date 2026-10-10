@@ -1,0 +1,22 @@
+[
+  {
+    "isin": "PL0000117024",
+    "code": "IZ0836",
+    "name": "Obligacje skarbowe IZ0836 (indeksowane inflacją, 2 %)",
+    "type": "BOND_LISTED",
+    "currency": "PLN",
+    "venue": "XWAR",
+    "sourceIds": { "gpw": "IZ0836" },
+    "terms": "mf"
+  },
+  {
+    "isin": "PL0000113783",
+    "code": "DS0432",
+    "name": "Obligacje skarbowe DS0432 (stałe 1,75 %)",
+    "type": "BOND_LISTED",
+    "currency": "PLN",
+    "venue": "XWAR",
+    "sourceIds": { "gpw": "DS0432" },
+    "terms": "mf"
+  }
+]

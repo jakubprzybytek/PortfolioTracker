@@ -1,0 +1,10 @@
+{
+  "name": "@portfolio/jobs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-lambda": "^3.1149.0",
+    "@portfolio/core": "*"
+  }
+}

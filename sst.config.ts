@@ -1,0 +1,113 @@
+/// <reference path="./.sst/platform/config.d.ts" />
+
+// Infrastructure for the portfolio tracker (see Docs/README.md). Everything is serverless and
+// costs nothing when idle: one DynamoDB table, one S3 bucket, scheduled Lambdas, an HTTP API and a static site.
+
+const WARSAW = "Europe/Warsaw";
+
+export default $config({
+  app(input) {
+    return {
+      name: "portfolio-tracker",
+      home: "aws",
+      providers: { aws: { region: "eu-west-1" } },
+      removal: input.stage === "prod" ? "retain" : "remove",
+      protect: input.stage === "prod",
+    };
+  },
+  async run() {
+    // --- storage ---------------------------------------------------------------------------------
+    const table = new sst.aws.Dynamo("Table", {
+      fields: { PK: "string", SK: "string", GSI1PK: "string", GSI1SK: "string" },
+      primaryIndex: { hashKey: "PK", rangeKey: "SK" },
+      globalIndexes: { GSI1: { hashKey: "GSI1PK", rangeKey: "GSI1SK" } },
+      stream: "new-and-old-images",
+      ttl: "ttl",
+      transform: {
+        table: (args) => {
+          args.pointInTimeRecovery = { enabled: true };
+        },
+      },
+    });
+
+    // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload.
+    const files = new sst.aws.Bucket("Files");
+
+    const gusApiKey = new sst.Secret("GusApiKey", "not-set");
+
+    const link = [table, files, gusApiKey];
+    const defaults = { link, timeout: "5 minutes" as const, memory: "512 MB" as const };
+
+    // --- jobs ----------------------------------------------------------------------------------
+    const valuation = new sst.aws.Function("Valuation", { ...defaults, handler: "packages/jobs/src/handlers/valuation.handler", timeout: "15 minutes" });
+
+    const backfill = new sst.aws.Function("Backfill", {
+      ...defaults,
+      handler: "packages/jobs/src/handlers/backfill.handler",
+      timeout: "15 minutes",
+      link: [...link, valuation],
+    });
+    // A new instrument item starts its own backfill.
+    table.subscribe("NewInstrument", backfill.arn, {
+      filters: [{ eventName: ["INSERT"], dynamodb: { Keys: { SK: { S: ["META"] } } } }],
+    });
+
+    const importer = new sst.aws.Function("Import", {
+      ...defaults,
+      handler: "packages/jobs/src/handlers/import.handler",
+      timeout: "15 minutes",
+      link: [...link, valuation],
+    });
+    files.notify({
+      notifications: [{ name: "Imports", function: importer.arn, events: ["s3:ObjectCreated:*"], filterPrefix: "imports/" }],
+    });
+
+    new sst.aws.CronV2("EodGpw", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/eodGpw.handler" },
+      schedule: "cron(30 18 ? * MON-FRI *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
+    new sst.aws.CronV2("RecheckGpw", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/eodGpw.handler" },
+      schedule: "cron(15 7 ? * TUE-SAT *)",
+      timezone: WARSAW,
+      event: { final: true },
+      retries: 2,
+    });
+    new sst.aws.CronV2("Monthly", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/monthly.handler" },
+      schedule: "cron(0 10 16 * ? *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
+    new sst.aws.CronV2("ValuationEvening", { function: valuation.arn, schedule: "cron(30 22 ? * MON-FRI *)", timezone: WARSAW });
+    new sst.aws.CronV2("ValuationMorning", { function: valuation.arn, schedule: "cron(30 7 ? * TUE-SAT *)", timezone: WARSAW });
+
+    // --- api + web -----------------------------------------------------------------------------
+    const api = new sst.aws.ApiGatewayV2("Api", { link, cors: true });
+    const apiHandler = { ...defaults, handler: "packages/jobs/src/handlers/api.handler", timeout: "30 seconds" as const };
+    api.route("GET /holdings", apiHandler);
+    api.route("GET /portfolio/history", apiHandler);
+    api.route("GET /instruments", apiHandler);
+    api.route("GET /instruments/{isin}/prices", apiHandler);
+    api.route("GET /instruments/{isin}/transactions", apiHandler);
+    api.route("GET /status", apiHandler);
+
+    const web = new sst.aws.StaticSite("Web", {
+      path: "packages/web",
+      build: { command: "npm run build", output: "dist" },
+      environment: { VITE_API_URL: api.url },
+      dev: { command: "npm run dev", title: "web" },
+    });
+
+    return {
+      api: api.url,
+      web: web.url,
+      table: table.name,
+      files: files.name,
+      backfillFunction: backfill.name,
+      valuationFunction: valuation.name,
+    };
+  },
+});

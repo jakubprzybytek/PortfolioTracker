@@ -17,3 +17,6 @@ Thumbs.db
 
 # Personal notes (holdings), kept local only
 Docs/Research.md
+
+# PoC data downloads
+poc/gpw-history/data/
