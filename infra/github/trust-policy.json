@@ -12,7 +12,10 @@
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
         },
         "StringLike": {
-          "token.actions.githubusercontent.com:sub": "repo:jakubprzybytek/PortfolioTracker:*"
+          "token.actions.githubusercontent.com:sub": [
+            "repo:jakubprzybytek/PortfolioTracker:*",
+            "repo:jakubprzybytek@90648/PortfolioTracker@1413383966:*"
+          ]
         }
       }
     }
