@@ -13,6 +13,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 | [ingestion.md](ingestion.md) | Scheduled daily jobs, valuation, data quality rules |
 | [backfill.md](backfill.md) | How history is loaded: triggers and order per source |
 | [ui.md](ui.md) | Visualisation: holdings table and charts |
+| [ReferenceFeatures.md](ReferenceFeatures.md) | Feature inventory of the Google Sheets tracker the app reproduces |
 
 ## Scope
 
