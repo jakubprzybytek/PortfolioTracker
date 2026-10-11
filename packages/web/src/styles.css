@@ -90,3 +90,4 @@ form.login p { margin: 0; font-size: 0.9rem; }
 .field input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 form.login button[type="submit"] { padding: 8px; }
 form.login button.link { align-self: center; font-size: 0.9rem; }
+.gate button.link { background: none; border: 0; padding: 0; color: var(--accent); }
