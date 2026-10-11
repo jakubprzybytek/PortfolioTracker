@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { InstrumentItem, TransactionItem } from "../src/db/items.ts";
 import { parseRetailRates, type RetailTerms } from "../src/mf/retailRates.ts";
-import { retailLotsAt, valueRetailLots } from "../src/valuation/retailLots.ts";
+import { retailLotsAt, retailValueHistory, valueRetailLots } from "../src/valuation/retailLots.ts";
 import { valuePortfolio } from "../src/valuation/valuePortfolio.ts";
 import { toReferenceIndex } from "../src/bonds/izIndex.ts";
 import { FIXTURES, fixture } from "./fixtures.ts";
@@ -52,5 +52,19 @@ describe("valuePortfolio with retail bonds", () => {
     expect(h).toMatchObject({ code: "EDO0332", quantity: 20, cost: 1999, cleanPrice: null, flags: [], rate: { current: 0.0345, previous: 0.0655 } });
     expect(h.value).toBeGreaterThan(2760); // ≈ 20 × 138.3
     expect(h.valuePerUnit).toBeCloseTo(138.36, 1);
+  });
+});
+
+describe("retailValueHistory", () => {
+  it("gives the daily value per bond while the bonds are held", () => {
+    const txs = [
+      tx({ id: "1", date: "2022-03-01", valueDate: "2022-03-11", type: "BUY", quantity: 10, price: 100, amount: -1000 }),
+      tx({ id: "2", date: "2022-03-20", type: "SELL", quantity: 10, amount: 1000 }),
+    ];
+    const h = retailValueHistory(edo0332, txs, "2022-03-01", "2022-04-01");
+    expect(h[0]).toEqual({ date: "2022-03-11", value: 100 }); // starts when interest starts
+    expect(h.at(-1)!.date).toBe("2022-03-19"); // sold on the 20th
+    expect(h.at(-1)!.value).toBeCloseTo(100 + 2.2 * (8 / 365), 2);
+    expect(retailValueHistory(edo0332, txs, "2026-01-01", "2026-02-01")).toEqual([]);
   });
 });

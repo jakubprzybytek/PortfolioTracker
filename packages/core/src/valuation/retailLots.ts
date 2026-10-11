@@ -1,8 +1,8 @@
 // Retail treasury bonds are valued per lot: each purchase earns interest from its own start date (valueDate),
 // so two purchases of the same series a few days apart are worth slightly different amounts.
 
-import type { IsoDate } from "../dates.ts";
 import type { TransactionItem } from "../db/items.ts";
+import { addDays, type IsoDate } from "../dates.ts";
 import { grosz, lotSeries, publishedRatePeriods, valueRetailBond } from "../bonds/retail.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
 
@@ -72,4 +72,20 @@ export function valueRetailLots(terms: RetailTerms, lots: RetailLot[], date: Iso
     rate,
     flags: [...flags],
   };
+}
+
+/**
+ * Daily value per bond of a retail position (all lots in `transactions`, averaged), for the days it was held
+ * between `from` and `to`: the "price" line of a bond that isn't traded. Nominal 100, so it reads like % of nominal.
+ */
+export function retailValueHistory(terms: RetailTerms, transactions: TransactionItem[], from: IsoDate, to: IsoDate): { date: IsoDate; value: number }[] {
+  const first = transactions.filter((t) => t.type === "BUY").map((t) => t.valueDate ?? t.date).sort()[0];
+  if (!first) return [];
+  const out: { date: IsoDate; value: number }[] = [];
+  for (let date = from > first ? from : first; date <= to; date = addDays(date, 1)) {
+    const lots = retailLotsAt(transactions, date);
+    const r = valueRetailLots(terms, lots, date);
+    if (r.quantity > 0) out.push({ date, value: grosz(r.value / r.quantity) });
+  }
+  return out;
 }

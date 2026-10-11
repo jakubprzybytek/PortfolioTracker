@@ -126,5 +126,10 @@ test.describe("prices view", () => {
     await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
     await ds.click(); // click again: chart closes
     await expect(page.getByTestId("price-title")).toHaveCount(0);
+
+    // Retail bond: the chart is its calculated value per bond
+    await page.getByTestId("price-EDO0935").click();
+    await expect(page.getByTestId("price-title")).toContainText("value per bond, PLN (calculated");
+    await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
   });
 });

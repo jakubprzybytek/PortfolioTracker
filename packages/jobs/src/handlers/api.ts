@@ -2,7 +2,7 @@
 // in one of the stage's access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
-import { addDays, priceRows, today, type PriceItem } from "@portfolio/core";
+import { addDays, priceRows, retailValueHistory, today, type PriceItem } from "@portfolio/core";
 import { hasAnyGroup } from "../lib/access.ts";
 import { repo } from "../lib/context.ts";
 
@@ -47,6 +47,12 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
         const inst = await repo.getInstrument(isin);
         if (!inst) return json(404, { error: "Unknown instrument" });
+        // Retail bonds aren't traded: their line is the calculated value per bond of your lots (nominal 100).
+        if (inst.type === "BOND_RETAIL" && inst.retail) {
+          const txs = (await repo.listTransactions()).filter((t) => t.isin === isin);
+          const points = retailValueHistory(inst.retail, txs, from, to);
+          return json(200, points.map((p) => ({ isin, venue: "CALC", date: p.date, close: p.value, traded: true, currency: inst.currency, calculated: true })));
+        }
         const prices = await repo.queryPrices(isin, inst.venue, from, to);
         return json(200, prices.map(({ PK: _p, SK: _s, ...rest }) => rest));
       }

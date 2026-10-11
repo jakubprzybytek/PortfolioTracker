@@ -106,12 +106,13 @@ export function DashboardView() {
           <h2 data-testid="price-title">
             {selectedInst?.code ?? rows.find((h) => h.isin === selected)?.code ?? selected}{" "}
             <span className="muted" style={{ fontWeight: 400 }}>
-              {selectedInst?.name} · clean price, % of nominal
+              {selectedInst?.name}
+              {selectedInst?.type === "BOND_RETAIL" ? " · value per bond, PLN (calculated, nominal 100)" : selectedInst?.type === "BOND_LISTED" ? " · clean price, % of nominal" : ""}
               {selectedInst?.backfill && selectedInst.backfill.status !== "done" ? ` · history: ${selectedInst.backfill.status}` : ""}
             </span>
           </h2>
           <RangePicker value={priceRange} onChange={setPriceRange} testId="price-range" />
-          {prices.error ? <p className="error">{prices.error}</p> : <PriceChart prices={prices.data ?? []} transactions={transactions.data ?? []} />}
+          {prices.error ? <p className="error">{prices.error}</p> : <PriceChart prices={prices.data ?? []} transactions={transactions.data ?? []} calculated={selectedInst?.type === "BOND_RETAIL"} />}
         </>
       )}
 

@@ -45,9 +45,8 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
               <tr
                 key={r.isin}
                 className={r.isin === selected ? "selected" : ""}
-                // Retail bonds have no market prices to chart.
-                onClick={r.type === "BOND_RETAIL" ? undefined : () => setParams({ chart: r.isin === selected ? undefined : r.isin })}
-                style={{ cursor: r.type === "BOND_RETAIL" ? "default" : "pointer" }}
+                onClick={() => setParams({ chart: r.isin === selected ? undefined : r.isin })}
+                style={{ cursor: "pointer" }}
                 data-testid={`price-${r.code}`}
               >
                 <td className="left instrument">
@@ -99,11 +98,11 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             {sel?.code ?? selected}{" "}
             <span className="muted" style={{ fontWeight: 400 }}>
               {sel?.name}
-              {sel?.type === "BOND_LISTED" ? " · clean price, % of nominal" : ""}
+              {sel?.type === "BOND_LISTED" ? " · clean price, % of nominal" : sel?.type === "BOND_RETAIL" ? " · value per bond, PLN (calculated, nominal 100)" : ""}
             </span>
           </h2>
           <RangePicker value={range} onChange={setRange} testId="price-range" />
-          {prices.error ? <p className="error">{prices.error}</p> : <PriceChart prices={prices.data ?? []} transactions={txs.data ?? []} />}
+          {prices.error ? <p className="error">{prices.error}</p> : <PriceChart prices={prices.data ?? []} transactions={txs.data ?? []} calculated={sel?.type === "BOND_RETAIL"} />}
         </>
       )}
     </>

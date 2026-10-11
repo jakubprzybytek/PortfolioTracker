@@ -42,7 +42,7 @@ Kept deliberately short (a passive portfolio needs no daily statistics): what ea
 
 - **One row per held instrument** (latest snapshot), sorted by code; no filters.
 - **Columns:** instrument (code + name), type, price (bonds: clean, % of nominal; others: in their currency), price date (grey with a "stale" tag when older than a week), **1 year**: change since the price on or before the same day a year earlier (hover shows that price and date; "–" without a year of history).
-- **Retail bonds** aren't traded: price = this year's interest rate ("5,00 % p.a."), date = "calculated", 1 year = the previous year's rate. Their rows open no chart.
+- **Retail bonds** aren't traded: price = this year's interest rate ("5,00 % p.a."), date = "calculated", 1 year = the previous year's rate. Their chart shows the calculated value per bond of your lots (PLN, nominal 100, so it reads like % of nominal), from the first purchase; each new interest year changes the slope.
 - **Click a row:** its price chart opens below (range selector, transactions as markers); click again to close. The open chart is in the URL (`?chart=<ISIN>`).
 
 ## Transactions
@@ -61,7 +61,7 @@ All transactions from `GET /transactions`.
 | `GET /holdings` | `SNAP#LATEST` (holdings per account and instrument) |
 | `GET /portfolio/history?from&to` | `SNAP#<from>…<to>` (totals only) |
 | `GET /instruments` | instruments + backfill status |
-| `GET /instruments/{isin}/prices?from&to` | `PX#…` items |
+| `GET /instruments/{isin}/prices?from&to` | `PX#…` items; retail bonds: the daily calculated value per bond of your lots (`calculated: true`) |
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
 | `GET /prices` | held instruments: latest price + date, stale flag, price a year earlier and the change (`core/valuation/priceRows.ts`) |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |

@@ -80,6 +80,15 @@ describe(`API ${API}`, () => {
     expect(body.at(-1)).toMatchObject({ close: 87.92, traded: true, lastTradeDate: "2026-10-09" });
   });
 
+  it("GET /instruments/{isin}/prices gives a retail bond's calculated value per bond, from its purchase", async () => {
+    const { status, body } = await get<{ date: string; close: number; calculated?: boolean }[]>("/instruments/PL0000118402/prices?from=2025-09-01&to=2026-10-11");
+    expect(status).toBe(200);
+    expect(body[0]).toMatchObject({ date: "2025-09-15", close: 100, calculated: true }); // EDO0935 bought 2025-09-15
+    expect(body.find((p) => p.date === "2026-09-15")!.close).toBe(106); // year 1 at 6.00 %, capitalised
+    expect(body.at(-1)!.close).toBeGreaterThan(106);
+    expect(body.every((p, i) => i === 0 || p.close >= body[i - 1]!.close)).toBe(true);
+  });
+
   it("GET /holdings values the sample portfolio with accrued interest and IZ indexation", async () => {
     const snap = await waitFor(async () => {
       const r = await get<SnapshotItem>("/holdings");
