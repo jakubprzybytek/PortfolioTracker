@@ -42,11 +42,6 @@ declare module "sst" {
       "type": "sst.aws.Router"
       "url": string
     }
-    "TestClient": {
-      "id": string
-      "secret": string
-      "type": "sst.aws.CognitoUserPoolClient"
-    }
     "TestUser": {
       "clientId": string
       "email": string

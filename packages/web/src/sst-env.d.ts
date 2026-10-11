@@ -7,9 +7,8 @@
 interface ImportMetaEnv {
   readonly VITE_API_URL: string
   readonly VITE_APP_VERSION: string
-  readonly VITE_AUTH_AUTHORITY: string
+  readonly VITE_AUTH_USER_POOL_ID: string
   readonly VITE_AUTH_CLIENT_ID: string
-  readonly VITE_AUTH_LOGIN_DOMAIN: string
 }
 interface ImportMeta {
   readonly env: ImportMetaEnv
