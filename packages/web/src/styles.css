@@ -71,7 +71,9 @@ th, td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: r
 th:first-child, td:first-child, th.left, td.left { text-align: left; }
 th { cursor: pointer; user-select: none; color: var(--muted); font-weight: 500; }
 tbody tr:hover { background: var(--row); }
-tr.selected { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Selected row: accent bar on the left edge + light tint (works in light and dark mode). */
+tr.selected td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .flag { display: inline-block; font-size: 0.7rem; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--border); color: var(--muted); margin-left: 4px; }
 .range { display: flex; gap: 6px; margin-bottom: 8px; }
 .range button { border: 1px solid var(--border); background: transparent; color: var(--fg); padding: 4px 10px; border-radius: 6px; cursor: pointer; }
