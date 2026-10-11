@@ -1,9 +1,9 @@
 // HTTP API for the UI (see Docs/ui.md). Read-only. Every route needs a Cognito login (checked by API Gateway)
-// in the access group (checked here).
+// in one of the stage's access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import { addDays, today } from "@portfolio/core";
-import { hasGroup } from "../lib/access.ts";
+import { hasAnyGroup } from "../lib/access.ts";
 import { repo } from "../lib/context.ts";
 
 const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({
@@ -14,10 +14,11 @@ const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({
 
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 
-const ACCESS_GROUP = process.env["ACCESS_GROUP"] ?? "portfolio-tracker";
+/** Comma-separated, set per stage in sst.config.ts (accessGroups). */
+const ACCESS_GROUPS = (process.env["ACCESS_GROUPS"] ?? "portfolio-tracker").split(",");
 
 export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
-  if (!hasGroup(event.requestContext.authorizer?.jwt?.claims, ACCESS_GROUP)) return json(403, { error: "This account has no access" });
+  if (!hasAnyGroup(event.requestContext.authorizer?.jwt?.claims, ACCESS_GROUPS)) return json(403, { error: "This account has no access" });
   const route = event.routeKey; // e.g. "GET /holdings"
   const q = event.queryStringParameters ?? {};
   const isin = event.pathParameters?.["isin"];

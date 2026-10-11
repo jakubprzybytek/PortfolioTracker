@@ -20,3 +20,14 @@ export function groupsOf(claims: Claims): string[] {
 }
 
 export const hasGroup = (claims: Claims, group: string): boolean => groupsOf(claims).includes(group);
+
+/** True when the user is in at least one of `groups`. */
+export const hasAnyGroup = (claims: Claims, groups: string[]): boolean => groupsOf(claims).some((g) => groups.includes(g));
+
+/**
+ * Groups each stage's API accepts. prod: only real users. int/dev also accept the test user's group, whose
+ * password is stored in those stages' secrets; the test user therefore gets 403 on prod.
+ */
+export function accessGroups(stage: string): string[] {
+  return stage === "prod" ? ["portfolio-tracker"] : ["portfolio-tracker", "portfolio-tracker-test"];
+}

@@ -6,10 +6,10 @@
 const WARSAW = "Europe/Warsaw";
 
 // Login: the existing, shared Cognito user pool (AlbedoUserPool) and its hosted login page. Other apps use the
-// same pool and anyone can sign up to it, so the API also requires this group (Docs/ui.md, "Access").
+// same pool and anyone can sign up to it, so the API also requires a group, per stage (accessGroups;
+// Docs/ui.md, "Access").
 const COGNITO_POOL_ID = "eu-west-1_IVai0KEAA";
 const COGNITO_LOGIN_DOMAIN = "https://eu-west-1ivai0keaa.auth.eu-west-1.amazoncognito.com";
-const ACCESS_GROUP = "portfolio-tracker";
 const TEST_USER = "portfolio-tracker-test@albedoonline.com";
 
 // prod → portfoliotracker.albedoonline.com, any other stage → <stage>.portfoliotracker.albedoonline.com
@@ -27,6 +27,8 @@ export default $config({
     };
   },
   async run() {
+    const { accessGroups } = await import("./packages/jobs/src/lib/access.ts");
+
     // --- storage ---------------------------------------------------------------------------------
     // Three tables by lifecycle (Docs/data-storage.md): market data can be rebuilt, transactions can't,
     // holdings are computed by valuation.
@@ -122,7 +124,9 @@ export default $config({
     const pool = sst.aws.CognitoUserPool.get("Auth", COGNITO_POOL_ID);
     const clientName = (kind: string) => `portfolio-tracker-${$app.stage}-${kind}`;
 
-    // The site: authorization code + PKCE, no secret. Access token 1 h, refresh token 30 days.
+    // One client per stage. The site: authorization code + PKCE, no secret. Access token 1 h, refresh token
+    // 30 days. On int/dev the tests also log in with a password (USER_PASSWORD_AUTH); never on prod.
+    const testing = $app.stage !== "prod";
     const webClient = pool.addClient("WebClient", {
       callbackUrls: siteUrls,
       transform: {
@@ -131,7 +135,7 @@ export default $config({
           args.allowedOauthFlows = ["code"];
           args.allowedOauthScopes = ["openid", "email", "profile"];
           args.logoutUrls = siteUrls;
-          args.explicitAuthFlows = ["ALLOW_REFRESH_TOKEN_AUTH"];
+          args.explicitAuthFlows = testing ? ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_PASSWORD_AUTH"] : ["ALLOW_REFRESH_TOKEN_AUTH"];
           args.preventUserExistenceErrors = "ENABLED";
           args.enableTokenRevocation = true;
           args.accessTokenValidity = 1;
@@ -142,26 +146,10 @@ export default $config({
       },
     });
 
-    // Tests (int, dev only): password login without a browser, for the test user.
-    const testClient = $app.stage !== "prod"
-      ? pool.addClient("TestClient", {
-          transform: {
-            client: (args) => {
-              args.name = clientName("test");
-              args.allowedOauthFlowsUserPoolClient = false;
-              args.allowedOauthFlows = [];
-              args.allowedOauthScopes = [];
-              args.callbackUrls = [];
-              args.explicitAuthFlows = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"];
-              args.preventUserExistenceErrors = "ENABLED";
-            },
-          },
-        })
-      : undefined;
     // Read by the integration and E2E tests through `sst shell`: Resource.TestUser, Resource.TestUserPassword.
-    if (testClient) {
+    if (testing) {
       new sst.Secret("TestUserPassword");
-      new sst.Linkable("TestUser", { properties: { email: TEST_USER, clientId: testClient.id } });
+      new sst.Linkable("TestUser", { properties: { email: TEST_USER, clientId: webClient.id } });
     }
 
     // --- api + web -----------------------------------------------------------------------------
@@ -171,7 +159,7 @@ export default $config({
       name: "Cognito",
       jwt: {
         issuer: `https://cognito-idp.eu-west-1.amazonaws.com/${COGNITO_POOL_ID}`,
-        audiences: testClient ? [webClient.id, testClient.id] : [webClient.id],
+        audiences: [webClient.id],
       },
     });
     const auth = { auth: { jwt: { authorizer: authorizer.id } } };
@@ -180,7 +168,7 @@ export default $config({
       handler: "packages/jobs/src/handlers/api.handler",
       timeout: "30 seconds" as const,
       link: [...link, market, transactions, holdings],
-      environment: { ACCESS_GROUP },
+      environment: { ACCESS_GROUPS: accessGroups($app.stage).join(",") },
     };
     api.route("GET /holdings", apiHandler, auth);
     api.route("GET /portfolio/history", apiHandler, auth);
@@ -221,7 +209,7 @@ export default $config({
       backfillFunction: backfill.name,
       valuationFunction: valuation.name,
       authClientId: webClient.id,
-      ...(testClient ? { testClientId: testClient.id, testUser: TEST_USER } : {}),
+      ...(testing ? { testUser: TEST_USER } : {}),
     };
   },
 });

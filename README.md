@@ -48,7 +48,7 @@ Give someone access (once per person; works for every stage):
 aws cognito-idp admin-add-user-to-group --user-pool-id eu-west-1_IVai0KEAA --username <email> --group-name portfolio-tracker
 ```
 
-Tests log in as `portfolio-tracker-test@albedoonline.com` (in the group) through a password-login client that exists on `int` and `dev` only; its password is the SST secret `TestUserPassword` of those stages.
+Tests log in as `portfolio-tracker-test@albedoonline.com` with a password (allowed on the `int`/`dev` clients only); its password is the SST secret `TestUserPassword` of those stages. It's in the group `portfolio-tracker-test`, which only `int` and `dev` accept, so on `prod` it gets 403.
 
 ## Continuous delivery
 
