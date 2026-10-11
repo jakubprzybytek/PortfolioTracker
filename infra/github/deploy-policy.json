@@ -83,6 +83,20 @@
         "iam:CreateServiceLinkedRole"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "Auth",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:DescribeUserPool",
+        "cognito-idp:GetUserPoolMfaConfig",
+        "cognito-idp:ListTagsForResource",
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient",
+        "cognito-idp:DeleteUserPoolClient"
+      ],
+      "Resource": "arn:aws:cognito-idp:eu-west-1:198805281865:userpool/eu-west-1_IVai0KEAA"
     }
   ]
 }

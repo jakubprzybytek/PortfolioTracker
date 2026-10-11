@@ -60,13 +60,14 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - name: Deploy int
         run: npx sst deploy --stage int
+      # Inside `sst shell`: the tests log in as the stage's test user (Resource.TestUser, TestUserPassword).
       - name: Integration tests (API)
-        run: npm run test:integration
+        run: npx sst shell --stage int -- npm run test:integration
         env:
           API_URL: https://int.portfoliotracker.albedoonline.com/api
       - run: npx playwright install --with-deps chromium
       - name: E2E tests (UI)
-        run: npm run test:e2e
+        run: npx sst shell --stage int -- npm run test:e2e
         env:
           WEB_URL: https://int.portfoliotracker.albedoonline.com
       - uses: actions/upload-artifact@v4

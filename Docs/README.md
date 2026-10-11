@@ -38,7 +38,7 @@ S3 upload imports/… ──────────► Lambda import (Bossa / C
                                                                                                  │
 every job ──► S3 raw archive (sst.aws.Bucket, write-only originals)                              │
                                                                                                  │
-<stage>.portfoliotracker.albedoonline.com (sst.aws.Router/CloudFront)                                 │
+<stage>.portfoliotracker.albedoonline.com (sst.aws.Router/CloudFront)   login: Cognito (shared pool) │
    ├─ /*     ──► React UI (sst.aws.StaticSite)                                                  │
    └─ /api/* ──► sst.aws.ApiGatewayV2 ──► Lambda api ─────────────────────────────────────────┘
 ```

@@ -1,32 +1,43 @@
-// Integration tests run against the deployed `dev` stage (keep `npm run dev -- --stage dev` running,
-// or deploy with `npm run deploy -- --stage dev`). Outputs come from .sst/outputs.json or env vars.
+// Integration tests run against a deployed stage, inside `sst shell` so the stage's resources (bucket,
+// site URL, test user) are available:
+//   npx sst shell --stage dev -- npm run test:integration
+// API_URL overrides the API address (CI points it at the custom domain).
 
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { Resource } from "sst";
 
-interface Outputs {
-  api: string;
-  files: string;
-}
-
-function readOutputs(): Outputs {
-  const fromEnv = { api: process.env["API_URL"], files: process.env["FILES_BUCKET"] };
-  if (fromEnv.api && fromEnv.files) return fromEnv as Outputs;
-  const file = path.resolve(import.meta.dirname, "../../../../.sst/outputs.json");
+function resources() {
   try {
-    const json = JSON.parse(readFileSync(file, "utf8")) as Partial<Outputs>;
-    return { api: fromEnv.api ?? json.api!, files: fromEnv.files ?? json.files! };
+    return { files: Resource.Files.name, site: Resource.Router.url, user: Resource.TestUser, password: Resource.TestUserPassword.value };
   } catch (err) {
-    throw new Error(`No deployed stage found: set API_URL/FILES_BUCKET or run "npm run dev -- --stage dev" first (${(err as Error).message})`);
+    throw new Error(`Run the tests inside "npx sst shell --stage <stage> -- …" (${(err as Error).message})`);
   }
 }
 
-export const outputs = readOutputs();
-export const API = outputs.api.replace(/\/$/, "");
+const res = resources();
+export const outputs = { files: res.files };
+export const API = (process.env["API_URL"] ?? `${res.site.replace(/\/$/, "")}/api`).replace(/\/$/, "");
 
-export async function get<T = unknown>(path: string): Promise<{ status: number; body: T }> {
-  const res = await fetch(API + path);
+/** Logs the test user in through the test client (USER_PASSWORD_AUTH) and returns an access token. */
+async function login(): Promise<string> {
+  const r = await fetch("https://cognito-idp.eu-west-1.amazonaws.com/", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-amz-json-1.1", "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth" },
+    body: JSON.stringify({ AuthFlow: "USER_PASSWORD_AUTH", ClientId: res.user.clientId, AuthParameters: { USERNAME: res.user.email, PASSWORD: res.password } }),
+  });
+  const body = (await r.json()) as { AuthenticationResult?: { AccessToken: string }; message?: string };
+  if (!r.ok || !body.AuthenticationResult) throw new Error(`Test user login failed: ${body.message ?? r.status}`);
+  return body.AuthenticationResult.AccessToken;
+}
+let token: Promise<string> | undefined;
+
+/** GET with the test user's token; `{ auth: false }` sends none. */
+export async function get<T = unknown>(path: string, opts: { auth?: boolean; token?: string } = {}): Promise<{ status: number; body: T }> {
+  const headers: Record<string, string> = {};
+  if (opts.token) headers["Authorization"] = `Bearer ${opts.token}`;
+  else if (opts.auth !== false) headers["Authorization"] = `Bearer ${await (token ??= login())}`;
+  const res = await fetch(API + path, { headers });
   const text = await res.text();
   let body: T;
   try {

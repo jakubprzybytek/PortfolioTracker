@@ -56,4 +56,13 @@ All transactions from `GET /transactions`.
 
 The UI loads all transactions and filters them in the browser; at a few hundred to a few thousand rows that's one small request.
 
-Access: private use only. Simplest is a shared secret or IAM-signed requests; the choice is still open.
+## Access
+
+Login with Cognito; everything under `/api` needs it. The site's files are public (they hold no data); the app sends you to the login page until you're logged in.
+
+- **User pool:** the existing `AlbedoUserPool` (`eu-west-1_IVai0KEAA`), shared with other apps, and its hosted login page `https://eu-west-1ivai0keaa.auth.eu-west-1.amazoncognito.com`. SST only references it (`CognitoUserPool.get`) and adds clients; it never changes or deletes the pool.
+- **Clients per stage:** `portfolio-tracker-<stage>-web` for the site (authorization code + PKCE, no secret; callback and logout URL = the stage's site, plus `http://localhost:5173/` on `dev`; access/ID token 1 hour, refresh token 30 days) and, on `int` and `dev` only, `portfolio-tracker-<stage>-test` (password login without a browser, for the tests).
+- **API Gateway** (JWT authorizer) accepts only access tokens of this pool issued to those clients: a missing, expired or forged token gets **401**, and tokens from the other apps' clients are rejected too.
+- **Group:** the pool allows sign-up, so being able to log in isn't enough: the API Lambda also requires `cognito:groups` to contain **`portfolio-tracker`** and returns **403** otherwise ("This account has no access"). Members are added with the AWS CLI (README, "Login").
+- **In the browser** (`oidc-client-ts` + `react-oidc-context`): tokens in localStorage, renewed with the refresh token; the view you were on (`#/…`) survives the round trip to the login page. A 401 from the API starts a new login. "Log out" (in the menu) clears the tokens and ends the hosted-page session.
+- MFA is off in the pool (a pool-wide setting shared with the other apps).

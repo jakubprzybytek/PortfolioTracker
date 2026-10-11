@@ -10,6 +10,10 @@ declare module "sst" {
       "type": "sst.aws.ApiGatewayV2"
       "url": string
     }
+    "Auth": {
+      "id": string
+      "type": "sst.aws.CognitoUserPool"
+    }
     "Backfill": {
       "name": string
       "type": "sst.aws.Function"
@@ -38,6 +42,20 @@ declare module "sst" {
       "type": "sst.aws.Router"
       "url": string
     }
+    "TestClient": {
+      "id": string
+      "secret": string
+      "type": "sst.aws.CognitoUserPoolClient"
+    }
+    "TestUser": {
+      "clientId": string
+      "email": string
+      "type": "sst.sst.Linkable"
+    }
+    "TestUserPassword": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "Transactions": {
       "name": string
       "type": "sst.aws.Dynamo"
@@ -49,6 +67,11 @@ declare module "sst" {
     "Web": {
       "type": "sst.aws.StaticSite"
       "url": string
+    }
+    "WebClient": {
+      "id": string
+      "secret": string
+      "type": "sst.aws.CognitoUserPoolClient"
     }
   }
 }

@@ -26,3 +26,4 @@ playwright-report/
 
 # Real data converted from the spreadsheet (scripts/sheet-to-transactions.ts)
 data/private/
+packages/web/e2e/.auth/

@@ -118,6 +118,14 @@ describe(`API ${API}`, () => {
     expect(new Set(body.map((t) => t.account))).toEqual(new Set(["broker", "ike"]));
   });
 
+  it("requires a login: no token or a forged token gets 401", async () => {
+    for (const route of ["/holdings", "/transactions", "/status", `/instruments/${IZ}/prices`]) {
+      expect((await get(route, { auth: false })).status, route).toBe(401);
+    }
+    const forged = ["eyJhbGciOiJSUzI1NiJ9", "eyJzdWIiOiJ4IiwiY29nbml0bzpncm91cHMiOlsicG9ydGZvbGlvLXRyYWNrZXIiXX0", "c2ln"].join(".");
+    expect((await get("/holdings", { token: forged })).status).toBe(401);
+  });
+
   it("rejects bad input", async () => {
     expect((await get("/instruments/not-an-isin/prices")).status).toBe(400);
     expect((await get("/nope")).status).toBe(404);

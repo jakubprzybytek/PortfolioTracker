@@ -5,6 +5,13 @@
 
 const WARSAW = "Europe/Warsaw";
 
+// Login: the existing, shared Cognito user pool (AlbedoUserPool) and its hosted login page. Other apps use the
+// same pool and anyone can sign up to it, so the API also requires this group (Docs/ui.md, "Access").
+const COGNITO_POOL_ID = "eu-west-1_IVai0KEAA";
+const COGNITO_LOGIN_DOMAIN = "https://eu-west-1ivai0keaa.auth.eu-west-1.amazoncognito.com";
+const ACCESS_GROUP = "portfolio-tracker";
+const TEST_USER = "portfolio-tracker-test@albedoonline.com";
+
 // prod → portfoliotracker.albedoonline.com, any other stage → <stage>.portfoliotracker.albedoonline.com
 const ROOT_DOMAIN = "portfoliotracker.albedoonline.com";
 const stageDomain = (stage: string) => (stage === "prod" ? ROOT_DOMAIN : `${stage}.${ROOT_DOMAIN}`);
@@ -108,24 +115,81 @@ export default $config({
     new sst.aws.CronV2("ValuationEvening", { function: valuation.arn, schedule: "cron(30 22 ? * MON-FRI *)", timezone: WARSAW });
     new sst.aws.CronV2("ValuationMorning", { function: valuation.arn, schedule: "cron(30 7 ? * TUE-SAT *)", timezone: WARSAW });
 
+    // --- auth ----------------------------------------------------------------------------------
+    // One domain per stage: the site at "/", the API at "/api/*" (same origin, one certificate).
+    const domain = stageDomain($app.stage);
+    const siteUrls = [`https://${domain}/`, ...($app.stage === "dev" ? ["http://localhost:5173/"] : [])];
+    const pool = sst.aws.CognitoUserPool.get("Auth", COGNITO_POOL_ID);
+    const clientName = (kind: string) => `portfolio-tracker-${$app.stage}-${kind}`;
+
+    // The site: authorization code + PKCE, no secret. Access token 1 h, refresh token 30 days.
+    const webClient = pool.addClient("WebClient", {
+      callbackUrls: siteUrls,
+      transform: {
+        client: (args) => {
+          args.name = clientName("web");
+          args.allowedOauthFlows = ["code"];
+          args.allowedOauthScopes = ["openid", "email", "profile"];
+          args.logoutUrls = siteUrls;
+          args.explicitAuthFlows = ["ALLOW_REFRESH_TOKEN_AUTH"];
+          args.preventUserExistenceErrors = "ENABLED";
+          args.enableTokenRevocation = true;
+          args.accessTokenValidity = 1;
+          args.idTokenValidity = 1;
+          args.refreshTokenValidity = 30;
+          args.tokenValidityUnits = { accessToken: "hours", idToken: "hours", refreshToken: "days" };
+        },
+      },
+    });
+
+    // Tests (int, dev only): password login without a browser, for the test user.
+    const testClient = $app.stage !== "prod"
+      ? pool.addClient("TestClient", {
+          transform: {
+            client: (args) => {
+              args.name = clientName("test");
+              args.allowedOauthFlowsUserPoolClient = false;
+              args.allowedOauthFlows = [];
+              args.allowedOauthScopes = [];
+              args.callbackUrls = [];
+              args.explicitAuthFlows = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"];
+              args.preventUserExistenceErrors = "ENABLED";
+            },
+          },
+        })
+      : undefined;
+    // Read by the integration and E2E tests through `sst shell`: Resource.TestUser, Resource.TestUserPassword.
+    if (testClient) {
+      new sst.Secret("TestUserPassword");
+      new sst.Linkable("TestUser", { properties: { email: TEST_USER, clientId: testClient.id } });
+    }
+
     // --- api + web -----------------------------------------------------------------------------
     const api = new sst.aws.ApiGatewayV2("Api", { cors: true });
+    // API Gateway accepts only this pool's tokens issued to our clients; the Lambda checks the group.
+    const authorizer = api.addAuthorizer({
+      name: "Cognito",
+      jwt: {
+        issuer: `https://cognito-idp.eu-west-1.amazonaws.com/${COGNITO_POOL_ID}`,
+        audiences: testClient ? [webClient.id, testClient.id] : [webClient.id],
+      },
+    });
+    const auth = { auth: { jwt: { authorizer: authorizer.id } } };
     const apiHandler = {
       ...defaults,
       handler: "packages/jobs/src/handlers/api.handler",
       timeout: "30 seconds" as const,
       link: [...link, market, transactions, holdings],
+      environment: { ACCESS_GROUP },
     };
-    api.route("GET /holdings", apiHandler);
-    api.route("GET /portfolio/history", apiHandler);
-    api.route("GET /instruments", apiHandler);
-    api.route("GET /instruments/{isin}/prices", apiHandler);
-    api.route("GET /instruments/{isin}/transactions", apiHandler);
-    api.route("GET /transactions", apiHandler);
-    api.route("GET /status", apiHandler);
+    api.route("GET /holdings", apiHandler, auth);
+    api.route("GET /portfolio/history", apiHandler, auth);
+    api.route("GET /instruments", apiHandler, auth);
+    api.route("GET /instruments/{isin}/prices", apiHandler, auth);
+    api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
+    api.route("GET /transactions", apiHandler, auth);
+    api.route("GET /status", apiHandler, auth);
 
-    // One domain per stage: the site at "/", the API at "/api/*" (same origin, one certificate).
-    const domain = stageDomain($app.stage);
     const router = new sst.aws.Router("Router", { domain });
     router.route("/api", api.url, { rewrite: { regex: "^/api/(.*)$", to: "/$1" } });
     const publicApiUrl = $interpolate`https://${domain}/api`;
@@ -138,6 +202,9 @@ export default $config({
         // In `sst dev` the site runs on localhost, so it talks to API Gateway directly.
         VITE_API_URL: $dev ? api.url : publicApiUrl,
         VITE_APP_VERSION: process.env["APP_VERSION"] ?? `${$app.stage}-local`,
+        VITE_AUTH_AUTHORITY: `https://cognito-idp.eu-west-1.amazonaws.com/${COGNITO_POOL_ID}`,
+        VITE_AUTH_CLIENT_ID: webClient.id,
+        VITE_AUTH_LOGIN_DOMAIN: COGNITO_LOGIN_DOMAIN,
       },
       dev: { command: "npm run dev", title: "web" },
     });
@@ -153,6 +220,8 @@ export default $config({
       files: files.name,
       backfillFunction: backfill.name,
       valuationFunction: valuation.name,
+      authClientId: webClient.id,
+      ...(testClient ? { testClientId: testClient.id, testUser: TEST_USER } : {}),
     };
   },
 });
