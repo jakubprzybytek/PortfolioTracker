@@ -108,7 +108,8 @@ export default $config({
       retries: 2,
     });
     new sst.aws.CronV2("Monthly", {
-      function: { ...defaults, handler: "packages/jobs/src/handlers/monthly.handler" },
+      // Revalues when the Ministry publishes new retail-bond rates.
+      function: { ...defaults, handler: "packages/jobs/src/handlers/monthly.handler", link: [...link, market, valuation] },
       schedule: "cron(0 10 16 * ? *)",
       timezone: WARSAW,
       retries: 2,

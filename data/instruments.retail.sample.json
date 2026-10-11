@@ -1,0 +1,11 @@
+[
+  {
+    "isin": "PL0000118402",
+    "code": "EDO0935",
+    "name": "Obligacje skarbowe EDO0935 (emerytalne 10-letnie)",
+    "type": "BOND_RETAIL",
+    "currency": "PLN",
+    "venue": "CALC",
+    "terms": "mf-retail"
+  }
+]

@@ -24,8 +24,16 @@ describe(`API ${API}`, () => {
       const run = r.body.jobs["import"];
       return run?.status === "ok" && run.note?.includes(mfKey) ? true : undefined;
     }, 180_000);
+    // 1b. Ministry retail-bond file — retail instruments ("mf-retail") need it first.
+    const retailKey = await uploadImport("mf-retail", "obligacje-detaliczne.xls", readFileSync(path.join(repoRoot, "packages/core/test/fixtures/obligacje-detaliczne-2026-10.xls")));
+    await waitFor(async () => {
+      const r = await get<{ jobs: Record<string, { status: string; note?: string } | null> }>("/status");
+      const run = r.body.jobs["import"];
+      return run?.status === "ok" && run.note?.includes(retailKey) ? true : undefined;
+    }, 180_000);
     // 2. Instruments: starts the GPW history backfill; wait for it so the valuation sees prices and names.
     await uploadImport("instruments", "instruments.json", readFileSync(path.join(repoRoot, "data/instruments.json")));
+    await uploadImport("instruments", "retail.json", readFileSync(path.join(repoRoot, "data/instruments.retail.sample.json")));
     await waitFor(async () => {
       const inst = await get<InstrumentOut[]>("/instruments");
       const ok = inst.status === 200 && [IZ, DS].every((i) => inst.body.find((x) => x.isin === i)?.backfill?.status === "done");
@@ -38,7 +46,7 @@ describe(`API ${API}`, () => {
       if (r.status !== 200) return undefined;
       const codes = new Set(r.body.holdings.map((h) => h.code));
       const clean = r.body.holdings.every((h) => !h.flags.includes("unknown_instrument") && !h.flags.includes("no_price"));
-      return codes.has("DS0432") && codes.has("IZ0836") && clean ? true : undefined;
+      return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && clean ? true : undefined;
     }, 180_000);
   });
 
@@ -72,17 +80,21 @@ describe(`API ${API}`, () => {
   it("GET /holdings values the sample portfolio with accrued interest and IZ indexation", async () => {
     const snap = await waitFor(async () => {
       const r = await get<SnapshotItem>("/holdings");
-      return r.status === 200 && r.body.holdings.length >= 3 ? r.body : undefined;
+      return r.status === 200 && r.body.holdings.length >= 4 ? r.body : undefined;
     });
     expect(snap.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     // one holding per account and instrument, sorted by account then code
-    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["broker/DS0432", "broker/IZ0836", "ike/DS0432"]);
+    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["broker/DS0432", "broker/IZ0836", "ike/DS0432", "ike/EDO0935"]);
     const by = Object.fromEntries(snap.holdings.map((h) => [`${h.account}/${h.code}`, h])) as Record<string, HoldingSnapshot>;
     expect(by["broker/DS0432"]).toMatchObject({ quantity: 20, nominal: 1000, cost: 15931.8, couponsReceived: 700 });
     expect(by["broker/IZ0836"]).toMatchObject({ quantity: 10, cost: 9561.54, couponsReceived: 214.2 });
     expect(by["ike/DS0432"]).toMatchObject({ quantity: 5, cost: 4013.01, couponsReceived: 0 });
     expect(by["broker/IZ0836"]!.nominal!).toBeGreaterThan(1100);
-    for (const h of snap.holdings) {
+    // Retail bond: valued from the Ministry's rates (6.00 % in year 1, 5.00 % from 2026-09-15), no market price.
+    const edo = by["ike/EDO0935"]!;
+    expect(edo).toMatchObject({ type: "BOND_RETAIL", quantity: 10, cost: 1000, cleanPrice: null, flags: [], rate: { current: 0.05, previous: 0.06 } });
+    expect(edo.valuePerUnit!).toBeGreaterThan(106); // 100 + 6.00 after year 1, plus year-2 interest so far
+    for (const h of snap.holdings.filter((x) => x.type !== "BOND_RETAIL")) {
       expect(h.cleanPrice).not.toBeNull();
       expect(h.accruedInterest).not.toBeNull();
       expect(h.value).toBeCloseTo(h.valuePerUnit! * h.quantity, 1);
@@ -110,7 +122,7 @@ describe(`API ${API}`, () => {
   it("GET /transactions lists all transactions newest first, with their instrument", async () => {
     const { status, body } = await get<{ date: string; account: string; type: string; isin?: string; instrument: { code: string; type: string } | null }[]>("/transactions");
     expect(status).toBe(200);
-    expect(body).toHaveLength(8);
+    expect(body).toHaveLength(9);
     const dates = body.map((t) => t.date);
     expect(dates).toEqual([...dates].sort().reverse());
     expect(body[0]).toMatchObject({ date: "2026-05-15", account: "ike", type: "BUY", instrument: { code: "DS0432", type: "BOND_LISTED" } });
@@ -119,10 +131,11 @@ describe(`API ${API}`, () => {
   });
 
   it("GET /prices lists held instruments with their latest price, its date and the 1-year change", async () => {
-    const { status, body } = await get<{ code: string; price: number | null; priceDate: string | null; stale: boolean; change1y: number | null; yearAgo: { date: string } | null }[]>("/prices");
+    const { status, body } = await get<{ code: string; price: number | null; priceDate: string | null; stale: boolean; change1y: number | null; yearAgo: { date: string } | null; rate?: unknown }[]>("/prices");
     expect(status).toBe(200);
-    expect(body.map((r) => r.code)).toEqual(["DS0432", "IZ0836"]);
-    for (const r of body) {
+    expect(body.map((r) => r.code)).toEqual(["DS0432", "EDO0935", "IZ0836"]);
+    expect(body.find((r) => r.code === "EDO0935")).toMatchObject({ price: null, rate: { current: 0.05, previous: 0.06 } });
+    for (const r of body.filter((x) => x.code !== "EDO0935")) {
       expect(r.price).toBeGreaterThan(50);
       expect(r.priceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(typeof r.change1y).toBe("number"); // both have more than a year of GPW history

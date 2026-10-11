@@ -1,9 +1,11 @@
-// Monthly job: extend the IZ reference index with the latest GUS CPI m/m and cross-check
-// the current month's index ratio against the Ministry of Finance page.
+// Monthly job: extend the IZ reference index with the latest GUS CPI m/m, cross-check the current month's
+// index ratio against the Ministry of Finance page, and refresh the retail-bond rates from the Ministry file.
 
 import { buildReferenceIndex, indexRatioAt, shiftMonth, toReferenceIndex, today } from "@portfolio/core";
 import { Resource } from "sst";
-import { repo, runJob } from "../lib/context.ts";
+import { archiveRaw, invokeAsync, repo, runJob } from "../lib/context.ts";
+import { fetchRetailFile } from "../lib/mfRetail.ts";
+import { importRetailRates } from "./import.ts";
 import { fetchGusCpiMonthOnMonth } from "../lib/gus.ts";
 import { fetchMfIndexRatios } from "../lib/mfPage.ts";
 
@@ -49,6 +51,19 @@ export async function handler() {
       notes.push(`${bond.code}: ${theirs.size} MF ratios checked, ${mismatches.length} mismatches${mismatches.length ? " " + JSON.stringify(mismatches.slice(0, 3)) : ""}`);
       if (mismatches.length > 0) console.error(`${bond.code}: index ratio mismatch vs MF`, mismatches);
     }
+    // 3. Retail bonds: newly published rates (a series' new interest year) → refresh and revalue the history.
+    try {
+      const { url, content } = await fetchRetailFile();
+      const day = today();
+      await archiveRaw("mf-retail", day, "Dane_dotyczace_obligacji_detalicznych.xls", content);
+      const r = await importRetailRates(content, url);
+      itemsWritten += r.series + r.refreshed;
+      notes.push(`retail: ${r.series} series, ${r.refreshed} instruments refreshed`);
+      if (r.refreshed > 0) await invokeAsync(Resource.Valuation.name, { reason: "retail-rates" });
+    } catch (err) {
+      notes.push(`retail file failed: ${(err as Error).message}`);
+    }
+
     return { itemsWritten, note: notes.join("; ") };
   });
 }

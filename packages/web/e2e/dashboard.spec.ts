@@ -30,7 +30,7 @@ test.describe("dashboard", () => {
 
   test("sorts the table by clicking a header", async ({ page }) => {
     const firstCode = () => page.getByTestId("holdings-table").locator("tbody tr").first().locator("td").first().locator("strong").textContent();
-    await expect(page.getByTestId("holdings-table").locator("tbody tr")).toHaveCount(2);
+    await expect(page.getByTestId("holdings-table").locator("tbody tr")).toHaveCount(3); // DS0432, EDO0935 (retail), IZ0836
     await page.getByRole("columnheader", { name: /^Instrument/ }).click();
     expect(await firstCode()).toBe("DS0432");
     await page.getByRole("columnheader", { name: /^Instrument/ }).click();

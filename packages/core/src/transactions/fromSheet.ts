@@ -3,6 +3,8 @@
 // knows (by code); everything else is reported as skipped, with the reason.
 
 import * as XLSX from "xlsx";
+import type { InstrumentInput } from "../instruments/schema.ts";
+import type { RetailTerms } from "../mf/retailRates.ts";
 import { transactionId, type TransactionInput } from "./schema.ts";
 
 /** One row of "Transakcje" (columns A–N). */
@@ -41,6 +43,43 @@ export interface SkippedRow {
 export interface SheetConversion {
   transactions: TransactionInput[];
   skipped: SkippedRow[];
+  /** Retail bond series the transactions use: instruments to import (terms resolved from the Ministry file). */
+  retailInstruments: InstrumentInput[];
+}
+
+const RETAIL_LABELS: Record<string, string> = {
+  EDO: "emerytalne 10-letnie",
+  COI: "indeksowane 4-letnie",
+  ROD: "rodzinne 12-letnie",
+  ROS: "rodzinne 6-letnie",
+  TOS: "stałoprocentowe 3-letnie",
+  ROR: "roczne",
+  DOR: "dwuletnie",
+};
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const addMonthsIso = (date: string, months: number): string => {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  const t = new Date(Date.UTC(y, m - 1 + months, 1));
+  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${t.getUTCFullYear()}-${pad2(t.getUTCMonth() + 1)}-${pad2(Math.min(d, last))}`;
+};
+
+/**
+ * The sheet's retail tickers → series and interest start date. "EDO-110332" = EDO bought on 11.03 maturing in
+ * 2032 → series EDO0332, interest from 2022-03-11 (maturity minus the term). Series-style tickers ("ROR0623")
+ * start on the transaction date.
+ */
+export function retailLot(ticker: string, txDate: string, series: Map<string, RetailTerms>): { terms: RetailTerms; valueDate: string } | undefined {
+  const dated = /^([A-Z]{3})-(\d{2})(\d{2})(\d{2})$/.exec(ticker);
+  if (dated) {
+    const [, kind, dd, mm, yy] = dated;
+    const terms = series.get(`${kind}${mm}${yy}`);
+    if (!terms) return undefined;
+    return { terms, valueDate: addMonthsIso(`20${yy}-${mm}-${dd}`, -terms.termMonths) };
+  }
+  const terms = series.get(ticker);
+  return terms ? { terms, valueDate: txDate } : undefined;
 }
 
 const CASH_CLASS = "Gotówka";
@@ -67,9 +106,14 @@ const round = (v: number, digits: number) => Math.round(v * 10 ** digits) / 10 *
 /**
  * @param instruments the app's instruments: code → ISIN and nominal (e.g. from data/instruments.json + bond terms)
  */
-export function convertSheetRows(rows: SheetRow[], instruments: Map<string, { isin: string; nominal?: number }>): SheetConversion {
+export function convertSheetRows(
+  rows: SheetRow[],
+  instruments: Map<string, { isin: string; nominal?: number }>,
+  retailSeries: Map<string, RetailTerms> = new Map(),
+): SheetConversion {
   const transactions: TransactionInput[] = [];
   const skipped: SkippedRow[] = [];
+  const retailUsed = new Map<string, RetailTerms>();
   const skip = (r: SheetRow, reason: string) => skipped.push({ row: r.row, date: r.date, account: r.account, ticker: r.ticker, type: r.type, reason });
 
   for (const r of rows) {
@@ -80,6 +124,21 @@ export function convertSheetRows(rows: SheetRow[], instruments: Map<string, { is
       if (!m) skip(r, `cash: unsupported type "${r.type}"`);
       else if (r.currency !== "PLN") skip(r, `cash in ${r.currency}: not supported`);
       else transactions.push({ date: r.date, account: r.account, type: m.type, amount: round(m.sign * r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
+      continue;
+    }
+
+    // Retail treasury bonds: valued from the Ministry's published rates, per lot (valueDate).
+    const lot = r.assetClass === "Obligacje skarbowe polskie" && !instruments.has(r.ticker) ? retailLot(r.ticker, r.date, retailSeries) : undefined;
+    if (lot) {
+      retailUsed.set(lot.terms.series, lot.terms);
+      const isin = lot.terms.isin;
+      if (r.type === "Zakup")
+        transactions.push({ date: r.date, account: r.account, type: "BUY", isin, quantity: r.quantity, price: r.price, amount: -round(r.totalPln - r.fee, 2), fee: r.fee, valueDate: lot.valueDate, currency: "PLN", ...(note ? { note } : {}) });
+      else if (r.type === "Sprzedaż")
+        transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: r.price, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+      else if (r.type === "Dywidenda / Odsetki")
+        transactions.push({ date: r.date, account: r.account, type: "COUPON", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
+      else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
       continue;
     }
 
@@ -121,7 +180,21 @@ export function convertSheetRows(rows: SheetRow[], instruments: Map<string, { is
     seen.set(base, n);
     t.id = n === 1 ? base : `${base}-${n}`;
   }
-  return { transactions, skipped };
+  const retailInstruments: InstrumentInput[] = [...retailUsed.values()]
+    .sort((a, b) => a.series.localeCompare(b.series))
+    .map((t) => ({
+      isin: t.isin,
+      code: t.series,
+      name: `Obligacje skarbowe ${t.series} (${RETAIL_LABELS[t.kind] ?? t.kind})`,
+      type: "BOND_RETAIL",
+      currency: "PLN",
+      venue: "CALC",
+      sourceIds: {},
+      active: true,
+      live: false,
+      terms: "mf-retail",
+    }));
+  return { transactions, skipped, retailInstruments };
 }
 
 const SHEET_NAME = "Transakcje";

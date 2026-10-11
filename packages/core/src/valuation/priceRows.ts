@@ -1,5 +1,6 @@
 // Rows of the Prices view (Docs/ui.md): latest price of each held instrument, how old it is, and the change
-// over a year. Bonds: clean price in % of nominal.
+// over a year. Bonds: clean price in % of nominal. Retail bonds have no market price: their row shows the
+// current period's interest rate and the previous one instead (`rate`).
 
 import type { IsoDate } from "../dates.ts";
 import type { InstrumentItem, PriceItem } from "../db/items.ts";
@@ -17,6 +18,8 @@ export interface PriceRow {
   /** Price on or before the same day a year earlier, and the change since (fraction, e.g. 0.021). */
   yearAgo: { date: IsoDate; price: number } | null;
   change1y: number | null;
+  /** Retail bonds: annual rate now and in the previous period (instead of a price). */
+  rate?: { current: number; previous: number | null };
 }
 
 const daysBetween = (a: IsoDate, b: IsoDate) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -27,9 +30,14 @@ export function priceRows(
   yearAgo: Map<string, PriceItem>,
   today: IsoDate,
   staleAfterDays = 7,
+  rates: Map<string, { current: number; previous: number | null }> = new Map(),
 ): PriceRow[] {
   return instruments
     .map((i): PriceRow => {
+      if (i.type === "BOND_RETAIL") {
+        const rate = rates.get(i.isin);
+        return { isin: i.isin, code: i.code, name: i.name, type: i.type, currency: i.currency, price: null, priceDate: null, stale: false, yearAgo: null, change1y: null, ...(rate ? { rate } : {}) };
+      }
       const now = latest.get(i.isin);
       const then = yearAgo.get(i.isin);
       return {

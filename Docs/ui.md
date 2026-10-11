@@ -40,6 +40,7 @@ Kept deliberately short (a passive portfolio needs no daily statistics): what ea
 
 - **One row per held instrument** (latest snapshot), sorted by code; no filters.
 - **Columns:** instrument (code + name), type, price (bonds: clean, % of nominal; others: in their currency), price date (grey with a "stale" tag when older than a week), **1 year**: change since the price on or before the same day a year earlier (hover shows that price and date; "–" without a year of history).
+- **Retail bonds** aren't traded: price = this year's interest rate ("5,00 % p.a."), date = "calculated", 1 year = the previous year's rate. Their rows open no chart.
 - **Click a row:** its price chart opens below (range selector, transactions as markers); click again to close. The open chart is in the URL (`?chart=<ISIN>`).
 
 ## Transactions

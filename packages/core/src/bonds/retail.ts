@@ -6,7 +6,7 @@
 // Check the results against the Ministry's interest tables (obligacjeskarbowe.pl) before relying on them.
 
 import { addDays, daysBetween, type IsoDate } from "../dates.ts";
-import { round2 } from "./izIndex.ts";
+import type { RetailTerms } from "../mf/retailRates.ts";
 
 export interface RetailBondSeries {
   series: string; // e.g. EDO0936
@@ -29,7 +29,7 @@ export interface RetailRatePeriod {
   start: IsoDate;
   end: IsoDate;
   rate: number;
-  basis: "FIXED" | "CPI+margin" | "unknown";
+  basis: "FIXED" | "CPI+margin" | "PUBLISHED" | "unknown";
   cpiMonth?: string;
 }
 
@@ -85,25 +85,70 @@ export interface RetailBondValue {
   problem?: "before_purchase" | "matured" | "unknown_rate";
 }
 
-/** Value of one retail bond on `date`. Interest accrues daily, ACT/ACT within each period. */
+/** Rounds to the grosz, immune to binary noise (100 × 6.3 % / 12 = 0.525 must give 0.53, not 0.52). */
+export const grosz = (x: number): number => Math.round(Number((x * 100).toPrecision(12))) / 100;
+
+/**
+ * Value of one retail bond on `date`, the way the Ministry computes it (checked against every fully published
+ * series in its file):
+ *   - a period earns base × annual rate × months/12 (ROR0623 month 1: 100 × 5.25 % / 12 = 0.44);
+ *   - capitalising series (EDO, ROD, ROS, TOS) compound unrounded and round only the amount shown;
+ *     payout series (COI, ROR, DOR) pay each period's interest rounded to the grosz;
+ *   - within a period, interest accrues by days elapsed / days in the period.
+ */
 export function valueRetailBond(series: RetailBondSeries, periods: RetailRatePeriod[], date: IsoDate): RetailBondValue {
   if (date < series.purchaseDate) return { base: series.nominal, accrued: 0, value: series.nominal, paidOut: 0, problem: "before_purchase" };
+  const months = series.periodMonths ?? 12;
   let base = series.nominal;
   let paidOut = 0;
   for (const p of periods) {
+    const periodInterest = base * p.rate * (months / 12);
     if (date >= p.end) {
-      const interest = base * p.rate * (daysBetween(p.start, p.end) / daysBetween(p.start, addMonths(p.start, 12)));
-      if (series.capitalises) base = round2(base + interest);
-      else paidOut += interest;
+      if (series.capitalises) base += periodInterest;
+      else paidOut += grosz(periodInterest);
       continue;
     }
-    const fraction = daysBetween(p.start, date) / daysBetween(p.start, addMonths(p.start, 12));
-    const accrued = round2(base * p.rate * fraction);
-    const result: RetailBondValue = { base, accrued, value: round2(base + accrued), paidOut: round2(paidOut), period: p };
+    const elapsed = daysBetween(p.start, date) / daysBetween(p.start, p.end);
+    const accrued = series.capitalises ? base * p.rate * (months / 12) * elapsed : grosz(periodInterest) * elapsed;
+    const result: RetailBondValue = { base: grosz(base), accrued: grosz(accrued), value: grosz(base + accrued), paidOut: grosz(paidOut), period: p };
     if (p.basis === "unknown") result.problem = "unknown_rate";
     return result;
   }
-  return { base, accrued: 0, value: base, paidOut: round2(paidOut), problem: "matured" };
+  return { base: grosz(base), accrued: 0, value: grosz(base), paidOut: grosz(paidOut), problem: "matured" };
+}
+
+/** One lot of a series: its terms from the Ministry file, interest starting on `valueDate` (the purchase date). */
+export function lotSeries(terms: RetailTerms, valueDate: IsoDate): RetailBondSeries {
+  return {
+    series: terms.series,
+    kind: terms.kind,
+    nominal: 100,
+    purchaseDate: valueDate,
+    maturity: addMonths(valueDate, terms.termMonths),
+    firstRate: terms.rates[0] ?? 0,
+    ...(terms.margin !== undefined ? { margin: terms.margin } : {}),
+    capitalises: terms.capitalises,
+    periodMonths: terms.periodMonths,
+  };
+}
+
+/** Periods with the rates the Ministry published; a period not published yet keeps the last rate, as "unknown". */
+export function publishedRatePeriods(series: RetailBondSeries, rates: readonly (number | null)[]): RetailRatePeriod[] {
+  const months = series.periodMonths ?? 12;
+  const periods: RetailRatePeriod[] = [];
+  let lastRate = rates[0] ?? series.firstRate;
+  for (let i = 0, start = series.purchaseDate; start < series.maturity; i++) {
+    const next = addMonths(series.purchaseDate, months * (i + 1));
+    const end = next <= series.maturity ? next : series.maturity;
+    const rate = rates[i];
+    if (rate === null || rate === undefined) periods.push({ start, end, rate: lastRate, basis: "unknown" });
+    else {
+      lastRate = rate;
+      periods.push({ start, end, rate, basis: "PUBLISHED" });
+    }
+    start = end;
+  }
+  return periods;
 }
 
 /** Yesterday's value is often what the bank shows; convenience for tests and checks. */

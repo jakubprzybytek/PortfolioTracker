@@ -18,6 +18,8 @@ export const TransactionInput = z.object({
   /** Signed cash effect: negative = money out (buys, fees), positive = money in (sells, coupons). */
   amount: z.number(),
   fee: z.number().nonnegative().optional(),
+  /** Retail bonds: when interest starts (the purchase date), if not the transaction date. */
+  valueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   currency: z.string().length(3).default("PLN"),
   note: z.string().optional(),
 });
@@ -29,7 +31,8 @@ export const TransactionFile = z.array(TransactionInput);
 export function transactionId(t: z.output<typeof TransactionInput>): string {
   if (t.id) return t.id;
   const h = createHash("sha256");
-  h.update([t.date, t.account, t.type, t.isin ?? "", t.quantity ?? "", t.amount, t.currency].join("|"));
+  // valueDate only when present, so ids of existing rows don't change.
+  h.update([t.date, t.account, t.type, t.isin ?? "", t.quantity ?? "", t.amount, t.currency, ...(t.valueDate ? [t.valueDate] : [])].join("|"));
   return h.digest("hex").slice(0, 16);
 }
 

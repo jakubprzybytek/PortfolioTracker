@@ -10,4 +10,5 @@ export const FIXTURES = {
   izHistory: "iz0836_to_2026-10-10_obligacje.xls",
   day20261009: "_2026-10-09_obligacje.xls",
   mfCalculator: "kalkulatorodsetek.xlsm",
+  mfRetail: "obligacje-detaliczne-2026-10.xls",
 } as const;

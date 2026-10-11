@@ -67,6 +67,7 @@ First-time data load (see [data/README.md](data/README.md)):
 ```sh
 BUCKET=$(node -p "require('./.sst/outputs.json').files")
 aws s3 cp <kalkulatorodsetek.xlsm> s3://$BUCKET/imports/mf-calculator/kalkulatorodsetek.xlsm   # MF reference index + bond terms
+aws s3 cp <Dane_dotyczace_obligacji_detalicznych.xls> s3://$BUCKET/imports/mf-retail/retail.xls # retail bond series + rates
 aws s3 cp data/instruments.json  s3://$BUCKET/imports/instruments/instruments.json              # starts GPW history backfill
 aws s3 cp <transactions.json>    s3://$BUCKET/imports/transactions/2026-10.json                 # triggers valuation
 ```
@@ -92,6 +93,6 @@ WEB_URL=https://dev.portfoliotracker.albedoonline.com npx sst shell --stage dev 
 | `eod-gpw` | 18:30 Mon–Fri | GPW all-bonds XLS for today + any day missing in the last 14 days |
 | `eod-gpw` (recheck) | 07:15 Tue–Sat | re-fetches yesterday, marks prices final |
 | `valuation` | 22:30, 07:30 | daily snapshot (positions × prices + accrued interest) |
-| `monthly` | 16th 10:00 | CPI → IZ reference index; cross-check against the Ministry of Finance page |
+| `monthly` | 16th 10:00 | CPI → IZ reference index; cross-check against the Ministry of Finance page; retail-bond rates from the Ministry file (revalues when a rate changes) |
 | `import` | on S3 upload to `imports/` | instruments, transactions, MF calculator |
 | `backfill` | on new instrument, or manual invoke `{ "isin": "…" }` | full GPW history |

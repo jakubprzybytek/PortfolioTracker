@@ -20,6 +20,12 @@ describe("priceRows", () => {
     expect(rows[1]).toMatchObject({ price: 87.92, stale: true, yearAgo: null, change1y: null }); // 21 days old, no history a year back
   });
 
+  it("shows retail bonds with their rates instead of a price", () => {
+    const edo = { ...inst("PL0000114518", "EDO0332"), type: "BOND_RETAIL", venue: "CALC" } as InstrumentItem;
+    const [row] = priceRows([edo], new Map(), new Map(), "2026-10-11", 7, new Map([["PL0000114518", { current: 0.0345, previous: 0.0655 }]]));
+    expect(row).toMatchObject({ code: "EDO0332", price: null, stale: false, rate: { current: 0.0345, previous: 0.0655 } });
+  });
+
   it("marks an instrument without any price", () => {
     const [row] = priceRows([inst("PL0000113783", "DS0432")], new Map(), new Map(), "2026-10-11");
     expect(row).toMatchObject({ price: null, priceDate: null, stale: true, change1y: null });

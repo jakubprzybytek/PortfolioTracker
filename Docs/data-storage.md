@@ -126,13 +126,13 @@ PK = INST#<ISIN>            SK = BACKFILL
 
 `status` (`pending` / `running` / `done` / `no_history` / `failed`), `source`, `from`, `to`, `rows`, `updated_at`, `note`. Written by the `backfill` and `import` Lambdas; shown in the UI.
 
-### Retail bond rate periods
+### Retail bond series
 
 ```
-PK = SERIES#<series>        SK = RATE#<period_start>
+PK = SERIES#<series>        SK = META        (e.g. SERIES#EDO0332)
 ```
 
-`period_start`, `period_end`, `rate`, `basis` (`FIXED` / `CPI+margin`), `cpi_ref` (month used).
+Every series of the Ministry retail-bond file (~990 items): `isin`, `kind`, `termMonths`, `periodMonths`, `capitalises`, `rates` (per period, `null` = not published yet), `margin`, `rolloverPrice`, `publishedInterest`, `saleStart`/`saleEnd`, `source`. Rewritten on every import of the file. A retail instrument (`type = BOND_RETAIL`, `venue = CALC`, no prices) carries a copy of its series in `retail`, refreshed by the same import; valuation reads only the instrument.
 
 ### Macro series
 
@@ -174,7 +174,8 @@ GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
 
 `type`, `isin`, `quantity`, `price`, `amount`, `fee`, `currency`, `fx_rate`, `note`, `source`.
 
-`type`: `BUY`, `SELL`, `DIVIDEND`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`.
+`type`: `BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`.
+`valueDate` (optional): retail bonds, when interest starts if not the transaction date. Retail positions are valued per lot (each buy; sales take the oldest lots first).
 `tx_id` is deterministic (broker id, or a hash of the row), so imports can be re-run safely. `GSI1` lists all transactions across accounts in date order, which is what valuation replays.
 
 ### Later: settings you enter

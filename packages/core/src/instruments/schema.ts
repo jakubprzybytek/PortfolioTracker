@@ -34,8 +34,11 @@ export const InstrumentInput = z.object({
   sourceIds: z.record(z.string(), z.string()).default({}),
   active: z.boolean().default(true),
   live: z.boolean().default(false),
-  /** "mf" = look the terms up in the imported MF calculator data by `code`. */
-  terms: z.union([z.literal("mf"), BondTermsInput]).optional(),
+  /**
+   * "mf" = look the terms up in the imported MF calculator data by `code` (treasury bonds on GPW);
+   * "mf-retail" = the retail series `code` (e.g. EDO0332) from the imported Ministry retail-bond file.
+   */
+  terms: z.union([z.literal("mf"), z.literal("mf-retail"), BondTermsInput]).optional(),
 });
 export type InstrumentInput = z.output<typeof InstrumentInput>;
 

@@ -3,6 +3,7 @@ import { dirtyValue, valueBond } from "../bonds/accrued.ts";
 import type { ReferenceIndex } from "../bonds/izIndex.ts";
 import type { CouponRateItem, HoldingSnapshot, InstrumentItem, PriceItem, SnapshotItem, TransactionItem } from "../db/items.ts";
 import { positionsAt } from "./positions.ts";
+import { retailLotsAt, valueRetailLots } from "./retailLots.ts";
 import { round2 } from "../bonds/izIndex.ts";
 
 export interface ValuationContext {
@@ -42,6 +43,29 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       couponsReceived: round2(p.couponsReceived),
     };
     if (!inst) flags.push("unknown_instrument");
+
+    // Retail treasury bonds: no market price; value = Σ lots × nominal with interest (published rates).
+    if (inst?.type === "BOND_RETAIL") {
+      if (!inst.retail) flags.push("missing_terms");
+      const lots = retailLotsAt(ctx.transactions.filter((t) => t.account === p.account && t.isin === p.isin), date);
+      const r = inst.retail ? valueRetailLots(inst.retail, lots, date) : undefined;
+      const value = r ? r.value : null;
+      const gain = value === null ? null : round2(value - p.cost);
+      holdings.push({
+        ...base,
+        cleanPrice: null,
+        priceDate: null,
+        nominal: r?.nominal ?? null,
+        accruedInterest: r?.accruedInterest ?? null,
+        valuePerUnit: r && r.quantity ? round2(r.value / r.quantity) : null,
+        value,
+        gain,
+        gainPct: gain === null || p.cost === 0 ? null : round2((gain / p.cost) * 100),
+        flags: [...flags, ...(r?.flags ?? [])],
+        ...(r?.rate ? { rate: r.rate } : {}),
+      });
+      continue;
+    }
 
     const price = ctx.prices.get(p.isin);
     if (!price) flags.push("no_price");

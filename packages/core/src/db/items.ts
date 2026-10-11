@@ -2,6 +2,7 @@
 
 import type { IsoDate } from "../dates.ts";
 import type { BondTerms } from "../bonds/terms.ts";
+import type { RetailTerms } from "../mf/retailRates.ts";
 
 export type InstrumentType = "BOND_LISTED" | "BOND_RETAIL" | "ETF" | "BOND_IBKR" | "FUND_MANUAL" | "CASH";
 
@@ -20,6 +21,16 @@ export interface InstrumentItem {
   active: boolean;
   live: boolean;
   terms?: BondTerms;
+  /** Retail treasury bonds: the series' terms and published rates (from the Ministry file). */
+  retail?: RetailTerms;
+  updatedAt: string;
+}
+
+/** One retail series from the Ministry file ("Dane dotyczące obligacji detalicznych"). */
+export interface RetailSeriesItem extends RetailTerms {
+  PK: `SERIES#${string}`;
+  SK: "META";
+  source: string;
   updatedAt: string;
 }
 
@@ -89,7 +100,9 @@ export interface TransactionItem {
   type: TransactionType;
   isin?: string;
   quantity?: number;
-  price?: number; // bonds: clean % of nominal
+  price?: number; // bonds: clean % of nominal; retail bonds: PLN per 100 PLN bond
+  /** Retail bonds: when interest starts (the purchase date), if not the transaction date. */
+  valueDate?: IsoDate;
   amount: number; // signed cash effect in `currency`: negative = money out
   fee?: number;
   currency: string;
@@ -117,6 +130,8 @@ export interface HoldingSnapshot {
   gain: number | null;
   gainPct: number | null;
   flags: string[];
+  /** Retail bonds: annual rate of the current period and of the one before (null in the first). */
+  rate?: { current: number; previous: number | null };
 }
 
 export interface SnapshotItem {
@@ -165,5 +180,6 @@ export const keys = {
   transaction: (account: string, date: IsoDate, id: string) => ({ PK: `ACCT#${account}` as const, SK: `TX#${date}#${id}` as const }),
   snapshot: (date: IsoDate | "LATEST") => ({ PK: "PORTFOLIO" as const, SK: `SNAP#${date}` as const }),
   backfill: (isin: string) => ({ PK: `INST#${isin}` as const, SK: "BACKFILL" as const }),
+  retailSeries: (series: string) => ({ PK: `SERIES#${series}` as const, SK: "META" as const }),
   jobRun: (job: string, startedAt: string) => ({ PK: `JOB#${job}` as const, SK: `RUN#${startedAt}` as const }),
 };

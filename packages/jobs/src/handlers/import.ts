@@ -1,6 +1,7 @@
 // Handles files uploaded to imports/<kind>/… in the bucket:
 //   imports/mf-calculator/*.xlsm   Ministry of Finance calculator → reference index + treasury bond terms
-//   imports/instruments/*.json     instruments to track (terms "mf" resolved from the imported calculator)
+//   imports/mf-retail/*.xls        Ministry retail-bond file → series terms and published rates (also fetched monthly)
+//   imports/instruments/*.json     instruments to track (terms "mf"/"mf-retail" resolved from the imported files)
 //   imports/transactions/*.json    your transactions
 
 import type { S3Event } from "aws-lambda";
@@ -9,9 +10,11 @@ import { Resource } from "sst";
 import {
   parseInstrumentFile,
   parseMfCalculator,
+  parseRetailRates,
   parseTransactionFile,
   type BondTerms,
   type InstrumentItem,
+  type RetailTerms,
 } from "@portfolio/core";
 import { invokeAsync, repo, runJob } from "../lib/context.ts";
 import type { BackfillEvent } from "./backfill.ts";
@@ -49,15 +52,40 @@ export async function importMfCalculator(content: Buffer, source: string) {
   return { months, series: data.bonds.length };
 }
 
+/**
+ * Stores every series of the Ministry retail-bond file and refreshes the terms (newly published rates) of the
+ * retail instruments already tracked. Used by the import and by the monthly job.
+ */
+export async function importRetailRates(content: Uint8Array, source: string) {
+  const series = parseRetailRates(content);
+  const stored = await repo.putRetailSeries([...series.values()], source);
+  let refreshed = 0;
+  for (const inst of await repo.listInstruments()) {
+    const terms = inst.type === "BOND_RETAIL" ? series.get(inst.code) : undefined;
+    if (!terms || JSON.stringify(terms) === JSON.stringify(inst.retail)) continue;
+    const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, updatedAt: _u, ...rest } = inst;
+    await repo.putInstrument({ ...rest, retail: terms });
+    refreshed++;
+  }
+  return { series: stored, refreshed };
+}
+
 export async function importInstruments(json: string) {
   const inputs = parseInstrumentFile(json);
   const mf = await mfTermsByCode();
   let written = 0;
   for (const i of inputs) {
     let terms: BondTerms | undefined;
+    let retail: RetailTerms | undefined;
     if (i.terms === "mf") {
       terms = mf.get(i.code);
       if (!terms) throw new Error(`${i.code}: no terms in the imported MF calculator; import kalkulatorodsetek.xlsm first`);
+    } else if (i.terms === "mf-retail") {
+      const item = await repo.getRetailSeries(i.code);
+      if (!item) throw new Error(`${i.code}: not in the imported retail-bond file; import it first (imports/mf-retail/)`);
+      if (item.isin !== i.isin) throw new Error(`${i.code}: ISIN ${i.isin} doesn't match the Ministry file (${item.isin})`);
+      const { PK: _p, SK: _s, source: _src, updatedAt: _u, ...t } = item;
+      retail = t;
     } else if (i.terms) {
       terms = { isin: i.isin, code: i.code, ...i.terms, periods: i.terms.periods.map((p) => ({ ...p, paymentDate: p.paymentDate ?? p.end })) };
     }
@@ -72,11 +100,14 @@ export async function importInstruments(json: string) {
       active: i.active,
       live: i.live,
       ...(terms ? { terms } : {}),
+      ...(retail ? { retail } : {}),
     };
     await repo.putInstrument(item);
     written++;
-    // Start the history backfill for an instrument that never had one (new, or missed before).
-    if (!(await repo.getBackfillStatus(i.isin))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
+    // Start the history backfill for an instrument that never had one (new, or missed before). Instruments
+    // without a price source (retail bonds: values are calculated) have no history to load.
+    const hasSource = Object.keys(i.sourceIds).length > 0;
+    if (hasSource && !(await repo.getBackfillStatus(i.isin))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
   }
   return { instruments: written };
 }
@@ -93,6 +124,10 @@ export async function importKey(bucket: string, key: string): Promise<{ itemsWri
     case "mf-calculator": {
       const r = await importMfCalculator(content, key);
       return { itemsWritten: r.months + 1, note: `${key}: ${r.months} months, ${r.series} series` };
+    }
+    case "mf-retail": {
+      const r = await importRetailRates(content, key);
+      return { itemsWritten: r.series + r.refreshed, note: `${key}: ${r.series} series, ${r.refreshed} instruments refreshed` };
     }
     case "instruments": {
       const r = await importInstruments(content.toString("utf8"));

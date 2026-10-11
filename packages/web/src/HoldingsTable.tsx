@@ -24,6 +24,9 @@ const FLAG_LABELS: Record<string, string> = {
   missing_coupon_rate: "coupon rate missing",
   missing_reference_index: "CPI index missing",
   no_period: "outside coupon periods",
+  rate_pending: "rate not published yet",
+  matured: "matured",
+  missing_terms: "series terms missing",
 };
 
 export function HoldingsTable({ holdings, selected, onSelect }: { holdings: Holding[]; selected: string | null; onSelect: (isin: string) => void }) {

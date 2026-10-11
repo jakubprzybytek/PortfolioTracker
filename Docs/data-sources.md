@@ -91,10 +91,12 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - `bdl.stat.gov.pl/api/v1`, free API key. Monthly CPI (y/y, previous year = 100); used for EDO/COI/ROD rate resets and IZ indexation.
 - Final figure published around mid-month.
 
-### Retail bond terms (obligacje detaliczne)
-- Static per series: first-period rate, margin over CPI, purchase date, number of bonds, early-redemption fee.
-- Source: the series' terms of issue (list emisyjny) on obligacjeskarbowe.pl, entered once per series.
-- Check: the official interest tables (tabele odsetkowe, PDF per series) give accrued interest per bond per day.
+### Retail bonds (obligacje detaliczne) – Ministry of Finance file
+- **Source:** "Dane dotyczące obligacji detalicznych" (XLS) on [gov.pl/web/finanse/obligacje-detaliczne1](https://www.gov.pl/web/finanse/obligacje-detaliczne1), updated monthly. One tab per kind (EDO, COI, ROD, ROS, TOS, ROR, DOR …); per series: **ISIN**, term, sale period, issue and rollover price ("Cena zamiany", e.g. 99.90), the **rate actually paid in each year** (per month for ROR/DOR), the interest per bond the Ministry published (per period for COI/ROR/DOR, the total at maturity for EDO/ROD/ROS/TOS) and the margin.
+- **Used for:** retail bond terms and rates, so no CPI calculation is needed (and no correction for March series, whose rates rest on a preliminary CPI). The `monthly` job downloads it (the attachment link changes with each update: found by its text), archives it in S3 and refreshes the instruments; `imports/mf-retail/` loads a copy by hand. Parser: `core/mf/retailRates.ts`.
+- **Method, verified against every fully published series in the file (157 EDO, 60 ROS, 51 TOS, all COI/ROR/DOR periods; unit test):** a period earns base × rate × months/12; capitalising kinds compound **unrounded** and round only the amount; payout kinds round each payout to the grosz; within a period interest accrues by days elapsed / days in the period. Values are gross (before the 19 % tax) and ignore the early-redemption fee, like the reference sheet.
+- **Per lot:** interest runs from each purchase's own date (transaction field `valueDate`), so lots of one series bought days apart differ slightly. Checked against the reference sheet: all 21 open lots identical to the grosz per bond on 2026-10-11.
+- A period whose rate isn't in the file yet keeps the last rate and is flagged `rate_pending`.
 
 ### IBKR Flex Web Service – IBKR bonds, positions, cash
 - Token + query ID; plain HTTPS request; works from Lambda (no gateway).

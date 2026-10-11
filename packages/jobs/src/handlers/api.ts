@@ -59,13 +59,14 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const latest = new Map<string, PriceItem>();
         const yearAgo = new Map<string, PriceItem>();
         await Promise.all(
-          shown.map(async (i) => {
+          shown.filter((i) => i.type !== "BOND_RETAIL").map(async (i) => {
             const [now, then] = await Promise.all([repo.latestPrice(i.isin, i.venue, day), repo.latestPrice(i.isin, i.venue, addDays(day, -365))]);
             if (now) latest.set(i.isin, now);
             if (then) yearAgo.set(i.isin, then);
           }),
         );
-        return json(200, priceRows(shown, latest, yearAgo, day));
+        const rates = new Map((snap?.holdings ?? []).filter((h) => h.rate).map((h) => [h.isin, h.rate!] as const));
+        return json(200, priceRows(shown, latest, yearAgo, day, 7, rates));
       }
       case "GET /transactions": {
         // All transactions, newest first, with the instrument's code, name and type (none for cash movements).

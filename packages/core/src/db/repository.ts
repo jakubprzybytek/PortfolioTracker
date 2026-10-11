@@ -17,6 +17,7 @@ import {
   type JobRunItem,
   type PriceItem,
   type ReferenceIndexItem,
+  type RetailSeriesItem,
   type SnapshotItem,
   type TransactionItem,
 } from "./items.ts";
@@ -155,6 +156,17 @@ export class Repository {
       KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: { ":pk": "CPI_REF" },
     });
+  }
+
+  // --- retail bond series (Ministry file) -------------------------------------------------------
+
+  putRetailSeries(series: Omit<RetailSeriesItem, "PK" | "SK" | "source" | "updatedAt">[], source: string): Promise<number> {
+    const updatedAt = new Date().toISOString();
+    return this.batchPut("market", series.map((s) => ({ ...keys.retailSeries(s.series), ...s, source, updatedAt })));
+  }
+
+  getRetailSeries(series: string): Promise<RetailSeriesItem | undefined> {
+    return this.get<RetailSeriesItem>("market", keys.retailSeries(series));
   }
 
   // --- floating coupon rates -------------------------------------------------------------------
