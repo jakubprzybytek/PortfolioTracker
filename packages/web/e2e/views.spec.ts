@@ -1,0 +1,89 @@
+import { expect, test } from "@playwright/test";
+
+// Holdings and Transactions views, against the sample data: accounts "broker" (DS0432, IZ0836) and "ike" (DS0432).
+
+test.describe("navigation", () => {
+  test("the side menu switches views and keeps the URL in sync", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("nav-dashboard")).toHaveAttribute("aria-current", "page");
+    await expect(page.getByTestId("total-value")).toBeVisible();
+
+    await page.getByTestId("nav-holdings").click();
+    await expect(page).toHaveURL(/#\/holdings$/);
+    await expect(page.getByTestId("nav-holdings")).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "Holdings", level: 2 })).toBeVisible();
+
+    await page.getByTestId("nav-transactions").click();
+    await expect(page).toHaveURL(/#\/transactions$/);
+    await expect(page.getByTestId("transactions-table")).toBeVisible();
+
+    await page.goBack();
+    await expect(page.getByTestId("nav-holdings")).toHaveAttribute("aria-current", "page");
+  });
+});
+
+test.describe("transactions view", () => {
+  test("lists all transactions, newest first", async ({ page }) => {
+    await page.goto("/#/transactions");
+    const rows = page.getByTestId("transaction-row");
+    await expect(rows).toHaveCount(8);
+    const dates = await rows.locator("td:first-child").allTextContents();
+    expect(dates).toEqual([...dates].sort().reverse());
+    await expect(rows.first()).toContainText("2026-05-15");
+    await expect(page.getByTestId("filters-summary")).toHaveText("8 of 8 transactions");
+  });
+
+  test("filters by instrument, account and asset type, and keeps filters in the URL", async ({ page }) => {
+    await page.goto("/#/transactions");
+    const rows = page.getByTestId("transaction-row");
+    await expect(rows).toHaveCount(8);
+
+    await page.getByTestId("filter-instrument").selectOption({ label: "DS0432" });
+    await expect(rows).toHaveCount(4); // broker: buy + 2 coupons, ike: buy
+    await page.getByTestId("filter-account").selectOption("ike");
+    await expect(rows).toHaveCount(1);
+    await expect(page).toHaveURL(/instrument=PL0000113783/);
+    await expect(page).toHaveURL(/account=ike/);
+
+    await page.reload();
+    await expect(rows).toHaveCount(1);
+
+    await page.getByTestId("filters-reset").click();
+    await expect(rows).toHaveCount(8);
+    await page.getByTestId("filter-type").selectOption({ label: "Cash" });
+    await expect(rows).toHaveCount(2); // the two deposits
+    await expect(rows.first()).toContainText("Deposit");
+  });
+});
+
+test.describe("holdings view", () => {
+  test("groups holdings by account, sorted alphabetically", async ({ page }) => {
+    await page.goto("/#/holdings");
+    const table = page.getByTestId("holdings-by-account");
+    await expect(page.getByTestId("account-broker")).toBeVisible();
+    await expect(page.getByTestId("account-ike")).toBeVisible();
+    await expect(page.getByTestId("holdings-total")).toBeVisible();
+
+    const groupOrder = await table.locator("tr.group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
+    expect(groupOrder).toEqual(["account-broker", "account-ike"]);
+    const broker = table.locator('tr[data-account="broker"]');
+    await expect(broker).toHaveCount(2);
+    expect(await broker.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "IZ0836"]);
+    const ike = table.locator('tr[data-account="ike"]');
+    await expect(ike).toHaveCount(1);
+    await expect(ike.locator("td").nth(2)).toHaveText("5");
+  });
+
+  test("filters by account and asset type", async ({ page }) => {
+    await page.goto("/#/holdings");
+    const rows = page.getByTestId("holding-row");
+    await expect(rows).toHaveCount(3);
+    await page.getByTestId("filter-account").selectOption("ike");
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByTestId("account-broker")).toHaveCount(0);
+    await expect(page.getByTestId("filters-summary")).toHaveText("1 of 3 holdings");
+    await page.getByTestId("filters-reset").click();
+    await page.getByTestId("filter-type").selectOption({ label: "Listed bond" });
+    await expect(rows).toHaveCount(3);
+  });
+});

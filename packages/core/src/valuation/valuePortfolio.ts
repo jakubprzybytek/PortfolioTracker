@@ -31,6 +31,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     const inst = byIsin.get(p.isin);
     const flags: string[] = [];
     const base = {
+      account: p.account,
       isin: p.isin,
       code: inst?.code ?? p.isin,
       name: inst?.name ?? p.isin,
@@ -80,7 +81,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     });
   }
 
-  holdings.sort((a, b) => a.code.localeCompare(b.code));
+  holdings.sort((a, b) => a.account.localeCompare(b.account) || a.code.localeCompare(b.code));
   const totals = { value: 0, cost: 0, gain: 0, couponsReceived: 0 };
   const byType: Record<string, { value: number; cost: number }> = {};
   for (const h of holdings) {

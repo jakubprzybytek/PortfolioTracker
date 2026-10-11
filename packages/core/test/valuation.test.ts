@@ -3,7 +3,7 @@ import { parseMfCalculator } from "../src/mf/calculator.ts";
 import { toReferenceIndex, type ReferenceIndex } from "../src/bonds/izIndex.ts";
 import type { BondTerms } from "../src/bonds/terms.ts";
 import type { InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
-import { positionsAt } from "../src/valuation/positions.ts";
+import { positionKey, positionsAt } from "../src/valuation/positions.ts";
 import { valuePortfolio } from "../src/valuation/valuePortfolio.ts";
 import { parseTransactionFile, transactionId } from "../src/transactions/schema.ts";
 import { gpwRowsToPriceItems } from "../src/gpw/toPriceItems.ts";
@@ -33,12 +33,24 @@ describe("positionsAt", () => {
       tx({ id: "4", date: "2025-06-01", type: "SELL", isin: "PL0000113783", quantity: 5, price: 83, amount: 4150, fee: 5 }),
       tx({ id: "5", date: "2025-06-02", type: "DEPOSIT", amount: 1000 }),
     ];
-    const p = positionsAt(txs, "2025-12-31").get("PL0000113783")!;
+    const p = positionsAt(txs, "2025-12-31").get(positionKey("a", "PL0000113783"))!;
     expect(p.quantity).toBe(15);
     expect(p.cost).toBe(12165); // 16220 × 15/20
     expect(p.couponsReceived).toBe(350);
-    expect(positionsAt(txs, "2025-02-01").get("PL0000113783")!.quantity).toBe(10);
+    expect(positionsAt(txs, "2025-02-01").get(positionKey("a", "PL0000113783"))!.quantity).toBe(10);
     expect(positionsAt(txs, "2024-12-31").size).toBe(0);
+  });
+
+  it("keeps the same instrument in two accounts as separate positions", () => {
+    const txs = [
+      tx({ id: "1", date: "2025-01-10", type: "BUY", isin: "PL0000113783", quantity: 10, amount: -8000 }),
+      tx({ id: "2", date: "2025-01-11", account: "b", type: "BUY", isin: "PL0000113783", quantity: 4, amount: -3300 }),
+      tx({ id: "3", date: "2025-02-01", account: "b", type: "SELL", isin: "PL0000113783", quantity: 1, amount: 830 }),
+    ];
+    const positions = positionsAt(txs, "2025-12-31");
+    expect(positions.size).toBe(2);
+    expect(positions.get(positionKey("a", "PL0000113783"))).toMatchObject({ account: "a", quantity: 10, cost: 8000 });
+    expect(positions.get(positionKey("b", "PL0000113783"))).toMatchObject({ account: "b", quantity: 3, cost: 2475 });
   });
 });
 
@@ -55,6 +67,7 @@ describe("valuePortfolio", () => {
       tx({ id: "2", date: "2026-01-15", type: "BUY", isin: "PL0000113783", quantity: 20, price: 80, amount: -16000, fee: 5 }),
     ];
     const snap = valuePortfolio({ date: "2026-10-09", instruments, transactions, prices, referenceIndex: index, couponRates: new Map() });
+    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["a/DS0432", "a/IZ0836"]);
 
     const izH = snap.holdings.find((h) => h.code === "IZ0836")!;
     expect(izH).toMatchObject({ quantity: 10, cleanPrice: 87.92, nominal: 1105.53, accruedInterest: 2.73, valuePerUnit: 974.71, value: 9747.1, cost: 9505, flags: [] });

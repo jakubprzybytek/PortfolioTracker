@@ -44,6 +44,17 @@ export async function handler(event: APIGatewayProxyEventV2): Promise<APIGateway
         const prices = await repo.queryPrices(isin, inst.venue, from, to);
         return json(200, prices.map(({ PK: _p, SK: _s, ...rest }) => rest));
       }
+      case "GET /transactions": {
+        // All transactions, newest first, with the instrument's code, name and type (none for cash movements).
+        const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
+        const byIsin = new Map(instruments.map((i) => [i.isin, i]));
+        const rows = txs.map(({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...rest }) => {
+          const inst = rest.isin ? byIsin.get(rest.isin) : undefined;
+          return { ...rest, instrument: inst ? { code: inst.code, name: inst.name, type: inst.type } : null };
+        });
+        rows.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+        return json(200, rows);
+      }
       case "GET /instruments/{isin}/transactions": {
         if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
         const txs = (await repo.listTransactions()).filter((t) => t.isin === isin);

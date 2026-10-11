@@ -72,21 +72,24 @@ describe(`API ${API}`, () => {
   it("GET /holdings values the sample portfolio with accrued interest and IZ indexation", async () => {
     const snap = await waitFor(async () => {
       const r = await get<SnapshotItem>("/holdings");
-      return r.status === 200 && r.body.holdings.length >= 2 ? r.body : undefined;
+      return r.status === 200 && r.body.holdings.length >= 3 ? r.body : undefined;
     });
     expect(snap.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    const by = Object.fromEntries(snap.holdings.map((h) => [h.code, h])) as Record<string, HoldingSnapshot>;
-    expect(by["DS0432"]).toMatchObject({ quantity: 20, nominal: 1000, cost: 15931.8, couponsReceived: 700 });
-    expect(by["IZ0836"]).toMatchObject({ quantity: 10, cost: 9561.54, couponsReceived: 214.2 });
-    expect(by["IZ0836"]!.nominal!).toBeGreaterThan(1100);
-    for (const h of [by["DS0432"]!, by["IZ0836"]!]) {
+    // one holding per account and instrument, sorted by account then code
+    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["broker/DS0432", "broker/IZ0836", "ike/DS0432"]);
+    const by = Object.fromEntries(snap.holdings.map((h) => [`${h.account}/${h.code}`, h])) as Record<string, HoldingSnapshot>;
+    expect(by["broker/DS0432"]).toMatchObject({ quantity: 20, nominal: 1000, cost: 15931.8, couponsReceived: 700 });
+    expect(by["broker/IZ0836"]).toMatchObject({ quantity: 10, cost: 9561.54, couponsReceived: 214.2 });
+    expect(by["ike/DS0432"]).toMatchObject({ quantity: 5, cost: 4013.01, couponsReceived: 0 });
+    expect(by["broker/IZ0836"]!.nominal!).toBeGreaterThan(1100);
+    for (const h of snap.holdings) {
       expect(h.cleanPrice).not.toBeNull();
       expect(h.accruedInterest).not.toBeNull();
       expect(h.value).toBeCloseTo(h.valuePerUnit! * h.quantity, 1);
       expect(h.flags).not.toContain("no_price");
       expect(h.flags).not.toContain("unknown_instrument");
     }
-    expect(snap.totals.value).toBeCloseTo(by["DS0432"]!.value! + by["IZ0836"]!.value!, 1);
+    expect(snap.totals.value).toBeCloseTo(snap.holdings.reduce((s, h) => s + h.value!, 0), 1);
   });
 
   it("GET /portfolio/history returns one snapshot per day since the first transaction", async () => {
@@ -102,6 +105,17 @@ describe(`API ${API}`, () => {
     expect(status).toBe(200);
     expect(body.length).toBeGreaterThanOrEqual(3);
     expect(body.every((t) => t.isin === DS)).toBe(true);
+  });
+
+  it("GET /transactions lists all transactions newest first, with their instrument", async () => {
+    const { status, body } = await get<{ date: string; account: string; type: string; isin?: string; instrument: { code: string; type: string } | null }[]>("/transactions");
+    expect(status).toBe(200);
+    expect(body).toHaveLength(8);
+    const dates = body.map((t) => t.date);
+    expect(dates).toEqual([...dates].sort().reverse());
+    expect(body[0]).toMatchObject({ date: "2026-05-15", account: "ike", type: "BUY", instrument: { code: "DS0432", type: "BOND_LISTED" } });
+    expect(body.filter((t) => t.type === "DEPOSIT").every((t) => t.instrument === null)).toBe(true);
+    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["broker", "ike"]));
   });
 
   it("rejects bad input", async () => {

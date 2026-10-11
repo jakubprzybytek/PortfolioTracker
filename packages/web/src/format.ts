@@ -27,3 +27,26 @@ export const rangeFrom = (key: RangeKey): string => {
   const days = RANGES.find((r) => r.key === key)!.days;
   return days === null ? "2000-01-01" : addDays(today(), -days);
 };
+
+/** Readable labels for instrument types (the "asset type" filters). Cash movements have no instrument: "CASH". */
+export const TYPE_LABELS: Record<string, string> = {
+  BOND_LISTED: "Listed bond",
+  BOND_RETAIL: "Retail bond",
+  BOND_IBKR: "Bond (IBKR)",
+  ETF: "ETF",
+  FUND_MANUAL: "Manually valued",
+  CASH: "Cash",
+};
+export const typeLabel = (type: string): string => TYPE_LABELS[type] ?? type;
+
+export const TX_TYPE_LABELS: Record<string, string> = {
+  BUY: "Buy",
+  SELL: "Sell",
+  COUPON: "Coupon",
+  REDEMPTION: "Redemption",
+  DEPOSIT: "Deposit",
+  WITHDRAWAL: "Withdrawal",
+  FEE: "Fee",
+  TAX: "Tax",
+  INTEREST: "Interest",
+};

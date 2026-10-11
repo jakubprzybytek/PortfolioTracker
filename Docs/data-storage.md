@@ -195,7 +195,7 @@ PK = PORTFOLIO              SK = SNAP#<YYYY-MM-DD>
 PK = PORTFOLIO              SK = SNAP#LATEST
 ```
 
-Written by the valuation job: per holding `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart and dashboard come from these items.
+Written by the valuation job: one holding per **account and instrument** (the same bond in two accounts is two holdings), sorted by account then code. Per holding `account`, `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart, dashboard and Holdings view come from these items. Snapshots written before 2026-10-11 have no `account`; only `SNAP#LATEST` is read per holding, and every valuation run rewrites it.
 Items stay small: about 25 holdings, well under the 400 KB item limit.
 
 ## Access per function

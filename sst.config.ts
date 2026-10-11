@@ -121,6 +121,7 @@ export default $config({
     api.route("GET /instruments", apiHandler);
     api.route("GET /instruments/{isin}/prices", apiHandler);
     api.route("GET /instruments/{isin}/transactions", apiHandler);
+    api.route("GET /transactions", apiHandler);
     api.route("GET /status", apiHandler);
 
     // One domain per stage: the site at "/", the API at "/api/*" (same origin, one certificate).

@@ -97,7 +97,9 @@ export interface TransactionItem {
   source: string;
 }
 
+/** One position: an instrument held in one account. */
 export interface HoldingSnapshot {
+  account: string;
   isin: string;
   code: string;
   name: string;

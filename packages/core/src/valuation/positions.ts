@@ -2,6 +2,7 @@ import type { IsoDate } from "../dates.ts";
 import type { TransactionItem } from "../db/items.ts";
 
 export interface Position {
+  account: string;
   isin: string;
   quantity: number;
   /** Average-cost basis of the open quantity, in the instrument's currency (fees included). */
@@ -10,13 +11,17 @@ export interface Position {
   firstDate: IsoDate;
 }
 
-/** Positions on `date` from all transactions up to and including it (average cost; sells reduce cost proportionally). */
+/** Map key of a position: the same instrument in two accounts is two positions. */
+export const positionKey = (account: string, isin: string): string => `${account}|${isin}`;
+
+/** Positions per account and ISIN on `date`, from all transactions up to and including it (average cost; sells reduce cost proportionally). */
 export function positionsAt(transactions: TransactionItem[], date: IsoDate): Map<string, Position> {
   const positions = new Map<string, Position>();
   const sorted = [...transactions].filter((t) => t.date <= date && t.isin).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   for (const t of sorted) {
     const isin = t.isin!;
-    const p = positions.get(isin) ?? { isin, quantity: 0, cost: 0, couponsReceived: 0, firstDate: t.date };
+    const key = positionKey(t.account, isin);
+    const p = positions.get(key) ?? { account: t.account, isin, quantity: 0, cost: 0, couponsReceived: 0, firstDate: t.date };
     const qty = t.quantity ?? 0;
     switch (t.type) {
       case "BUY":
@@ -39,11 +44,11 @@ export function positionsAt(transactions: TransactionItem[], date: IsoDate): Map
       default:
         break;
     }
-    positions.set(isin, p);
+    positions.set(key, p);
   }
-  for (const [isin, p] of positions) {
+  for (const [key, p] of positions) {
     p.cost = Math.round(p.cost * 100) / 100;
-    if (p.quantity <= 0 && p.couponsReceived === 0) positions.delete(isin);
+    if (p.quantity <= 0 && p.couponsReceived === 0) positions.delete(key);
   }
   return positions;
 }

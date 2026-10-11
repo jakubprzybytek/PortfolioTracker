@@ -21,7 +21,7 @@ test.describe("dashboard", () => {
     const iz = page.getByTestId("holding-IZ0836");
     await expect(ds).toBeVisible();
     await expect(iz).toBeVisible();
-    await expect(ds.locator("td").nth(1)).toHaveText("20");
+    await expect(ds.locator("td").nth(1)).toHaveText("25"); // 20 in "broker" + 5 in "ike", one row per instrument
     await expect(iz.locator("td").nth(1)).toHaveText("10");
     await expect(ds.locator("td").nth(3)).not.toHaveText("–"); // accrued interest
     await expect(iz.locator("td").nth(4)).toHaveText(/^9\d\d,\d\d$/); // value per bond ≈ 97x PLN (indexed nominal)
