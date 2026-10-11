@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+      .form-label { font-size: 0.875rem; }
+      .form-control, .form-select { font-size: 0.875rem; }
+      .form-check-label {
+        font-size: 0.875rem;
+        text-align: justify;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container pt-2" id="userform">
+      <div class="mb-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <label for="rodzajTransakcji" class="form-label mb-2">Rodzaj transakcji</label>
+          <a href="https://inwestomat.eu/wlasny-arkusz-do-monitorowania-inwestycji/" 
+            target="_blank" class="text-muted small">
+            <i class="bi bi-book"></i> Instrukcja
+          </a>
+        </div>
+        <select class="form-select" id="rodzajTransakcji">
+          <option>Wybierz...</option>
+          <option>Zakup</option>
+          <option>Sprzedaż</option>
+          <option>Wpłata środków</option>
+          <option>Wypłata środków</option>
+          <option>Dywidenda / Odsetki</option>
+          <option>Koszty</option>
+          <option>Split</option>
+          <option>Transfer środków</option>
+        </select>
+      </div>
+      <div class="mb-2 d-none" id="hideData">
+        <label for="data" class="form-label">Data transakcji</label>
+        <input type="date" id="data" class="form-control" required>
+        <div class="invalid-feedback">Wybierz date transakcji</div>
+      </div>
+      <div>
+        <div class="row">
+          <label for="kontoDD" class="form-label d-none" id="kontoLabel_2">Konto (Podaj lub wybierz z listy)</label>
+          <label for="konto" class="form-label d-none" id="kontoLabel">Konto</label>
+          <div class="col mb-2 d-none" id="hideKontoDD">
+            <select class="form-select" id="kontoDD"></select>
+          </div>
+          <div class="col mb-2 d-none" id="hideKonto">
+            <input type="text" class="form-control" id="konto" placeholder="Podaj konto" required>
+            <div class="invalid-feedback">Wprowadź konto</div>
+          </div>
+        </div>
+        <div class="row">
+          <label for="kontoBDD" class="form-label d-none" id="kontoBLabel">Konto docelowe (Podaj lub wybierz z listy)</label>
+          <div class="col mb-2 d-none" id="hideKontoBDD">
+            <select class="form-select" id="kontoBDD"></select>
+          </div>
+          <div class="col mb-2 d-none" id="hideKontoB">
+            <input type="text" class="form-control" id="kontoB" placeholder="Podaj konto docelowe">
+            <div class="invalid-feedback">Wprowadź konto docelowe</div>
+          </div>
+        </div>
+        <div id="kontoLoadError"></div>
+        <div class="mb-2 d-none" id="hideWalutaTransfer">
+          <label class="form-label">Waluta</label>
+          <input type="text" class="form-control" id="walutaTransfer" value="PLN" disabled>
+          <small class="form-text text-muted">Obecnie obsługiwany tylko transfer w PLN</small>
+        </div>
+        <div class="mb-2 d-none" id="hideKlasaAktywowDD">
+          <label for="klasaAktywowDD" class="form-label">Klasa aktywów</label>
+          <select class="form-select" id="klasaAktywowDD"></select>
+        </div>
+        <div class="mb-2 d-none" id="hideKlasaAktywow">
+          <label for="klasaAktywow" class="form-label">Klasa aktywów</label>
+          <select class="form-select" id="klasaAktywow">
+            <option>Wybierz...</option>
+            <option>Waluty</option>
+            <option>Akcje polskie</option>
+            <option>Akcje zagraniczne</option>
+            <option>Obligacje skarbowe polskie</option>
+            <option>Obligacje skarbowe zagraniczne</option>
+            <option>Obligacje korporacyjne polskie</option>
+            <option>Obligacje korporacyjne zagraniczne</option>
+            <option>Metale i surowce</option>
+            <option>Kryptowaluty</option>
+            <option>Inne</option>
+            <option>Multi-asset</option>
+          </select>
+        </div>
+        <div class="mb-2 d-none" id="hideObligacjeTyp">
+          <label for="obligacjeTyp" class="form-label">Typ obligacji</label>
+          <select class="form-select" id="obligacjeTyp">
+            <option>Fundusz / ETF</option>
+            <option>Notowane na Catalyst</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="tickerDD" class="form-label d-none" id="tickerLabel_2">Ticker (Podaj lub wybierz z listy)</label>
+          <label for="ticker" class="form-label d-none" id="tickerLabel">Ticker</label>
+          <div class="col mb-2 d-none" id="hideTickerDD">
+            <select class="form-select" id="tickerDD"></select>
+          </div>
+          <div class="col mb-2 d-none" id="hideTicker">
+            <input type="text" class="form-control" id="ticker" placeholder="Podaj ticker" required>
+            <div class="invalid-feedback">Podaj ticker</div>
+          </div>
+          <small class="form-text text-muted d-none" id="tickerHelp">
+            Przykłady: LON:IGLN, FRA:V80A, WSE:PZU, IZ0836, BTC/PLN.
+            <a href="https://inwestomat.eu/wlasny-arkusz-do-monitorowania-inwestycji/" target="_blank" class="text-muted">
+              <i class="bi bi-book"></i> Instrukcja</a>.
+            <i id="helpIcon2" class="bi bi-question-circle" data-bs-toggle="tooltip" title="Akcje i ETFy: format giełda:ticker (np. WSE:PZU). Obligacje: ticker bez przedrostka (np. IZ0836). Krypto: para walutowa (np. BTC/PLN). Ticker znajdziesz w Biznes Radar, Google Finance lub markets.ft.com. Niektórych tickerów nie ma w Google Finance – mimo to wprowadź je w tym samym formacie."></i>
+          </small>
+          <div class="mb-2"></div>
+        </div>
+        <div class="mb-2 d-none" id="hideNazwa">
+          <label for="nazwa" class="form-label">Nazwa instrumentu</label>
+          <i id="helpIcon3" class="bi bi-question-circle" data-bs-toggle="tooltip" title="Zostaw puste by pobrać nazwę z markets.ft.com (jeśli instrument jest tam dostępny). Nazwę wystarczy wpisać tylko dla pierwszej transakcji danego aktywa."></i>
+          <input type="text" class="form-control" placeholder="(Opcjonalne) Podaj nazwę" id="nazwa">
+        </div>
+
+        <!-- WALUTA INSTRUMENTU + KURS -->
+        <div class="mb-2 d-none" id="hideWaluta">
+          <label for="waluta" class="form-label">Waluta instrumentu</label>
+          <i
+            id="helpIcon4"
+            class="bi bi-question-circle"
+            data-bs-toggle="tooltip"
+            data-bs-html="true"
+            title="1. W przypadku zakupu / sprzedaży wybierz walutę, w której notowany jest instrument, a nie walutę transakcji.<br><br>2. Aby dodać nową walutę do listy, wpisz jej kod w kolumnie A w Arkuszu technicznym, a następnie odśwież formularz.">
+          </i>
+          <select class="form-select" id="waluta"></select>
+        </div>
+        <div class="mb-2 d-none" id="hideKursWalutowy">
+          <label for="kursWaluty" class="form-label">Kurs <span id="kursWalutyLabel">PLN</span>/PLN</label>
+          <i id="helpIcon" class="bi bi-question-circle" data-bs-toggle="tooltip" title="Zostaw puste by pobrać kurs NBP (D-1)"></i>
+          <input type="number" class="form-control" id="kursWaluty" min="0" step="0.0000001">
+        </div>
+
+        <!-- LICZBA + CENA -->
+        <div class="row" id="hideLiczbaCena">
+          <div class="col mb-2 d-none" id="hideLiczba">
+            <label for="liczba" class="form-label">Liczba jednostek</label>
+            <input type="number" class="form-control" id="liczba" min="0" step="0.0000000001" required>
+            <div class="invalid-feedback">Wprowadź liczbę</div>
+          </div>
+          <div class="col mb-2 d-none" id="hideCena">
+            <label for="cena" class="form-label">Cena</label>
+            <input type="number" class="form-control" id="cena" min="0" step="0.0000000001" required>
+            <div class="invalid-feedback">Wprowadź cenę</div>
+          </div>
+          <div class="row mb-2 d-none" id="hideCenaKorpo">
+            <small id="cenaKorpoHelpBlock" class="form-text text-muted">Podana cena musi być w PLN, a nie wyrażona w procentach</small>
+          </div>
+        </div>
+
+        <!-- SEKCJA PROWIZJI -->
+        <div class="d-none" id="hideProwizjaSekcja">
+          <hr class="my-2">
+          <p class="text-muted small mb-2">Prowizja</p>
+          <div class="mb-2" id="hideWalutaProwizji">
+            <label for="walutaProwizji" class="form-label">Waluta prowizji</label>
+            <select class="form-select" id="walutaProwizji"></select>
+          </div>
+          <div class="mb-2" id="hideProwizja">
+            <label for="prowizja" class="form-label">Kwota prowizji (<span id="walutaProwizjiLabel">PLN</span>)</label>
+            <input type="number" class="form-control" id="prowizja" min="0" step="0.0000001" value="0">
+          </div>
+          <div class="mb-2 d-none" id="hideKursProwizji">
+            <label for="kursProwizji" class="form-label">Kurs <span id="kursProwizjiLabel">PLN</span>/PLN</label>
+            <i class="bi bi-question-circle" data-bs-toggle="tooltip" title="Zostaw puste by pobrać kurs NBP (D-1)"></i>
+            <input type="number" class="form-control" id="kursProwizji" min="0" step="0.0000001">
+            <small class="form-text text-muted d-none" id="kursProwizjiInfo">Kurs taki sam jak dla aktywa</small>
+          </div>
+        </div>
+        <hr class="my-2 d-none" id="hideProwizjaSeparator">
+
+        <div class="row">
+          <div class="col mb-2 d-none" id="hideNominalna">
+            <label for="nominalna" class="form-label">Cena nominalna</label>
+            <input type="number" class="form-control" id="nominalna" min="0" step="0.01" value="1">
+          </div>
+          <div class="col mb-2 d-none" id="hideKwota">
+            <label for="kwota" class="form-label">Kwota (w wybranej walucie)</label>
+            <input type="number" class="form-control" id="kwota" min="0" step="0.00001" value="0">
+          </div>
+        </div>
+        <div class="col mb-2 d-none" id="hideTax">
+          <label for="tax" class="form-label">Pobrany podatek</label>
+          <i id="helpIcon5" class="bi bi-question-circle" data-bs-toggle="tooltip" title="Podaj wartość pobranego podatku, jeżeli chcesz pomniejszyć wpisaną kwotę brutto o podaną wartość."></i>
+          <input type="number" class="form-control" id="tax" min="0" step="0.01" value="0" placeholder="0">
+        </div>
+        <div class="mb-2 d-none" id="hideSPLIT">
+          <label for="split" class="form-label">Podaj proporcję splitu</label>
+          <i id="helpIcon6" class="bi bi-question-circle" data-bs-toggle="tooltip" title="Wartość musi przyjąć format X:Y, np 2:1."></i>
+          <input type="text" class="form-control" placeholder="np. 2:1" id="split">
+        </div>
+        <div class="mb-2 d-none" id="hideCash">
+          <label for="cash" class="form-label" data-bs-toggle="tooltip" data-bs-placement="top" title="Waluta transakcji">Środki finansowe</label>
+          <select class="form-select" id="cash">
+            <option>Gotówka PLN</option>
+            <option>Waluty</option>
+          </select>
+          <small id="nazwaHelpBlock2" class="form-text text-muted">Wybierz "Waluty" jeżeli chcesz automatycznie dodać transakcję zakupu / sprzedaży waluty. Więcej
+            <a href="https://inwestomat.eu/wlasny-arkusz-do-monitorowania-inwestycji/#konta-walutowe-i-automatyczna-wymiana-walut" target="_blank" class="link-primary">tutaj</a>
+          </small>
+        </div>
+        <div class="form-check form-switch mb-2 d-none" id="hideWplata">
+          <input class="form-check-input" type="checkbox" role="switch" id="wplata">
+          <label class="form-check-label" for="wplata">Zaznacz, jeżeli chcesz dodać automatyczną wpłatę gotówkową tej samej wysokości.</label>
+        </div>
+        <div class="mb-2 d-none" id="hideKomentarz">
+          <label for="komentarz" class="form-label">Komentarz (opcjonalny)</label>
+          <textarea class="form-control" id="komentarz" placeholder="(Opcjonalnie) Dodaj komentarz" rows="2"></textarea>
+        </div>
+        <div class="mb-2 d-none" id="hideButton">
+          <button class="btn btn-primary mb-5" id="mainButton">Dodaj transakcję</button>          
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+
+    <script>
+      // ============================================================
+      // BOOTSTRAP TOOLTIPS
+      // ============================================================
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+
+      // ============================================================
+      // STAN GLOBALNY
+      // ============================================================
+      var arrayOfValues;
+
+      // ============================================================
+      // KONFIGURACJA TYPÓW TRANSAKCJI
+      // ============================================================
+      const ALL_FIELDS = [
+        'hideData',
+        'hideKonto', 'hideKontoDD', 'kontoLabel', 'kontoLabel_2',
+        'hideKontoBDD', 'hideKontoB', 'kontoBLabel',
+        'hideWalutaTransfer',
+        'hideKlasaAktywow', 'hideKlasaAktywowDD',
+        'hideObligacjeTyp',
+        'hideTicker', 'hideTickerDD', 'tickerLabel', 'tickerLabel_2', 'tickerHelp',
+        'hideNazwa', 'hideWaluta', 'hideKursWalutowy',
+        'hideLiczba', 'hideCena', 'hideCenaKorpo',
+        'hideProwizjaSekcja',
+        'hideNominalna', 'hideKwota',
+        'hideTax', 'hideSPLIT',
+        'hideCash', 'hideWplata',
+        'hideKomentarz', 'hideButton',
+        'hideProwizjaSeparator'
+      ];
+
+      const TRANSACTION_CONFIG = {
+
+        'Zakup': {
+          show: [
+            'hideData',
+            'hideKonto', 'hideKontoDD', 'kontoLabel_2',
+            'hideKlasaAktywow',
+            'hideTicker', 'hideTickerDD', 'tickerLabel_2', 'tickerHelp',
+            'hideNazwa',
+            'hideWaluta',
+            'hideLiczba', 'hideCena',
+            'hideProwizjaSekcja',
+            'hideKomentarz', 'hideButton',
+            'hideWplata',
+            'hideProwizjaSeparator'
+          ],
+          defaults: {
+            ticker: '',
+            liczba: null,
+            cena: null
+          },
+          handlers: {
+            'kontoDD': ['klasaAktywowDropDown', 'tickerDropDown', 'hideKonto'],
+            'tickerDD': ['hideTicker'],
+            'klasaAktywow': ['hideDiv', 'tickerDropDown']
+          }
+        },
+
+        'Sprzedaż': {
+          show: [
+            'hideData',
+            'hideKontoDD', 'kontoLabel',
+            'hideKlasaAktywowDD',
+            'hideTickerDD', 'tickerLabel',
+            'hideWaluta',
+            'hideLiczba', 'hideCena',
+            'hideProwizjaSekcja',
+            'hideKomentarz', 'hideButton',
+            'hideProwizjaSeparator'
+          ],
+          defaults: {
+            konto: '{{kontoDD}}',
+            ticker: '{{tickerDD}}'
+          },
+          handlers: {
+            'kontoDD': ['klasaAktywowDropDown', 'tickerDropDown'],
+            'klasaAktywowDD': ['tickerDropDown', 'hideDivSellWaluta'],
+            'tickerDD': ['hideTicker']
+          }
+        },
+
+        'Wpłata środków': {
+          show: [
+            'hideData',
+            'hideKontoDD', 'hideKonto', 'kontoLabel_2',
+            'hideWaluta',
+            'hideKwota',
+            'hideButton'
+          ],
+          defaults: {
+            ticker: 'Gotówka',
+            liczba: 1,
+            cena: 1
+          },
+          handlers: {
+            'kontoDD': ['hideKonto']
+          }
+        },
+
+        'Wypłata środków': {
+          show: [
+            'hideData',
+            'hideKontoDD', 'kontoLabel',
+            'hideWaluta',
+            'hideKwota',
+            'hideButton'
+          ],
+          defaults: {
+            ticker: 'Gotówka',
+            liczba: 1,
+            cena: 1,
+            konto: '{{kontoDD}}'
+          },
+          handlers: {}
+        },
+
+        'Dywidenda / Odsetki': {
+          show: [
+            'hideData',
+            'hideKontoDD', 'kontoLabel',
+            'hideKlasaAktywowDD',
+            'hideTickerDD', 'tickerLabel',
+            'hideWaluta',
+            'hideKwota',
+            'hideTax',
+            'hideButton'
+          ],
+          defaults: {
+            konto: '{{kontoDD}}',
+            ticker: '',
+            liczba: 1,
+            cena: 1
+          },
+          handlers: {
+            'kontoDD': ['klasaAktywowDropDown', 'tickerDropDown'],
+            'klasaAktywowDD': ['tickerDropDown'],
+            'tickerDD': ['hideTicker']
+          }
+        },
+
+        'Koszty': {
+          show: [
+            'hideData',
+            'hideKontoDD', 'kontoLabel',
+            'hideWaluta',
+            'hideKwota',
+            'hideButton'
+          ],
+          defaults: {
+            ticker: 'Gotówka',
+            liczba: 1,
+            cena: 1,
+            konto: '{{kontoDD}}'
+          },
+          handlers: {}
+        },
+
+        'Split': {
+          show: [
+            'hideData',
+            'hideKontoDD', 'kontoLabel',
+            'hideKlasaAktywowDD',
+            'hideTickerDD', 'tickerLabel',
+            'hideWaluta',
+            'hideSPLIT',
+            'hideKomentarz', 'hideButton'
+          ],
+          defaults: {
+            konto: '{{kontoDD}}',
+            ticker: '{{tickerDD}}',
+            liczba: 1,
+            cena: 1
+          },
+          handlers: {
+            'kontoDD': ['klasaAktywowDropDown', 'tickerDropDown'],
+            'klasaAktywowDD': ['tickerDropDown'],
+            'tickerDD': ['hideTicker']
+          }
+        },
+
+        'Transfer środków': {
+          show: [
+            'hideData',
+            'hideKontoDD', 'kontoLabel',
+            'hideKontoBDD', 'hideKontoB', 'kontoBLabel',
+            'hideWalutaTransfer',
+            'hideKwota',
+            'hideKomentarz', 'hideButton'
+          ],
+          defaults: {
+            ticker: 'Gotówka',
+            liczba: 1,
+            cena: 1
+          },
+          handlers: {
+            'kontoDD': ['handleKontoBDropDown', 'handleAutoKomentarzTransfer'],
+            'kontoBDD': ['handleKontoB', 'handleAutoKomentarzTransfer']
+          }
+        }
+
+      };
+
+      // ============================================================
+      // SILNIK FORMULARZA
+      // ============================================================
+      function addHide(fields) {
+        fields.forEach(function(field) {
+          var el = document.getElementById(field);
+          if (el) el.classList.add('d-none');
+        });
+      }
+
+      function removeHide(fields) {
+        fields.forEach(function(field) {
+          var el = document.getElementById(field);
+          if (el) el.classList.remove('d-none');
+        });
+      }
+
+      function clearFields(fields) {
+        fields.forEach(function(field) {
+          var el = document.getElementById(field);
+          if (!el) return;
+          if (field === 'nominalna') {
+            el.value = 1;
+          } else if (field === 'rodzajTransakcji' || field === 'kontoDD' || field === 'tickerDD' || field === 'klasaAktywowDD' || field === 'klasaAktywow') {
+            el.value = 'Wybierz...';
+          } else if (field === 'waluta' || field === 'walutaProwizji') {
+            el.value = 'PLN';
+          } else if (field === 'cash') {
+            el.value = 'Gotówka PLN';
+          } else if (field === 'wplata') {
+            el.checked = false;
+          } else {
+            el.value = '';
+          }
+        });
+      }
+
+      function hideDivTransakcje() {
+        const selectedRodzajTransakcji = document.getElementById('rodzajTransakcji').value;
+        const config = TRANSACTION_CONFIG[selectedRodzajTransakcji];
+
+        addHide(ALL_FIELDS);
+
+        if (!config) return;
+
+        removeHide(config.show);
+
+        Object.entries(config.defaults).forEach(function([field, value]) {
+          var el = document.getElementById(field);
+          if (!el) return;
+          if (value === null) {
+            el.value = '';
+          } else if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
+            var sourceId = value.slice(2, -2);
+            var sourceEl = document.getElementById(sourceId);
+            el.value = sourceEl ? sourceEl.value : '';
+          } else {
+            el.value = value;
+          }
+        });
+
+        Object.entries(config.handlers).forEach(function([elementId, handlerNames]) {
+          var el = document.getElementById(elementId);
+          if (!el) return;
+          var newEl = el.cloneNode(true);
+          el.parentNode.replaceChild(newEl, el);
+          handlerNames.forEach(function(handlerName) {
+            newEl.addEventListener('change', window[handlerName]);
+          });
+        });
+      }
+
+      function changeTransactionType() {
+        document.getElementById('waluta').disabled = false;
+        clearFields(['konto', 'kontoB', 'data', 'ticker', 'nazwa', 'liczba', 'cena', 'prowizja', 'kursWaluty', 'kursProwizji', 'walutaProwizji', 'nominalna', 'komentarz', 'kwota', 'waluta','split',
+          'kontoDD', 'klasaAktywow', 'klasaAktywowDD', 'tickerDD', 'cash', 'tax', 'wplata'
+        ]);
+
+        var kwotaLabel = document.querySelector('#hideKwota label');
+        kwotaLabel.textContent = 'Kwota w PLN';
+
+        // Reset sekcji prowizji
+        addHide(['hideKursWalutowy', 'hideKursProwizji']);
+        document.getElementById('kursProwizjiInfo').classList.add('d-none');
+        document.getElementById('kursProwizji').disabled = false;
+        document.getElementById('kursProwizjiLabel').textContent = 'PLN';
+        document.getElementById('kursWalutyLabel').textContent = 'PLN';
+      }
+
+      // ============================================================
+      // HANDLERY DROPDOWNÓW
+      // ============================================================
+      function klasaAktywowDropDown() {
+        var item = document.getElementById('klasaAktywowDD');
+        var konto = document.getElementById('kontoDD').value;
+        var transakcja = document.getElementById('rodzajTransakcji').value;
+
+        if (transakcja === 'Split') {
+          var filteredValues = arrayOfValues.filter(function(r) { return r[0] === konto && r[3] !== 'Gotówka' && r[3] !== 'Waluty'; });
+        } else if (transakcja === 'Sprzedaż') {
+          var filteredValues = arrayOfValues.filter(function(r) { return r[0] === konto && r[3] !== 'Gotówka'; });
+        } else {
+          var filteredValues = arrayOfValues.filter(function(r) { return r[0] === konto; });
+        }
+
+        uniqueValuesDD(item, filteredValues, 3);
+      }
+
+      function tickerDropDown() {
+        var item = document.getElementById('tickerDD');
+        if (document.getElementById('rodzajTransakcji').value === 'Zakup') {
+          var klasaAktywow = document.getElementById('klasaAktywow').value;
+        } else {
+          var klasaAktywow = document.getElementById('klasaAktywowDD').value;
+        }
+
+        if (klasaAktywow === 'Gotówka') {
+          item.innerHTML = '<option>Wybierz...</option><option>Gotówka</option>';
+        } else {
+          var konto = document.getElementById('kontoDD').value;
+          var filteredValues = arrayOfValues.filter(function(r) {
+            return r[0] === konto && r[3] === klasaAktywow;
+          });
+          uniqueValuesDD(item, filteredValues, 1);
+        }
+      }
+
+      function uniqueValuesDD(el, arrayOfArrays, index) {
+        el.innerHTML = '<option>Wybierz...</option>';
+        var sorted = arrayOfArrays
+          .map(function(r) { return r[index]; })
+          .filter(function(v, i, arr) { return v !== '' && arr.indexOf(v) === i; })
+          .sort();
+        sorted.forEach(function(value) {
+          var option = document.createElement('option');
+          option.textContent = value;
+          el.appendChild(option);
+        });
+      }
+
+      // ============================================================
+      // HANDLERY TRANSFERU
+      // ============================================================
+      function handleKontoBDropDown() {
+        var kontoA = document.getElementById('kontoDD').value;
+        var item = document.getElementById('kontoBDD');
+        var filtered = arrayOfValues.filter(function(r) { return r[0] !== kontoA; });
+        uniqueValuesDD(item, filtered, 0);
+        document.getElementById('kontoB').value = '';
+        removeHide(['hideKontoB']);
+        handleAutoKomentarzTransfer();
+      }
+
+      function handleKontoB() {
+        var val = document.getElementById('kontoBDD').value;
+        if (val !== 'Wybierz...') {
+          document.getElementById('kontoB').value = val;
+          addHide(['hideKontoB']);
+        } else {
+          document.getElementById('kontoB').value = '';
+          removeHide(['hideKontoB']);
+        }
+        handleAutoKomentarzTransfer();
+      }
+
+      function handleAutoKomentarzTransfer() {
+        var kontoA = document.getElementById('kontoDD').value;
+        var kontoB = document.getElementById('kontoB').value;
+        if (kontoA !== 'Wybierz...' && kontoB !== '') {
+          document.getElementById('komentarz').value = 'Transfer: ' + kontoA + ' → ' + kontoB;
+        }
+      }
+
+      // ============================================================
+      // HANDLERY WIDOCZNOŚCI
+      // ============================================================
+      function hideDiv() {
+        var selectedKlasaAktywow = document.getElementById('klasaAktywow').value;
+        var typObligacji = document.getElementById('obligacjeTyp').value;
+
+        if (selectedKlasaAktywow === 'Obligacje skarbowe polskie' || selectedKlasaAktywow === 'Obligacje korporacyjne polskie') {
+          document.getElementById('hideObligacjeTyp').classList.remove('d-none');
+        } else {
+          document.getElementById('hideObligacjeTyp').classList.add('d-none');
+        }
+
+        if ((selectedKlasaAktywow === 'Obligacje korporacyjne polskie' || selectedKlasaAktywow === 'Obligacje skarbowe polskie') && typObligacji === 'Notowane na Catalyst') {
+          document.getElementById('hideNominalna').classList.remove('d-none');
+          document.getElementById('hideCenaKorpo').classList.remove('d-none');
+        } else {
+          document.getElementById('hideNominalna').classList.add('d-none');
+          document.getElementById('hideCenaKorpo').classList.add('d-none');
+        }
+
+        if (selectedKlasaAktywow === 'Waluty') {
+          addHide(['hideTicker', 'hideTickerDD', 'tickerHelp', 'tickerLabel_2', 'hideNazwa', 'hideCena', 'hideProwizjaSekcja']);
+          document.getElementById('ticker').value = 'Waluta_';
+          document.getElementById('cena').value = 1;
+        } else {
+          removeHide(['hideTicker', 'hideTickerDD', 'tickerHelp', 'tickerLabel_2', 'hideNazwa', 'hideCena', 'hideProwizjaSekcja']);
+          document.getElementById('ticker').value = '';
+          document.getElementById('cena').value = '';
+        }
+      }
+
+      function hideDivSellWaluta() {
+        var selectedKlasaAktywow = document.getElementById('klasaAktywowDD').value;
+        if (selectedKlasaAktywow === 'Waluty') {
+          addHide(['hideTicker', 'tickerHelp', 'tickerLabel_2', 'hideNazwa', 'hideCena', 'hideProwizjaSekcja', 'hideWaluta']);
+          removeHide(['hideKursWalutowy']);
+          document.getElementById('cena').value = 1;
+        } else {
+          removeHide(['hideTickerDD', 'hideCena', 'hideProwizjaSekcja', 'hideWaluta']);
+          addHide(['hideKursWalutowy']);
+        }
+      }
+
+      function hideDivWaluta() {
+        var selectedCurrency = document.getElementById('waluta').value;
+        var selectedRodzajTransakcji = document.getElementById('rodzajTransakcji').value;
+
+        // Aktualizuj label kursu aktywa
+        document.getElementById('kursWalutyLabel').textContent = selectedCurrency;
+
+        if (selectedCurrency === 'PLN' || selectedRodzajTransakcji === 'Split') {
+          document.getElementById('hideKursWalutowy').classList.add('d-none');
+          document.getElementById('hideCash').classList.add('d-none');
+        } else {
+          document.getElementById('hideKursWalutowy').classList.remove('d-none');
+          document.getElementById('hideCash').classList.remove('d-none');
+        }
+
+        // Zaktualizuj stan kursu prowizji gdy waluta aktywa się zmienia
+        updateKursProwizji();
+      }
+
+      function updateKursProwizji() {
+        var walutaAktywa = document.getElementById('waluta').value;
+        var walutaProwizji = document.getElementById('walutaProwizji').value;
+        var kursProwizjiEl = document.getElementById('kursProwizji');
+        var kursProwizjiInfo = document.getElementById('kursProwizjiInfo');
+        var hideKursProwizji = document.getElementById('hideKursProwizji');
+
+        document.getElementById('kursProwizjiLabel').textContent = walutaProwizji;
+        document.getElementById('walutaProwizjiLabel').textContent = walutaProwizji;
+
+        if (walutaProwizji === 'PLN') {
+          hideKursProwizji.classList.add('d-none');
+          kursProwizjiEl.disabled = false;
+          kursProwizjiInfo.classList.add('d-none');
+        } else if (walutaProwizji === walutaAktywa) {
+          hideKursProwizji.classList.remove('d-none');
+          kursProwizjiEl.disabled = true;
+          kursProwizjiEl.value = '';
+          kursProwizjiInfo.classList.remove('d-none');
+        } else {
+          hideKursProwizji.classList.remove('d-none');
+          kursProwizjiEl.disabled = false;
+          kursProwizjiInfo.classList.add('d-none');
+        }
+      }
+
+      function hideKonto() {
+        if (document.getElementById('kontoDD').value !== 'Wybierz...') {
+          document.getElementById('konto').value = document.getElementById('kontoDD').value;
+          addHide(['hideKonto']);
+        } else {
+          document.getElementById('konto').value = '';
+          removeHide(['hideKonto']);
+        }
+      }
+
+      function hideTicker() {
+        if (document.getElementById('tickerDD').value !== 'Wybierz...') {
+          var selectedTicker = document.getElementById('tickerDD').value;
+          document.getElementById('ticker').value = selectedTicker;
+          document.getElementById('nazwa').value = '';
+          addHide(['hideTicker', 'hideNazwa', 'tickerHelp']);
+
+          var rodzajTransakcji = document.getElementById('rodzajTransakcji').value;
+          if (rodzajTransakcji !== 'Dywidenda / Odsetki') {
+            var konto = document.getElementById('kontoDD').value;
+            var klasaAktywow = rodzajTransakcji === 'Zakup'
+              ? document.getElementById('klasaAktywow').value
+              : document.getElementById('klasaAktywowDD').value;
+
+            var match = arrayOfValues.find(function(r) {
+              return r[0] === konto && r[1] === selectedTicker && r[3] === klasaAktywow;
+            });
+
+            if (match && match[4]) {
+              var walutaEl = document.getElementById('waluta');
+              walutaEl.value = match[4];
+              if (rodzajTransakcji === 'Sprzedaż' || rodzajTransakcji === 'Split') {
+                walutaEl.disabled = true;
+              }
+              hideDivWaluta();
+            }
+          }
+        } else {
+          document.getElementById('ticker').value = '';
+          removeHide(['hideTicker', 'hideNazwa', 'tickerHelp']);
+        }
+      }
+
+      function hideWplata() {
+        if (document.getElementById('cash').value === 'Gotówka PLN') {
+          removeHide(['hideWplata']);
+        } else {
+          addHide(['hideWplata']);
+          document.getElementById('wplata').checked = false;
+        }
+      }
+
+      // ============================================================
+      // WALUTA – aktualizacja etykiet
+      // ============================================================
+      document.getElementById('waluta').addEventListener('change', function() {
+        var selectedCurrency = this.value;
+        document.querySelector('#hideKwota label').textContent = 'Kwota (' + selectedCurrency.toUpperCase() + ')';
+        document.querySelector('#hideCena label').textContent = 'Cena (' + selectedCurrency.toUpperCase() + ')';
+      });
+
+      document.getElementById('walutaProwizji').addEventListener('change', function() {
+        updateKursProwizji();
+      });
+
+      // ============================================================
+      // SUBMIT
+      // ============================================================
+      function afterButtonClicked(event) {
+        if (validate()) {
+          const btn = document.getElementById('mainButton');
+          btn.disabled = true;
+          btn.textContent = 'Zapisywanie...';
+
+          var konto = document.getElementById('konto');
+          var data = document.getElementById('data');
+          var ticker = document.getElementById('ticker');
+          var nazwa = document.getElementById('nazwa');
+          var waluta = document.getElementById('waluta');
+          var klasaAktywow = document.getElementById('klasaAktywow');
+          var rodzajTransakcji = document.getElementById('rodzajTransakcji');
+          var liczba = document.getElementById('liczba');
+          var cena = document.getElementById('cena');
+          var prowizja = document.getElementById('prowizja');
+          var kursWaluty = document.getElementById('kursWaluty');
+          var nominalna = document.getElementById('nominalna');
+          var totalPLN = document.getElementById('kwota');
+          var komentarz = document.getElementById('komentarz').value;
+          var kontoDD = document.getElementById('kontoDD');
+          var tickerDD = document.getElementById('tickerDD');
+          var klasaAktywowDD = document.getElementById('klasaAktywowDD');
+          var cash = document.getElementById('cash');
+          var tax = document.getElementById('tax');
+          var wplata = document.getElementById('wplata');
+          var obligacjeTyp = document.getElementById('obligacjeTyp');
+          var walutaProwizji = document.getElementById('walutaProwizji').value;
+          var kursProwizji = document.getElementById('kursProwizji').value;
+
+          // ── Transfer środków ──────────────────────────────────────
+          if (rodzajTransakcji.value === 'Transfer środków') {
+            var rowData = {
+              konto: kontoDD.value,
+              kontoB: document.getElementById('kontoB').value,
+              data: data.value,
+              ticker: 'Gotówka',
+              nazwa: '',
+              waluta: 'PLN',
+              klasaAktywow: 'Gotówka',
+              rodzajTransakcji: 'Transfer środków',
+              liczba: 1,
+              cena: totalPLN.value,
+              prowizja: 0,
+              kursWaluty: '',
+              kursProwizji: '',
+              walutaProwizji: 'PLN',
+              nominalna: 1,
+              totalPLN: totalPLN.value,
+              komentarz: komentarz,
+              cash: 'Gotówka PLN',
+              wplata: false,
+              obligacjeTyp: ''
+            };
+
+            google.script.run
+              .withSuccessHandler(afterSubmit)
+              .withFailureHandler(function(error) {
+                btn.disabled = false;
+                btn.textContent = 'Dodaj transakcję';
+              })
+              .transferSrodkow(rowData);
+            return;
+          }
+
+          // ── Pozostałe typy ────────────────────────────────────────
+          if (rodzajTransakcji.value === 'Sprzedaż') {
+            konto = kontoDD.value;
+            ticker = tickerDD.value;
+            klasaAktywow = klasaAktywowDD.value;
+            liczba = liczba.value;
+          } else if (rodzajTransakcji.value === 'Wypłata środków') {
+            konto = kontoDD.value;
+            ticker = ticker.value;
+            klasaAktywow = klasaAktywow.value;
+            liczba = liczba.value;
+          } else if (rodzajTransakcji.value === 'Koszty') {
+            konto = kontoDD.value;
+            ticker = 'Gotówka';
+            klasaAktywow = 'Gotówka';
+            liczba = liczba.value;
+          } else if (rodzajTransakcji.value === 'Split') {
+            konto = kontoDD.value;
+            ticker = tickerDD.value;
+            klasaAktywow = klasaAktywowDD.value;
+            liczba = split.value;
+          } else if (rodzajTransakcji.value === 'Dywidenda / Odsetki') {
+            konto = kontoDD.value;
+            ticker = ticker.value;
+            klasaAktywow = klasaAktywowDD.value;
+            liczba = liczba.value;
+          } else {
+            konto = konto.value;
+            ticker = ticker.value;
+            klasaAktywow = klasaAktywow.value;
+            liczba = liczba.value;
+          }
+
+          if (rodzajTransakcji.value === 'Dywidenda / Odsetki') {
+            totalPLN = totalPLN.value - tax.value;
+            if (tax.value > 0) {
+              komentarz = 'Pobrany podatek: ' + tax.value + ' ' + waluta.value;
+            }
+          } else {
+            totalPLN = totalPLN.value;
+          }
+
+          var rowData = {
+            konto: konto,
+            data: data.value,
+            ticker: ticker,
+            nazwa: nazwa.value,
+            waluta: waluta.value,
+            klasaAktywow: klasaAktywow,
+            rodzajTransakcji: rodzajTransakcji.value,
+            liczba: liczba,
+            cena: cena.value,
+            prowizja: prowizja.value,
+            walutaProwizji: walutaProwizji,
+            kursProwizji: kursProwizji,
+            kursWaluty: kursWaluty.value,
+            nominalna: nominalna.value,
+            totalPLN: totalPLN,
+            komentarz: komentarz,
+            cash: cash.value,
+            wplata: wplata.checked,
+            obligacjeTyp: obligacjeTyp.value
+          };
+
+          google.script.run
+            .withSuccessHandler(afterSubmit)
+            .withFailureHandler(function(error) {
+              btn.disabled = false;
+              btn.textContent = 'Dodaj transakcję';
+            })
+            .dodajTransakcje(rowData);
+        }
+      }
+
+      function afterSubmit(e) {
+        if (e === 'multiasset') {
+          google.script.run.loadFormMultiasset();
+        } else {
+          google.script.run.loadForm();
+        }
+      }
+
+      function validate() {
+        var rodzajTransakcji = document.getElementById('rodzajTransakcji').value;
+
+        if (rodzajTransakcji === 'Transfer środków') {
+          var kontoA = document.getElementById('kontoDD').value;
+          var kontoB = document.getElementById('kontoB').value;
+          if (kontoA === 'Wybierz...' || kontoA === '') {
+            document.getElementById('kontoDD').classList.add('is-invalid');
+            return false;
+          }
+          if (kontoB === '') {
+            document.getElementById('kontoBDD').classList.add('is-invalid');
+            return false;
+          }
+          if (kontoA === kontoB) {
+            document.getElementById('kontoBDD').classList.add('is-invalid');
+            return false;
+          }
+          if (!document.getElementById('kwota').value || document.getElementById('kwota').value <= 0) {
+            document.getElementById('kwota').classList.add('is-invalid');
+            return false;
+          }
+          return true;
+        }
+
+        var fieldsToValidate = Array.from(document.querySelectorAll('#userform input')).filter(function(el) {
+          return !el.disabled && el.offsetParent !== null;
+        });
+        Array.prototype.forEach.call(fieldsToValidate, function(el) {
+          if (el.checkValidity()) {
+            el.classList.remove('is-invalid');
+          } else {
+            el.classList.add('is-invalid');
+          }
+        });
+        return Array.prototype.every.call(fieldsToValidate, function(el) {
+          return el.checkValidity();
+        });
+      }
+
+      // ============================================================
+      // INICJALIZACJA DROPDOWNÓW Z BACKENDU
+      // ============================================================
+      var accountsLoaded = false;
+      var accountsLoadTimedOut = false;
+      var accountsTimeoutId;
+
+      function showKontoLoadError() {
+        document.getElementById('kontoLoadError').innerHTML =
+          '<small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Problem z załadowaniem listy kont. Odśwież okno lub spróbuj ponownie za chwilę.</small>';
+      }
+
+      function clearKontoLoadError() {
+        document.getElementById('kontoLoadError').innerHTML = '';
+      }
+
+      function afterSlidebarLoads() {
+        var accountsLoaded = false;
+
+        var timeout = setTimeout(function() {
+          var hideKontoDDEl = document.getElementById('hideKontoDD');
+
+          if (
+            !accountsLoaded &&
+            hideKontoDDEl &&
+            !hideKontoDDEl.classList.contains('d-none')
+          ) {
+            document.getElementById('kontoLoadError').innerHTML =
+              '<small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Problem z załadowaniem listy kont. Odśwież okno lub spróbuj ponownie za chwilę.</small>';
+          }
+        }, 10000);
+
+        google.script.run
+          .withSuccessHandler(function(data) {
+            accountsLoaded = true;
+            clearTimeout(timeout);
+            document.getElementById('kontoLoadError').innerHTML = '';
+            afterDropDownArrayReturned(data);
+          })
+          .getDropDownArrayKlasyPortfolio();
+
+        google.script.run
+          .withSuccessHandler(afterDropDownArrayReturnedWaluty)
+          .getDropDownArrayWaluty();
+      }
+
+      function afterDropDownArrayReturned(arrayOfArrays) {
+        arrayOfValues = arrayOfArrays.filter(function(r) { return true; });
+        var item = document.getElementById('kontoDD');
+        uniqueValuesDD(item, arrayOfValues, 0);
+        klasaAktywowDropDown();
+        tickerDropDown();
+      }
+
+      function afterDropDownArrayReturnedWaluty(arrayOfArrays) {
+        // Wypełnij dropdown waluty instrumentu
+        var item = document.getElementById('waluta');
+        arrayOfArrays.forEach(function(r) {
+          var option = document.createElement('option');
+          option.textContent = r;
+          item.appendChild(option);
+        });
+
+        // Wypełnij dropdown waluty prowizji – ta sama lista
+        var itemProwizji = document.getElementById('walutaProwizji');
+        arrayOfArrays.forEach(function(r) {
+          var option = document.createElement('option');
+          option.textContent = r;
+          itemProwizji.appendChild(option);
+        });
+      }
+
+      // ============================================================
+      // GLOBALNE EVENT LISTENERY
+      // ============================================================
+      document.getElementById('rodzajTransakcji').addEventListener('change', changeTransactionType);
+      document.getElementById('rodzajTransakcji').addEventListener('change', hideDivTransakcje);
+      document.getElementById('waluta').addEventListener('change', hideDivWaluta);
+      document.getElementById('klasaAktywow').addEventListener('change', hideDiv);
+      document.getElementById('obligacjeTyp').addEventListener('change', hideDiv);
+      document.getElementById('cash').addEventListener('change', hideWplata);
+      document.getElementById('kontoDD').addEventListener('change', klasaAktywowDropDown);
+      document.getElementById('kontoDD').addEventListener('change', tickerDropDown);
+      document.getElementById('klasaAktywowDD').addEventListener('change', tickerDropDown);
+      document.getElementById('mainButton').addEventListener('click', afterButtonClicked);
+      document.addEventListener('DOMContentLoaded', afterSlidebarLoads);
+    </script>
+
+  </body>
+</html>

@@ -18,7 +18,7 @@ The access patterns never read prices, transactions and holdings in one request;
 
 On-demand billing is per request and per GB with no per-table fee, so three tables cost the same as one.
 
-**Holdings are derived, never edited.** As in the reference spreadsheet ([ReferenceFeatures.md](ReferenceFeatures.md)), positions follow from transactions. The valuation job is the only writer of `holdings`; any change to transactions or prices is followed by a revaluation.
+**Holdings are derived, never edited.** As in the reference spreadsheet ([reference/ReferenceFeatures.md](reference/ReferenceFeatures.md)), positions follow from transactions. The valuation job is the only writer of `holdings`; any change to transactions or prices is followed by a revaluation.
 
 ## Common layout
 

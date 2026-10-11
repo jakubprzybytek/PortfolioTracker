@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+      .form-label { font-size: 0.875rem; }
+      .form-control, .form-select { font-size: 0.875rem; }
+      .form-check-label {
+        font-size: 0.875rem;
+        text-align: justify;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container pt-2" id="userform_Obligacje">
+      <div class="row">
+        <div class="d-flex justify-content-between align-items-center">
+          <label for="kontoDD" class="form-label mb-0" id="kontoLabel_2">
+            Konto<br>
+            <span class="text-muted" style="font-size: 0.8rem;">(Podaj lub wybierz z listy)</span>
+          </label>
+          <a href="https://inwestomat.eu/wlasny-arkusz-do-monitorowania-inwestycji/" target="_blank" class="text-muted small">
+            <i class="bi bi-book"></i> Instrukcja
+          </a>
+        </div>
+        <div class="col mb-2" id="hideKontoDD">
+          <select class="form-select" id="kontoDD"></select>
+        </div>
+        <div class="col mb-2" id="hideKonto">
+          <input type="text" class="form-control" id="konto" placeholder="Podaj konto" required>
+          <div class="invalid-feedback">Wprowadź konto</div>
+        </div>
+      </div>
+      <div class="mb-2">
+        <label for="typObligacji" class="form-label">Rodzaj obligacji</label>
+        <select class="form-select" id="typObligacji">
+          <option>Wybierz...</option>
+          <option>EDO</option>
+          <option>COI</option>
+          <option>ROS</option>
+          <option>ROD</option>
+          <option>TOS</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label for="data" class="form-label">Data zakupu</label>
+        <input type="date" id="data" class="form-control" required>
+        <div class="invalid-feedback">Wybierz date zakupu</div>
+      </div>
+      <div class="mb-2">
+        <label for="liczba" class="form-label">Liczba zakupionych obligacji</label>
+        <input type="number" class="form-control" id="liczba" min="0" step="1" required>
+        <small id="nazwaHelpBlock" class="form-text text-muted">1 obligacja = 100zł</small>
+        <div class="invalid-feedback">Wprowadź liczbę</div>
+      </div>
+      <div class="mb-2 d-none" id="hide1rok">
+        <label for="pierwszyRok" class="form-label">Oprocentowanie w pierwszym roku [%]</label>
+        <input type="number" class="form-control" id="pierwszyRok" min="0" step="0.01" required>
+        <div class="invalid-feedback">Wprowadź oprocentowanie w pierwszym roku</div>
+      </div>
+      <div class="mb-2 d-none" id="hideMarza">
+        <label for="marza" class="form-label">Marża w kolejnych latach [%]</label>
+        <input type="number" class="form-control" id="marza" min="0" step="0.01" required>
+        <div class="invalid-feedback">Wprowadź marże</div>
+      </div>
+      <div class="mb-2 d-none" id="hideProcTOS">
+        <label for="procTos" class="form-label">Oprocentowanie roczne [%]</label>
+        <input type="number" class="form-control" id="procTos" min="0" step="0.01" required>
+        <div class="invalid-feedback">Wprowadź oprocentowanie w skali roku</div>
+      </div>
+
+      <!-- PRZYCISK POBIERZ OPROCENTOWANIE -->
+      <div class="mb-2 d-none" id="hidePobierzOpr">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPobierzOpr">
+          <i class="bi bi-cloud-download"></i> Pobierz oprocentowanie
+        </button>
+        <div id="msgPobierzOpr" class="form-text mt-1"></div>
+      </div>
+
+      <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" role="switch" id="dyskonto">
+        <label class="form-check-label" for="dyskonto">Zaznacz, jeżeli obligacje zakupiono z dyskontem</label>
+      </div>
+      <div class="mb-2">
+        <button class="btn btn-primary mb-5" id="mainButton">Dodaj obligacje</button>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+
+      // ============================================================
+      // ISTNIEJĄCA LOGIKA FORMULARZA
+      // ============================================================
+
+      function afterButtonClickedObl(){
+        event.preventDefault();
+        if(validateObl()){
+          var btn = document.getElementById("mainButton");
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Dodawanie...';
+
+          var konto = document.getElementById("konto");
+          var typObligacji = document.getElementById("typObligacji");
+          var data = document.getElementById("data");
+          var liczba = document.getElementById("liczba");
+          var pierwszyRok = document.getElementById("pierwszyRok").value;
+          var marza = document.getElementById("marza").value;
+          var dyskonto = document.getElementById("dyskonto");
+          var procTos = document.getElementById("procTos");
+
+          if(typObligacji.value == 'TOS') {
+            pierwszyRok = document.getElementById("procTos").value;
+            marza = ''
+          }
+
+          var rowDataObligacje = {
+            konto: konto.value,
+            typObligacji: typObligacji.value,
+            data: data.value,
+            liczba: liczba.value,
+            pierwszyRok: pierwszyRok,
+            marza: marza,
+            dyskonto: dyskonto.checked
+          };
+          google.script.run.withSuccessHandler(afterSubmitObl).dodajObligacjeNew(rowDataObligacje);
+        }
+      }
+
+      function afterSubmitObl(e){
+        var btn = document.getElementById("mainButton");
+        btn.disabled = false;
+        btn.innerHTML = 'Dodaj obligacje';
+
+        clearFieldsObl(["konto","kontoDD","typObligacji","data","liczba","pierwszyRok","marza",'procTos',"dyskonto"]);
+        document.getElementById("hideKonto").classList.remove("d-none");
+        addHide(["hide1rok","hideMarza","hideProcTOS","hidePobierzOpr"]);
+        ustawKomunikatPobierz('', '');
+      }
+
+      function removeHide(fields){
+        fields.forEach(function(field){
+          document.getElementById(field).classList.remove("d-none");
+        });
+      }
+
+      function addHide(fields){
+        fields.forEach(function(field){
+          document.getElementById(field).classList.add("d-none");
+        });
+      }
+
+      function clearFieldsObl(fields){
+        fields.forEach(function(field){
+          var el = document.getElementById(field);
+          if(field == "typObligacji" || field == "kontoDD"){
+            el.value = "Wybierz..."
+          } else if (field == "dyskonto"){
+            el.checked = false
+          } else {
+            el.value = "";
+          }
+        });
+      }
+
+      function validateObl(){
+        var fieldsToValidate = document.querySelectorAll("#userform_Obligacje input");
+        Array.prototype.forEach.call(fieldsToValidate, function(el){
+          if(el.checkValidity()){
+            el.classList.remove("is-invalid");
+          } else {
+            el.classList.add("is-invalid");
+          }
+        });
+        return Array.prototype.every.call(fieldsToValidate, function(el){
+          return el.checkValidity();
+        });
+      }
+
+      function afterSlidebarLoads(){
+        google.script.run.withSuccessHandler(afterDropDownArrayReturned).getDropDownArrayKlasyPortfolio();
+      }
+
+      function uniqueValuesDD(el, arrayOfArrays, index){
+        var currentlyAdded = [];
+        el.innerHTML = '<option>Wybierz...</option>';
+        arrayOfArrays.forEach(function(r){
+          if(currentlyAdded.indexOf(r[index]) == -1 && r[index] != ""){
+            var option = document.createElement("option");
+            option.textContent = r[index];
+            el.appendChild(option);
+            currentlyAdded.push(r[index]);
+          }
+        });
+      }
+
+      function afterDropDownArrayReturned(arrayOfArrays){
+        arrayOfValues = arrayOfArrays.filter(function(r){ return true; });
+        var item = document.getElementById("kontoDD");
+        uniqueValuesDD(item, arrayOfValues, 0);
+      }
+
+      function hideKonto(){
+        if(document.getElementById("kontoDD").value != "Wybierz..."){
+          document.getElementById("konto").value = document.getElementById("kontoDD").value;
+          document.getElementById("hideKonto").classList.add("d-none");
+        } else {
+          document.getElementById("konto").value = "";
+          document.getElementById("hideKonto").classList.remove("d-none");
+        }
+      }
+
+      function hideMarza(){
+        selectedTypObligacji = document.getElementById("typObligacji").value;
+        if(selectedTypObligacji == 'TOS'){
+          document.getElementById("hideProcTOS").classList.remove("d-none");
+          document.getElementById("hide1rok").classList.add("d-none");
+          document.getElementById("hideMarza").classList.add("d-none");
+          document.getElementById("pierwszyRok").value = 1;
+          document.getElementById("marza").value = 1;
+          document.getElementById("procTos").value = '';
+        } else {
+          document.getElementById("hideProcTOS").classList.add("d-none");
+          document.getElementById("hide1rok").classList.remove("d-none");
+          document.getElementById("hideMarza").classList.remove("d-none");
+          document.getElementById("pierwszyRok").value = '';
+          document.getElementById("marza").value = '';
+          document.getElementById("procTos").value = 1;
+        }
+        // Pokaż przycisk pobierania i wyczyść poprzedni komunikat
+        document.getElementById("hidePobierzOpr").classList.remove("d-none");
+        ustawKomunikatPobierz('', '');
+      }
+
+      // ============================================================
+      // POBIERANIE OPROCENTOWANIA Z MF
+      // ============================================================
+
+      function ustawKomunikatPobierz(tekst, typ) {
+        var msg = document.getElementById("msgPobierzOpr");
+        msg.textContent = tekst;
+        msg.className = 'form-text mt-1 ' + typ;
+      }
+
+      function pobierzOprocentowanie() {
+        var typObligacji = document.getElementById("typObligacji").value;
+        var data         = document.getElementById("data").value;
+
+        if (!typObligacji || typObligacji === 'Wybierz...') {
+          ustawKomunikatPobierz('Najpierw wybierz rodzaj obligacji.', 'text-danger');
+          return;
+        }
+        if (!data) {
+          ustawKomunikatPobierz('Najpierw podaj datę zakupu.', 'text-danger');
+          return;
+        }
+
+        var btn = document.getElementById("btnPobierzOpr");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Pobieranie...';
+        ustawKomunikatPobierz('', '');
+
+        google.script.run
+          .withSuccessHandler(function(wynik) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cloud-download"></i> Pobierz oprocentowanie';
+
+            var opr1  = wynik.opr1  !== null ? Math.round(wynik.opr1  * 100 * 100) / 100 : null;
+            var marza = wynik.marza !== null ? Math.round(wynik.marza * 100 * 100) / 100 : null;
+
+            if (wynik.staleCena) {
+              if (opr1 !== null) document.getElementById("procTos").value = opr1;
+            } else {
+              if (opr1  !== null) document.getElementById("pierwszyRok").value = opr1;
+              if (marza !== null) document.getElementById("marza").value = marza;
+            }
+            ustawKomunikatPobierz('Pobrano dla serii ' + wynik.seria + '.', 'text-success');
+          })
+          .withFailureHandler(function(err) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cloud-download"></i> Pobierz oprocentowanie';
+            ustawKomunikatPobierz(
+              'Nie udało się pobrać danych (' + (err.message || err) + '). Spróbuj ponownie lub wpisz oprocentowanie ręcznie.',
+              'text-danger'
+            );
+          })
+          .pobierzOprocentowanieZFrontendu(typObligacji, data);
+      }
+
+      // ============================================================
+      // EVENT LISTENERS
+      // ============================================================
+
+      document.getElementById("mainButton").addEventListener("click", afterButtonClickedObl);
+      document.getElementById("kontoDD").addEventListener("change", hideKonto);
+      document.getElementById("typObligacji").addEventListener("change", hideMarza);
+      document.getElementById("btnPobierzOpr").addEventListener("click", pobierzOprocentowanie);
+      document.addEventListener("DOMContentLoaded", afterSlidebarLoads);
+    </script>
+  </body>
+</html>

@@ -78,11 +78,14 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - **A missed day is lost for good.** It can't be re-fetched later; it can only come from a backfill source.
 - **Parsing:** the bid/ask cells contain sub-values, so data cells don't line up with header cells. Read cells by position, and check the expected count per row.
 - **Clean price:** prices exclude accrued interest; market value = clean % × nominal + accrued interest.
+- **Instruments list** `o-instrumentach-instrumenty-notowane`: every listed bond with its current nominal and accrued interest on one page. The reference sheet reads both from it (see reference/ReferenceFeatures.md); a candidate cross-check for our computed accrued interest.
+- The reference sheet parses the quotes page by position too: ticker in the first or second cell, market code next, reference price 3 cells after the ticker, last price 9 cells after; rows with market other than `GPW` are skipped.
 
 ### Bossa (DM BOŚ) EOD files – Catalyst backfill candidate
 - bossa.pl → Pliki z danymi → EOD (login required). Terms: personal, non-commercial use only.
 - Historically the standard free source of full GPW/Catalyst history (MetaStock and text formats). **Current contents are not yet verified.**
 - bossaAPI is not usable: NOL3 has been unavailable since 2026-10-02 and the new API is in a private pilot.
+- **Website quote JSON (not verified):** the reference sheet reads current quotes from `bossa.pl/fl_api/API/GPW/v2/Q/C/<category>` (`_cat_shares`, `_cat_nConnect`, `_cat_etf`, `_cat_bonds`): one request per category, fields `_quote`, `_quote_ref`, `_change_pnts`, `_change_proc`. An undocumented endpoint behind the website: check terms and whether `_cat_bonds` covers Catalyst corporates before relying on it.
 
 ### GUS BDL – CPI
 - `bdl.stat.gov.pl/api/v1`, free API key. Monthly CPI (y/y, previous year = 100); used for EDO/COI/ROD rate resets and IZ indexation.

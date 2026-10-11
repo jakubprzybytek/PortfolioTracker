@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investment Allocation Form</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    .form-label { font-size: 0.875rem; }
+    .form-control, .form-select { font-size: 0.875rem; }
+    .form-check-label {
+      font-size: 0.875rem;
+      text-align: justify;
+    }
+    #totalAllocationMessage { margin-top: 5px; }
+    .green-text { color: green; }
+    .red-text { color: red; }
+  </style>
+</head>
+
+<body>
+  <div class="container pt-2 pb-3">
+    <form id="investmentForm">
+      <!-- Ticker -->
+      <div class="col mb-2">
+        <div class="d-flex justify-content-between align-items-center">
+          <label for="tickers" class="form-label mb-0" style="font-weight: bold;">Ticker</label>
+          <a href="https://inwestomat.eu/wlasny-arkusz-do-monitorowania-inwestycji/" target="_blank" class="text-muted small">
+            <i class="bi bi-book"></i> Instrukcja
+          </a>
+        </div>
+        <small class="form-text text-muted d-block mb-1">Przypisz każdej klasie aktywów wartości od 0 do 100, zgodnie z ich udziałem w funduszu / ETFie</small>
+        <select id="tickers" class="form-select"></select>
+        <div id="noTickersMessage" class="red-text small"></div>
+      </div>
+
+      <hr>
+      <div class="row mb-3">
+        <label class="form-label d-block" style="font-weight: bold;">Akcje</label>
+        <div class="col">
+          <label for="akcjePolskie" class="form-label">Polskie</label>
+          <input type="number" class="form-control" id="akcjePolskie" value="0" min="0" max="100" step="0.01">
+        </div>
+        <div class="col">
+          <label for="akcjeZagraniczne" class="form-label">Zagraniczne</label>
+          <input type="number" class="form-control" id="akcjeZagraniczne" value="0" min="0" max="100" step="0.01">
+        </div>
+      </div>
+      <hr>
+      <div class="row mb-3">
+        <label class="form-label d-block" style="font-weight: bold;">Obligacje skarbowe</label>
+        <div class="col">
+          <label for="obligacjeSkarbowePolskie" class="form-label">Polskie</label>
+          <input type="number" class="form-control" id="obligacjeSkarbowePolskie" value="0" min="0" max="100" step="0.01">
+        </div>
+        <div class="col">
+          <label for="obligacjeSkarboweZagraniczne" class="form-label">Zagraniczne</label>
+          <input type="number" class="form-control" id="obligacjeSkarboweZagraniczne" value="0" min="0" max="100" step="0.01">
+        </div>
+      </div>
+      <hr>
+      <div class="row mb-3">
+        <label class="form-label d-block" style="font-weight: bold;">Obligacje korporacyjne</label>
+        <div class="col">
+          <label for="obligacjeKorporacyjnePolskie" class="form-label">Polskie</label>
+          <input type="number" class="form-control" id="obligacjeKorporacyjnePolskie" value="0" min="0" max="100" step="0.01">
+        </div>
+        <div class="col">
+          <label for="obligacjeKorporacyjneZagraniczne" class="form-label">Zagraniczne</label>
+          <input type="number" class="form-control" id="obligacjeKorporacyjneZagraniczne" value="0" min="0" max="100" step="0.01">
+        </div>
+      </div>
+      <hr>
+      <div class="row mb-3">
+        <label class="form-label d-block" style="font-weight: bold;">Inne</label>
+        <div class="col">
+          <label for="metaleISurowce" class="form-label">Metale i surowce</label>
+          <input type="number" class="form-control" id="metaleISurowce" value="0" min="0" max="100" step="0.01">
+        </div>
+        <div class="col">
+          <label for="kryptowaluty" class="form-label">Kryptowaluty</label>
+          <input type="number" class="form-control" id="kryptowaluty" value="0" min="0" max="100" step="0.01">
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col">
+          <label for="gotowka" class="form-label">Gotówka</label>
+          <input type="number" class="form-control" id="gotowka" value="0" min="0" max="100" step="0.01">
+        </div>
+        <div class="col">
+          <label for="inne" class="form-label">Inne</label>
+          <input type="number" class="form-control" id="inne" value="0" min="0" max="100" step="0.01">
+        </div>
+      </div>
+      <hr>
+
+      <div class="row mb-3">
+        <div class="col">
+          <label for="totalAllocation" class="form-label" style="font-weight: bold;">Łączna alokacja</label>
+          <input type="text" class="form-control" id="totalAllocation" readonly>
+          <div id="totalAllocationMessage"></div>
+        </div>
+      </div>
+
+      <div id="errorMessage" class="red-text mb-2"></div>
+
+      <button type="submit" class="btn btn-primary mb-5" id="submit">Zapisz alokacje</button>
+    </form>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function calculateTotalAllocation() {
+      var inputs = document.querySelectorAll('input[type="number"]');
+      var total = 0;
+      inputs.forEach(function(input) {
+        total += parseFloat(input.value);
+      });
+      return parseFloat(total.toFixed(2));
+    }
+
+    function updateTotalAllocationDisplay() {
+      var totalAllocationInput = document.getElementById('totalAllocation');
+      var totalAllocation = calculateTotalAllocation();
+      totalAllocationInput.value = totalAllocation;
+
+      var totalAllocationMessage = document.getElementById('totalAllocationMessage');
+      if (totalAllocation !== 100) {
+        totalAllocationMessage.innerHTML = '<span class="red-text">Łączna alokacja musi wynosić dokładnie 100</span>';
+      } else {
+        totalAllocationMessage.innerHTML = '<span class="green-text">Łączna alokacja jest poprawna</span>';
+      }
+    }
+
+    function onError(error) {
+      var btn = document.getElementById("submit");
+      btn.disabled = false;
+      btn.innerHTML = 'Zapisz alokacje';
+      document.getElementById("errorMessage").textContent = "Błąd zapisu: " + error.message;
+    }
+
+    function afterSubmit(response) {
+      google.script.host.close();
+    }
+
+    function afterButtonClicked(event) {
+      event.preventDefault();
+
+      var ticker = document.getElementById("tickers").value;
+      if (!ticker) {
+        document.getElementById("noTickersMessage").textContent = "Wybierz ticker przed zapisem.";
+        return;
+      } else {
+        document.getElementById("noTickersMessage").textContent = "";
+      }
+
+      var total = calculateTotalAllocation();
+      if (total !== 100) {
+        return;
+      }
+
+      var btn = document.getElementById("submit");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Zapisywanie...';
+
+      var formData = {
+        tickers: ticker,
+        akcjePolskie: document.getElementById("akcjePolskie").value,
+        akcjeZagraniczne: document.getElementById("akcjeZagraniczne").value,
+        obligacjeSkarbowePolskie: document.getElementById("obligacjeSkarbowePolskie").value,
+        obligacjeSkarboweZagraniczne: document.getElementById("obligacjeSkarboweZagraniczne").value,
+        obligacjeKorporacyjnePolskie: document.getElementById("obligacjeKorporacyjnePolskie").value,
+        obligacjeKorporacyjneZagraniczne: document.getElementById("obligacjeKorporacyjneZagraniczne").value,
+        metaleISurowce: document.getElementById("metaleISurowce").value,
+        kryptowaluty: document.getElementById("kryptowaluty").value,
+        inne: document.getElementById("inne").value,
+        gotowka: document.getElementById("gotowka").value
+      };
+
+      google.script.run
+        .withSuccessHandler(afterSubmit)
+        .withFailureHandler(onError)
+        .submitInvestmentForm(formData);
+    }
+
+    document.querySelectorAll('input[type="number"]').forEach(function(input) {
+      input.addEventListener('change', function() {
+        updateTotalAllocationDisplay();
+      });
+    });
+
+    updateTotalAllocationDisplay();
+
+    function populateTickersDropdown() {
+      google.script.run.withSuccessHandler(function(tickers) {
+        var tickersDropdown = document.getElementById('tickers');
+        var noTickersMessage = document.getElementById('noTickersMessage');
+        tickersDropdown.innerHTML = '';
+        if (tickers.length === 0) {
+          noTickersMessage.textContent = 'Wszystkie aktywa multi-asset zostały skonfigurowane. Jeżeli chcesz dokonać zmian, zrób to bezpośrednio w arkuszu Multi-asset.';
+        } else {
+          noTickersMessage.textContent = '';
+          tickers.forEach(function(ticker) {
+            var option = document.createElement('option');
+            option.value = ticker;
+            option.text = ticker;
+            tickersDropdown.appendChild(option);
+          });
+        }
+      }).getMultiassetsTickers();
+    }
+
+    window.onload = function() {
+      populateTickersDropdown();
+    };
+
+    document.getElementById("investmentForm").addEventListener("submit", afterButtonClicked);
+  </script>
+</body>
+</html>

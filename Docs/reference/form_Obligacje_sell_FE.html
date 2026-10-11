@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+      .form-label { font-size: 0.875rem; }
+      .form-control, .form-select { font-size: 0.875rem; }
+      .form-check-label {
+        font-size: 0.875rem;
+        text-align: justify;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container pt-2" id="userform_Obligacje">
+      <!-- Konto -->
+      <div class="row">
+        <div class="d-flex justify-content-between align-items-center">
+          <label for="kontoDD" class="form-label mb-0" id="kontoLabel">Wybierz konto</label>
+          <a href="https://inwestomat.eu/wlasny-arkusz-do-monitorowania-inwestycji/" target="_blank" class="text-muted small">
+            <i class="bi bi-book"></i> Instrukcja
+          </a>
+        </div>
+        <div class="col mb-2">
+          <select class="form-select" id="kontoDD"></select>
+        </div>
+      </div>
+      <!-- Ticker -->
+      <div class="row">
+        <label for="tickerDD" class="form-label" id="tickerLabel">Wybierz ticker</label>
+        <div class="col mb-2">
+          <select class="form-select" id="tickerDD"></select>
+        </div>
+      </div>
+      <!-- Data -->
+      <div class="mb-2">
+        <label for="data" class="form-label">Data sprzedaży</label>
+        <input type="date" id="data" class="form-control" required>
+        <div class="invalid-feedback">Wybierz date sprzedaży</div>
+      </div>
+      <!-- Liczba sprzedanych obligacji -->
+      <div class="mb-2">
+        <label for="liczba" class="form-label">Liczba sprzedanych obligacji</label>
+        <input type="number" class="form-control" id="liczba" min="0" step="1" required>
+        <small class="form-text text-muted">1 obligacja = 100zł</small>
+        <div class="invalid-feedback">Wprowadź liczbę</div>
+      </div>
+      <!-- Prowizja -->
+      <div class="mb-2">
+        <label for="prowizja" class="form-label">Opłata za przedterminowy wykup (łączna)</label>
+        <input type="number" class="form-control" id="prowizja" min="0" step="0.01" value="0">
+      </div>
+      <!-- TotalPLN -->
+      <div class="mb-2">
+        <label for="kwota" class="form-label">Łączna uzyskana kwota</label>
+        <i id="helpIcon2" class="bi bi-question-circle" data-bs-toggle="tooltip" title="Wprowadź łączną kwotę, która trafiła na Twoje konto bankowe w wyniku sprzedaży"></i>
+        <input type="number" class="form-control" id="kwota" min="0" step="0.01" value="0">
+        <small class="form-text text-muted">Obie powyższe kwoty znajdziesz w historii dyspozycji na rachunku rejestrowym</small>
+      </div>
+      <!-- Przycisk -->
+      <div class="mb-2">
+        <button class="btn btn-primary mb-5" id="mainButton">Sprzedaj obligacje</button>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+
+      function afterButtonClickedOblSell(){
+        event.preventDefault();
+        if(validateObl()){
+          var btn = document.getElementById("mainButton");
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Dodawanie...';
+
+          var rowDataObligacje = {
+            konto: document.getElementById("kontoDD").value,
+            ticker: document.getElementById("tickerDD").value,
+            data: document.getElementById("data").value,
+            liczba: document.getElementById("liczba").value,
+            prowizja: document.getElementById("prowizja").value,
+            totalPLN: document.getElementById("kwota").value
+          };
+          google.script.run.withSuccessHandler(afterSubmitObl).sprzedajObligacje(rowDataObligacje);
+        }
+      }
+
+      function afterSubmitObl(e){
+        var btn = document.getElementById("mainButton");
+        btn.disabled = false;
+        btn.innerHTML = 'Sprzedaj obligacje';
+
+        clearFieldsObl(["kontoDD","tickerDD","data","liczba","prowizja","kwota"]);
+      }
+
+      function clearFieldsObl(fields){
+        fields.forEach(function(field){
+          var el = document.getElementById(field);
+          if(field == "tickerDD" || field == "kontoDD"){
+            el.value = "Wybierz..."
+          } else if(field == "dyskonto"){
+            el.checked = false
+          } else {
+            el.value = "";
+          }
+        });
+      }
+
+      function validateObl(){
+        var fieldsToValidate = document.querySelectorAll("#userform_Obligacje input");
+        Array.prototype.forEach.call(fieldsToValidate, function(el){
+          if(el.checkValidity()){
+            el.classList.remove("is-invalid");
+          } else {
+            el.classList.add("is-invalid");
+          }
+        });
+        return Array.prototype.every.call(fieldsToValidate, function(el){
+          return el.checkValidity();
+        });
+      }
+
+      function afterSlidebarLoads(){
+        google.script.run.withSuccessHandler(afterDropDownArrayReturned).getDropDownArrayKlasyPortfolio();
+      }
+
+      function uniqueValuesDD(el, arrayOfArrays, index){
+        var currentlyAdded = [];
+        el.innerHTML = '<option>Wybierz...</option>';
+        arrayOfArrays.forEach(function(r){
+          if(currentlyAdded.indexOf(r[index]) == -1 && r[index] != ""){
+            var option = document.createElement("option");
+            option.textContent = r[index];
+            el.appendChild(option);
+            currentlyAdded.push(r[index]);
+          }
+        });
+      }
+
+      function afterDropDownArrayReturned(arrayOfArrays){
+        arrayOfValues = arrayOfArrays.filter(function(r){ return true; });
+        var item = document.getElementById("kontoDD");
+        uniqueValuesDD(item, arrayOfValues, 0);
+        tickerDropDown();
+      }
+
+      function tickerDropDown(){
+        var item = document.getElementById("tickerDD");
+        var klasaAktywow = "Obligacje skarbowe polskie";
+        var konto = document.getElementById("kontoDD").value;
+        var prefixes = ["EDO", "COI", "ROS", "ROD", "TOS"];
+
+        var filteredValues = arrayOfValues.filter(function(r){
+          return r[0] === konto &&
+                 r[3] === klasaAktywow &&
+                 prefixes.some(prefix => r[1].startsWith(prefix));
+        });
+
+        var tickers = filteredValues.map(function(r){ return r[1]; });
+        var sortedTickers = sortTickers(tickers);
+
+        filteredValues.sort(function(a, b){
+          return sortedTickers.indexOf(a[1]) - sortedTickers.indexOf(b[1]);
+        });
+
+        uniqueValuesDD(item, filteredValues, 1);
+      }
+
+      function sortTickers(tickers){
+        return tickers.sort(function(a, b){
+          var prefixA = a.split('-')[0];
+          var prefixB = b.split('-')[0];
+          var dateA = a.split('-')[1];
+          var dateB = b.split('-')[1];
+          if(prefixA < prefixB) return -1;
+          if(prefixA > prefixB) return 1;
+          return compareDates(dateA, dateB);
+        });
+      }
+
+      function compareDates(dateA, dateB){
+        var dayA = parseInt(dateA.substring(0, 2));
+        var monthA = parseInt(dateA.substring(2, 4));
+        var yearA = parseInt(dateA.substring(4, 6));
+        var dayB = parseInt(dateB.substring(0, 2));
+        var monthB = parseInt(dateB.substring(2, 4));
+        var yearB = parseInt(dateB.substring(4, 6));
+        return new Date(2000 + yearA, monthA - 1, dayA) - new Date(2000 + yearB, monthB - 1, dayB);
+      }
+
+      document.getElementById("mainButton").addEventListener("click", afterButtonClickedOblSell);
+      document.getElementById("kontoDD").addEventListener("change", tickerDropDown);
+      document.addEventListener("DOMContentLoaded", afterSlidebarLoads);
+    </script>
+  </body>
+</html>
