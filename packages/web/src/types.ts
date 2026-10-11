@@ -1,5 +1,7 @@
 // API response shapes, taken from the core item types (type-only import: nothing from core is bundled).
-import type { BackfillItem, HoldingSnapshot, InstrumentItem, PriceItem, SnapshotItem, TransactionItem } from "@portfolio/core";
+import type { BackfillItem, HoldingSnapshot, InstrumentItem, PriceItem, PriceRow, SnapshotItem, TransactionItem } from "@portfolio/core";
+
+export type { PriceRow };
 
 export type Holding = HoldingSnapshot;
 export type Snapshot = SnapshotItem;

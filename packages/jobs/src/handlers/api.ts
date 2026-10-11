@@ -2,7 +2,7 @@
 // in one of the stage's access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
-import { addDays, today } from "@portfolio/core";
+import { addDays, priceRows, today, type PriceItem } from "@portfolio/core";
 import { hasAnyGroup } from "../lib/access.ts";
 import { repo } from "../lib/context.ts";
 
@@ -49,6 +49,23 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         if (!inst) return json(404, { error: "Unknown instrument" });
         const prices = await repo.queryPrices(isin, inst.venue, from, to);
         return json(200, prices.map(({ PK: _p, SK: _s, ...rest }) => rest));
+      }
+      case "GET /prices": {
+        // Held instruments (latest snapshot): latest price, its date, and the price a year earlier.
+        const [snap, instruments] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments()]);
+        const held = new Set((snap?.holdings ?? []).filter((h) => h.quantity > 0).map((h) => h.isin));
+        const shown = instruments.filter((i) => held.has(i.isin));
+        const day = today();
+        const latest = new Map<string, PriceItem>();
+        const yearAgo = new Map<string, PriceItem>();
+        await Promise.all(
+          shown.map(async (i) => {
+            const [now, then] = await Promise.all([repo.latestPrice(i.isin, i.venue, day), repo.latestPrice(i.isin, i.venue, addDays(day, -365))]);
+            if (now) latest.set(i.isin, now);
+            if (then) yearAgo.set(i.isin, then);
+          }),
+        );
+        return json(200, priceRows(shown, latest, yearAgo, day));
       }
       case "GET /transactions": {
         // All transactions, newest first, with the instrument's code, name and type (none for cash movements).

@@ -1,6 +1,6 @@
 # UI
 
-A small React app (Vite, `sst.aws.StaticSite`) that reads through the `api` Lambda. Three views, switched from a menu on the left (a top bar on narrow screens).
+A small React app (Vite, `sst.aws.StaticSite`) that reads through the `api` Lambda. Four views, switched from a menu on the left (a top bar on narrow screens).
 
 ## Navigation
 
@@ -10,6 +10,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 |---|---|
 | `#/` | Dashboard (default) |
 | `#/holdings?account=…&type=…` | Holdings |
+| `#/prices?chart=<ISIN>` | Prices |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 
 Changing a filter replaces the history entry, so "back" goes to the previous view, not the previous filter. No router library: `packages/web/src/route.ts`.
@@ -33,6 +34,14 @@ From the latest snapshot (`SNAP#LATEST`), one row per account and instrument.
 - **Columns:** instrument (code + name), asset type, quantity, clean price (% of nominal; price date on hover), accrued interest per bond, value, cost, gain (PLN, %), coupons received.
 - **Filters:** account, asset type; "Reset" clears them; "n of m holdings".
 
+## Prices
+
+Kept deliberately short (a passive portfolio needs no daily statistics): what each held instrument is worth per unit, and whether that price is current.
+
+- **One row per held instrument** (latest snapshot), sorted by code; no filters.
+- **Columns:** instrument (code + name), type, price (bonds: clean, % of nominal; others: in their currency), price date (grey with a "stale" tag when older than a week), **1 year**: change since the price on or before the same day a year earlier (hover shows that price and date; "–" without a year of history).
+- **Click a row:** its price chart opens below (range selector, transactions as markers); click again to close. The open chart is in the URL (`?chart=<ISIN>`).
+
 ## Transactions
 
 All transactions from `GET /transactions`.
@@ -51,6 +60,7 @@ All transactions from `GET /transactions`.
 | `GET /instruments` | instruments + backfill status |
 | `GET /instruments/{isin}/prices?from&to` | `PX#…` items |
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
+| `GET /prices` | held instruments: latest price + date, stale flag, price a year earlier and the change (`core/valuation/priceRows.ts`) |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |
 | `GET /status` | last run of each job |
 

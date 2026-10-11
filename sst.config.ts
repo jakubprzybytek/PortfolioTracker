@@ -176,6 +176,7 @@ export default $config({
     api.route("GET /instruments/{isin}/prices", apiHandler, auth);
     api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
     api.route("GET /transactions", apiHandler, auth);
+    api.route("GET /prices", apiHandler, auth);
     api.route("GET /status", apiHandler, auth);
 
     const router = new sst.aws.Router("Router", { domain });

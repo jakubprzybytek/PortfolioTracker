@@ -87,3 +87,25 @@ test.describe("holdings view", () => {
     await expect(rows).toHaveCount(3);
   });
 });
+
+test.describe("prices view", () => {
+  test("lists held instruments with price, date and 1-year change; a click shows the chart", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("nav-prices").click();
+    await expect(page).toHaveURL(/#\/prices$/);
+    const rows = page.getByTestId("prices-table").locator("tbody tr");
+    await expect(rows).toHaveCount(2);
+    expect(await rows.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "IZ0836"]);
+    const ds = page.getByTestId("price-DS0432");
+    await expect(ds.locator("td").nth(2)).toHaveText(/^\d+,\d{2} %$/); // clean price, % of nominal
+    await expect(ds.locator("td").nth(3)).toHaveText(/^\d{4}-\d{2}-\d{2}/);
+    await expect(ds.locator("td").nth(4)).toHaveText(/%$/);
+
+    await ds.click();
+    await expect(page).toHaveURL(/#\/prices\?chart=PL0000113783$/);
+    await expect(page.getByTestId("price-title")).toContainText("DS0432");
+    await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
+    await ds.click(); // click again: chart closes
+    await expect(page.getByTestId("price-title")).toHaveCount(0);
+  });
+});

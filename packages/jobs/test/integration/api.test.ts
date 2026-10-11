@@ -118,8 +118,20 @@ describe(`API ${API}`, () => {
     expect(new Set(body.map((t) => t.account))).toEqual(new Set(["broker", "ike"]));
   });
 
+  it("GET /prices lists held instruments with their latest price, its date and the 1-year change", async () => {
+    const { status, body } = await get<{ code: string; price: number | null; priceDate: string | null; stale: boolean; change1y: number | null; yearAgo: { date: string } | null }[]>("/prices");
+    expect(status).toBe(200);
+    expect(body.map((r) => r.code)).toEqual(["DS0432", "IZ0836"]);
+    for (const r of body) {
+      expect(r.price).toBeGreaterThan(50);
+      expect(r.priceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(typeof r.change1y).toBe("number"); // both have more than a year of GPW history
+      expect(r.yearAgo!.date < r.priceDate!).toBe(true);
+    }
+  });
+
   it("requires a login: no token or a forged token gets 401", async () => {
-    for (const route of ["/holdings", "/transactions", "/status", `/instruments/${IZ}/prices`]) {
+    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`]) {
       expect((await get(route, { auth: false })).status, route).toBe(401);
     }
     const forged = ["eyJhbGciOiJSUzI1NiJ9", "eyJzdWIiOiJ4IiwiY29nbml0bzpncm91cHMiOlsicG9ydGZvbGlvLXRyYWNrZXIiXX0", "c2ln"].join(".");
