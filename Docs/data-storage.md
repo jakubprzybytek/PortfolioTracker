@@ -1,20 +1,49 @@
 # Data storage
 
-One DynamoDB table, on-demand capacity, plus an S3 bucket used only as a raw-file archive.
+Three DynamoDB tables, all on-demand capacity, plus an S3 bucket used only as a raw-file archive.
 
-## Table `portfolio`
+> **Status (2026-10-11):** this is the target design. The code still writes everything to one table (`Table` in `sst.config.ts`) with the same keys; splitting it is an open item in the [README](README.md).
+
+| Table | Contents | Written by | Can be rebuilt? |
+|---|---|---|---|
+| `market` | Instruments, daily prices, live quotes, events, coupon rates, retail-bond rates, CPI, FX, calendar, backfill status, job runs | Scheduled jobs, backfill, import (instruments) | Yes: re-fetch, or reprocess the S3 archive (the only source for past Catalyst snapshots) |
+| `transactions` | Accounts, transactions; later also allocation targets and multi-asset splits | You, through the import (later a form) | **No.** This is the only data that exists nowhere else |
+| `holdings` | Daily portfolio snapshots | Valuation job only | Yes: recompute from `transactions` + `market` |
+
+## Why three tables
+
+The access patterns never read prices, transactions and holdings in one request; each query hits one partition of one kind. A single table therefore brings no benefit, and separate tables give:
+
+- **Different lifecycles.** `transactions` is the only table that can't be recreated, so it gets the strictest protection and a monthly export. `holdings` is a computed result and can be wiped and recomputed.
+- **Isolation.** `int` re-seeds sample transactions on every test run without touching price history, and a bad backfill can't damage transactions.
+- **Least privilege.** Each Lambda links only the tables it needs (see [Access per function](#access-per-function)).
+- **Simpler streams.** The backfill trigger listens to `market` only.
+
+On-demand billing is per request and per GB with no per-table fee, so three tables cost the same as one.
+
+**Holdings are derived, never edited.** As in the reference spreadsheet ([ReferenceFeatures.md](ReferenceFeatures.md)), positions follow from transactions. The valuation job is the only writer of `holdings`; any change to transactions or prices is followed by a revaluation.
+
+## Common layout
+
+Every table uses the same key schema, so the same helpers work everywhere:
 
 | Attribute | Type | Notes |
 |---|---|---|
 | `PK` | String | Partition key |
 | `SK` | String | Sort key |
-| `GSI1PK` | String | Sparse: set only on items that must be listed by type |
+| `GSI1PK` | String | Sparse: set only on items that must be listed by type (`market`, `transactions`) |
 | `GSI1SK` | String | |
-| `ttl` | Number | Optional, epoch seconds |
+| `ttl` | Number | Optional, epoch seconds (`market`: job runs) |
 
-Settings: point-in-time recovery **on** (35-day restore window, a few cents a month at this size), deletion protection **on**.
+Index `GSI1` (`GSI1PK`, `GSI1SK`), projection ALL, on `market` and `transactions`.
 
-Index `GSI1` (`GSI1PK`, `GSI1SK`), projection ALL. Used for "list all instruments" and "all live quotes".
+| Setting | `market` | `transactions` | `holdings` |
+|---|---|---|---|
+| Point-in-time recovery | on | on | off |
+| Deletion protection (`prod`) | on | on | on |
+| Stream | new and old images (new-instrument trigger) | none | none |
+| TTL attribute | `ttl` | — | — |
+| Monthly export to S3 | yes | yes | no |
 
 ## Conventions
 
@@ -25,7 +54,7 @@ Index `GSI1` (`GSI1PK`, `GSI1SK`), projection ALL. Used for "list all instrument
 - **Bond prices** are stored as clean price in % of nominal; accrued interest is stored separately per bond in currency.
 - Every item written by a job carries `source` and `fetched_at`.
 
-## Items
+## Table `market`
 
 ### Instrument (reference data)
 
@@ -43,6 +72,8 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 | `active` | `false` once sold/matured (jobs skip inactive instruments) |
 | bonds only | `nominal` (face value), `coupon_type` (`FIXED` / `FLOATING` / `INDEXED`), `coupon_rate` or `margin` + `reference_rate`, `maturity`, `coupon_schedule` (period start/end, payment date); IZ bonds also `base_ref` (e.g. IZ0836: 194.28509) and `issue_date` |
 | retail bonds only | `series` (e.g. `EDO0936`), `first_rate`, `margin`, `redemption_fee` |
+
+A new instrument item (stream `INSERT` with `SK = META`) starts its own backfill.
 
 ### Daily price
 
@@ -97,7 +128,7 @@ PK = INST#<ISIN>            SK = COUPON#<period_start>
 PK = INST#<ISIN>            SK = BACKFILL
 ```
 
-`status` (`pending` / `done` / `no_history` / `failed`), `source`, `from`, `to`, `rows`, `updated_at`, `note`. Written by the `backfill` and `import` Lambdas; shown in the UI.
+`status` (`pending` / `running` / `done` / `no_history` / `failed`), `source`, `from`, `to`, `rows`, `updated_at`, `note`. Written by the `backfill` and `import` Lambdas; shown in the UI.
 
 ### Retail bond rate periods
 
@@ -124,15 +155,42 @@ PK = CAL#<venue>            SK = <YYYY-MM-DD>       type = HOLIDAY | HALF_DAY, n
 
 Entered by hand once a year. Used by gap repair (a holiday isn't a gap) and by the live poller (no polling on holidays).
 
-### Accounts and transactions
+### Job runs
+
+```
+PK = JOB#<job_name>         SK = RUN#<started_at>    status, items_written, gaps_found, errors, ttl (90 days)
+```
+
+## Table `transactions`
+
+### Accounts
 
 ```
 PK = ACCT#<account>         SK = META                           broker, currency, name
-PK = ACCT#<account>         SK = TX#<YYYY-MM-DD>#<tx_id>        type, isin, quantity, price, amount, fee, currency, fx_rate, source
 ```
 
+### Transactions
+
+```
+PK = ACCT#<account>         SK = TX#<YYYY-MM-DD>#<tx_id>
+GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
+```
+
+`type`, `isin`, `quantity`, `price`, `amount`, `fee`, `currency`, `fx_rate`, `note`, `source`.
+
 `type`: `BUY`, `SELL`, `DIVIDEND`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`.
-`tx_id` is deterministic (broker id, or a hash of the row), so imports can be re-run safely.
+`tx_id` is deterministic (broker id, or a hash of the row), so imports can be re-run safely. `GSI1` lists all transactions across accounts in date order, which is what valuation replays.
+
+### Later: settings you enter
+
+```
+PK = TARGETS                SK = <asset_class>                  target_pct                    (allocation targets, rebalancing)
+PK = MULTI#<ISIN>           SK = META                           split: { <asset_class>: pct } (multi-asset look-through)
+```
+
+Both are user input, so they live here rather than in `market`.
+
+## Table `holdings`
 
 ### Portfolio snapshots
 
@@ -141,27 +199,34 @@ PK = PORTFOLIO              SK = SNAP#<YYYY-MM-DD>
 PK = PORTFOLIO              SK = SNAP#LATEST
 ```
 
-Written by the valuation job: per holding `quantity`, `price`, `price_date`, `value_ccy`, `value_pln`, `cost_pln`; totals per account and per asset type. The UI's history chart and dashboard come from these items.
+Written by the valuation job: per holding `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart and dashboard come from these items.
 Items stay small: about 25 holdings, well under the 400 KB item limit.
 
-### Job runs
+## Access per function
 
-```
-PK = JOB#<job_name>         SK = RUN#<started_at>    status, items_written, gaps_found, errors, ttl (90 days)
-```
+Each function links only the tables it needs.
+
+| Function | `market` | `transactions` | `holdings` |
+|---|---|---|---|
+| `EodGpw`, `RecheckGpw`, `Monthly` (and later EODHD, IBKR, NBP jobs) | read/write | — | — |
+| `Backfill` | read/write | — | — |
+| `Import` | read/write (instruments, backfill status) | read/write | — |
+| `Valuation` | read | read | write |
+| `Api` | read | read | read |
 
 ## Access patterns
 
-| Need | Operation |
-|---|---|
-| Dashboard | `Get PORTFOLIO/SNAP#LATEST` + `Query GSI1 GSI1PK=LIVE`; the api Lambda swaps in live prices where newer |
-| Portfolio value over time | `Query PK=PORTFOLIO, SK between SNAP#<from> and SNAP#<to>` |
-| Price chart for one instrument | `Query PK=INST#<isin>, SK between PX#<venue>#<from> and PX#<venue>#<to>` |
-| All instruments (jobs, UI) | `Query GSI1 GSI1PK=INSTRUMENT` |
-| Transactions of an account | `Query PK=ACCT#<acct>, SK begins_with TX#` |
-| FX for a tax calculation | `Query PK=FX#EUR, SK <= <date>, ScanIndexForward=false, Limit=1` (previous business day) |
-| Retail bond rate on a date | `Query PK=SERIES#<s>, SK <= RATE#<date>, ScanIndexForward=false, Limit=1` |
-| Gap check | `Query PK=INST#<isin>, SK begins_with PX#<venue>#` over the look-back window, compared with the calendar |
+| Need | Table | Operation |
+|---|---|---|
+| Dashboard | `holdings` + `market` | `Get PORTFOLIO/SNAP#LATEST` + `Query GSI1 GSI1PK=LIVE`; the api Lambda swaps in live prices where newer |
+| Portfolio value over time | `holdings` | `Query PK=PORTFOLIO, SK between SNAP#<from> and SNAP#<to>` |
+| Price chart for one instrument | `market` | `Query PK=INST#<isin>, SK between PX#<venue>#<from> and PX#<venue>#<to>` |
+| All instruments (jobs, UI) | `market` | `Query GSI1 GSI1PK=INSTRUMENT` |
+| Transactions of an account | `transactions` | `Query PK=ACCT#<acct>, SK begins_with TX#` |
+| All transactions in date order (valuation) | `transactions` | `Query GSI1 GSI1PK=TX` |
+| FX for a tax calculation | `market` | `Query PK=FX#EUR, SK <= <date>, ScanIndexForward=false, Limit=1` (previous business day) |
+| Retail bond rate on a date | `market` | `Query PK=SERIES#<s>, SK <= RATE#<date>, ScanIndexForward=false, Limit=1` |
+| Gap check | `market` | `Query PK=INST#<isin>, SK begins_with PX#<venue>#` over the look-back window, compared with the calendar |
 
 ## S3 raw archive
 
@@ -175,16 +240,17 @@ s3://<bucket>/raw/<source>/<YYYY>/<MM>/<DD>/<file>       e.g. raw/gpw/2026/10/09
 
 ## Sizing
 
-| Data | Items |
-|---|---|
-| Daily prices: 25 instruments × 250 days × 20 years | ≈ 125,000 |
-| Live quotes | ≈ 15 (overwritten) |
-| Snapshots | ≈ 250/year |
-| Transactions | hundreds |
+| Table | Data | Items |
+|---|---|---|
+| `market` | Daily prices: 25 instruments × 250 days × 20 years | ≈ 125,000 |
+| `market` | Live quotes | ≈ 15 (overwritten) |
+| `transactions` | Transactions | hundreds (the reference sheet: ≈ 750 in 4 years) |
+| `holdings` | Snapshots | ≈ 250/year |
 
 Total < 100 MB. A 10-year chart query reads about 2,500 items (≈ 500 KB, 1 page plus a few).
 
 ## Backup / export
 
-- PITR covers mistakes in the last 35 days.
-- Monthly: DynamoDB export to S3 (Parquet/JSON), also usable for ad-hoc analysis with DuckDB locally.
+- PITR covers mistakes in the last 35 days on `market` and `transactions`.
+- Monthly: DynamoDB export of `transactions` and `market` to S3 (Parquet/JSON), also usable for ad-hoc analysis with DuckDB locally.
+- `holdings` isn't backed up: rerun valuation over the needed date range instead.

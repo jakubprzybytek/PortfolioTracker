@@ -9,7 +9,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 | Document | Contents |
 |---|---|
 | [data-sources.md](data-sources.md) | Where each price comes from, per holding; IZ indexation; accrued interest |
-| [data-storage.md](data-storage.md) | DynamoDB single-table design: items, keys, access patterns |
+| [data-storage.md](data-storage.md) | DynamoDB tables (`market`, `transactions`, `holdings`): items, keys, access patterns |
 | [ingestion.md](ingestion.md) | Scheduled daily jobs, valuation, data quality rules |
 | [backfill.md](backfill.md) | How history is loaded: triggers and order per source |
 | [ui.md](ui.md) | Visualisation: holdings table and charts |
@@ -29,7 +29,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
                          ┌──────────────────────────── AWS (SST v4) ────────────────────────────┐
 sst.aws.Cron ────────────┼─► Lambda eod-gpw        18:30   treasury bonds, daily all-bonds XLS   │
                          ├─► Lambda eod-catalyst   18:30   corporate bonds, page snapshot        │
-                         │                         (+20:30, 23:00 retry, 07:15 recheck)          ├──► DynamoDB (sst.aws.Dynamo)
+                         │                         (+20:30, 23:00 retry, 07:15 recheck)          ├──► DynamoDB: market, transactions, holdings
                          ├─► Lambda monthly        16th    CPI, IZ reference index, retail rates  │        ▲   │ stream
                          └─► Lambda valuation      22:30 + 07:30                                 │        │   ▼
                                                                                                  │   Lambda backfill  ◄── manual (sst shell / CLI)
@@ -80,7 +80,8 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 
 ## Key decisions
 
-1. **DynamoDB on-demand is the only database.** Price history, transactions, reference data and daily snapshots. No idle cost, no cold start; Aurora Serverless was rejected because polling keeps it awake. Volume is tiny.
+1. **DynamoDB on-demand is the only database.** No idle cost, no cold start; Aurora Serverless was rejected because polling keeps it awake. Volume is tiny.
+   Three tables by lifecycle: `market` (instruments, prices, reference data; rebuildable), `transactions` (your input; the only irreplaceable data) and `holdings` (snapshots computed by valuation). See [data-storage.md](data-storage.md).
 2. **Transactions are entered by you.** Start with a file import (CSV/JSON uploaded to S3); add a form later if needed. Coupon payments you enter are also used to check the calculated accrued interest.
 3. **Accrued interest is computed, not fetched.** It comes from each bond's terms. The only external input is the coupon rate per period of floating-rate corporate bonds (see data-sources.md).
 4. **ISIN is the internal key.** Each source's code/ticker is a mapping on the instrument.
@@ -102,6 +103,7 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 ## Open decisions / to verify
 
 Phase 1:
+- [ ] Split the single DynamoDB table into `market`, `transactions` and `holdings` (data-storage.md); per-function table links. `prod` holds no real transactions yet, so nothing to migrate; price history is re-backfilled.
 - [ ] Load `prod`: MF calculator, `data/instruments.json`, and your real transactions (export of the sheet), plus retail bond series with purchase dates. `int` and `dev` hold `data/transactions.sample.json` (made-up).
 - [ ] Wire the retail bond calculator (`core/bonds/retail.ts`) into instruments/valuation once the series are known; needs a CPI y/y source (GUS).
 - [ ] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
