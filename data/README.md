@@ -17,3 +17,16 @@ aws s3 cp my-transactions.json s3://$BUCKET/imports/transactions/2026-10.json
 Transaction fields: `date`, `account`, `type` (`BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`), `isin`, `quantity`, `price` (bonds: clean % of nominal), `amount` (signed cash: negative = money out), `fee`, `currency` (default PLN), `note`, optional `id`.
 
 `transactions.sample.json` is **made-up data** for trying the app out.
+
+## Transactions from the reference spreadsheet
+
+`scripts/sheet-to-transactions.ts` converts the "Transakcje" tab of the Google Sheets tracker (File → Download → Microsoft Excel) into a transactions file:
+
+```sh
+node scripts/sheet-to-transactions.ts ~/Downloads/portfolio.xlsx      # → data/private/transactions.json (gitignored)
+```
+
+- Converts what the app can value: cash movements (deposits, withdrawals, interest, costs) and the instruments in [instruments.json](instruments.json), matched by code. Everything else is listed as skipped, with the reason (retail bonds, Catalyst bonds, ETFs, IBKR bonds, currency positions …); it gets converted once the app supports it.
+- Bond prices: the sheet stores PLN per bond; the file gets % of nominal. Buy amounts exclude the fee (the sheet's total includes it).
+- Ids are derived from the row contents, so re-running the script and re-importing never duplicates transactions, even after the sheet re-sorts its rows. Identical rows (e.g. two equal deposits on one day) get distinct ids.
+- The file is validated with the same schema as the Import Lambda before it's written.

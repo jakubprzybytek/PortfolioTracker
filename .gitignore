@@ -23,3 +23,6 @@ poc/gpw-history/data/
 # Playwright
 test-results/
 playwright-report/
+
+# Real data converted from the spreadsheet (scripts/sheet-to-transactions.ts)
+data/private/
