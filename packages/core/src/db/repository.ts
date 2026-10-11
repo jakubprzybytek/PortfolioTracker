@@ -23,46 +23,59 @@ import {
 
 const GSI1 = "GSI1";
 
-/** Typed access to the single table. Table name is injected so core stays free of SST imports. */
+/**
+ * Table names, read on every call. A function linked to only some tables can pass getters,
+ * so a name is resolved only when that table is actually used.
+ */
+export interface TableNames {
+  readonly market: string;
+  readonly transactions: string;
+  readonly holdings: string;
+}
+
+type Table = keyof TableNames;
+
+/** Typed access to the three tables (see Docs/data-storage.md). Table names are injected so core stays free of SST imports. */
 export class Repository {
   private readonly doc: DynamoDBDocumentClient;
-  private readonly tableName: string;
+  private readonly tables: TableNames;
 
-  constructor(tableName: string, client: DynamoDBClient = new DynamoDBClient({})) {
-    this.tableName = tableName;
+  constructor(tables: TableNames, client: DynamoDBClient = new DynamoDBClient({})) {
+    this.tables = tables;
     this.doc = DynamoDBDocumentClient.from(client, { marshallOptions: { removeUndefinedValues: true } });
   }
 
   // --- generic helpers -------------------------------------------------------------------------
 
-  private async get<T>(key: { PK: string; SK: string }): Promise<T | undefined> {
-    const res = await this.doc.send(new GetCommand({ TableName: this.tableName, Key: key }));
+  private async get<T>(table: Table, key: { PK: string; SK: string }): Promise<T | undefined> {
+    const res = await this.doc.send(new GetCommand({ TableName: this.tables[table], Key: key }));
     return res.Item as T | undefined;
   }
 
-  private async put(item: object): Promise<void> {
-    await this.doc.send(new PutCommand({ TableName: this.tableName, Item: item }));
+  private async put(table: Table, item: object): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.tables[table], Item: item }));
   }
 
   /** Writes in batches of 25, retrying unprocessed items. Returns the number of items written. */
-  async batchPut(items: object[]): Promise<number> {
+  private async batchPut(table: Table, items: object[]): Promise<number> {
+    const tableName = this.tables[table];
     for (let i = 0; i < items.length; i += 25) {
       let requests = items.slice(i, i + 25).map((Item) => ({ PutRequest: { Item } }));
       for (let attempt = 0; requests.length > 0; attempt++) {
         if (attempt > 8) throw new Error(`BatchWrite: ${requests.length} items still unprocessed after ${attempt} attempts`);
         if (attempt > 0) await new Promise((r) => setTimeout(r, 100 * 2 ** attempt));
-        const res = await this.doc.send(new BatchWriteCommand({ RequestItems: { [this.tableName]: requests } }));
-        requests = (res.UnprocessedItems?.[this.tableName] ?? []) as typeof requests;
+        const res = await this.doc.send(new BatchWriteCommand({ RequestItems: { [tableName]: requests } }));
+        requests = (res.UnprocessedItems?.[tableName] ?? []) as typeof requests;
       }
     }
     return items.length;
   }
 
-  private async queryAll<T>(input: Omit<QueryCommandInput, "TableName">): Promise<T[]> {
+  private async queryAll<T>(table: Table, input: Omit<QueryCommandInput, "TableName">): Promise<T[]> {
     const out: T[] = [];
     let ExclusiveStartKey: Record<string, unknown> | undefined;
     do {
-      const res = await this.doc.send(new QueryCommand({ TableName: this.tableName, ...input, ExclusiveStartKey }));
+      const res = await this.doc.send(new QueryCommand({ TableName: this.tables[table], ...input, ExclusiveStartKey }));
       out.push(...((res.Items ?? []) as T[]));
       ExclusiveStartKey = res.LastEvaluatedKey;
     } while (ExclusiveStartKey);
@@ -73,16 +86,16 @@ export class Repository {
 
   async putInstrument(item: Omit<InstrumentItem, "PK" | "SK" | "GSI1PK" | "GSI1SK" | "updatedAt">): Promise<InstrumentItem> {
     const full: InstrumentItem = { ...keys.instrument(item.isin), GSI1PK: "INSTRUMENT", GSI1SK: item.isin, ...item, updatedAt: new Date().toISOString() };
-    await this.put(full);
+    await this.put("market", full);
     return full;
   }
 
   getInstrument(isin: string): Promise<InstrumentItem | undefined> {
-    return this.get<InstrumentItem>(keys.instrument(isin));
+    return this.get<InstrumentItem>("market", keys.instrument(isin));
   }
 
   listInstruments(): Promise<InstrumentItem[]> {
-    return this.queryAll<InstrumentItem>({
+    return this.queryAll<InstrumentItem>("market", {
       IndexName: GSI1,
       KeyConditionExpression: "GSI1PK = :pk",
       ExpressionAttributeValues: { ":pk": "INSTRUMENT" },
@@ -92,12 +105,12 @@ export class Repository {
   // --- prices ----------------------------------------------------------------------------------
 
   putPrices(items: PriceItem[]): Promise<number> {
-    return this.batchPut(items);
+    return this.batchPut("market", items);
   }
 
   queryPrices(isin: string, venue: string, from: IsoDate, to: IsoDate): Promise<PriceItem[]> {
     const { PK, SK } = keys.pricePrefix(isin, venue);
-    return this.queryAll<PriceItem>({
+    return this.queryAll<PriceItem>("market", {
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
       ExpressionAttributeValues: { ":pk": PK, ":from": `${SK}${from}`, ":to": `${SK}${to}` },
     });
@@ -108,7 +121,7 @@ export class Repository {
     const { PK, SK } = keys.pricePrefix(isin, venue);
     const res = await this.doc.send(
       new QueryCommand({
-        TableName: this.tableName,
+        TableName: this.tables.market,
         KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
         ExpressionAttributeValues: { ":pk": PK, ":from": `${SK}0000-00-00`, ":to": `${SK}${date}` },
         ScanIndexForward: false,
@@ -121,7 +134,7 @@ export class Repository {
   /** Dates that already have a price in [from, to]. */
   async priceDates(isin: string, venue: string, from: IsoDate, to: IsoDate): Promise<Set<IsoDate>> {
     const { PK, SK } = keys.pricePrefix(isin, venue);
-    const items = await this.queryAll<{ SK: string }>({
+    const items = await this.queryAll<{ SK: string }>("market", {
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
       ExpressionAttributeValues: { ":pk": PK, ":from": `${SK}${from}`, ":to": `${SK}${to}` },
       ProjectionExpression: "SK",
@@ -134,11 +147,11 @@ export class Repository {
   putReferenceIndex(months: ReferenceIndexMonth[], source: string): Promise<number> {
     const updatedAt = new Date().toISOString();
     const items: ReferenceIndexItem[] = months.map((m) => ({ ...keys.referenceIndex(m.month), ...m, source, updatedAt }));
-    return this.batchPut(items);
+    return this.batchPut("market", items);
   }
 
   listReferenceIndex(): Promise<ReferenceIndexItem[]> {
-    return this.queryAll<ReferenceIndexItem>({
+    return this.queryAll<ReferenceIndexItem>("market", {
       KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: { ":pk": "CPI_REF" },
     });
@@ -147,11 +160,11 @@ export class Repository {
   // --- floating coupon rates -------------------------------------------------------------------
 
   putCouponRates(items: Omit<CouponRateItem, "PK" | "SK">[]): Promise<number> {
-    return this.batchPut(items.map((i) => ({ ...keys.couponRate(i.isin, i.periodStart), ...i })));
+    return this.batchPut("market", items.map((i) => ({ ...keys.couponRate(i.isin, i.periodStart), ...i })));
   }
 
   listCouponRates(isin: string): Promise<CouponRateItem[]> {
-    return this.queryAll<CouponRateItem>({
+    return this.queryAll<CouponRateItem>("market", {
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ExpressionAttributeValues: { ":pk": `INST#${isin}`, ":sk": "COUPON#" },
     });
@@ -161,13 +174,14 @@ export class Repository {
 
   putTransactions(items: Omit<TransactionItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {
     return this.batchPut(
+      "transactions",
       items.map((t) => ({ ...keys.transaction(t.account, t.date, t.id), GSI1PK: "TX", GSI1SK: `${t.date}#${t.id}`, ...t })),
     );
   }
 
   /** All transactions, oldest first. */
   listTransactions(): Promise<TransactionItem[]> {
-    return this.queryAll<TransactionItem>({
+    return this.queryAll<TransactionItem>("transactions", {
       IndexName: GSI1,
       KeyConditionExpression: "GSI1PK = :pk",
       ExpressionAttributeValues: { ":pk": "TX" },
@@ -177,16 +191,16 @@ export class Repository {
   // --- snapshots -------------------------------------------------------------------------------
 
   async putSnapshot(snapshot: Omit<SnapshotItem, "PK" | "SK">, alsoLatest: boolean): Promise<void> {
-    await this.put({ ...keys.snapshot(snapshot.date), ...snapshot });
-    if (alsoLatest) await this.put({ ...keys.snapshot("LATEST"), ...snapshot });
+    await this.put("holdings", { ...keys.snapshot(snapshot.date), ...snapshot });
+    if (alsoLatest) await this.put("holdings", { ...keys.snapshot("LATEST"), ...snapshot });
   }
 
   getSnapshot(date: IsoDate | "LATEST"): Promise<SnapshotItem | undefined> {
-    return this.get<SnapshotItem>(keys.snapshot(date));
+    return this.get<SnapshotItem>("holdings", keys.snapshot(date));
   }
 
   querySnapshots(from: IsoDate, to: IsoDate): Promise<SnapshotItem[]> {
-    return this.queryAll<SnapshotItem>({
+    return this.queryAll<SnapshotItem>("holdings", {
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
       ExpressionAttributeValues: { ":pk": "PORTFOLIO", ":from": `SNAP#${from}`, ":to": `SNAP#${to}` },
     });
@@ -195,20 +209,20 @@ export class Repository {
   // --- backfill status and job runs ------------------------------------------------------------
 
   async putBackfillStatus(item: Omit<BackfillItem, "PK" | "SK" | "updatedAt">): Promise<void> {
-    await this.put({ ...keys.backfill(item.isin), ...item, updatedAt: new Date().toISOString() });
+    await this.put("market", { ...keys.backfill(item.isin), ...item, updatedAt: new Date().toISOString() });
   }
 
   getBackfillStatus(isin: string): Promise<BackfillItem | undefined> {
-    return this.get<BackfillItem>(keys.backfill(isin));
+    return this.get<BackfillItem>("market", keys.backfill(isin));
   }
 
   async putJobRun(item: Omit<JobRunItem, "PK" | "SK" | "ttl">): Promise<void> {
     const ttl = Math.floor(Date.now() / 1000) + 90 * 86_400;
-    await this.put({ ...keys.jobRun(item.job, item.startedAt), ...item, ttl });
+    await this.put("market", { ...keys.jobRun(item.job, item.startedAt), ...item, ttl });
   }
 
   listJobRuns(job: string): Promise<JobRunItem[]> {
-    return this.queryAll<JobRunItem>({
+    return this.queryAll<JobRunItem>("market", {
       KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: { ":pk": `JOB#${job}` },
       ScanIndexForward: false,

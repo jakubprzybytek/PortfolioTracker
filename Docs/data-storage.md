@@ -2,8 +2,6 @@
 
 Three DynamoDB tables, all on-demand capacity, plus an S3 bucket used only as a raw-file archive.
 
-> **Status (2026-10-11):** this is the target design. The code still writes everything to one table (`Table` in `sst.config.ts`) with the same keys; splitting it is an open item in the [README](README.md).
-
 | Table | Contents | Written by | Can be rebuilt? |
 |---|---|---|---|
 | `market` | Instruments, daily prices, live quotes, events, coupon rates, retail-bond rates, CPI, FX, calendar, backfill status, job runs | Scheduled jobs, backfill, import (instruments) | Yes: re-fetch, or reprocess the S3 archive (the only source for past Catalyst snapshots) |
@@ -17,7 +15,6 @@ The access patterns never read prices, transactions and holdings in one request;
 - **Different lifecycles.** `transactions` is the only table that can't be recreated, so it gets the strictest protection and a monthly export. `holdings` is a computed result and can be wiped and recomputed.
 - **Isolation.** `int` re-seeds sample transactions on every test run without touching price history, and a bad backfill can't damage transactions.
 - **Least privilege.** Each Lambda links only the tables it needs (see [Access per function](#access-per-function)).
-- **Simpler streams.** The backfill trigger listens to `market` only.
 
 On-demand billing is per request and per GB with no per-table fee, so three tables cost the same as one.
 
@@ -41,7 +38,6 @@ Index `GSI1` (`GSI1PK`, `GSI1SK`), projection ALL, on `market` and `transactions
 |---|---|---|---|
 | Point-in-time recovery | on | on | off |
 | Deletion protection (`prod`) | on | on | on |
-| Stream | new and old images (new-instrument trigger) | none | none |
 | TTL attribute | `ttl` | — | — |
 | Monthly export to S3 | yes | yes | no |
 
@@ -73,7 +69,7 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 | bonds only | `nominal` (face value), `coupon_type` (`FIXED` / `FLOATING` / `INDEXED`), `coupon_rate` or `margin` + `reference_rate`, `maturity`, `coupon_schedule` (period start/end, payment date); IZ bonds also `base_ref` (e.g. IZ0836: 194.28509) and `issue_date` |
 | retail bonds only | `series` (e.g. `EDO0936`), `first_rate`, `margin`, `redemption_fee` |
 
-A new instrument item (stream `INSERT` with `SK = META`) starts its own backfill.
+The import Lambda starts the backfill of every imported instrument that has no backfill status yet (see backfill.md).
 
 ### Daily price
 
@@ -210,8 +206,8 @@ Each function links only the tables it needs.
 |---|---|---|---|
 | `EodGpw`, `RecheckGpw`, `Monthly` (and later EODHD, IBKR, NBP jobs) | read/write | — | — |
 | `Backfill` | read/write | — | — |
-| `Import` | read/write (instruments, backfill status) | read/write | — |
-| `Valuation` | read | read | write |
+| `Import` | read/write (instruments, reference index) | read/write | — |
+| `Valuation` | read (writes its job run) | read | write |
 | `Api` | read | read | read |
 
 ## Access patterns

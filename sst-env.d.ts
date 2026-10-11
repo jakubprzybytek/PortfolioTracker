@@ -22,15 +22,23 @@ declare module "sst" {
       "type": "sst.sst.Secret"
       "value": string
     }
+    "Holdings": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
     "Import": {
       "name": string
       "type": "sst.aws.Function"
+    }
+    "Market": {
+      "name": string
+      "type": "sst.aws.Dynamo"
     }
     "Router": {
       "type": "sst.aws.Router"
       "url": string
     }
-    "Table": {
+    "Transactions": {
       "name": string
       "type": "sst.aws.Dynamo"
     }

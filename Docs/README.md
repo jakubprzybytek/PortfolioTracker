@@ -30,10 +30,11 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 sst.aws.Cron ────────────┼─► Lambda eod-gpw        18:30   treasury bonds, daily all-bonds XLS   │
                          ├─► Lambda eod-catalyst   18:30   corporate bonds, page snapshot        │
                          │                         (+20:30, 23:00 retry, 07:15 recheck)          ├──► DynamoDB: market, transactions, holdings
-                         ├─► Lambda monthly        16th    CPI, IZ reference index, retail rates  │        ▲   │ stream
-                         └─► Lambda valuation      22:30 + 07:30                                 │        │   ▼
+                         ├─► Lambda monthly        16th    CPI, IZ reference index, retail rates  │        ▲
+                         └─► Lambda valuation      22:30 + 07:30                                 │        │
                                                                                                  │   Lambda backfill  ◄── manual (sst shell / CLI)
-S3 upload imports/… ──────────► Lambda import (Bossa / Cbonds / MF files, transactions) ──────────┤
+                                                                                                 │        ▲ new instruments
+S3 upload imports/… ──────────► Lambda import (Bossa / Cbonds / MF files, transactions) ──────────┤────────┘
                                                                                                  │
 every job ──► S3 raw archive (sst.aws.Bucket, write-only originals)                              │
                                                                                                  │
@@ -103,7 +104,8 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 ## Open decisions / to verify
 
 Phase 1:
-- [ ] Split the single DynamoDB table into `market`, `transactions` and `holdings` (data-storage.md); per-function table links. `prod` holds no real transactions yet, so nothing to migrate; price history is re-backfilled.
+- [x] Split the single DynamoDB table into `market`, `transactions` and `holdings` (data-storage.md), with per-function table links.
+- [ ] `prod`: re-import MF calculator and instruments into the new tables (backfill runs again); then drop the old `Table` (still declared in `sst.config.ts` for `prod` only, linked to nothing; removing the block leaves it in AWS because of `removal: retain`, so delete it in the console afterwards).
 - [ ] Load `prod`: MF calculator, `data/instruments.json`, and your real transactions (export of the sheet), plus retail bond series with purchase dates. `int` and `dev` hold `data/transactions.sample.json` (made-up).
 - [ ] Wire the retail bond calculator (`core/bonds/retail.ts`) into instruments/valuation once the series are known; needs a CPI y/y source (GUS).
 - [ ] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.

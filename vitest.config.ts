@@ -14,7 +14,7 @@ export default defineConfig({
           name: "integration",
           include: ["packages/jobs/test/integration/**/*.test.ts"],
           testTimeout: 60_000,
-          hookTimeout: 120_000,
+          hookTimeout: 600_000,
           fileParallelism: false,
         },
       },

@@ -6,7 +6,18 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { gzipSync } from "node:zlib";
 import { Repository, type IsoDate } from "@portfolio/core";
 
-export const repo = new Repository(Resource.Table.name);
+// Getters: each function links only the tables it needs, and Resource throws for an unlinked one.
+export const repo = new Repository({
+  get market() {
+    return Resource.Market.name;
+  },
+  get transactions() {
+    return Resource.Transactions.name;
+  },
+  get holdings() {
+    return Resource.Holdings.name;
+  },
+});
 export const bucketName = Resource.Files.name;
 
 const s3 = new S3Client({});

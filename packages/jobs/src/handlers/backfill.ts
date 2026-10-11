@@ -1,7 +1,6 @@
-// Backfills one instrument's history. Triggered either by the DynamoDB stream when a new
-// instrument item appears, or manually with { isin } (see Docs/backfill.md).
+// Backfills one instrument's history. Invoked with { isin } by the import Lambda for an instrument
+// without a backfill status, or manually (see Docs/backfill.md).
 
-import type { DynamoDBStreamEvent } from "aws-lambda";
 import { Resource } from "sst";
 import { invokeAsync, repo, runJob } from "../lib/context.ts";
 import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
@@ -10,17 +9,6 @@ export interface BackfillEvent {
   isin: string;
   /** Re-run the valuation afterwards (default true). */
   revalue?: boolean;
-}
-
-function isinsFromEvent(event: BackfillEvent | DynamoDBStreamEvent): string[] {
-  if ("Records" in event) {
-    return event.Records.flatMap((r) => {
-      const isin = r.dynamodb?.NewImage?.["isin"]?.S;
-      // MF-TERMS is the imported Ministry calculator data stored as a pseudo-instrument, not a holding.
-      return r.eventName === "INSERT" && isin && isin !== "MF-TERMS" ? [isin] : [];
-    });
-  }
-  return [event.isin];
 }
 
 export async function backfillInstrument(isin: string): Promise<{ status: string; rows?: number; from?: string; to?: string }> {
@@ -44,9 +32,9 @@ export async function backfillInstrument(isin: string): Promise<{ status: string
   return { status: "no_history" };
 }
 
-export async function handler(event: BackfillEvent | DynamoDBStreamEvent) {
-  const isins = isinsFromEvent(event);
-  const revalue = "Records" in event ? true : (event.revalue ?? true);
+export async function handler(event: BackfillEvent) {
+  const isins = [event.isin];
+  const revalue = event.revalue ?? true;
   return runJob("backfill", async () => {
     const results: Record<string, unknown> = {};
     let itemsWritten = 0;

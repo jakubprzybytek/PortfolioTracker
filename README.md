@@ -25,7 +25,7 @@ npm run dev -- --stage dev        # deploy the dev stage, run Lambdas locally (L
 npm run deploy -- --stage dev     # real deployment: Lambdas and crons run in AWS without your machine
 ```
 
-`sst dev` runs the functions **on your machine**: the scheduled jobs only fire while it's running. Use `deploy` for unattended daily collection. Outputs (API URL, bucket, table) are printed and saved in `.sst/outputs.json`.
+`sst dev` runs the functions **on your machine**: the scheduled jobs only fire while it's running. Use `deploy` for unattended daily collection. Outputs (API URL, bucket, tables) are printed and saved in `.sst/outputs.json`.
 
 ## Domains
 

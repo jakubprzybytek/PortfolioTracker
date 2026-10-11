@@ -1,4 +1,4 @@
-// Item shapes and key builders for the single DynamoDB table (see Docs/data-storage.md).
+// Item shapes and key builders for the DynamoDB tables market, transactions and holdings (see Docs/data-storage.md).
 
 import type { IsoDate } from "../dates.ts";
 import type { BondTerms } from "../bonds/terms.ts";

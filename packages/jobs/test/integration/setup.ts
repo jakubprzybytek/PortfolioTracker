@@ -8,18 +8,17 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 interface Outputs {
   api: string;
   files: string;
-  table: string;
 }
 
 function readOutputs(): Outputs {
-  const fromEnv = { api: process.env["API_URL"], files: process.env["FILES_BUCKET"], table: process.env["TABLE_NAME"] };
-  if (fromEnv.api && fromEnv.files && fromEnv.table) return fromEnv as Outputs;
+  const fromEnv = { api: process.env["API_URL"], files: process.env["FILES_BUCKET"] };
+  if (fromEnv.api && fromEnv.files) return fromEnv as Outputs;
   const file = path.resolve(import.meta.dirname, "../../../../.sst/outputs.json");
   try {
     const json = JSON.parse(readFileSync(file, "utf8")) as Partial<Outputs>;
-    return { api: fromEnv.api ?? json.api!, files: fromEnv.files ?? json.files!, table: fromEnv.table ?? json.table! };
+    return { api: fromEnv.api ?? json.api!, files: fromEnv.files ?? json.files! };
   } catch (err) {
-    throw new Error(`No deployed stage found: set API_URL/FILES_BUCKET/TABLE_NAME or run "npm run dev -- --stage dev" first (${(err as Error).message})`);
+    throw new Error(`No deployed stage found: set API_URL/FILES_BUCKET or run "npm run dev -- --stage dev" first (${(err as Error).message})`);
   }
 }
 

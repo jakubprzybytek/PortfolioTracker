@@ -8,7 +8,7 @@ Backfill uses the same adapters as the daily jobs (`fetch → archive → parse 
 
 | Trigger | When | How |
 |---|---|---|
-| **Automatic: new instrument** | You add a transaction for an instrument that isn't in the database yet | The DynamoDB Stream on `INST#…/META` invokes the `backfill` Lambda for that instrument, from its source's earliest date |
+| **Automatic: new instrument** | You import an instrument that has no backfill status yet | The `import` Lambda invokes the `backfill` Lambda for that instrument, from its source's earliest date. (A DynamoDB stream was used before; on a newly created table it missed the first inserts, and re-importing never retried.) |
 | **Manual** | First load, filling gaps, after a parser fix | Invoke the same `backfill` Lambda with `{ isin, source, from? }`, from a script run with `sst shell` |
 | **File import** | Sources delivered as files: Bossa EOD files, Cbonds export, MF calculator `kalkulatorodsetek.xlsm`, transaction files | Upload to the bucket under `imports/<kind>/…`. The S3 event invokes the `import` Lambda, which parses the file and upserts the rows |
 | **Reprocessing** | A parser bug found later | Script via `sst shell` that re-parses the originals in `raw/` and upserts again |

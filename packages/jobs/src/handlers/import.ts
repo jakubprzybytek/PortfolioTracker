@@ -14,6 +14,7 @@ import {
   type InstrumentItem,
 } from "@portfolio/core";
 import { invokeAsync, repo, runJob } from "../lib/context.ts";
+import type { BackfillEvent } from "./backfill.ts";
 
 const s3 = new S3Client({});
 
@@ -74,6 +75,8 @@ export async function importInstruments(json: string) {
     };
     await repo.putInstrument(item);
     written++;
+    // Start the history backfill for an instrument that never had one (new, or missed before).
+    if (!(await repo.getBackfillStatus(i.isin))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
   }
   return { instruments: written };
 }
