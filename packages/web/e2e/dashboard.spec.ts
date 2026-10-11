@@ -13,7 +13,11 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("total-value")).toContainText("zł");
     await expect(page.getByTestId("total-value")).not.toContainText("–");
     await expect(page.getByTestId("total-gain")).toContainText("%");
-    await expect(page.getByTestId("total-coupons")).toContainText("914,20");
+    await expect(page.getByTestId("total-coupons")).toContainText("926,70"); // bond coupons + the manual asset's income
+    // Cash: broker + ike; the incomplete "etf" account is left out and the card says so
+    await expect(page.getByTestId("total-cash")).toContainText("5520,35");
+    await expect(page.getByTestId("total-cash")).toContainText("1 incomplete account not included");
+    await expect(page.getByTestId("total-all")).toContainText("zł");
   });
 
   test("lists the holdings with accrued interest and no data flags", async ({ page }) => {
@@ -30,11 +34,11 @@ test.describe("dashboard", () => {
 
   test("sorts the table by clicking a header", async ({ page }) => {
     const firstCode = () => page.getByTestId("holdings-table").locator("tbody tr").first().locator("td").first().locator("strong").textContent();
-    await expect(page.getByTestId("holdings-table").locator("tbody tr")).toHaveCount(3); // DS0432, EDO0935 (retail), IZ0836
+    await expect(page.getByTestId("holdings-table").locator("tbody tr")).toHaveCount(4); // DS0432, EDO0935 (retail), IZ0836, SAMPLE-APARTMENT (manual)
     await page.getByRole("columnheader", { name: /^Instrument/ }).click();
     expect(await firstCode()).toBe("DS0432");
     await page.getByRole("columnheader", { name: /^Instrument/ }).click();
-    expect(await firstCode()).toBe("IZ0836");
+    expect(await firstCode()).toBe("SAMPLE-APARTMENT");
   });
 
   test("renders the portfolio chart and switches ranges", async ({ page }) => {

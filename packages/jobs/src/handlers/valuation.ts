@@ -21,7 +21,7 @@ export interface ValuationEvent {
 
 export async function handler(event: ValuationEvent = {}) {
   return runJob("valuation", async () => {
-    const [instruments, transactions, refIndex] = await Promise.all([repo.listInstruments(), repo.listTransactions(), repo.listReferenceIndex()]);
+    const [instruments, transactions, refIndex, accounts] = await Promise.all([repo.listInstruments(), repo.listTransactions(), repo.listReferenceIndex(), repo.listAccounts()]);
     const referenceIndex = toReferenceIndex(refIndex);
     const tracked = instruments.filter((i) => i.isin !== "MF-TERMS");
 
@@ -50,7 +50,7 @@ export async function handler(event: ValuationEvent = {}) {
         }
         if (latest) prices.set(isin, latest);
       }
-      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates });
+      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates, accounts });
       await repo.putSnapshot(snapshot, date === to);
       written++;
     }

@@ -11,6 +11,7 @@ import type { IsoDate } from "../dates.ts";
 import type { ReferenceIndexMonth } from "../bonds/izIndex.ts";
 import {
   keys,
+  type AccountItem,
   type BackfillItem,
   type CouponRateItem,
   type InstrumentItem,
@@ -189,6 +190,23 @@ export class Repository {
       "transactions",
       items.map((t) => ({ ...keys.transaction(t.account, t.date, t.id), GSI1PK: "TX", GSI1SK: `${t.date}#${t.id}`, ...t })),
     );
+  }
+
+  /** Replaces the metadata of the given accounts (others are left alone). */
+  putAccounts(accounts: { account: string; incomplete?: string[] }[]): Promise<number> {
+    const updatedAt = new Date().toISOString();
+    return this.batchPut(
+      "transactions",
+      accounts.map((a) => ({ ...keys.account(a.account), GSI1PK: "ACCOUNT", GSI1SK: a.account, account: a.account, ...(a.incomplete?.length ? { incomplete: a.incomplete } : {}), updatedAt })),
+    );
+  }
+
+  listAccounts(): Promise<AccountItem[]> {
+    return this.queryAll<AccountItem>("transactions", {
+      IndexName: GSI1,
+      KeyConditionExpression: "GSI1PK = :pk",
+      ExpressionAttributeValues: { ":pk": "ACCOUNT" },
+    });
   }
 
   /** All transactions, oldest first. */

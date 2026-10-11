@@ -162,8 +162,11 @@ PK = JOB#<job_name>         SK = RUN#<started_at>    status, items_written, gaps
 ### Accounts
 
 ```
-PK = ACCT#<account>         SK = META                           broker, currency, name
+PK = ACCT#<account>         SK = META
+GSI1PK = ACCOUNT            GSI1SK = <account>
 ```
+
+`account`, `incomplete` (kinds of assets not tracked yet, e.g. `["ETFs"]`; absent = complete), `updatedAt`. Imported from `imports/accounts/` (written by the sheet converter). An incomplete account's cash is shown but not added to the total.
 
 ### Transactions
 
@@ -176,6 +179,10 @@ GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
 
 `type`: `BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`.
 `valueDate` (optional): retail bonds, when interest starts if not the transaction date. Retail positions are valued per lot (each buy; sales take the oldest lots first).
+
+**Cash** of an account = Σ of its transactions' cash effects: BUY = `amount` (the trade value) minus `fee`; every other type's `amount` already is the cash effect (SELL: received, net of the fee). Computed by the valuation (`core/valuation/cash.ts`), not stored per transaction.
+
+**Assets without an ISIN** (manually valued, e.g. a property fund share) get a private id in ISIN format with the ISO user-assigned prefix `ZZ` (`ZZRZESZOW000`), which no real ISIN uses. Their prices are `PX#MANUAL#<date>` items from `imports/prices/`.
 `tx_id` is deterministic (broker id, or a hash of the row), so imports can be re-run safely. `GSI1` lists all transactions across accounts in date order, which is what valuation replays.
 
 ### Later: settings you enter
@@ -196,7 +203,7 @@ PK = PORTFOLIO              SK = SNAP#<YYYY-MM-DD>
 PK = PORTFOLIO              SK = SNAP#LATEST
 ```
 
-Written by the valuation job: one holding per **account and instrument** (the same bond in two accounts is two holdings), sorted by account then code. Per holding `account`, `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart, dashboard and Holdings view come from these items. Snapshots written before 2026-10-11 have no `account`; only `SNAP#LATEST` is read per holding, and every valuation run rewrites it.
+Written by the valuation job: `accounts` (per account: `cash`, `incomplete`), `totals.cash` (complete accounts only), and one holding per **account and instrument** (the same bond in two accounts is two holdings), sorted by account then code. Per holding `account`, `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart, dashboard and Holdings view come from these items. Snapshots written before 2026-10-11 have no `account`; only `SNAP#LATEST` is read per holding, and every valuation run rewrites it.
 Items stay small: about 25 holdings, well under the 400 KB item limit.
 
 ## Access per function

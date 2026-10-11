@@ -7,11 +7,12 @@ import { RangePicker } from "./RangePicker.tsx";
 import type { HistoryPoint, Holding, Instrument, Price, Snapshot, Status, Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
-function Card({ label, value, className, testId }: { label: string; value: string; className?: string; testId: string }) {
+function Card({ label, value, className, testId, note }: { label: string; value: string; className?: string; testId: string; note?: string }) {
   return (
     <div className="card" data-testid={testId}>
       <div className="label">{label}</div>
       <div className={`value ${className ?? ""}`}>{value}</div>
+      {note && <div className="note muted">{note}</div>}
     </div>
   );
 }
@@ -59,6 +60,8 @@ export function DashboardView() {
   }, [rows, selected]);
 
   const totals = snap?.totals;
+  const incomplete = Object.values(snap?.accounts ?? {}).filter((a) => a.incomplete?.length).length;
+  const cash = totals?.cash;
   const selectedInst = instruments.data?.find((i) => i.isin === selected);
   const failedJobs = Object.entries(status.data?.jobs ?? {}).filter(([, j]) => j?.status === "failed");
 
@@ -83,7 +86,9 @@ export function DashboardView() {
       )}
 
       <section className="cards" data-testid="totals">
-        <Card label="Value" value={fmtPln(totals?.value)} testId="total-value" />
+        <Card label="Total" value={fmtPln(totals && cash !== undefined ? totals.value + cash : totals?.value)} testId="total-all" note="positions + cash" />
+        <Card label="Value" value={fmtPln(totals?.value)} testId="total-value" note="positions" />
+        <Card label="Cash" value={fmtPln(cash)} testId="total-cash" note={incomplete ? `${incomplete} incomplete account${incomplete > 1 ? "s" : ""} not included` : undefined} />
         <Card label="Cost" value={fmtPln(totals?.cost)} testId="total-cost" />
         <Card label="Gain" value={`${fmtPln(totals?.gain)}${totals && totals.cost ? ` (${fmtPct((totals.gain / totals.cost) * 100)})` : ""}`} className={signClass(totals?.gain)} testId="total-gain" />
         <Card label="Coupons received" value={fmtPln(totals?.couponsReceived)} testId="total-coupons" />

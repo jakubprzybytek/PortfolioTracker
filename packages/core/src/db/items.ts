@@ -78,6 +78,17 @@ export interface CouponRateItem {
   source: string;
 }
 
+/** Account metadata: which kinds of assets of this account aren't tracked yet (from the sheet import). */
+export interface AccountItem {
+  PK: `ACCT#${string}`;
+  SK: "META";
+  GSI1PK: "ACCOUNT";
+  GSI1SK: string; // account
+  account: string;
+  incomplete?: string[];
+  updatedAt: string;
+}
+
 export type TransactionType =
   | "BUY"
   | "SELL"
@@ -134,12 +145,20 @@ export interface HoldingSnapshot {
   rate?: { current: number; previous: number | null };
 }
 
+/** An account's cash, and whether all of its assets are tracked (`incomplete` lists what isn't yet). */
+export interface AccountSnapshot {
+  cash: number;
+  incomplete?: string[];
+}
+
 export interface SnapshotItem {
   PK: "PORTFOLIO";
   SK: `SNAP#${IsoDate}` | "SNAP#LATEST";
   date: IsoDate;
   holdings: HoldingSnapshot[];
-  totals: { value: number; cost: number; gain: number; couponsReceived: number };
+  /** value/cost/gain: positions; cash: accounts that are fully tracked (older snapshots have none). */
+  totals: { value: number; cost: number; gain: number; couponsReceived: number; cash?: number };
+  accounts?: Record<string, AccountSnapshot>;
   byType: Record<string, { value: number; cost: number }>;
   computedAt: string;
 }
@@ -180,6 +199,7 @@ export const keys = {
   transaction: (account: string, date: IsoDate, id: string) => ({ PK: `ACCT#${account}` as const, SK: `TX#${date}#${id}` as const }),
   snapshot: (date: IsoDate | "LATEST") => ({ PK: "PORTFOLIO" as const, SK: `SNAP#${date}` as const }),
   backfill: (isin: string) => ({ PK: `INST#${isin}` as const, SK: "BACKFILL" as const }),
+  account: (account: string) => ({ PK: `ACCT#${account}` as const, SK: "META" as const }),
   retailSeries: (series: string) => ({ PK: `SERIES#${series}` as const, SK: "META" as const }),
   jobRun: (job: string, startedAt: string) => ({ PK: `JOB#${job}` as const, SK: `RUN#${startedAt}` as const }),
 };

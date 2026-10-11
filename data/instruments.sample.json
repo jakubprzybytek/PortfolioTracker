@@ -7,5 +7,13 @@
     "currency": "PLN",
     "venue": "CALC",
     "terms": "mf-retail"
+  },
+  {
+    "isin": "ZZSAMPLEAPA0",
+    "code": "SAMPLE-APARTMENT",
+    "name": "Sample apartment share (made up)",
+    "type": "FUND_MANUAL",
+    "currency": "PLN",
+    "venue": "MANUAL"
   }
 ]

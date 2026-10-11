@@ -1,9 +1,10 @@
 import type { IsoDate } from "../dates.ts";
 import { dirtyValue, valueBond } from "../bonds/accrued.ts";
 import type { ReferenceIndex } from "../bonds/izIndex.ts";
-import type { CouponRateItem, HoldingSnapshot, InstrumentItem, PriceItem, SnapshotItem, TransactionItem } from "../db/items.ts";
+import type { AccountSnapshot, CouponRateItem, HoldingSnapshot, InstrumentItem, PriceItem, SnapshotItem, TransactionItem } from "../db/items.ts";
 import { positionsAt } from "./positions.ts";
 import { retailLotsAt, valueRetailLots } from "./retailLots.ts";
+import { cashByAccount } from "./cash.ts";
 import { round2 } from "../bonds/izIndex.ts";
 
 export interface ValuationContext {
@@ -14,8 +15,10 @@ export interface ValuationContext {
   prices: Map<string, PriceItem>;
   referenceIndex: ReferenceIndex;
   couponRates: Map<string, CouponRateItem[]>;
-  /** A price older than this many days is flagged stale. */
+  /** A price older than this many days is flagged stale (not for manual prices). */
   staleAfterDays?: number;
+  /** Account metadata: which accounts aren't fully tracked yet. */
+  accounts?: { account: string; incomplete?: string[] }[];
 }
 
 const daysBetween = (a: IsoDate, b: IsoDate) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -69,7 +72,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
 
     const price = ctx.prices.get(p.isin);
     if (!price) flags.push("no_price");
-    else if (daysBetween(price.lastTradeDate ?? price.date, date) > staleAfterDays) flags.push("stale_price");
+    else if (price.venue !== "MANUAL" && daysBetween(price.lastTradeDate ?? price.date, date) > staleAfterDays) flags.push("stale_price");
 
     let nominal: number | null = null;
     let accruedInterest: number | null = null;
@@ -122,5 +125,14 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     t.value = round2(t.value);
     t.cost = round2(t.cost);
   }
-  return { date, holdings, totals, byType, computedAt: new Date().toISOString() };
+  const incomplete = new Map((ctx.accounts ?? []).map((a) => [a.account, a.incomplete ?? []]));
+  const accounts: Record<string, AccountSnapshot> = {};
+  let cashTotal = 0;
+  for (const [account, cash] of [...cashByAccount(ctx.transactions, date)].sort(([a], [b]) => a.localeCompare(b))) {
+    const missing = incomplete.get(account) ?? [];
+    accounts[account] = { cash, ...(missing.length ? { incomplete: missing } : {}) };
+    // An incomplete account's cash misses the untracked purchases (it would be far too high): not in the total.
+    if (missing.length === 0) cashTotal += cash;
+  }
+  return { date, holdings, totals: { ...totals, cash: round2(cashTotal) }, accounts, byType, computedAt: new Date().toISOString() };
 }

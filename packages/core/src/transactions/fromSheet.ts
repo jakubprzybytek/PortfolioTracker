@@ -5,6 +5,7 @@
 import * as XLSX from "xlsx";
 import type { InstrumentInput } from "../instruments/schema.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
+import { privateAssetId, type ManualPriceInput } from "../prices/manual.ts";
 import { transactionId, type TransactionInput } from "./schema.ts";
 
 /** One row of "Transakcje" (columns A–N). */
@@ -15,6 +16,8 @@ export interface SheetRow {
   /** YYYY-MM-DD */
   date: string;
   ticker: string;
+  /** "Nazwa" (instrument name). */
+  name: string;
   currency: string;
   assetClass: string;
   /** "Wpłata środków", "Zakup", … */
@@ -38,6 +41,8 @@ export interface SkippedRow {
   ticker: string;
   type: string;
   reason: string;
+  /** What kind of asset isn't tracked (for the account's "incomplete" note), e.g. "ETFs". */
+  what: string;
 }
 
 export interface SheetConversion {
@@ -45,7 +50,23 @@ export interface SheetConversion {
   skipped: SkippedRow[];
   /** Retail bond series the transactions use: instruments to import (terms resolved from the Ministry file). */
   retailInstruments: InstrumentInput[];
+  /** Manually valued assets (sheet class "Inne"): instruments with a private id, and their purchase prices. */
+  manualInstruments: InstrumentInput[];
+  manualPrices: ManualPriceInput[];
+  /** Every account, with the kinds of assets not imported (empty = complete). */
+  accounts: { account: string; incomplete: string[] }[];
 }
+
+/** Short label of what isn't tracked, per sheet asset class (for the account's "incomplete" note). */
+const WHAT_BY_CLASS: Record<string, string> = {
+  "Obligacje skarbowe polskie": "retail bonds",
+  "Obligacje korporacyjne polskie": "Catalyst bonds",
+  "Akcje zagraniczne": "ETFs",
+  "Obligacje korporacyjne zagraniczne": "ETFs",
+  "Obligacje skarbowe zagraniczne": "foreign bonds",
+  Waluty: "foreign currency",
+  Inne: "other assets",
+};
 
 const RETAIL_LABELS: Record<string, string> = {
   EDO: "emerytalne 10-letnie",
@@ -114,7 +135,10 @@ export function convertSheetRows(
   const transactions: TransactionInput[] = [];
   const skipped: SkippedRow[] = [];
   const retailUsed = new Map<string, RetailTerms>();
-  const skip = (r: SheetRow, reason: string) => skipped.push({ row: r.row, date: r.date, account: r.account, ticker: r.ticker, type: r.type, reason });
+  const skip = (r: SheetRow, reason: string) =>
+    skipped.push({ row: r.row, date: r.date, account: r.account, ticker: r.ticker, type: r.type, reason, what: WHAT_BY_CLASS[r.assetClass] ?? r.assetClass });
+  const manualUsed = new Map<string, InstrumentInput>();
+  const manualPrices: ManualPriceInput[] = [];
 
   for (const r of rows) {
     const note = r.comment.trim() || undefined;
@@ -138,6 +162,21 @@ export function convertSheetRows(
         transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: r.price, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
       else if (r.type === "Dywidenda / Odsetki")
         transactions.push({ date: r.date, account: r.account, type: "COUPON", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
+      else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
+      continue;
+    }
+
+    // Manually valued assets (class "Inne", e.g. a property fund share): private id, price entered by hand.
+    if (r.assetClass === "Inne" && r.currency === "PLN") {
+      const isin = privateAssetId(r.ticker);
+      if (!manualUsed.has(isin))
+        manualUsed.set(isin, { isin, code: r.ticker.toUpperCase(), name: r.name || r.ticker, type: "FUND_MANUAL", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: true, live: false });
+      if (r.type === "Zakup") {
+        transactions.push({ date: r.date, account: r.account, type: "BUY", isin, quantity: r.quantity, price: r.price, amount: -round(r.totalPln - r.fee, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+        manualPrices.push({ isin, date: r.date, price: r.price, currency: "PLN", note: "purchase price" });
+      } else if (r.type === "Sprzedaż")
+        transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: r.price, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+      else if (r.type === "Dywidenda / Odsetki") transactions.push({ date: r.date, account: r.account, type: "INTEREST", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
       else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
       continue;
     }
@@ -194,7 +233,21 @@ export function convertSheetRows(
       live: false,
       terms: "mf-retail",
     }));
-  return { transactions, skipped, retailInstruments };
+  const incomplete = new Map<string, Set<string>>();
+  for (const s of skipped) incomplete.set(s.account, (incomplete.get(s.account) ?? new Set()).add(s.what));
+  const accounts = [...new Set(rows.map((r) => r.account))].sort().map((account) => ({ account, incomplete: [...(incomplete.get(account) ?? [])].sort() }));
+  return { transactions, skipped, retailInstruments, manualInstruments: [...manualUsed.values()], manualPrices, accounts };
+}
+
+/** Current prices of manually valued assets from the sheet's "Portfolio" tab (column K), dated `date`. */
+export function readSheetManualPrices(content: Uint8Array, date: string): ManualPriceInput[] {
+  const workbook = XLSX.read(content, { type: "array" });
+  const sheet = workbook.Sheets["Portfolio"];
+  if (!sheet) return [];
+  const [, ...rows] = XLSX.utils.sheet_to_json<Cell[]>(sheet, { header: 1, blankrows: false, defval: null });
+  return rows
+    .filter((c) => String(c[3] ?? "").trim() === "Inne" && c[1] && typeof c[10] === "number" && c[10] > 0)
+    .map((c) => ({ isin: privateAssetId(String(c[1])), date, price: c[10] as number, currency: String(c[4] ?? "PLN"), note: "from the sheet" }));
 }
 
 const SHEET_NAME = "Transakcje";
@@ -221,6 +274,7 @@ export function readSheetTransactions(content: Uint8Array): SheetRow[] {
       account: String(c[0]).trim(),
       date: isoDate(c[1]),
       ticker: String(c[2] ?? "").trim(),
+      name: String(c[4] ?? "").trim(),
       currency: String(c[3] ?? "PLN").trim().toUpperCase(),
       assetClass: String(c[5] ?? "").trim(),
       type: String(c[6] ?? "").trim(),

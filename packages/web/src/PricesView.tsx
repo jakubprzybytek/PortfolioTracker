@@ -69,6 +69,11 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                     <td className={r.stale ? "muted" : ""} title={r.stale ? "Older than a week: no recent price" : ""}>
                       {r.priceDate ?? "no price"}
                       {r.stale && r.priceDate && <span className="flag">stale</span>}
+                      {r.manual && (
+                        <span className="flag" title="Entered by hand (imports/prices/)">
+                          manual
+                        </span>
+                      )}
                     </td>
                     <td className={signClass(r.change1y)} title={r.yearAgo ? `${fmtNum(r.yearAgo.price)} on ${r.yearAgo.date}` : "no price a year ago"}>
                       {r.change1y === null ? "–" : fmtPct(r.change1y * 100)}

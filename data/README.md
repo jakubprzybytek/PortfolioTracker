@@ -6,6 +6,8 @@ Upload a file to the bucket under `imports/<kind>/` and the `Import` Lambda load
 |---|---|---|
 | `mf-calculator` | `imports/mf-calculator/<name>.xlsm` | Ministry of Finance `kalkulatorodsetek.xlsm` from [gov.pl/web/finanse/kalkulatory2](https://www.gov.pl/web/finanse/kalkulatory2): CPI reference index + treasury bond terms. Import this first. |
 | `mf-retail` | `imports/mf-retail/<name>.xls` | Ministry of Finance "Dane dotyczące obligacji detalicznych" from [gov.pl/web/finanse/obligacje-detaliczne1](https://www.gov.pl/web/finanse/obligacje-detaliczne1): every retail bond series with its rates. Import before retail instruments. The `monthly` job also fetches it. |
+| `prices` | `imports/prices/<name>.json` | Manual prices for assets without a price source: `[{ "isin": "ZZ…", "date": "2026-10-11", "price": 1000, "currency": "PLN" }]`. Upload a new file whenever you have a new value. |
+| `accounts` | `imports/accounts/<name>.json` | `[{ "account": "…", "incomplete": ["ETFs"] }]`: accounts whose assets aren't all tracked yet (their cash is shown greyed and not totalled). Written by the converter. |
 | `instruments` | `imports/instruments/<name>.json` | Instruments to track ([instruments.json](instruments.json)). `"terms": "mf"` resolves bond terms from the calculator by code. A new instrument starts its own history backfill. |
 | `transactions` | `imports/transactions/<name>.json` | Your transactions ([transactions.sample.json](transactions.sample.json) shows the format). Re-importing the same file is safe: ids are derived from the row contents. |
 
@@ -17,7 +19,7 @@ aws s3 cp my-transactions.json s3://$BUCKET/imports/transactions/2026-10.json
 
 Transaction fields: `date`, `account`, `type` (`BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`), `isin`, `quantity`, `price` (bonds: clean % of nominal), `amount` (signed cash: negative = money out), `fee`, `currency` (default PLN), `note`, optional `id`.
 
-`transactions.sample.json` (with `instruments.retail.sample.json` for its retail bond) is **made-up data** for trying the app out.
+`transactions.sample.json` (with `instruments.sample.json`, `prices.sample.json` and `accounts.sample.json`) is **made-up data** for trying the app out.
 
 ## Transactions from the reference spreadsheet
 
@@ -25,7 +27,7 @@ Transaction fields: `date`, `account`, `type` (`BUY`, `SELL`, `COUPON`, `REDEMPT
 
 ```sh
 node scripts/sheet-to-transactions.ts ~/Downloads/portfolio.xlsx --mf-retail ~/Downloads/Dane_dotyczace_obligacji_detalicznych.xls
-# → data/private/transactions.json and data/private/instruments.json (your retail series; gitignored)
+# → data/private/: instruments.json, prices.json, accounts.json, transactions.json (gitignored); import in that order
 ```
 
 - Converts what the app can value: cash movements (deposits, withdrawals, interest, costs), the instruments in [instruments.json](instruments.json) (matched by code) and retail treasury bonds: the sheet's `EDO-110332` becomes series EDO0332 (ISIN from the Ministry file) with interest from 2022-03-11 (`valueDate`); COI/ROR interest becomes `COUPON`. Your retail series go to `data/private/instruments.json`: import it after the `mf-retail` file. Everything else is listed as skipped, with the reason (retail bonds, Catalyst bonds, ETFs, IBKR bonds, currency positions …); it gets converted once the app supports it.

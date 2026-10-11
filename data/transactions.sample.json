@@ -7,5 +7,9 @@
   { "date": "2026-04-27", "account": "broker", "type": "COUPON", "isin": "PL0000113783", "amount": 350 },
   { "date": "2025-09-15", "account": "ike", "type": "BUY", "isin": "PL0000118402", "quantity": 10, "price": 100, "amount": -1000, "note": "retail bond EDO0935 (sample data)" },
   { "date": "2026-05-14", "account": "ike", "type": "DEPOSIT", "amount": 5000, "note": "second account (sample data)" },
-  { "date": "2026-05-15", "account": "ike", "type": "BUY", "isin": "PL0000113783", "quantity": 5, "price": 80.1, "amount": -4005, "fee": 8.01 }
+  { "date": "2026-05-15", "account": "ike", "type": "BUY", "isin": "PL0000113783", "quantity": 5, "price": 80.1, "amount": -4005, "fee": 8.01 },
+  { "date": "2025-09-15", "account": "ike", "type": "DEPOSIT", "amount": 1000, "note": "for the retail bond (sample data)" },
+  { "date": "2026-06-01", "account": "ike", "type": "BUY", "isin": "ZZSAMPLEAPA0", "quantity": 1, "price": 900, "amount": -900, "note": "manually valued asset (sample data)" },
+  { "date": "2026-09-30", "account": "ike", "type": "INTEREST", "isin": "ZZSAMPLEAPA0", "amount": 12.5 },
+  { "date": "2026-01-10", "account": "etf", "type": "DEPOSIT", "amount": 2000, "note": "account whose ETFs aren't tracked (sample data)" }
 ]

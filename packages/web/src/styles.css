@@ -63,7 +63,7 @@ h2 { font-size: 1.1rem; margin: 24px 0 8px; }
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
 .cards { display: flex; gap: 12px; flex-wrap: wrap; }
-.card { border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; min-width: 160px; }
+.card { border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; flex: 1 1 140px; min-width: 140px; }
 .card .label { font-size: 0.8rem; color: var(--muted); }
 .card .value { font-size: 1.25rem; font-weight: 600; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
@@ -93,3 +93,5 @@ form.login p { margin: 0; font-size: 0.9rem; }
 form.login button[type="submit"] { padding: 8px; }
 form.login button.link { align-self: center; font-size: 0.9rem; }
 .gate button.link { background: none; border: 0; padding: 0; color: var(--accent); }
+.card .note { font-size: 0.75rem; margin-top: 2px; }
+tr.muted td { color: var(--muted); }

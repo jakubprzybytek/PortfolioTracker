@@ -19,7 +19,7 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 
 ## Dashboard
 
-- **Totals:** value, cost, gain (PLN and %), coupons received.
+- **Totals:** total (positions + cash), value of positions, cash (only accounts whose assets are all tracked; the card says how many it leaves out), cost, gain (PLN and %), coupons and income received.
 - **Portfolio value over time:** from `PORTFOLIO/SNAP#<date>`, with a range selector (1M, 6M, 1Y, all).
 - **Holdings table:** one row per instrument, summed across accounts; sortable by any column. Clicking a row shows its price chart.
 - **Per-instrument price chart:** clean price as a line, transactions as markers.
@@ -29,10 +29,12 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 
 From the latest snapshot (`SNAP#LATEST`), one row per account and instrument.
 
-- **Grouped by account** (alphabetically); each group row shows the account's value, cost, gain, gain % and coupons. A total row appears when more than one account is shown.
+- **Grouped by account** (alphabetically); each group row shows the account's value (positions + cash), cost, gain, gain % and coupons. Each account ends with a **Cash** row; accounts holding only cash appear too. A total row appears when more than one account is shown.
+- **Incomplete accounts** (some of their assets aren't tracked yet, e.g. ETFs): the group row says what's missing, and the cash row is greyed and left out of the sums, because without the untracked purchases it's far too high.
 - **Instruments sorted by code** within each account.
 - **Columns:** instrument (code + name), asset type, quantity, clean price (% of nominal; price date on hover), accrued interest per bond, value, cost, gain (PLN, %), coupons received.
-- **Filters:** account, asset type; "Reset" clears them; "n of m holdings".
+- **Filters:** account, asset type ("Cash" shows only the cash rows); "Reset" clears them; "n of m holdings".
+- **Manually valued** assets (e.g. a property fund share) show their latest manual price; in the Prices view it's tagged "manual" and never marked stale.
 
 ## Prices
 

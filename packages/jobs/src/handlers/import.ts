@@ -2,13 +2,17 @@
 //   imports/mf-calculator/*.xlsm   Ministry of Finance calculator → reference index + treasury bond terms
 //   imports/mf-retail/*.xls        Ministry retail-bond file → series terms and published rates (also fetched monthly)
 //   imports/instruments/*.json     instruments to track (terms "mf"/"mf-retail" resolved from the imported files)
+//   imports/prices/*.json          manual prices [{ isin, date, price, currency? }] (assets without a price source)
+//   imports/accounts/*.json        account metadata [{ account, incomplete: ["ETFs", …] }]
 //   imports/transactions/*.json    your transactions
 
 import type { S3Event } from "aws-lambda";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Resource } from "sst";
 import {
+  parseAccountsFile,
   parseInstrumentFile,
+  parseManualPrices,
   parseMfCalculator,
   parseRetailRates,
   parseTransactionFile,
@@ -124,6 +128,14 @@ export async function importKey(bucket: string, key: string): Promise<{ itemsWri
     case "mf-calculator": {
       const r = await importMfCalculator(content, key);
       return { itemsWritten: r.months + 1, note: `${key}: ${r.months} months, ${r.series} series` };
+    }
+    case "prices": {
+      const n = await repo.putPrices(parseManualPrices(content.toString("utf8"), key));
+      return { itemsWritten: n, note: `${key}: ${n} prices` };
+    }
+    case "accounts": {
+      const n = await repo.putAccounts(parseAccountsFile(content.toString("utf8")));
+      return { itemsWritten: n, note: `${key}: ${n} accounts` };
     }
     case "mf-retail": {
       const r = await importRetailRates(content, key);

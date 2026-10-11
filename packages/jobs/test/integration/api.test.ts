@@ -33,7 +33,9 @@ describe(`API ${API}`, () => {
     }, 180_000);
     // 2. Instruments: starts the GPW history backfill; wait for it so the valuation sees prices and names.
     await uploadImport("instruments", "instruments.json", readFileSync(path.join(repoRoot, "data/instruments.json")));
-    await uploadImport("instruments", "retail.json", readFileSync(path.join(repoRoot, "data/instruments.retail.sample.json")));
+    await uploadImport("instruments", "sample.json", readFileSync(path.join(repoRoot, "data/instruments.sample.json")));
+    await uploadImport("prices", "sample.json", readFileSync(path.join(repoRoot, "data/prices.sample.json")));
+    await uploadImport("accounts", "sample.json", readFileSync(path.join(repoRoot, "data/accounts.sample.json")));
     await waitFor(async () => {
       const inst = await get<InstrumentOut[]>("/instruments");
       const ok = inst.status === 200 && [IZ, DS].every((i) => inst.body.find((x) => x.isin === i)?.backfill?.status === "done");
@@ -46,7 +48,8 @@ describe(`API ${API}`, () => {
       if (r.status !== 200) return undefined;
       const codes = new Set(r.body.holdings.map((h) => h.code));
       const clean = r.body.holdings.every((h) => !h.flags.includes("unknown_instrument") && !h.flags.includes("no_price"));
-      return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && clean ? true : undefined;
+      const ike = r.body.accounts?.["ike"]?.cash;
+      return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && codes.has("SAMPLE-APARTMENT") && ike === 99.49 && clean ? true : undefined;
     }, 180_000);
   });
 
@@ -80,11 +83,11 @@ describe(`API ${API}`, () => {
   it("GET /holdings values the sample portfolio with accrued interest and IZ indexation", async () => {
     const snap = await waitFor(async () => {
       const r = await get<SnapshotItem>("/holdings");
-      return r.status === 200 && r.body.holdings.length >= 4 ? r.body : undefined;
+      return r.status === 200 && r.body.holdings.length >= 5 ? r.body : undefined;
     });
     expect(snap.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     // one holding per account and instrument, sorted by account then code
-    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["broker/DS0432", "broker/IZ0836", "ike/DS0432", "ike/EDO0935"]);
+    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["broker/DS0432", "broker/IZ0836", "ike/DS0432", "ike/EDO0935", "ike/SAMPLE-APARTMENT"]);
     const by = Object.fromEntries(snap.holdings.map((h) => [`${h.account}/${h.code}`, h])) as Record<string, HoldingSnapshot>;
     expect(by["broker/DS0432"]).toMatchObject({ quantity: 20, nominal: 1000, cost: 15931.8, couponsReceived: 700 });
     expect(by["broker/IZ0836"]).toMatchObject({ quantity: 10, cost: 9561.54, couponsReceived: 214.2 });
@@ -94,7 +97,12 @@ describe(`API ${API}`, () => {
     const edo = by["ike/EDO0935"]!;
     expect(edo).toMatchObject({ type: "BOND_RETAIL", quantity: 10, cost: 1000, cleanPrice: null, flags: [], rate: { current: 0.05, previous: 0.06 } });
     expect(edo.valuePerUnit!).toBeGreaterThan(106); // 100 + 6.00 after year 1, plus year-2 interest so far
-    for (const h of snap.holdings.filter((x) => x.type !== "BOND_RETAIL")) {
+    // Manually valued: the latest manual price (950 on 2026-09-30), never stale; its income counts as received.
+    expect(by["ike/SAMPLE-APARTMENT"]).toMatchObject({ type: "FUND_MANUAL", quantity: 1, cost: 900, value: 950, gain: 50, couponsReceived: 12.5, flags: [] });
+    // Cash per account; the incomplete account's cash is shown but not in the total.
+    expect(snap.accounts).toEqual({ broker: { cash: 5420.86 }, etf: { cash: 2000, incomplete: ["ETFs"] }, ike: { cash: 99.49 } });
+    expect(snap.totals.cash).toBe(5520.35);
+    for (const h of snap.holdings.filter((x) => x.type === "BOND_LISTED")) {
       expect(h.cleanPrice).not.toBeNull();
       expect(h.accruedInterest).not.toBeNull();
       expect(h.value).toBeCloseTo(h.valuePerUnit! * h.quantity, 1);
@@ -122,20 +130,21 @@ describe(`API ${API}`, () => {
   it("GET /transactions lists all transactions newest first, with their instrument", async () => {
     const { status, body } = await get<{ date: string; account: string; type: string; isin?: string; instrument: { code: string; type: string } | null }[]>("/transactions");
     expect(status).toBe(200);
-    expect(body).toHaveLength(9);
+    expect(body).toHaveLength(13);
     const dates = body.map((t) => t.date);
     expect(dates).toEqual([...dates].sort().reverse());
-    expect(body[0]).toMatchObject({ date: "2026-05-15", account: "ike", type: "BUY", instrument: { code: "DS0432", type: "BOND_LISTED" } });
+    expect(body[0]).toMatchObject({ date: "2026-09-30", account: "ike", type: "INTEREST", instrument: { code: "SAMPLE-APARTMENT", type: "FUND_MANUAL" } });
     expect(body.filter((t) => t.type === "DEPOSIT").every((t) => t.instrument === null)).toBe(true);
-    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["broker", "ike"]));
+    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["broker", "etf", "ike"]));
   });
 
   it("GET /prices lists held instruments with their latest price, its date and the 1-year change", async () => {
     const { status, body } = await get<{ code: string; price: number | null; priceDate: string | null; stale: boolean; change1y: number | null; yearAgo: { date: string } | null; rate?: unknown }[]>("/prices");
     expect(status).toBe(200);
-    expect(body.map((r) => r.code)).toEqual(["DS0432", "EDO0935", "IZ0836"]);
+    expect(body.map((r) => r.code)).toEqual(["DS0432", "EDO0935", "IZ0836", "SAMPLE-APARTMENT"]);
     expect(body.find((r) => r.code === "EDO0935")).toMatchObject({ price: null, rate: { current: 0.05, previous: 0.06 } });
-    for (const r of body.filter((x) => x.code !== "EDO0935")) {
+    expect(body.find((r) => r.code === "SAMPLE-APARTMENT")).toMatchObject({ price: 950, priceDate: "2026-09-30", stale: false, manual: true });
+    for (const r of body.filter((x) => x.code === "DS0432" || x.code === "IZ0836")) {
       expect(r.price).toBeGreaterThan(50);
       expect(r.priceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(typeof r.change1y).toBe("number"); // both have more than a year of GPW history

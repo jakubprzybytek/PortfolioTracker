@@ -26,6 +26,12 @@ describe("priceRows", () => {
     expect(row).toMatchObject({ code: "EDO0332", price: null, stale: false, rate: { current: 0.0345, previous: 0.0655 } });
   });
 
+  it("never marks a manual price stale and tags it", () => {
+    const old = { ...px("ZZRZESZOW000", "2023-03-23", 1000), venue: "MANUAL" };
+    const [row] = priceRows([{ ...inst("ZZRZESZOW000", "RZESZÓW"), type: "FUND_MANUAL", venue: "MANUAL" } as InstrumentItem], new Map([["ZZRZESZOW000", old]]), new Map(), "2026-10-11");
+    expect(row).toMatchObject({ price: 1000, priceDate: "2023-03-23", stale: false, manual: true });
+  });
+
   it("marks an instrument without any price", () => {
     const [row] = priceRows([inst("PL0000113783", "DS0432")], new Map(), new Map(), "2026-10-11");
     expect(row).toMatchObject({ price: null, priceDate: null, stale: true, change1y: null });

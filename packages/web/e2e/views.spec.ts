@@ -26,17 +26,17 @@ test.describe("transactions view", () => {
   test("lists all transactions, newest first", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(9);
+    await expect(rows).toHaveCount(13);
     const dates = await rows.locator("td:first-child").allTextContents();
     expect(dates).toEqual([...dates].sort().reverse());
-    await expect(rows.first()).toContainText("2026-05-15");
-    await expect(page.getByTestId("filters-summary")).toHaveText("9 of 9 transactions");
+    await expect(rows.first()).toContainText("2026-09-30");
+    await expect(page.getByTestId("filters-summary")).toHaveText("13 of 13 transactions");
   });
 
   test("filters by instrument, account and asset type, and keeps filters in the URL", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(9);
+    await expect(rows).toHaveCount(13);
 
     await page.getByTestId("filter-instrument").selectOption({ label: "DS0432" });
     await expect(rows).toHaveCount(4); // broker: buy + 2 coupons, ike: buy
@@ -49,9 +49,9 @@ test.describe("transactions view", () => {
     await expect(rows).toHaveCount(1);
 
     await page.getByTestId("filters-reset").click();
-    await expect(rows).toHaveCount(9);
+    await expect(rows).toHaveCount(13);
     await page.getByTestId("filter-type").selectOption({ label: "Cash" });
-    await expect(rows).toHaveCount(2); // the two deposits
+    await expect(rows).toHaveCount(4); // the deposits
     await expect(rows.first()).toContainText("Deposit");
   });
 });
@@ -65,13 +65,17 @@ test.describe("holdings view", () => {
     await expect(page.getByTestId("holdings-total")).toBeVisible();
 
     const groupOrder = await table.locator("tr.group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
-    expect(groupOrder).toEqual(["account-broker", "account-ike"]);
-    const broker = table.locator('tr[data-account="broker"]');
+    expect(groupOrder).toEqual(["account-broker", "account-etf", "account-ike"]);
+    // each account ends with its cash; the incomplete account shows only cash, greyed, with a note
+    await expect(table.locator('tr[data-testid="cash-row"][data-account="broker"]')).toContainText("5420,86");
+    await expect(page.getByTestId("account-etf").getByTestId("incomplete")).toContainText("ETFs not tracked yet");
+    await expect(table.locator('tr[data-testid="cash-row"][data-account="etf"]')).toHaveClass(/muted/);
+    const broker = table.locator('tr[data-testid="holding-row"][data-account="broker"]');
     await expect(broker).toHaveCount(2);
     expect(await broker.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "IZ0836"]);
-    const ike = table.locator('tr[data-account="ike"]');
-    await expect(ike).toHaveCount(2);
-    expect(await ike.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "EDO0935"]);
+    const ike = table.locator('tr[data-testid="holding-row"][data-account="ike"]');
+    await expect(ike).toHaveCount(3);
+    expect(await ike.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "EDO0935", "SAMPLE-APARTMENT"]);
     await expect(ike.first().locator("td").nth(2)).toHaveText("5");
     await expect(ike.nth(1).locator("td").nth(1)).toHaveText("Retail bond");
   });
@@ -79,16 +83,19 @@ test.describe("holdings view", () => {
   test("filters by account and asset type", async ({ page }) => {
     await page.goto("/#/holdings");
     const rows = page.getByTestId("holding-row");
-    await expect(rows).toHaveCount(4);
+    await expect(rows).toHaveCount(5);
     await page.getByTestId("filter-account").selectOption("ike");
-    await expect(rows).toHaveCount(2);
+    await expect(rows).toHaveCount(3);
     await expect(page.getByTestId("account-broker")).toHaveCount(0);
-    await expect(page.getByTestId("filters-summary")).toHaveText("2 of 4 holdings");
+    await expect(page.getByTestId("filters-summary")).toHaveText("3 of 5 holdings");
     await page.getByTestId("filters-reset").click();
     await page.getByTestId("filter-type").selectOption({ label: "Listed bond" });
     await expect(rows).toHaveCount(3);
     await page.getByTestId("filter-type").selectOption({ label: "Retail bond" });
     await expect(rows).toHaveCount(1);
+    await page.getByTestId("filter-type").selectOption({ label: "Cash" });
+    await expect(rows).toHaveCount(0);
+    await expect(page.getByTestId("cash-row")).toHaveCount(3);
   });
 });
 
@@ -98,8 +105,11 @@ test.describe("prices view", () => {
     await page.getByTestId("nav-prices").click();
     await expect(page).toHaveURL(/#\/prices$/);
     const rows = page.getByTestId("prices-table").locator("tbody tr");
-    await expect(rows).toHaveCount(3);
-    expect(await rows.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "EDO0935", "IZ0836"]);
+    await expect(rows).toHaveCount(4);
+    expect(await rows.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "EDO0935", "IZ0836", "SAMPLE-APARTMENT"]);
+    const manual = page.getByTestId("price-SAMPLE-APARTMENT");
+    await expect(manual.locator("td").nth(2)).toHaveText("950,00 PLN");
+    await expect(manual.locator("td").nth(3)).toHaveText(/2026-09-30\s*manual/);
     // Retail bond: its interest rate instead of a market price, the previous year's rate in "1 year"
     const edo = page.getByTestId("price-EDO0935");
     await expect(edo.locator("td").nth(2)).toHaveText("5,00 % p.a.");

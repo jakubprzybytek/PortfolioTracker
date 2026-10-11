@@ -13,8 +13,10 @@ export interface PriceRow {
   currency: string;
   price: number | null;
   priceDate: IsoDate | null;
-  /** True when the price is older than `staleAfterDays`. */
+  /** True when the price is older than `staleAfterDays` (never for manual prices: they're entered when known). */
   stale: boolean;
+  /** Price entered by hand (venue MANUAL). */
+  manual?: boolean;
   /** Price on or before the same day a year earlier, and the change since (fraction, e.g. 0.021). */
   yearAgo: { date: IsoDate; price: number } | null;
   change1y: number | null;
@@ -48,7 +50,8 @@ export function priceRows(
         currency: i.currency,
         price: now?.close ?? null,
         priceDate: now?.date ?? null,
-        stale: !now || daysBetween(now.date, today) > staleAfterDays,
+        stale: !now || (now.venue !== "MANUAL" && daysBetween(now.date, today) > staleAfterDays),
+        ...(now?.venue === "MANUAL" ? { manual: true } : {}),
         yearAgo: then ? { date: then.date, price: then.close } : null,
         change1y: now && then && then.close ? Math.round((now.close / then.close - 1) * 10_000) / 10_000 : null,
       };

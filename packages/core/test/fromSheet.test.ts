@@ -3,7 +3,7 @@ import { convertSheetRows, type SheetRow } from "../src/transactions/fromSheet.t
 import { parseTransactionFile } from "../src/transactions/schema.ts";
 
 const row = (r: Partial<SheetRow>): SheetRow => ({
-  row: 2, account: "Bossa", date: "2025-03-20", ticker: "Gotówka", currency: "PLN", assetClass: "Gotówka", type: "Wpłata środków",
+  row: 2, account: "Bossa", date: "2025-03-20", ticker: "Gotówka", name: "", currency: "PLN", assetClass: "Gotówka", type: "Wpłata środków",
   quantity: 1, price: 1, fee: 0, nominal: 1, totalPln: 0, comment: "", ...r,
 });
 const instruments = new Map([["IZ0836", { isin: "PL0000117024" }]]);
@@ -66,5 +66,23 @@ describe("convertSheetRows", () => {
     expect(a).toEqual(b);
     // the import keeps the ids
     expect(parseTransactionFile(JSON.stringify(convertSheetRows(rows, instruments).transactions), "t").map((t) => t.id)).toEqual(a);
+  });
+});
+
+describe("manual assets and account completeness", () => {
+  it("turns 'Inne' rows into a manually valued instrument with a private id, its purchase price and income", () => {
+    const r = convertSheetRows(
+      [
+        row({ account: "HRE", ticker: "Rzeszów", name: "Rzeszów Krogulskiego", assetClass: "Inne", type: "Zakup", quantity: 40, price: 1000, totalPln: 40000, date: "2023-03-23" }),
+        row({ account: "HRE", ticker: "Rzeszów", assetClass: "Inne", type: "Dywidenda / Odsetki", totalPln: 1248.4, date: "2023-06-30" }),
+        row({ account: "Zagr", ticker: "AMS:VWRL", assetClass: "Akcje zagraniczne", currency: "EUR", type: "Zakup" }),
+        row({ account: "Zagr", type: "Wpłata środków", totalPln: 100 }),
+      ],
+      instruments,
+    );
+    expect(r.manualInstruments).toEqual([expect.objectContaining({ isin: "ZZRZESZOW000", code: "RZESZÓW", name: "Rzeszów Krogulskiego", type: "FUND_MANUAL", venue: "MANUAL" })]);
+    expect(r.transactions.filter((t) => t.isin === "ZZRZESZOW000").map((t) => [t.type, t.amount])).toEqual([["BUY", -40000], ["INTEREST", 1248.4]]);
+    expect(r.manualPrices).toEqual([{ isin: "ZZRZESZOW000", date: "2023-03-23", price: 1000, currency: "PLN", note: "purchase price" }]);
+    expect(r.accounts).toEqual([{ account: "HRE", incomplete: [] }, { account: "Zagr", incomplete: ["ETFs"] }]);
   });
 });
