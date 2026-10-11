@@ -57,7 +57,7 @@ export function HoldingsTable({ holdings, selected, onSelect }: { holdings: Hold
         <tbody>
           {rows.map((h) => (
             <tr key={h.isin} className={h.isin === selected ? "selected" : ""} onClick={() => onSelect(h.isin)} data-testid={`holding-${h.code}`} style={{ cursor: "pointer" }}>
-              <td className="left">
+              <td className="left instrument">
                 <strong>{h.code}</strong> <span className="muted">{h.name !== h.code ? h.name : ""}</span>
                 {h.flags.map((f) => (
                   <span key={f} className="flag" title={f}>

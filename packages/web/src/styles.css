@@ -27,7 +27,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); }
 .layout { display: grid; grid-template-columns: 200px minmax(0, 1fr); min-height: 100vh; }
 main { max-width: 1280px; width: 100%; padding: 16px 24px; }
 h1 { font-size: 1.15rem; margin: 0 0 16px; }
-.sidebar { border-right: 1px solid var(--border); padding: 16px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
+/* The nav cell spans the whole page height (so does its border); the inner part stays in view while scrolling. */
+.sidebar { border-right: 1px solid var(--border); }
+.sidebar-inner { padding: 16px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
 .sidebar ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .sidebar a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--fg); text-decoration: none; }
 .sidebar a:hover { background: var(--row); }
@@ -35,7 +37,8 @@ h1 { font-size: 1.15rem; margin: 0 0 16px; }
 .sidebar footer { margin-top: auto; font-size: 0.75rem; }
 @media (max-width: 720px) {
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .sidebar { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; border-right: 0; border-bottom: 1px solid var(--border); padding: 8px 16px; }
+  .sidebar { border-right: 0; border-bottom: 1px solid var(--border); }
+  .sidebar-inner { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 16px; }
   .sidebar h1 { margin: 0; }
   .sidebar ul { flex-direction: row; flex-wrap: wrap; }
   .sidebar footer { display: none; }

@@ -10,19 +10,21 @@ export function App() {
   return (
     <div className="layout">
       <nav className="sidebar" aria-label="Views">
-        <h1>Portfolio Tracker</h1>
-        <ul>
-          {VIEWS.map((v) => (
-            <li key={v.view}>
-              <a href={v.path} aria-current={route.view === v.view ? "page" : undefined} data-testid={`nav-${v.view}`}>
-                {v.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-        <footer className="muted" data-testid="version">
-          Portfolio Tracker {APP_VERSION}
-        </footer>
+        <div className="sidebar-inner">
+          <h1>Portfolio Tracker</h1>
+          <ul>
+            {VIEWS.map((v) => (
+              <li key={v.view}>
+                <a href={v.path} aria-current={route.view === v.view ? "page" : undefined} data-testid={`nav-${v.view}`}>
+                  {v.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+          <footer className="muted" data-testid="version">
+            Portfolio Tracker {APP_VERSION}
+          </footer>
+        </div>
       </nav>
       <main>
         {route.view === "dashboard" && <DashboardView />}
