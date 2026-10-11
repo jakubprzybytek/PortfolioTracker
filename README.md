@@ -40,7 +40,7 @@ The API lives under `/api` on the same domain (a CloudFront `Router` strips the 
 
 ## Login
 
-The site and API need a login (Cognito; details in [Docs/ui.md](Docs/ui.md#access)). They use the existing user pool `AlbedoUserPool` (`eu-west-1_IVai0KEAA`) and its hosted login page; each stage adds its own app client. The pool is shared with other apps and allows sign-up, so access also requires the group **`portfolio-tracker`**: the API returns 403 to anyone outside it.
+The site and API need a login (Cognito; details in [Docs/ui.md](Docs/ui.md#access)): the app's own login form against the existing user pool `AlbedoUserPool` (`eu-west-1_IVai0KEAA`); each stage adds its own app client. The pool is shared with other apps and allows sign-up, so access also requires the group **`portfolio-tracker`**: the API returns 403 to anyone outside it.
 
 Give someone access (once per person; works for every stage):
 

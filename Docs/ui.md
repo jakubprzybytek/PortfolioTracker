@@ -58,10 +58,11 @@ The UI loads all transactions and filters them in the browser; at a few hundred 
 
 ## Access
 
-Login with Cognito; everything under `/api` needs it. The site's files are public (they hold no data); the app sends you to the login page until you're logged in.
+Login with Cognito; everything under `/api` needs it. The site's files are public (they hold no data); until you're logged in the app shows its own login form, on the stage's own domain (no redirect to a Cognito page).
 
-- **User pool:** the existing `AlbedoUserPool` (`eu-west-1_IVai0KEAA`), shared with other apps, and its hosted login page `https://eu-west-1ivai0keaa.auth.eu-west-1.amazoncognito.com`. SST only references it (`CognitoUserPool.get`) and adds clients; it never changes or deletes the pool.
-- **One client per stage**, `portfolio-tracker-<stage>-web`: authorization code + PKCE, no secret; callback and logout URL = the stage's site, plus `http://localhost:5173/` on `dev`; access/ID token 1 hour, refresh token 30 days. On `int` and `dev` it also allows password login without a browser (`USER_PASSWORD_AUTH`) for the tests; on `prod` it doesn't.
+- **User pool:** the existing `AlbedoUserPool` (`eu-west-1_IVai0KEAA`), shared with other apps. SST only references it (`CognitoUserPool.get`) and adds clients; it never changes or deletes the pool. A pool can have only one custom domain, which is why the login isn't a hosted page per stage.
+- **Login form** (`packages/web/src/LoginForm.tsx`, Amplify v6 `aws-amplify/auth`): email + password with **SRP** (the password never leaves the browser); a first-login "choose a new password" step for admin-created users; "Forgot password?" emails a code and sets a new password. Wrong email and wrong password give the same message.
+- **One client per stage**, `portfolio-tracker-<stage>-web`: no secret, no OAuth/hosted UI; auth flows SRP + refresh token; access/ID token 1 hour, refresh token 30 days. On `int` and `dev` it also allows plain password login (`USER_PASSWORD_AUTH`) for the tests; on `prod` it doesn't.
 - **API Gateway** (JWT authorizer) accepts only access tokens of this pool issued to the stage's own client: a missing, expired or forged token gets **401**, and so does a token from another stage or from the other apps' clients.
 - **Groups:** the pool allows sign-up, so being able to log in isn't enough. The API Lambda also requires one of the stage's groups in `cognito:groups` and returns **403** otherwise ("This account has no access"):
 
@@ -71,5 +72,5 @@ Login with Cognito; everything under `/api` needs it. The site's files are publi
   | `portfolio-tracker-test` | the test user | `int`, `dev` only |
 
   The test user's password is stored in the `int`/`dev` secrets; keeping it out of `portfolio-tracker` means it can log in to the `prod` site but gets no data there. Per-stage groups: `accessGroups()` in `packages/jobs/src/lib/access.ts`. Members are added with the AWS CLI (README, "Login").
-- **In the browser** (`oidc-client-ts` + `react-oidc-context`): tokens in localStorage, renewed with the refresh token; the view you were on (`#/…`) survives the round trip to the login page. A 401 from the API starts a new login. "Log out" (in the menu) clears the tokens and ends the hosted-page session.
+- **In the browser:** Amplify keeps the tokens in localStorage and renews them with the refresh token; the view you were on (`#/…`) stays in the URL while the login form shows. A 401 from the API or a failed renewal logs you out locally and shows the form. "Log out" (in the menu) clears the tokens.
 - MFA is off in the pool (a pool-wide setting shared with the other apps).

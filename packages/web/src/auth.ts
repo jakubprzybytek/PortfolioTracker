@@ -1,47 +1,44 @@
-// Login through the Cognito hosted page: authorization code + PKCE (oidc-client-ts). Tokens are kept in
-// localStorage, so you stay logged in across tabs and reloads; the refresh token (30 days) renews them.
+// Login against the shared Cognito user pool with the app's own form (LoginForm.tsx): SRP, so the password
+// never leaves the browser. Amplify keeps the tokens in localStorage and renews them with the refresh token
+// (30 days). Docs/ui.md, "Access".
 
-import { UserManager, WebStorageStateStore, type User } from "oidc-client-ts";
+import { Amplify } from "aws-amplify";
+import { fetchAuthSession, signOut } from "aws-amplify/auth";
 
 const env = import.meta.env as Record<string, string | undefined>;
-const AUTHORITY = env["VITE_AUTH_AUTHORITY"] ?? "";
-const CLIENT_ID = env["VITE_AUTH_CLIENT_ID"] ?? "";
-const LOGIN_DOMAIN = (env["VITE_AUTH_LOGIN_DOMAIN"] ?? "").replace(/\/$/, "");
-const SITE = `${window.location.origin}/`;
 
-export const userManager = new UserManager({
-  authority: AUTHORITY,
-  client_id: CLIENT_ID,
-  redirect_uri: SITE,
-  post_logout_redirect_uri: SITE,
-  response_type: "code",
-  scope: "openid email profile",
-  userStore: new WebStorageStateStore({ store: window.localStorage }),
-  automaticSilentRenew: true,
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolId: env["VITE_AUTH_USER_POOL_ID"] ?? "",
+      userPoolClientId: env["VITE_AUTH_CLIENT_ID"] ?? "",
+      loginWith: { email: true },
+    },
+  },
 });
 
-let loggingOut = false;
-
-/** Starts the login, remembering the current view (hash route) to come back to. */
-export async function login() {
-  if (loggingOut) return; // the page is about to leave for the Cognito logout
-  await userManager.signinRedirect({ state: window.location.hash });
+export interface Session {
+  email: string;
 }
 
-/** After the redirect back: drop ?code=… from the URL and restore the view. */
-export function onSigninCallback(user: User | void) {
-  const hash = typeof user?.state === "string" ? user.state : window.location.hash;
-  window.history.replaceState(null, "", `${window.location.pathname}${hash}`);
-}
-
-/** Cognito has no OIDC end-session endpoint: clear the local tokens, then end the hosted-page session. */
-export async function logout() {
-  loggingOut = true; // removing the user re-renders the app as logged out: don't start a new login meanwhile
-  await userManager.removeUser();
-  window.location.href = `${LOGIN_DOMAIN}/logout?client_id=${encodeURIComponent(CLIENT_ID)}&logout_uri=${encodeURIComponent(SITE)}`;
+/** The logged-in user, or null. Renews the tokens when needed. */
+export async function currentSession(): Promise<Session | null> {
+  try {
+    const { tokens } = await fetchAuthSession();
+    if (!tokens?.accessToken) return null;
+    return { email: String(tokens.idToken?.payload["email"] ?? "") };
+  } catch {
+    return null;
+  }
 }
 
 export async function accessToken(): Promise<string | undefined> {
-  const user = await userManager.getUser();
-  return user && !user.expired ? user.access_token : undefined;
+  try {
+    return (await fetchAuthSession()).tokens?.accessToken?.toString();
+  } catch {
+    return undefined;
+  }
 }
+
+/** Logs out here (local tokens); the app shows the login form again. */
+export const logout = () => signOut();

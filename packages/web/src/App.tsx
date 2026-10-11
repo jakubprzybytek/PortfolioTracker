@@ -1,40 +1,36 @@
-import { useEffect } from "react";
-import { hasAuthParams, useAuth } from "react-oidc-context";
+import { useCallback, useEffect, useState } from "react";
+import { Hub } from "aws-amplify/utils";
 import { APP_VERSION } from "./api.ts";
-import { login, logout } from "./auth.ts";
+import { currentSession, logout, type Session } from "./auth.ts";
 import { DashboardView } from "./DashboardView.tsx";
 import { HoldingsView } from "./HoldingsView.tsx";
+import { LoginForm } from "./LoginForm.tsx";
 import { useRoute, VIEWS } from "./route.ts";
 import { TransactionsView } from "./TransactionsView.tsx";
 
-/** Shows the app only to a logged-in user; otherwise goes straight to the Cognito login page. */
+/** Shows the app to a logged-in user and the login form otherwise. The view (#/…) stays in the URL meanwhile. */
 export function App() {
-  const auth = useAuth();
-  const needsLogin = !auth.isAuthenticated && !auth.isLoading && !auth.activeNavigator && !auth.error && !hasAuthParams();
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const refresh = useCallback(() => void currentSession().then(setSession), []);
 
   useEffect(() => {
-    if (needsLogin) void login();
-  }, [needsLogin]);
+    refresh();
+    // Logged out (button, expired session, failed token renewal) → login form.
+    return Hub.listen("auth", ({ payload }) => {
+      if (payload.event === "signedOut" || payload.event === "tokenRefresh_failure") setSession(null);
+      if (payload.event === "signedIn") refresh();
+    });
+  }, [refresh]);
 
-  if (auth.error) {
-    return (
-      <div className="gate" data-testid="auth-error">
-        <h1>Portfolio Tracker</h1>
-        <p className="error">Sign-in failed: {auth.error.message}</p>
-        <button type="button" onClick={() => void login()}>
-          Sign in again
-        </button>
-      </div>
-    );
-  }
-  if (!auth.isAuthenticated) {
+  if (session === undefined) {
     return (
       <div className="gate muted" data-testid="auth-pending">
-        Signing in…
+        Loading…
       </div>
     );
   }
-  return <Shell email={auth.user?.profile.email ?? ""} />;
+  if (session === null) return <LoginForm onSignedIn={refresh} />;
+  return <Shell email={session.email} />;
 }
 
 function Shell({ email }: { email: string }) {

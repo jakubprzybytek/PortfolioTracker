@@ -1,4 +1,4 @@
-import { accessToken, login } from "./auth.ts";
+import { accessToken, logout } from "./auth.ts";
 
 // Absolute (sst dev: API Gateway URL) or relative ("/api" behind the Router on the custom domain).
 export const API_URL: string = ((import.meta.env.VITE_API_URL as string | undefined) ?? "/api").replace(/\/$/, "");
@@ -10,9 +10,9 @@ export async function api<T>(path: string, params: Record<string, string | undef
   const token = await accessToken();
   const res = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
   if (res.status === 401) {
-    // Token missing, expired or revoked: log in again (comes back to the same view).
-    await login();
-    throw new Error("Signing in…");
+    // Token missing, expired or revoked: back to the login form (the view stays in the URL).
+    await logout();
+    throw new Error("Session expired. Sign in again.");
   }
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;

@@ -5,11 +5,10 @@
 
 const WARSAW = "Europe/Warsaw";
 
-// Login: the existing, shared Cognito user pool (AlbedoUserPool) and its hosted login page. Other apps use the
+// Login: a form in the app against the existing, shared Cognito user pool (AlbedoUserPool). Other apps use the
 // same pool and anyone can sign up to it, so the API also requires a group, per stage (accessGroups;
 // Docs/ui.md, "Access").
 const COGNITO_POOL_ID = "eu-west-1_IVai0KEAA";
-const COGNITO_LOGIN_DOMAIN = "https://eu-west-1ivai0keaa.auth.eu-west-1.amazoncognito.com";
 const TEST_USER = "portfolio-tracker-test@albedoonline.com";
 
 // prod → portfoliotracker.albedoonline.com, any other stage → <stage>.portfoliotracker.albedoonline.com
@@ -120,22 +119,23 @@ export default $config({
     // --- auth ----------------------------------------------------------------------------------
     // One domain per stage: the site at "/", the API at "/api/*" (same origin, one certificate).
     const domain = stageDomain($app.stage);
-    const siteUrls = [`https://${domain}/`, ...($app.stage === "dev" ? ["http://localhost:5173/"] : [])];
     const pool = sst.aws.CognitoUserPool.get("Auth", COGNITO_POOL_ID);
     const clientName = (kind: string) => `portfolio-tracker-${$app.stage}-${kind}`;
 
-    // One client per stage. The site: authorization code + PKCE, no secret. Access token 1 h, refresh token
-    // 30 days. On int/dev the tests also log in with a password (USER_PASSWORD_AUTH); never on prod.
+    // One client per stage, no secret. The site's login form uses SRP (the password never leaves the browser);
+    // no hosted login page, so no OAuth flows or callback URLs. Access token 1 h, refresh token 30 days.
+    // On int/dev the tests also log in with a plain password (USER_PASSWORD_AUTH); never on prod.
     const testing = $app.stage !== "prod";
     const webClient = pool.addClient("WebClient", {
-      callbackUrls: siteUrls,
       transform: {
         client: (args) => {
           args.name = clientName("web");
-          args.allowedOauthFlows = ["code"];
-          args.allowedOauthScopes = ["openid", "email", "profile"];
-          args.logoutUrls = siteUrls;
-          args.explicitAuthFlows = testing ? ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_PASSWORD_AUTH"] : ["ALLOW_REFRESH_TOKEN_AUTH"];
+          args.allowedOauthFlowsUserPoolClient = false;
+          args.allowedOauthFlows = [];
+          args.allowedOauthScopes = [];
+          args.callbackUrls = [];
+          args.supportedIdentityProviders = ["COGNITO"];
+          args.explicitAuthFlows = ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH", ...(testing ? ["ALLOW_USER_PASSWORD_AUTH"] : [])];
           args.preventUserExistenceErrors = "ENABLED";
           args.enableTokenRevocation = true;
           args.accessTokenValidity = 1;
@@ -190,9 +190,8 @@ export default $config({
         // In `sst dev` the site runs on localhost, so it talks to API Gateway directly.
         VITE_API_URL: $dev ? api.url : publicApiUrl,
         VITE_APP_VERSION: process.env["APP_VERSION"] ?? `${$app.stage}-local`,
-        VITE_AUTH_AUTHORITY: `https://cognito-idp.eu-west-1.amazonaws.com/${COGNITO_POOL_ID}`,
+        VITE_AUTH_USER_POOL_ID: COGNITO_POOL_ID,
         VITE_AUTH_CLIENT_ID: webClient.id,
-        VITE_AUTH_LOGIN_DOMAIN: COGNITO_LOGIN_DOMAIN,
       },
       dev: { command: "npm run dev", title: "web" },
     });
