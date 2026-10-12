@@ -50,7 +50,8 @@ export async function handler() {
     }
 
     // 2. Cross-check against the MF published ratios for IZ bonds we track.
-    const index = toReferenceIndex(buildReferenceIndex([...months, ...(await repo.listReferenceIndex()).map((m) => ({ month: m.month, wr: m.wr }))]));
+    // The stored index (incl. months just added), exactly as the valuation reads it.
+    const index = toReferenceIndex(await repo.listReferenceIndex());
     const izBonds = (await repo.listInstruments()).filter((i) => i.terms?.couponType === "INDEXED" && i.terms.baseRef);
     const published = await fetchMfIndexRatios().catch((err) => {
       notes.push(`MF page unavailable: ${(err as Error).message}`);
