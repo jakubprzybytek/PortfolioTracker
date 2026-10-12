@@ -133,3 +133,35 @@ test.describe("prices view", () => {
     await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
   });
 });
+
+test.describe("holdings grouped by instrument", () => {
+  test("groups by instrument with one row per account, cash last; the choice is in the URL and works with filters", async ({ page }) => {
+    await page.goto("/#/holdings");
+    await page.getByTestId("group-by").getByRole("button", { name: "Instrument" }).click();
+    await expect(page).toHaveURL(/group=instrument/);
+    const table = page.getByTestId("holdings-by-account");
+    await expect(page.getByTestId("instrument-cash")).toBeVisible(); // data loaded
+    const order = await table.locator("tr.group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
+    expect(order).toEqual(["instrument-DS0432", "instrument-EDO0935", "instrument-IZ0836", "instrument-SAMPLE-APARTMENT", "instrument-cash"]);
+
+    // DS0432 is held in two accounts: 20 + 5
+    const ds = page.getByTestId("instrument-DS0432");
+    await expect(ds.locator("td").nth(2)).toHaveText("25");
+    const dsRows = page.getByTestId("holding-row").filter({ has: page.locator("td:first-child", { hasText: /^(broker|ike)$/ }) });
+    await expect(dsRows.first()).toBeVisible();
+    // cash: one row per account, the incomplete one greyed
+    await expect(page.getByTestId("cash-row")).toHaveCount(3);
+    await expect(table.locator('tr[data-testid="cash-row"][data-account="etf"]')).toHaveClass(/muted/);
+
+    await page.reload();
+    await expect(page.getByTestId("instrument-cash")).toBeVisible();
+    await page.getByTestId("filter-account").selectOption("ike");
+    await expect(page).toHaveURL(/group=instrument/);
+    await expect(page.getByTestId("instrument-DS0432").locator("td").nth(2)).toHaveText("5");
+    await expect(page.getByTestId("instrument-IZ0836")).toHaveCount(0); // not held in ike
+
+    await page.getByTestId("group-by").getByRole("button", { name: "Account" }).click();
+    await expect(page.getByTestId("account-ike")).toBeVisible();
+    await expect(page).not.toHaveURL(/group=/);
+  });
+});
