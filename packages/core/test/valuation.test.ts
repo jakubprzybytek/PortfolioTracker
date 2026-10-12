@@ -25,7 +25,7 @@ const tx = (t: Partial<TransactionItem> & Pick<TransactionItem, "date" | "type" 
   ({ PK: "ACCT#a", SK: `TX#${t.date}#${t.id ?? "x"}`, GSI1PK: "TX", GSI1SK: `${t.date}#${t.id ?? "x"}`, id: "x", account: "a", currency: "PLN", source: "test", ...t }) as TransactionItem;
 
 describe("positionsAt", () => {
-  it("accumulates buys at average cost, reduces on sells, tracks coupons", () => {
+  it("accumulates buys, sells the oldest lots first (FIFO), tracks coupons", () => {
     const txs = [
       tx({ id: "1", date: "2025-01-10", type: "BUY", isin: "PL0000113783", quantity: 10, price: 80, amount: -8000, fee: 10 }),
       tx({ id: "2", date: "2025-03-10", type: "BUY", isin: "PL0000113783", quantity: 10, price: 82, amount: -8200, fee: 10 }),
@@ -35,10 +35,29 @@ describe("positionsAt", () => {
     ];
     const p = positionsAt(txs, "2025-12-31").get(positionKey("a", "PL0000113783"))!;
     expect(p.quantity).toBe(15);
-    expect(p.cost).toBe(12165); // 16220 × 15/20
+    // FIFO: the 5 sold come from the first lot (8010 for 10 → 4005 out); the second lot (8210) is untouched
+    expect(p.cost).toBe(12215);
+    expect(p.lots).toEqual([
+      { date: "2025-01-10", quantity: 5, cost: 4005 },
+      { date: "2025-03-10", quantity: 10, cost: 8210 },
+    ]);
+    expect(p.realised).toEqual([{ date: "2025-06-01", quantity: 5, proceeds: 4150, cost: 4005 }]);
     expect(p.couponsReceived).toBe(350);
     expect(positionsAt(txs, "2025-02-01").get(positionKey("a", "PL0000113783"))!.quantity).toBe(10);
     expect(positionsAt(txs, "2024-12-31").size).toBe(0);
+  });
+
+  it("a sale spanning lots takes each at its own cost per unit; a split multiplies every lot", () => {
+    const txs = [
+      tx({ id: "1", date: "2025-01-10", type: "BUY", isin: "IE00B3YCGJ38", quantity: 2, amount: -2000 }),
+      tx({ id: "2", date: "2025-02-10", type: "BUY", isin: "IE00B3YCGJ38", quantity: 2, amount: -3000 }),
+      tx({ id: "3", date: "2025-03-10", type: "SPLIT", isin: "IE00B3YCGJ38", ratio: 100, amount: 0 }),
+      tx({ id: "4", date: "2025-04-10", type: "SELL", isin: "IE00B3YCGJ38", quantity: 300, amount: 4000, fee: 10 }),
+    ];
+    const p = positionsAt(txs, "2025-12-31").get(positionKey("a", "IE00B3YCGJ38"))!;
+    // 200 units of lot 1 (2000) + 100 of lot 2 (1500) sold; 100 of lot 2 left
+    expect(p).toMatchObject({ quantity: 100, cost: 1500, lots: [{ date: "2025-02-10", quantity: 100, cost: 1500 }] });
+    expect(p.realised).toEqual([{ date: "2025-04-10", quantity: 300, proceeds: 4000, cost: 3500 }]);
   });
 
   it("keeps the same instrument in two accounts as separate positions", () => {

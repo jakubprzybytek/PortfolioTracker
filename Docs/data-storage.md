@@ -182,6 +182,8 @@ GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
 Foreign-currency trades (ETFs at Bossa): `price` in the instrument's currency, `amount` and `fee` in PLN, `fxRate` = the broker's PLN per unit. `SPLIT`: `ratio` (units after per unit before), `amount` 0; the position's quantity × `ratio`, cost unchanged. `DIVIDEND` counts as income received, like coupons.
 `valueDate` (optional): retail bonds, when interest starts if not the transaction date. Retail positions are valued per lot (each buy; sales take the oldest lots first).
 
+**Cost basis: FIFO.** Positions keep their open lots (one per buy, oldest first); a sale or redemption takes the oldest lots first, a partly sold lot keeping its cost per unit, and records the matched cost and the proceeds (`core/valuation/positions.ts`). A split multiplies every lot's units. Same as the reference sheet and Polish tax (PIT-38).
+
 **Cash** of an account = Σ of its transactions' cash effects: BUY = `amount` (the trade value) minus `fee`; every other type's `amount` already is the cash effect (SELL: received, net of the fee). Computed by the valuation (`core/valuation/cash.ts`), not stored per transaction.
 
 **Assets without an ISIN** (manually valued, e.g. a property fund share) get a private id in ISIN format with the ISO user-assigned prefix `ZZ` (`ZZRZESZOW000`), which no real ISIN uses. Their prices are `PX#MANUAL#<date>` items from `imports/prices/`.
