@@ -2,7 +2,7 @@
 // in one of the stage's access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
-import { addDays, priceRows, retailValueHistory, today, type PriceItem } from "@portfolio/core";
+import { addDays, cpiIndicators, priceRows, retailValueHistory, today, type PriceItem } from "@portfolio/core";
 import { hasAnyGroup } from "../lib/access.ts";
 import { repo } from "../lib/context.ts";
 
@@ -55,6 +55,10 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         }
         const prices = await repo.queryPrices(isin, inst.venue, from, to);
         return json(200, prices.map(({ PK: _p, SK: _s, ...rest }) => rest));
+      }
+      case "GET /indicators": {
+        // Small (a few hundred monthly points each): all series at once; the UI picks the range.
+        return json(200, cpiIndicators(await repo.listReferenceIndex()));
       }
       case "GET /prices": {
         // Held instruments (latest snapshot): latest price, its date, and the price a year earlier.

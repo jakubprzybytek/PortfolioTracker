@@ -175,8 +175,22 @@ describe(`API ${API}`, () => {
     }
   });
 
+  it("GET /indicators gives CPI m/m and the reference index from the stored CPI (MF calculator), oldest first", async () => {
+    const { status, body } = await get<{ id: string; unit: string; points: { date: string; value: number }[] }[]>("/indicators");
+    expect(status).toBe(200);
+    expect(body.map((i) => [i.id, i.unit])).toEqual([
+      ["cpi-mom", "%"],
+      ["cpi-index", "index"],
+    ]);
+    const [mom, index] = body;
+    expect(mom!.points[0]).toEqual({ date: "2003-07", value: -0.4 }); // the index starts in July 2003
+    expect(mom!.points.find((p) => p.date === "2026-08")).toEqual({ date: "2026-08", value: 0.3 });
+    expect(index!.points.find((p) => p.date === "2026-08")).toEqual({ date: "2026-08", value: 215.26519 });
+    expect(index!.points.length).toBe(mom!.points.length);
+  });
+
   it("requires a login: no token or a forged token gets 401", async () => {
-    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`]) {
+    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators"]) {
       expect((await get(route, { auth: false })).status, route).toBe(401);
     }
     const forged = ["eyJhbGciOiJSUzI1NiJ9", "eyJzdWIiOiJ4IiwiY29nbml0bzpncm91cHMiOlsicG9ydGZvbGlvLXRyYWNrZXIiXX0", "c2ln"].join(".");

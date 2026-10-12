@@ -4,6 +4,7 @@ import { APP_VERSION } from "./api.ts";
 import { currentSession, logout, type Session } from "./auth.ts";
 import { DashboardView } from "./DashboardView.tsx";
 import { HoldingsView } from "./HoldingsView.tsx";
+import { IndicatorsView } from "./IndicatorsView.tsx";
 import { LoginForm } from "./LoginForm.tsx";
 import { PricesView } from "./PricesView.tsx";
 import { useRoute, VIEWS } from "./route.ts";
@@ -66,6 +67,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "dashboard" && <DashboardView />}
         {route.view === "holdings" && <HoldingsView key="holdings" params={route.params} setParams={setParams} />}
         {route.view === "prices" && <PricesView key="prices" params={route.params} setParams={setParams} />}
+        {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
       </main>
     </div>

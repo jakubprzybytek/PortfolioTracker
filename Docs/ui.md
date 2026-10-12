@@ -11,6 +11,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/` | Dashboard (default) |
 | `#/holdings?group=instrument&account=…&type=…&chart=<ISIN>&chartAccount=…` | Holdings (`group` absent = by account; `chart` = the open row chart) |
 | `#/prices?chart=<ISIN>` | Prices |
+| `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 
 Changing a filter replaces the history entry, so "back" goes to the previous view, not the previous filter. No router library: `packages/web/src/route.ts`.
@@ -49,6 +50,14 @@ Kept deliberately short (a passive portfolio needs no daily statistics): what ea
 - **Retail bonds** aren't traded: price = this year's interest rate ("5,00 % p.a."), date = "calculated", 1 year = the previous year's rate. Their chart shows the calculated value per bond of your lots (PLN, nominal 100, so it reads like % of nominal), from the first purchase; each new interest year changes the slope.
 - **Click a row:** its price chart opens below (range selector, transactions as markers); click again to close. The open chart is in the URL (`?chart=<ISIN>`).
 
+## Indicators
+
+Economic indicators from data already stored (no extra source), same layout as Prices.
+
+- **Rows:** *Inflation, month on month* (CPI, previous month = 100, from `CPI_REF.wr`) and *CPI reference index* (`CPI_REF.w`, June 2003 = 100, the index behind IZ indexation). Columns: latest value, its month, the value a year earlier. Hover a row for what it is.
+- **Click a row:** its chart opens below: monthly bars around zero for the % series, a line for the index; ranges 1Y / 5Y (default) / 10Y / ALL (from 2003-07). Chart and range are in the URL.
+- **No 12-month inflation:** compounding the one-decimal monthly figures misses GUS's published y/y by up to ~0.3 pp, so that needs GUS's own y/y series (in the CSV the `monthly` job already downloads, not stored yet).
+
 ## Transactions
 
 All transactions from `GET /transactions`.
@@ -69,6 +78,7 @@ All transactions from `GET /transactions`.
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
 | `GET /prices` | held instruments: latest price + date, stale flag, price a year earlier and the change (`core/valuation/priceRows.ts`) |
 | `GET /holdings/history?isin&account&from&to` | a position's daily value, cost and quantity (`POS#…` items); without `account`, the instrument summed over the accounts holding it |
+| `GET /indicators` | all indicators with their full monthly series (`core/indicators/cpi.ts`): `[{ id, name, unit, note, points: [{ date: "YYYY-MM", value }] }]` |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |
 | `GET /status` | last run of each job |
 

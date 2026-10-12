@@ -212,3 +212,29 @@ test.describe("holdings row chart", () => {
     await expect(page.getByTestId("chart-panel")).toHaveCount(0);
   });
 });
+
+test.describe("indicators view", () => {
+  test("lists CPI m/m and the reference index; a click shows the chart, its range in the URL", async ({ page }) => {
+    await page.goto("/#/indicators");
+    await expect(page.getByTestId("nav-indicators")).toHaveAttribute("aria-current", "page");
+    const mom = page.getByTestId("indicator-cpi-mom");
+    await expect(mom).toContainText("Inflation, month on month");
+    await expect(mom.locator("td").nth(2)).toHaveText(/^\d{4}-\d{2}$/); // the latest month
+    await expect(page.getByTestId("indicator-cpi-index")).toContainText("CPI reference index");
+
+    await mom.click();
+    await expect(page).toHaveURL(/#\/indicators\?chart=cpi-mom$/);
+    await expect(mom).toHaveClass(/selected/);
+    await expect(page.getByTestId("indicator-title")).toContainText("Inflation, month on month");
+    await expect(page.getByTestId("indicator-chart")).toHaveAttribute("data-points", "60"); // 5Y default: 60 months
+    await expect(page.getByTestId("indicator-chart").locator(".recharts-bar-rectangle").first()).toBeVisible(); // (a 0.0 % month draws no bar)
+
+    await page.getByTestId("indicator-range").getByRole("button", { name: "1Y" }).click();
+    await expect(page).toHaveURL(/range=1Y/);
+    await expect(page.getByTestId("indicator-chart")).toHaveAttribute("data-points", "12");
+
+    await page.getByTestId("indicator-cpi-index").click();
+    await expect(page).toHaveURL(/chart=cpi-index/);
+    await expect(page.getByTestId("indicator-chart").locator("path.recharts-line-curve")).toHaveCount(1);
+  });
+});
