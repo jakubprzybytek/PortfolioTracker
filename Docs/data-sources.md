@@ -4,7 +4,7 @@
 
 | Asset | Examples | Daily source | Live source | Backfill source |
 |---|---|---|---|---|
-| UCITS ETFs on EU exchanges | Xetra, LSE, Euronext listings | EODHD EOD API | EODHD delayed live API | EODHD (full history) |
+| UCITS ETFs on EU exchanges | Xetra, LSE, Euronext listings | Yahoo chart API (EODHD if it gets blocked) | – (EODHD delayed live API, later) | Yahoo (full daily history, one request per ETF) |
 | Polish treasury bonds on GPW / Catalyst | DS, PS, WZ, IZ series | GPW archive: daily XLS with all treasury bonds | – | GPW archive: full history per bond (1 request each) |
 | Polish corporate bonds on Catalyst | fixed and floating coupons | gpwcatalyst.pl corporate quotes page (snapshot, no archive) | – | Bossa EOD files → Cbonds trial → Biznesradar |
 | Polish retail treasury bonds (not traded) | EDO, COI, ROD, ROR … | Calculated from terms + CPI | – | Calculated; checked against obligacjeskarbowe.pl interest tables |
@@ -14,7 +14,13 @@
 
 ## Source details
 
-### EODHD – ETFs
+### Yahoo Finance chart API – ETFs (verified 2026-10-12)
+- **Endpoint:** `query2.finance.yahoo.com/v8/finance/chart/<symbol>?period1=<unix>&period2=<unix>&interval=1d`, no key; the same one the reference sheet falls back to. Give `period1/period2`: `range=max` thins the series to monthly points. Client: `jobs/lib/yahoo.ts`.
+- **Symbols:** the sheet's `EXCHANGE:CODE` → Yahoo suffix (`AMS` → `.AS`, `FRA`/`ETR` → `.DE` (Xetra), `LON` → `.L`, `WSE` → `.WA`).
+- **Checked:** all 10 ETFs in the sheet (5 Amsterdam, 5 Xetra, all EUR) from AWS Lambda (`dev`, eu-west-1): full daily history (back to 2008–2021), ~0.1 s per request, 50 requests back to back without a 429. Closes match the sheet's trade prices within the day's range.
+- **Watch out:** history is **split-adjusted** (SPXS, split 100:1 in 2026: 1093.04 in the sheet vs 10.91 on Yahoo), so un-adjust with the split events (`events=split`) or adjust the quantities; London listings come in pence (`GBp`, converted). Unofficial and unlicensed beyond personal use: the daily job reports a failure like the other jobs, and EODHD (below) is the paid fallback with the same shape of data.
+
+### EODHD – ETFs (fallback)
 - **Data:** EOD OHLCV (raw `close` and `adjusted_close`; we keep raw), splits, dividends, delayed live quotes (multiple tickers per request; each ticker counts as one call).
 - **Tickers:** `<TICKER>.<EXCHANGE>`, e.g. `<TICKER>.XETRA`, `<TICKER>.LSE`. Map from ISIN once (EODHD search API or OpenFIGI).
 - **Plan:** EOD plan ≈ $19.99/mo. The free plan (20 calls/day) is not enough once live quotes are polled (~10 tickers × ~35 polls/day).
@@ -119,8 +125,8 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 
 | Source | Reason |
 |---|---|
-| Yahoo Finance (yfinance) | No official API, frequent 429 blocks, no guarantee |
-| Stooq | API key + quotas + JavaScript challenge since 2026 |
+| Stooq | API key + quotas + JavaScript challenge since 2026 (CSV download returns the challenge page, 2026-10-12) |
+| Google Finance | No API: `GOOGLEFINANCE()` works only inside Google Sheets |
 | Alpha Vantage, Massive (Polygon) | Free tiers too small, US focus |
 | IBKR TWS / Web API | Needs an always-on gateway + 2FA |
 | bossaAPI | NOL3 switched off; new API in pilot |

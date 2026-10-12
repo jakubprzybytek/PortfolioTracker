@@ -20,7 +20,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 | Phase | Contents |
 |---|---|
 | **1 – Polish bonds** (now) | Treasury bonds on GPW (fixed and inflation-linked IZ), Catalyst corporate bonds, retail bonds (EDO, COI, ROD); transactions import; daily valuation incl. accrued interest; table + charts |
-| 2 – ETFs | EODHD end-of-day prices and backfill; later "live" (15-min delayed) quotes |
+| 2 – ETFs | Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; later "live" (15-min delayed) quotes |
 | 3 – IBKR, FX | IBKR Flex (EU government bonds), NBP exchange rates |
 
 ## Architecture
@@ -99,7 +99,7 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 | DynamoDB (≈ 10k writes, few k reads, < 1 GB) | < $0.10 |
 | Lambda, EventBridge, HTTP API, static site | ≈ $0 (free tier) |
 | S3 raw archive | < $0.10 |
-| EODHD (phase 2 only) | ≈ $20 |
+| EODHD (only if Yahoo gets blocked) | ≈ $20 |
 
 ## Open decisions / to verify
 
@@ -124,6 +124,7 @@ Phase 1:
 - [x] Custom domains per stage and CD (int → tests → prod → tag); first release `v0.1` on 2026-10-11.
 
 Later phases:
-- [ ] EODHD: confirm the EOD plan includes the delayed live endpoint and enough daily calls.
+- [x] ETF source: Yahoo chart API works from Lambda for all 10 ETFs in the sheet, full daily history (data-sources.md). EODHD stays the fallback.
+- [ ] ETF splits: Yahoo history is split-adjusted (SPXS 100:1); un-adjust with split events or adjust quantities.
 - [ ] ISIN + venue for every ETF.
 - [ ] IBKR Flex: when the daily statement for day D becomes available.
