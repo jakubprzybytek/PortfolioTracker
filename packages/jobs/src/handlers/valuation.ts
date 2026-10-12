@@ -52,6 +52,7 @@ export async function handler(event: ValuationEvent = {}) {
       }
       const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates, accounts });
       await repo.putSnapshot(snapshot, date === to);
+      await repo.putPositionDays(snapshot); // per-position history for the Holdings row charts
       written++;
     }
     return { itemsWritten: written, note: `${from} → ${to} (${event.reason ?? "schedule"})` };

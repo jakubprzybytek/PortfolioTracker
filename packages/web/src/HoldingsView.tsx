@@ -1,6 +1,9 @@
-import { Fragment, useMemo, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, uniqueOptions, type Option } from "./Filters.tsx";
-import { fmtInt, fmtNum, fmtPct, fmtPln, signClass, typeLabel } from "./format.ts";
+import { fmtInt, fmtNum, fmtPct, fmtPln, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
+import { RangePicker } from "./RangePicker.tsx";
+import { ValueChart, type ValuePoint } from "./ValueChart.tsx";
 import type { Holding, Snapshot } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -51,9 +54,9 @@ interface InstrumentGroup {
 }
 
 /** One holding as a row; `label` is what goes in the first column (the instrument, or the account). */
-function HoldingRow({ h, label, account, detail }: { h: Holding; label: ReactNode; account: string; detail: boolean }) {
+function HoldingRow({ h, label, account, detail, selected, onSelect }: { h: Holding; label: ReactNode; account: string; detail: boolean; selected: boolean; onSelect: () => void }) {
   return (
-    <tr data-testid="holding-row" data-account={account}>
+    <tr data-testid="holding-row" data-account={account} data-isin={h.isin} className={`clickable${selected ? " selected" : ""}`} onClick={onSelect} title="Show its value over time">
       <td className="left indent instrument">{label}</td>
       <td className="left">{detail ? typeLabel(h.type) : ""}</td>
       <td>{fmtInt(h.quantity)}</td>
@@ -99,6 +102,27 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const accounts = useMemo(() => snap.data?.accounts ?? {}, [snap.data]);
   const { account = "", type = "" } = params;
   const byInstrument = params["group"] === "instrument";
+
+  // Row chart: `chart` = ISIN, `chartAccount` = one account's position (absent: the instrument across accounts).
+  const chartIsin = params["chart"];
+  const chartAccount = params["chartAccount"];
+  const [range, setRange] = useState<RangeKey>("1Y");
+  const [panelHeight, setPanelHeight] = useState(0);
+  const history = useApi<ValuePoint[]>(chartIsin ? "/holdings/history" : null, { isin: chartIsin, account: chartAccount, from: rangeFrom(range), to: today() }, [chartIsin, chartAccount, range]);
+  const select = (isin: string, acct?: string) =>
+    setParams(chartIsin === isin && chartAccount === acct ? { ...params, chart: undefined, chartAccount: undefined } : { ...params, chart: isin, chartAccount: acct });
+  const closeChart = useCallback(() => setParams({ ...params, chart: undefined, chartAccount: undefined }), [params, setParams]);
+  const isSelected = (isin: string, acct?: string) => chartIsin === isin && chartAccount === acct;
+  const chartHolding = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin);
+
+  // Keep the clicked row visible above the panel.
+  useEffect(() => {
+    if (!chartIsin || panelHeight === 0) return;
+    const row = document.querySelector<HTMLElement>("tr.selected");
+    if (!row) return;
+    const bottom = row.getBoundingClientRect().bottom;
+    if (bottom > window.innerHeight - panelHeight) window.scrollBy({ top: bottom - (window.innerHeight - panelHeight) + 16, behavior: "smooth" });
+  }, [chartIsin, chartAccount, panelHeight]);
 
   const options = useMemo(() => {
     const names = new Set([...all.map(accountOf), ...Object.entries(accounts).filter(([, a]) => a.cash !== 0 || a.incomplete).map(([n]) => n)]);
@@ -168,7 +192,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
         ))}
       </div>
 
-      <FilterBar active={!!(account || type)} onReset={() => setParams({ group: params["group"] })} summary={snap.loading ? "Loading…" : `${shownCount} of ${all.length} holdings`}>
+      <FilterBar active={!!(account || type)} onReset={() => setParams({ group: params["group"], chart: chartIsin, chartAccount })} summary={snap.loading ? "Loading…" : `${shownCount} of ${all.length} holdings`}>
         <FilterSelect label="Account" value={account} options={options.account} onChange={set("account")} testId="filter-account" />
         <FilterSelect label="Asset type" value={type} options={options.type} onChange={set("type")} testId="filter-type" />
       </FilterBar>
@@ -193,7 +217,12 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
             {byInstrument &&
               instrumentGroups.map((g) => (
                 <Fragment key={g.isin}>
-                  <tr className="group" data-testid={`instrument-${g.first.code}`}>
+                  <tr
+                    className={`group clickable${isSelected(g.isin) ? " selected" : ""}`}
+                    data-testid={`instrument-${g.first.code}`}
+                    onClick={() => select(g.isin)}
+                    title="Show its value over time (all accounts)"
+                  >
                     <td className="left instrument">
                       {g.first.code} <span className="muted">{g.first.name !== g.first.code ? g.first.name : ""} · {g.holdings.length}</span>
                     </td>
@@ -204,7 +233,15 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                     <SumCells s={g.sums} />
                   </tr>
                   {g.holdings.map((h) => (
-                    <HoldingRow key={`${g.isin}/${accountOf(h)}`} h={h} account={accountOf(h)} label={accountOf(h)} detail={false} />
+                    <HoldingRow
+                      key={`${g.isin}/${accountOf(h)}`}
+                      h={h}
+                      account={accountOf(h)}
+                      label={accountOf(h)}
+                      detail={false}
+                      selected={isSelected(g.isin, accountOf(h))}
+                      onSelect={() => select(g.isin, accountOf(h))}
+                    />
                   ))}
                 </Fragment>
               ))}
@@ -247,6 +284,8 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                     h={h}
                     account={g.name}
                     detail
+                    selected={isSelected(h.isin, g.name)}
+                    onSelect={() => select(h.isin, g.name)}
                     label={
                       <>
                         <strong>{h.code}</strong> <span className="muted">{h.name !== h.code ? h.name : ""}</span>
@@ -275,6 +314,27 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           </tbody>
         </table>
       </div>
+      {/* Room below the list so its last rows can scroll above the docked chart. */}
+      {chartIsin && <div style={{ height: panelHeight }} aria-hidden />}
+      {chartIsin && (
+        <ChartPanel
+          onClose={closeChart}
+          onHeight={setPanelHeight}
+          title={
+            <>
+              {chartHolding?.code ?? chartIsin}{" "}
+              <span className="muted" style={{ fontWeight: 400 }}>
+                {chartHolding && chartHolding.name !== chartHolding.code ? chartHolding.name : ""} · {chartAccount ?? "all accounts"} · value and cost
+              </span>
+            </>
+          }
+        >
+          <RangePicker value={range} onChange={setRange} testId="holding-range" />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            {history.error ? <p className="error">{history.error}</p> : <ValueChart testId="holding-chart" data={history.data ?? []} />}
+          </div>
+        </ChartPanel>
+      )}
     </>
   );
 }

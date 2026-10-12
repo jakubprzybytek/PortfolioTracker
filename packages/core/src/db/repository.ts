@@ -16,6 +16,7 @@ import {
   type CouponRateItem,
   type InstrumentItem,
   type JobRunItem,
+  type PositionDayItem,
   type PriceItem,
   type ReferenceIndexItem,
   type RetailSeriesItem,
@@ -233,6 +234,31 @@ export class Repository {
     return this.queryAll<SnapshotItem>("holdings", {
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
       ExpressionAttributeValues: { ":pk": "PORTFOLIO", ":from": `SNAP#${from}`, ":to": `SNAP#${to}` },
+    });
+  }
+
+  // --- position history (one item per position per day) --------------------------------------
+
+  /** Writes each holding of a snapshot as that position's value on the snapshot's day. */
+  putPositionDays(snapshot: Pick<SnapshotItem, "date" | "holdings">): Promise<number> {
+    return this.batchPut(
+      "holdings",
+      snapshot.holdings.map((h): PositionDayItem => ({
+        ...keys.positionDay(h.account, h.isin, snapshot.date),
+        account: h.account,
+        isin: h.isin,
+        date: snapshot.date,
+        quantity: h.quantity,
+        value: h.value,
+        cost: h.cost,
+      })),
+    );
+  }
+
+  queryPositionDays(account: string, isin: string, from: IsoDate, to: IsoDate): Promise<PositionDayItem[]> {
+    return this.queryAll<PositionDayItem>("holdings", {
+      KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
+      ExpressionAttributeValues: { ":pk": `POS#${account}#${isin}`, ":from": from, ":to": to },
     });
   }
 

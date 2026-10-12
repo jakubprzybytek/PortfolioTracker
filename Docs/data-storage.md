@@ -206,6 +206,14 @@ PK = PORTFOLIO              SK = SNAP#LATEST
 Written by the valuation job: `accounts` (per account: `cash`, `incomplete`), `totals.cash` (complete accounts only), and one holding per **account and instrument** (the same bond in two accounts is two holdings), sorted by account then code. Per holding `account`, `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart, dashboard and Holdings view come from these items. Snapshots written before 2026-10-11 have no `account`; only `SNAP#LATEST` is read per holding, and every valuation run rewrites it.
 Items stay small: about 25 holdings, well under the 400 KB item limit.
 
+### Position history
+
+```
+PK = POS#<account>#<isin>   SK = <YYYY-MM-DD>
+```
+
+`account`, `isin`, `date`, `quantity`, `value`, `cost`: each position's value on each day, written by the valuation alongside the snapshot (one batch per day). Read by the Holdings row charts (`GET /holdings/history`); about 15 items a day, so a year of one position is one small query instead of reading 365 snapshots.
+
 ## Access per function
 
 Each function links only the tables it needs.

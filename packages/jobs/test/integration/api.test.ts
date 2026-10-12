@@ -136,6 +136,20 @@ describe(`API ${API}`, () => {
     expect(body.every((t) => t.isin === DS)).toBe(true);
   });
 
+  it("GET /holdings/history gives a position's daily value and cost, or an instrument's total across accounts", async () => {
+    const snap = (await get<SnapshotItem>("/holdings")).body;
+    const ds = (acct: string) => snap.holdings.find((h) => h.account === acct && h.code === "DS0432")!;
+    const one = await waitFor(async () => {
+      const r = await get<{ date: string; value: number; cost: number; quantity: number }[]>(`/holdings/history?isin=${DS}&account=broker&from=2025-01-01&to=${snap.date}`);
+      return r.status === 200 && r.body.at(-1)?.date === snap.date ? r.body : undefined;
+    });
+    expect(one[0]).toMatchObject({ date: "2025-02-05", quantity: 20, cost: 15931.8 }); // from the purchase
+    expect(one.at(-1)).toMatchObject({ value: ds("broker").value, cost: ds("broker").cost, quantity: 20 });
+    const all = (await get<{ date: string; value: number; quantity: number }[]>(`/holdings/history?isin=${DS}&from=2026-01-01&to=${snap.date}`)).body;
+    expect(all.at(-1)).toMatchObject({ quantity: 25, value: Math.round((ds("broker").value! + ds("ike").value!) * 100) / 100 });
+    expect((await get("/holdings/history?isin=nope")).status).toBe(400);
+  });
+
   it("GET /transactions lists all transactions newest first, with their instrument", async () => {
     const { status, body } = await get<{ date: string; account: string; type: string; isin?: string; instrument: { code: string; type: string } | null }[]>("/transactions");
     expect(status).toBe(200);
@@ -162,7 +176,7 @@ describe(`API ${API}`, () => {
   });
 
   it("requires a login: no token or a forged token gets 401", async () => {
-    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`]) {
+    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`]) {
       expect((await get(route, { auth: false })).status, route).toBe(401);
     }
     const forged = ["eyJhbGciOiJSUzI1NiJ9", "eyJzdWIiOiJ4IiwiY29nbml0bzpncm91cHMiOlsicG9ydGZvbGlvLXRyYWNrZXIiXX0", "c2ln"].join(".");

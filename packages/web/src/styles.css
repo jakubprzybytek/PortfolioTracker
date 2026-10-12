@@ -95,3 +95,18 @@ form.login button.link { align-self: center; font-size: 0.9rem; }
 .gate button.link { background: none; border: 0; padding: 0; color: var(--accent); }
 .card .note { font-size: 0.75rem; margin-top: 2px; }
 tr.muted td { color: var(--muted); }
+/* Chart panel docked to the bottom (Holdings row charts); left edge follows the menu. */
+.chart-panel { position: fixed; bottom: 0; left: 200px; right: 0; z-index: 10; background: var(--bg); border-top: 1px solid var(--border); box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; padding: 0 24px 8px; }
+.chart-panel-handle { height: 10px; margin: 0 -24px; cursor: ns-resize; touch-action: none; position: relative; }
+.chart-panel-handle::after { content: ""; position: absolute; left: 50%; top: 3px; width: 48px; height: 4px; margin-left: -24px; border-radius: 2px; background: var(--border); }
+.chart-panel-handle:hover::after { background: var(--muted); }
+.chart-panel-header { display: flex; align-items: center; gap: 12px; }
+.chart-panel-title { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart-panel-close { border: 1px solid var(--border); background: transparent; color: var(--fg); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+.chart-panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.chart-panel-body .range { margin: 4px 0; }
+tr.clickable { cursor: pointer; }
+@media (max-width: 720px) {
+  .chart-panel { left: 0; padding: 0 12px 8px; }
+  .chart-panel-handle { margin: 0 -12px; }
+}

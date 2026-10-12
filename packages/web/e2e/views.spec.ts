@@ -165,3 +165,50 @@ test.describe("holdings grouped by instrument", () => {
     await expect(page).not.toHaveURL(/group=/);
   });
 });
+
+test.describe("holdings row chart", () => {
+  test("clicking a row docks its value chart at the bottom; resizable, remembered, closable", async ({ page }) => {
+    await page.goto("/#/holdings");
+    const row = page.locator('tr[data-testid="holding-row"][data-account="broker"][data-isin="PL0000113783"]');
+    await row.click();
+    await expect(page).toHaveURL(/chart=PL0000113783&chartAccount=broker/);
+    await expect(row).toHaveClass(/selected/);
+    const panel = page.getByTestId("chart-panel");
+    await expect(panel).toBeVisible();
+    await expect(page.getByTestId("chart-panel-title")).toContainText("DS0432");
+    await expect(page.getByTestId("chart-panel-title")).toContainText("broker");
+    await expect(page.getByTestId("holding-chart").locator("path.recharts-area-area")).toHaveCount(2); // value + cost
+    await expect(page.getByTestId("holdings-by-account")).toBeVisible(); // the list stays visible above
+
+    // default: a third of the window; dragging the handle up makes it taller, and it's remembered
+    const before = (await panel.boundingBox())!.height;
+    expect(before).toBeGreaterThan(250);
+    expect(before).toBeLessThan(350);
+    const handle = (await page.getByTestId("chart-panel-handle").boundingBox())!;
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + 4);
+    await page.mouse.down();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y - 200, { steps: 5 });
+    await page.mouse.up();
+    const after = (await panel.boundingBox())!.height;
+    expect(after).toBeGreaterThan(before + 150);
+    await page.reload();
+    await expect(page.getByTestId("chart-panel")).toBeVisible();
+    expect(Math.abs((await page.getByTestId("chart-panel").boundingBox())!.height - after)).toBeLessThan(5);
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("chart-panel")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/chart=/);
+    await page.evaluate(() => window.localStorage.removeItem("portfolio-tracker.chartPanel.height"));
+  });
+
+  test("grouped by instrument, the group row charts the instrument across accounts", async ({ page }) => {
+    await page.goto("/#/holdings?group=instrument");
+    await page.getByTestId("instrument-DS0432").click();
+    await expect(page).toHaveURL(/chart=PL0000113783/);
+    await expect(page).not.toHaveURL(/chartAccount=/);
+    await expect(page.getByTestId("chart-panel-title")).toContainText("all accounts");
+    await expect(page.getByTestId("holding-chart").locator("path.recharts-area-area")).toHaveCount(2);
+    await page.getByTestId("chart-panel-close").click();
+    await expect(page.getByTestId("chart-panel")).toHaveCount(0);
+  });
+});

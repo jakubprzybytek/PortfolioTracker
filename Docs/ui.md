@@ -9,7 +9,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | Route | View |
 |---|---|
 | `#/` | Dashboard (default) |
-| `#/holdings?group=instrument&account=…&type=…` | Holdings (`group` absent = by account) |
+| `#/holdings?group=instrument&account=…&type=…&chart=<ISIN>&chartAccount=…` | Holdings (`group` absent = by account; `chart` = the open row chart) |
 | `#/prices?chart=<ISIN>` | Prices |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 
@@ -37,6 +37,7 @@ From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **
 - **Instruments sorted by code** within each account.
 - **Columns:** instrument (code + name), asset type, quantity, clean price (% of nominal; price date on hover), accrued interest per bond, value, cost, gain (PLN, %), coupons received.
 - **Filters:** account, asset type ("Cash" shows only the cash rows); "Reset" clears them; "n of m holdings".
+- **Row chart:** clicking a holding row shows that position's value and cost over time (range 1M/6M/1Y/ALL); grouped by instrument, the group row shows the instrument across all accounts. The chart is a panel docked to the bottom of the window (1/3 of its height by default) while the list stays visible and scrolls above it; its top edge is a drag handle (size remembered in the browser); ✕ or Escape closes it. Cash rows have no chart.
 - **Manually valued** assets (e.g. a property fund share) show their latest manual price; in the Prices view it's tagged "manual" and never marked stale.
 
 ## Prices
@@ -67,6 +68,7 @@ All transactions from `GET /transactions`.
 | `GET /instruments/{isin}/prices?from&to` | `PX#…` items; retail bonds: the daily calculated value per bond of your lots (`calculated: true`) |
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
 | `GET /prices` | held instruments: latest price + date, stale flag, price a year earlier and the change (`core/valuation/priceRows.ts`) |
+| `GET /holdings/history?isin&account&from&to` | a position's daily value, cost and quantity (`POS#…` items); without `account`, the instrument summed over the accounts holding it |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |
 | `GET /status` | last run of each job |
 

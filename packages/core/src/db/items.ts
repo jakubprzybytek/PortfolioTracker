@@ -163,6 +163,18 @@ export interface SnapshotItem {
   computedAt: string;
 }
 
+/** One position's value on one day (holdings table), for the Holdings view's row charts. */
+export interface PositionDayItem {
+  PK: `POS#${string}#${string}`; // POS#<account>#<isin>
+  SK: IsoDate;
+  account: string;
+  isin: string;
+  date: IsoDate;
+  quantity: number;
+  value: number | null;
+  cost: number;
+}
+
 export type BackfillStatus = "pending" | "running" | "done" | "no_history" | "failed";
 
 export interface BackfillItem {
@@ -199,6 +211,7 @@ export const keys = {
   transaction: (account: string, date: IsoDate, id: string) => ({ PK: `ACCT#${account}` as const, SK: `TX#${date}#${id}` as const }),
   snapshot: (date: IsoDate | "LATEST") => ({ PK: "PORTFOLIO" as const, SK: `SNAP#${date}` as const }),
   backfill: (isin: string) => ({ PK: `INST#${isin}` as const, SK: "BACKFILL" as const }),
+  positionDay: (account: string, isin: string, date: IsoDate) => ({ PK: `POS#${account}#${isin}` as const, SK: date }),
   account: (account: string) => ({ PK: `ACCT#${account}` as const, SK: "META" as const }),
   retailSeries: (series: string) => ({ PK: `SERIES#${series}` as const, SK: "META" as const }),
   jobRun: (job: string, startedAt: string) => ({ PK: `JOB#${job}` as const, SK: `RUN#${startedAt}` as const }),

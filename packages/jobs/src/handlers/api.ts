@@ -74,6 +74,23 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const rates = new Map((snap?.holdings ?? []).filter((h) => h.rate).map((h) => [h.isin, h.rate!] as const));
         return json(200, priceRows(shown, latest, yearAgo, day, 7, rates));
       }
+      case "GET /holdings/history": {
+        // One position's daily value and cost (`account` + `isin`), or an instrument's total across the accounts
+        // that hold it now (`isin` only).
+        const id = q["isin"];
+        if (!id || !ISIN.test(id)) return json(400, { error: "Invalid ISIN" });
+        const accounts = q["account"] ? [q["account"]] : [...new Set(((await repo.getSnapshot("LATEST"))?.holdings ?? []).filter((h) => h.isin === id).map((h) => h.account))];
+        const byDate = new Map<string, { date: string; value: number; cost: number; quantity: number }>();
+        for (const a of accounts)
+          for (const d of await repo.queryPositionDays(a, id, from, to)) {
+            const p = byDate.get(d.date) ?? { date: d.date, value: 0, cost: 0, quantity: 0 };
+            p.value = Math.round((p.value + (d.value ?? 0)) * 100) / 100;
+            p.cost = Math.round((p.cost + d.cost) * 100) / 100;
+            p.quantity += d.quantity;
+            byDate.set(d.date, p);
+          }
+        return json(200, [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)));
+      }
       case "GET /transactions": {
         // All transactions, newest first, with the instrument's code, name and type (none for cash movements).
         const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
