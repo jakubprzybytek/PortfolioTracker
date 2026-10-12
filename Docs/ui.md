@@ -22,6 +22,8 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 
 - **Totals:** total (positions + cash), value of positions, cash (only accounts whose assets are all tracked; the card says how many it leaves out), cost, gain (PLN and %), coupons and income received.
 - **Portfolio value over time:** from `PORTFOLIO/SNAP#<date>`, with a range selector (1M, 6M, 1Y, all).
+- **Accounts** (`GET /accounts`): per account net deposits (deposits − withdrawals; transfers between your accounts count on both sides), positions, cash, total, profit (total − net deposits), **XIRR** (money-weighted annual return of the deposits and withdrawals plus today's total, `core/valuation/accounts.ts`), income (coupons, interest, dividends) and costs (commissions, fees, taxes). Incomplete accounts are greyed and left out of the total row.
+- **Allocation:** bars by asset type and by currency (positions of all accounts + cash of the complete ones, as in the totals), share and amount.
 - **Jobs:** last run of each job; failed jobs also appear as a banner.
 
 ## Holdings
@@ -71,6 +73,7 @@ All transactions from `GET /transactions`.
 | Endpoint | Reads |
 |---|---|
 | `GET /holdings` | `SNAP#LATEST` (holdings per account and instrument) |
+| `GET /accounts` | `{ date, accounts: AccountSummary[], total }` (latest snapshot + all transactions) |
 | `GET /portfolio/history?from&to` | `SNAP#<from>…<to>` (totals only) |
 | `GET /instruments` | instruments + backfill status |
 | `GET /instruments/{isin}/prices?from&to` | `PX#…` items; retail bonds: the daily calculated value per bond of your lots (`calculated: true`) |
