@@ -3,6 +3,7 @@
 
 import { Resource } from "sst";
 import { invokeAsync, repo, runJob } from "../lib/context.ts";
+import { YAHOO_SOURCE_ID, backfillYahooHistory } from "../lib/etfJobs.ts";
 import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
 
 export interface BackfillEvent {
@@ -23,6 +24,18 @@ export async function backfillInstrument(isin: string): Promise<{ status: string
       return { status: "done", ...result };
     } catch (err) {
       await repo.putBackfillStatus({ isin, status: "failed", source: GPW_SOURCE_ID, note: String((err as Error).message) });
+      throw err;
+    }
+  }
+
+  if (inst.sourceIds[YAHOO_SOURCE_ID]) {
+    await repo.putBackfillStatus({ isin, status: "running", source: YAHOO_SOURCE_ID });
+    try {
+      const result = await backfillYahooHistory(inst);
+      await repo.putBackfillStatus({ isin, status: "done", source: YAHOO_SOURCE_ID, ...result });
+      return { status: "done", ...result };
+    } catch (err) {
+      await repo.putBackfillStatus({ isin, status: "failed", source: YAHOO_SOURCE_ID, note: String((err as Error).message) });
       throw err;
     }
   }

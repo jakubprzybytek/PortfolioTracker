@@ -14,8 +14,8 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("total-value")).not.toContainText("–");
     await expect(page.getByTestId("total-gain")).toContainText("%");
     await expect(page.getByTestId("total-coupons")).toContainText("926,70"); // bond coupons + the manual asset's income
-    // Cash: broker + ike; the incomplete "etf" account is left out and the card says so
-    await expect(page.getByTestId("total-cash")).toContainText("5520,35");
+    // Cash: broker + foreign + ike; the incomplete "etf" account is left out and the card says so
+    await expect(page.getByTestId("total-cash")).toContainText("6183,49");
     await expect(page.getByTestId("total-cash")).toContainText("1 incomplete account not included");
     await expect(page.getByTestId("total-all")).toContainText("zł");
   });
@@ -37,7 +37,7 @@ test.describe("dashboard", () => {
 
   test("lists job runs", async ({ page }) => {
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
-    await expect(rows).toHaveCount(6);
+    await expect(rows).toHaveCount(8);
     await expect(page.getByTestId("jobs-table")).toContainText("valuation");
     await expect(page.getByTestId("jobs-table")).toContainText("ok");
   });

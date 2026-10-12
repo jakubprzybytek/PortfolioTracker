@@ -6,6 +6,7 @@ import { API, get, repoRoot, uploadImport, waitFor } from "./setup.ts";
 
 const IZ = "PL0000117024";
 const DS = "PL0000113783";
+const SPXS = "IE00B3YCGJ38"; // sample ETF (EUR, Yahoo), split 100:1 on 2025-12-15
 
 interface InstrumentOut {
   isin: string;
@@ -38,7 +39,7 @@ describe(`API ${API}`, () => {
     await uploadImport("accounts", "sample.json", readFileSync(path.join(repoRoot, "data/accounts.sample.json")));
     await waitFor(async () => {
       const inst = await get<InstrumentOut[]>("/instruments");
-      const ok = inst.status === 200 && [IZ, DS].every((i) => inst.body.find((x) => x.isin === i)?.backfill?.status === "done");
+      const ok = inst.status === 200 && [IZ, DS, SPXS].every((i) => inst.body.find((x) => x.isin === i)?.backfill?.status === "done");
       return ok ? true : undefined;
     }, 240_000);
     // 3. Transactions: triggers the valuation. Wait for a snapshot that knows both instruments.
@@ -47,16 +48,21 @@ describe(`API ${API}`, () => {
       const r = await get<SnapshotItem>("/holdings");
       if (r.status !== 200) return undefined;
       const codes = new Set(r.body.holdings.map((h) => h.code));
-      const clean = r.body.holdings.every((h) => !h.flags.includes("unknown_instrument") && !h.flags.includes("no_price"));
+      // The ETF needs NBP rates too (fetched when the instrument was imported).
+      const clean = r.body.holdings.every((h) => !h.flags.includes("unknown_instrument") && !h.flags.includes("no_price") && !h.flags.includes("no_fx"));
       const ike = r.body.accounts?.["ike"]?.cash;
-      return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && codes.has("SAMPLE-APARTMENT") && ike === 99.49 && clean ? true : undefined;
+      const etf = r.body.holdings.find((h) => h.code === "SPXS")?.quantity === 200;
+      return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && codes.has("SAMPLE-APARTMENT") && etf && ike === 99.49 && clean ? true : undefined;
     }, 180_000);
+    // The NBP import (EUR and USD back to 2002) writes rates as it goes; wait for the run to finish.
+    await waitFor(async () => ((await get<{ jobs: Record<string, { status: string } | null> }>("/status")).body.jobs["fx"]?.status === "ok" ? true : undefined), 300_000);
   });
 
   it("GET /status lists the last run of every job", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown> }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-gpw", "eod-gpw-recheck", "import", "monthly", "valuation"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-etf", "eod-gpw", "eod-gpw-recheck", "fx", "import", "monthly", "valuation"]);
+    expect(body.jobs["fx"]).toMatchObject({ status: "ok" });
     expect(body.jobs["import"]).toMatchObject({ status: "ok" });
   });
 
@@ -92,11 +98,11 @@ describe(`API ${API}`, () => {
   it("GET /holdings values the sample portfolio with accrued interest and IZ indexation", async () => {
     const snap = await waitFor(async () => {
       const r = await get<SnapshotItem>("/holdings");
-      return r.status === 200 && r.body.holdings.length >= 5 ? r.body : undefined;
+      return r.status === 200 && r.body.holdings.length >= 6 ? r.body : undefined;
     });
     expect(snap.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     // one holding per account and instrument, sorted by account then code
-    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["broker/DS0432", "broker/IZ0836", "ike/DS0432", "ike/EDO0935", "ike/SAMPLE-APARTMENT"]);
+    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["broker/DS0432", "broker/IZ0836", "foreign/SPXS", "ike/DS0432", "ike/EDO0935", "ike/SAMPLE-APARTMENT"]);
     const by = Object.fromEntries(snap.holdings.map((h) => [`${h.account}/${h.code}`, h])) as Record<string, HoldingSnapshot>;
     expect(by["broker/DS0432"]).toMatchObject({ quantity: 20, nominal: 1000, cost: 15931.8, couponsReceived: 700 });
     expect(by["broker/IZ0836"]).toMatchObject({ quantity: 10, cost: 9561.54, couponsReceived: 214.2 });
@@ -109,8 +115,15 @@ describe(`API ${API}`, () => {
     // Manually valued: the latest manual price (950 on 2026-09-30), never stale; its income counts as received.
     expect(by["ike/SAMPLE-APARTMENT"]).toMatchObject({ type: "FUND_MANUAL", quantity: 1, cost: 900, value: 950, gain: 50, couponsReceived: 12.5, flags: [] });
     // Cash per account; the incomplete account's cash is shown but not in the total.
-    expect(snap.accounts).toEqual({ broker: { cash: 5420.86 }, etf: { cash: 2000, incomplete: ["ETFs"] }, ike: { cash: 99.49 } });
-    expect(snap.totals.cash).toBe(5520.35);
+    expect(snap.accounts).toEqual({ broker: { cash: 5420.86 }, etf: { cash: 2000, incomplete: ["ETFs"] }, foreign: { cash: 663.14 }, ike: { cash: 99.49 } });
+    expect(snap.totals.cash).toBe(6183.49);
+    // ETF in EUR: 2 bought, x100 by the split; valued at the EUR close x NBP mid; cost as paid in PLN.
+    const spxs = by["foreign/SPXS"]!;
+    expect(spxs).toMatchObject({ type: "ETF", currency: "EUR", quantity: 200, cost: 9336.86, flags: [] });
+    expect(spxs.cleanPrice!).toBeGreaterThan(5); // ~13 EUR after the split
+    expect(spxs.cleanPrice!).toBeLessThan(50);
+    expect(spxs.fx!.rate).toBeGreaterThan(3.5);
+    expect(spxs.value!).toBeCloseTo(200 * spxs.cleanPrice! * spxs.fx!.rate, 0);
     for (const h of snap.holdings.filter((x) => x.type === "BOND_LISTED")) {
       expect(h.cleanPrice).not.toBeNull();
       expect(h.accruedInterest).not.toBeNull();
@@ -153,18 +166,24 @@ describe(`API ${API}`, () => {
   it("GET /transactions lists all transactions newest first, with their instrument", async () => {
     const { status, body } = await get<{ date: string; account: string; type: string; isin?: string; instrument: { code: string; type: string } | null }[]>("/transactions");
     expect(status).toBe(200);
-    expect(body).toHaveLength(13);
+    expect(body).toHaveLength(16);
     const dates = body.map((t) => t.date);
     expect(dates).toEqual([...dates].sort().reverse());
     expect(body[0]).toMatchObject({ date: "2026-09-30", account: "ike", type: "INTEREST", instrument: { code: "SAMPLE-APARTMENT", type: "FUND_MANUAL" } });
     expect(body.filter((t) => t.type === "DEPOSIT").every((t) => t.instrument === null)).toBe(true);
-    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["broker", "etf", "ike"]));
+    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["broker", "etf", "foreign", "ike"]));
+    expect(body.find((t) => t.type === "SPLIT")).toMatchObject({ account: "foreign", ratio: 100, amount: 0, instrument: { code: "SPXS", type: "ETF" } });
   });
 
   it("GET /prices lists held instruments with their latest price, its date and the 1-year change", async () => {
     const { status, body } = await get<{ code: string; price: number | null; priceDate: string | null; stale: boolean; change1y: number | null; yearAgo: { date: string } | null; rate?: unknown }[]>("/prices");
     expect(status).toBe(200);
-    expect(body.map((r) => r.code)).toEqual(["DS0432", "EDO0935", "IZ0836", "SAMPLE-APARTMENT"]);
+    expect(body.map((r) => r.code)).toEqual(["DS0432", "EDO0935", "IZ0836", "SAMPLE-APARTMENT", "SPXS"]);
+    // ETF: EUR price; the 1-year change compares on today's share basis across the split (not -99 %).
+    const spxs = body.find((r) => r.code === "SPXS")!;
+    expect(spxs).toMatchObject({ currency: "EUR", stale: false });
+    expect(spxs.change1y!).toBeGreaterThan(-0.5);
+    expect(spxs.change1y!).toBeLessThan(1);
     expect(body.find((r) => r.code === "EDO0935")).toMatchObject({ price: null, rate: { current: 0.05, previous: 0.06 } });
     expect(body.find((r) => r.code === "SAMPLE-APARTMENT")).toMatchObject({ price: 950, priceDate: "2026-09-30", stale: false, manual: true });
     for (const r of body.filter((x) => x.code === "DS0432" || x.code === "IZ0836")) {
@@ -175,22 +194,49 @@ describe(`API ${API}`, () => {
     }
   });
 
-  it("GET /indicators gives CPI m/m and the reference index from the stored CPI (MF calculator), oldest first", async () => {
-    const { status, body } = await get<{ id: string; unit: string; points: { date: string; value: number }[] }[]>("/indicators");
+  it("GET /instruments/{isin}/prices: an ETF's prices are stored as traded and charted on today's share basis", async () => {
+    const inst = (await get<(InstrumentOut & { splits?: unknown; sourceIds?: unknown })[]>("/instruments")).body.find((i) => i.isin === SPXS)!;
+    expect(inst).toMatchObject({ code: "SPXS", splits: [{ date: "2025-12-15", ratio: 100 }], sourceIds: { yahoo: "SPXS.AS" }, backfill: { status: "done" } });
+    expect(inst.backfill!.rows!).toBeGreaterThan(2000); // Yahoo history since 2017
+    const { status, body } = await get<{ date: string; close: number; currency: string }[]>(`/instruments/${SPXS}/prices?from=2025-12-10&to=2025-12-17`);
     expect(status).toBe(200);
-    expect(body.map((i) => [i.id, i.unit])).toEqual([
-      ["cpi-mom", "%"],
-      ["cpi-index", "index"],
+    expect(body.every((p) => p.currency === "EUR" && p.close > 5 && p.close < 50)).toBe(true); // no cliff at the split
+    const before = body.filter((p) => p.date < "2025-12-15").at(-1)!.close;
+    const after = body.find((p) => p.date >= "2025-12-15")!.close;
+    expect(Math.abs(after / before - 1)).toBeLessThan(0.05);
+  });
+
+  it("GET /indicators lists inflation and NBP exchange rates with the latest value and a year earlier", async () => {
+    const { status, body } = await get<{ id: string; group: string; unit: string; latest: { date: string; value: number } | null; yearAgo: { date: string; value: number } | null }[]>("/indicators");
+    expect(status).toBe(200);
+    expect(body.map((i) => [i.id, i.group, i.unit])).toEqual([
+      ["cpi-mom", "Inflation", "%"],
+      ["cpi-index", "Inflation", "index"],
+      ["fx-eur", "Exchange rates", "PLN"],
+      ["fx-usd", "Exchange rates", "PLN"],
     ]);
-    const [mom, index] = body;
-    expect(mom!.points[0]).toEqual({ date: "2003-07", value: -0.4 }); // the index starts in July 2003
-    expect(mom!.points.find((p) => p.date === "2026-08")).toEqual({ date: "2026-08", value: 0.3 });
-    expect(index!.points.find((p) => p.date === "2026-08")).toEqual({ date: "2026-08", value: 215.26519 });
-    expect(index!.points.length).toBe(mom!.points.length);
+    expect(body[0]!.latest!.date >= "2026-08").toBe(true);
+    for (const fx of body.slice(2)) {
+      expect(fx.latest!.value).toBeGreaterThan(3);
+      expect(fx.latest!.value).toBeLessThan(6);
+      expect(fx.yearAgo!.date <= `${Number(fx.latest!.date.slice(0, 4)) - 1}${fx.latest!.date.slice(4)}`).toBe(true);
+    }
+  });
+
+  it("GET /indicators/{id} gives one series in a range, oldest first", async () => {
+    const mom = (await get<{ date: string; value: number }[]>("/indicators/cpi-mom?from=2003-01-01&to=2026-08-31")).body;
+    expect(mom[0]).toEqual({ date: "2003-07", value: -0.4 }); // the index starts in July 2003
+    expect(mom.find((p) => p.date === "2026-08")).toEqual({ date: "2026-08", value: 0.3 });
+    const index = (await get<{ date: string; value: number }[]>("/indicators/cpi-index?from=2026-08-01&to=2026-08-31")).body;
+    expect(index).toEqual([{ date: "2026-08", value: 215.26519 }]);
+    const eur = (await get<{ date: string; value: number }[]>("/indicators/fx-eur?from=2002-01-01&to=2002-01-10")).body;
+    expect(eur[0]).toEqual({ date: "2002-01-02", value: 3.5496 }); // NBP table 1/A/NBP/2002, the first of the series
+    expect((await get("/indicators/nope")).status).toBe(404);
+    expect((await get("/indicators/fx-gbp")).status).toBe(404);
   });
 
   it("requires a login: no token or a forged token gets 401", async () => {
-    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators"]) {
+    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators", "/indicators/fx-eur"]) {
       expect((await get(route, { auth: false })).status, route).toBe(401);
     }
     const forged = ["eyJhbGciOiJSUzI1NiJ9", "eyJzdWIiOiJ4IiwiY29nbml0bzpncm91cHMiOlsicG9ydGZvbGlvLXRyYWNrZXIiXX0", "c2ln"].join(".");

@@ -2,7 +2,22 @@
 // in one of the stage's access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
-import { addDays, cpiIndicators, priceRows, retailValueHistory, today, type PriceItem } from "@portfolio/core";
+import {
+  CPI_INDICATORS,
+  addDays,
+  adjustForSplits,
+  cpiIndicators,
+  fxCurrencyOf,
+  fxIndicator,
+  priceRows,
+  retailValueHistory,
+  summarize,
+  today,
+  yearBefore,
+  type IndicatorSummary,
+  type PriceItem,
+} from "@portfolio/core";
+import { FX_CURRENCIES } from "./fx.ts";
 import { hasAnyGroup } from "../lib/access.ts";
 import { repo } from "../lib/context.ts";
 
@@ -53,12 +68,34 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
           const points = retailValueHistory(inst.retail, txs, from, to);
           return json(200, points.map((p) => ({ isin, venue: "CALC", date: p.date, close: p.value, traded: true, currency: inst.currency, calculated: true })));
         }
-        const prices = await repo.queryPrices(isin, inst.venue, from, to);
+        // On today's share basis: closes before a split are divided by its ratio, so the line has no cliff.
+        const prices = adjustForSplits(await repo.queryPrices(isin, inst.venue, from, to), inst.splits);
         return json(200, prices.map(({ PK: _p, SK: _s, ...rest }) => rest));
       }
       case "GET /indicators": {
-        // Small (a few hundred monthly points each): all series at once; the UI picks the range.
-        return json(200, cpiIndicators(await repo.listReferenceIndex()));
+        // One row per indicator: latest value and the one a year earlier (series via /indicators/{id}).
+        const cpi = cpiIndicators(await repo.listReferenceIndex()).map((i) => summarize(i, i.points));
+        const fx = await Promise.all(
+          FX_CURRENCIES.map(async (c): Promise<IndicatorSummary> => {
+            const last = await repo.latestFxRate(c, today());
+            const before = last && (await repo.latestFxRate(c, yearBefore(last.date)));
+            return { ...fxIndicator(c), latest: last ? { date: last.date, value: last.mid } : null, yearAgo: before ? { date: before.date, value: before.mid } : null };
+          }),
+        );
+        return json(200, [...cpi, ...fx]);
+      }
+      case "GET /indicators/{id}": {
+        // Points in [from, to] (monthly indicators compare by month), oldest first.
+        const id = event.pathParameters?.["id"] ?? "";
+        const currency = fxCurrencyOf(id);
+        if (currency) {
+          if (!FX_CURRENCIES.includes(currency)) return json(404, { error: `No indicator ${id}` });
+          const rates = await repo.queryFxRates(currency, from, to);
+          return json(200, rates.map((r) => ({ date: r.date, value: r.mid })));
+        }
+        if (!CPI_INDICATORS.some((i) => i.id === id)) return json(404, { error: `No indicator ${id}` });
+        const series = cpiIndicators(await repo.listReferenceIndex()).find((i) => i.id === id)!;
+        return json(200, series.points.filter((p) => p.date >= from.slice(0, 7) && p.date <= to.slice(0, 7)));
       }
       case "GET /prices": {
         // Held instruments (latest snapshot): latest price, its date, and the price a year earlier.
@@ -112,7 +149,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, txs.map(({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...rest }) => rest));
       }
       case "GET /status": {
-        const jobs = ["eod-gpw", "eod-gpw-recheck", "valuation", "backfill", "import", "monthly"];
+        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "fx", "valuation", "backfill", "import", "monthly"];
         const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.listJobRuns(j))[0] ?? null])));
         return json(200, { now: new Date().toISOString(), jobs: runs });
       }

@@ -39,7 +39,11 @@ export function positionsAt(transactions: TransactionItem[], date: IsoDate): Map
       }
       case "COUPON":
       case "INTEREST":
+      case "DIVIDEND":
         p.couponsReceived += t.amount;
+        break;
+      case "SPLIT":
+        p.quantity = Math.round(p.quantity * (t.ratio ?? 1) * 1e6) / 1e6; // cost unchanged
         break;
       default:
         break;

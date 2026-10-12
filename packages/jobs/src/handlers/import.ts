@@ -105,14 +105,20 @@ export async function importInstruments(json: string) {
       live: i.live,
       ...(terms ? { terms } : {}),
       ...(retail ? { retail } : {}),
+      ...(i.splits?.length ? { splits: [...i.splits].sort((x, y) => x.date.localeCompare(y.date)) } : {}),
     };
+    const before = await repo.getInstrument(i.isin);
     await repo.putInstrument(item);
     written++;
     // Start the history backfill for an instrument that never had one (new, or missed before). Instruments
     // without a price source (retail bonds: values are calculated) have no history to load.
     const hasSource = Object.keys(i.sourceIds).length > 0;
-    if (hasSource && !(await repo.getBackfillStatus(i.isin))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
+    // A newly recorded split changes how the (split-adjusted) source history converts back: load it again.
+    const splitsChanged = JSON.stringify(before?.splits ?? []) !== JSON.stringify(item.splits ?? []);
+    if (hasSource && (splitsChanged || !(await repo.getBackfillStatus(i.isin)))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
   }
+  // Instruments priced in another currency need NBP rates for their whole history: fetch what's missing now.
+  if (inputs.some((i) => i.currency !== "PLN")) await invokeAsync(Resource.Fx.name, {});
   return { instruments: written };
 }
 

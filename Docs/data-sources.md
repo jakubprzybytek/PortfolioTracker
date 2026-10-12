@@ -112,8 +112,9 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - Not used: TWS API / Client Portal Web API (need an always-on gateway with 2FA re-login, which doesn't fit the serverless design).
 
 ### NBP API – exchange rates
-- `api.nbp.pl/api/exchangerates/rates/a/{code}/{from}/{to}/` – table A mid rates, free, no key, max 93 days per request.
+- `api.nbp.pl/api/exchangerates/rates/a/{code}/{from}/{to}/` – table A mid rates, free, no key, max 93 days per request; a range without a table answers 404. Table A as a series starts on 2002-01-02 (EUR 3.5496). Client: `jobs/lib/nbp.ts`.
 - Published around 11:45–12:15 on business days. Polish tax uses the rate from the business day before the transaction.
+- **Used for:** valuing instruments priced in another currency (ETFs in EUR): value = quantity × close × the mid rate of the latest table on or before the day. Cost stays what was paid in PLN (the broker's own rate, kept on the transaction as `fxRate`). Also the exchange-rate rows of the Indicators view.
 
 ### Optional / fallback
 - **OpenFIGI** – ISIN → ticker per exchange (free).

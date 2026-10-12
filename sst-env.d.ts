@@ -22,6 +22,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Bucket"
     }
+    "Fx": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "Holdings": {
       "name": string
       "type": "sst.aws.Dynamo"

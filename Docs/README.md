@@ -125,6 +125,6 @@ Phase 1:
 
 Later phases:
 - [x] ETF source: Yahoo chart API works from Lambda for all 10 ETFs in the sheet, full daily history (data-sources.md). EODHD stays the fallback.
-- [ ] ETF splits: Yahoo history is split-adjusted (SPXS 100:1); un-adjust with split events or adjust quantities.
+- [x] ETFs: Yahoo prices (history converted back to traded prices with the recorded splits: Yahoo has no split event for SPXS.AS), NBP rates since 2002, valuation in PLN, the sheet's ETF transactions (buys, sells, dividends, the SPXS 100:1 split). Bossa Zagranica and IKE Bossa are complete.
 - [ ] ISIN + venue for every ETF.
 - [ ] IBKR Flex: when the daily statement for day D becomes available.

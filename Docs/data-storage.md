@@ -62,8 +62,9 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 | Field | Example |
 |---|---|
 | `isin`, `name`, `type` | `IE00B3RBWM25`, "Vanguard FTSE All-World", `ETF` / `BOND_LISTED` / `BOND_RETAIL` / `BOND_IBKR` / `FUND_MANUAL` / `CASH` |
-| `currency`, `primary_venue` | `EUR`, `XETRA` |
-| `source_ids` | `{ "eodhd": "<TICKER>.XETRA", "gpw": "<CODE>", "ibkr_conid": "…" }` |
+| `currency`, `venue` | `EUR`, `XAMS` (MIC of the listing prices come from: `XAMS` Euronext Amsterdam, `XETR` Xetra, `XWAR` GPW) |
+| `sourceIds` | `{ "yahoo": "VWRL.AS" }`, `{ "gpw": "<CODE>" }`, later `{ "ibkr_conid": "…" }` |
+| `splits` | ETFs: `[{ "date": "2025-12-15", "ratio": 100 }]`: from `date` on one unit became `ratio` units. Prices are stored as traded; charts and the 1-year change divide earlier prices by later splits (`core/prices/splits.ts`) |
 | `live` | `true` for instruments polled intraday |
 | `active` | `false` once sold/matured (jobs skip inactive instruments) |
 | bonds only | `nominal` (face value), `coupon_type` (`FIXED` / `FLOATING` / `INDEXED`), `coupon_rate` or `margin` + `reference_rate`, `maturity`, `coupon_schedule` (period start/end, payment date); IZ bonds also `base_ref` (e.g. IZ0836: 194.28509) and `issue_date` |
@@ -175,9 +176,10 @@ PK = ACCT#<account>         SK = TX#<YYYY-MM-DD>#<tx_id>
 GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
 ```
 
-`type`, `isin`, `quantity`, `price`, `amount`, `fee`, `currency`, `fx_rate`, `note`, `source`.
+`type`, `isin`, `quantity`, `price`, `amount`, `fee`, `currency`, `fxRate`, `ratio`, `note`, `source`.
 
-`type`: `BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`.
+`type`: `BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`, `DIVIDEND`, `SPLIT`.
+Foreign-currency trades (ETFs at Bossa): `price` in the instrument's currency, `amount` and `fee` in PLN, `fxRate` = the broker's PLN per unit. `SPLIT`: `ratio` (units after per unit before), `amount` 0; the position's quantity × `ratio`, cost unchanged. `DIVIDEND` counts as income received, like coupons.
 `valueDate` (optional): retail bonds, when interest starts if not the transaction date. Retail positions are valued per lot (each buy; sales take the oldest lots first).
 
 **Cash** of an account = Σ of its transactions' cash effects: BUY = `amount` (the trade value) minus `fee`; every other type's `amount` already is the cash effect (SELL: received, net of the fee). Computed by the valuation (`core/valuation/cash.ts`), not stored per transaction.

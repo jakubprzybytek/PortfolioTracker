@@ -81,12 +81,20 @@ export default $config({
       link: [...link, market, valuation],
     });
 
+    // NBP exchange rates; also started by an import that brings a foreign-currency instrument.
+    const fx = new sst.aws.Function("Fx", {
+      ...defaults,
+      handler: "packages/jobs/src/handlers/fx.handler",
+      timeout: "10 minutes",
+      link: [...link, market, transactions, valuation],
+    });
+
     const importer = new sst.aws.Function("Import", {
       ...defaults,
       handler: "packages/jobs/src/handlers/import.handler",
       timeout: "15 minutes",
       // Starts the backfill of new instruments directly (a stream on a new table misses early inserts).
-      link: [...link, market, transactions, valuation, backfill],
+      link: [...link, market, transactions, valuation, backfill, fx],
     });
     files.notify({
       notifications: [{ name: "Imports", function: importer.arn, events: ["s3:ObjectCreated:*"], filterPrefix: "imports/" }],
@@ -105,6 +113,22 @@ export default $config({
       event: { final: true },
       retries: 2,
     });
+    // ETFs (Yahoo): after the Amsterdam/Xetra close, and a morning pass for anything missed.
+    new sst.aws.CronV2("EodEtf", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/eodEtf.handler" },
+      schedule: "cron(0 19 ? * MON-FRI *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
+    new sst.aws.CronV2("RecheckEtf", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/eodEtf.handler" },
+      schedule: "cron(0 7 ? * TUE-SAT *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
+    // NBP table A is published around 12:00 on business days; the afternoon run catches a late table.
+    new sst.aws.CronV2("FxNoon", { function: fx.arn, schedule: "cron(30 12 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
+    new sst.aws.CronV2("FxAfternoon", { function: fx.arn, schedule: "cron(30 16 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
     new sst.aws.CronV2("Monthly", {
       // Revalues when the Ministry publishes new retail-bond rates.
       function: { ...defaults, handler: "packages/jobs/src/handlers/monthly.handler", link: [...link, market, valuation] },
@@ -177,6 +201,7 @@ export default $config({
     api.route("GET /transactions", apiHandler, auth);
     api.route("GET /prices", apiHandler, auth);
     api.route("GET /indicators", apiHandler, auth);
+    api.route("GET /indicators/{id}", apiHandler, auth);
     api.route("GET /holdings/history", apiHandler, auth);
     api.route("GET /status", apiHandler, auth);
 

@@ -4,6 +4,7 @@
 
 import type { IsoDate } from "../dates.ts";
 import type { InstrumentItem, PriceItem } from "../db/items.ts";
+import { splitFactorAfter } from "../prices/splits.ts";
 
 export interface PriceRow {
   isin: string;
@@ -17,7 +18,7 @@ export interface PriceRow {
   stale: boolean;
   /** Price entered by hand (venue MANUAL). */
   manual?: boolean;
-  /** Price on or before the same day a year earlier, and the change since (fraction, e.g. 0.021). */
+  /** Price on or before the same day a year earlier (on today's share basis after a split), and the change since (fraction, e.g. 0.021). */
   yearAgo: { date: IsoDate; price: number } | null;
   change1y: number | null;
   /** Retail bonds: annual rate now and in the previous period (instead of a price). */
@@ -41,7 +42,10 @@ export function priceRows(
         return { isin: i.isin, code: i.code, name: i.name, type: i.type, currency: i.currency, price: null, priceDate: null, stale: false, yearAgo: null, change1y: null, ...(rate ? { rate } : {}) };
       }
       const now = latest.get(i.isin);
-      const then = yearAgo.get(i.isin);
+      const raw = yearAgo.get(i.isin);
+      // A split in between: the year-ago price on today's share basis.
+      const f = raw && now ? splitFactorAfter(i.splits, raw.date) / splitFactorAfter(i.splits, now.date) : 1;
+      const then = raw && f !== 1 ? { ...raw, close: Number((raw.close / f).toFixed(6)) } : raw;
       return {
         isin: i.isin,
         code: i.code,

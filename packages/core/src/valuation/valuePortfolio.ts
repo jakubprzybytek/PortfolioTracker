@@ -19,6 +19,8 @@ export interface ValuationContext {
   staleAfterDays?: number;
   /** Account metadata: which accounts aren't fully tracked yet. */
   accounts?: { account: string; incomplete?: string[] }[];
+  /** Latest NBP mid rate on or before `date` per currency (PLN per unit), for instruments priced in another currency. */
+  fx?: Map<string, { mid: number; date: IsoDate }>;
 }
 
 const daysBetween = (a: IsoDate, b: IsoDate) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -92,6 +94,19 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       valuePerUnit = price.close;
     }
 
+    // Priced in another currency (ETFs): the value per unit in PLN at the NBP mid rate; cost is already in PLN.
+    let fx: { rate: number; date: IsoDate } | undefined;
+    if (base.currency !== "PLN") {
+      const rate = ctx.fx?.get(base.currency);
+      if (!rate) {
+        flags.push("no_fx");
+        valuePerUnit = null;
+      } else {
+        fx = { rate: rate.mid, date: rate.date };
+        if (valuePerUnit !== null) valuePerUnit = Number((valuePerUnit * rate.mid).toFixed(6));
+      }
+    }
+
     const value = valuePerUnit === null ? null : round2(valuePerUnit * p.quantity);
     const gain = value === null ? null : round2(value - p.cost);
     holdings.push({
@@ -105,6 +120,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       gain,
       gainPct: gain === null || p.cost === 0 ? null : round2((gain / p.cost) * 100),
       flags,
+      ...(fx ? { fx } : {}),
     });
   }
 

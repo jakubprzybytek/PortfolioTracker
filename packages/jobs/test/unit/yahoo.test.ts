@@ -1,15 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseYahooChart, yahooSymbol } from "../../src/lib/yahoo.ts";
-
-describe("yahooSymbol", () => {
-  it("maps the sheet's EXCHANGE:CODE tickers to Yahoo symbols", () => {
-    expect(yahooSymbol("AMS:VWRL")).toBe("VWRL.AS");
-    expect(yahooSymbol("FRA:EUNK")).toBe("EUNK.DE");
-    expect(yahooSymbol("LON:CSPX")).toBe("CSPX.L");
-    expect(yahooSymbol("VWCE.DE")).toBe("VWCE.DE");
-    expect(() => yahooSymbol("XYZ:ABC")).toThrow(/No Yahoo suffix/);
-  });
-});
+import { parseYahooChart } from "../../src/lib/yahoo.ts";
 
 describe("parseYahooChart", () => {
   // Shape of /v8/finance/chart/VWRL.AS?interval=1d (trimmed). Timestamps are the session open in UTC.
@@ -22,15 +12,15 @@ describe("parseYahooChart", () => {
     const d = parseYahooChart(chart("EUR", 7200, [1791529200, 1791788400, 1791874800], [167.12345678, 167.7, null]));
     expect(d).toMatchObject({ symbol: "VWRL.AS", currency: "EUR", exchange: "AMS", timezone: "Europe/Amsterdam" });
     expect(d.closes).toEqual([
-      { date: "2026-10-09", close: 167.1235 },
-      { date: "2026-10-12", close: 167.7 },
+      { date: "2026-10-09", open: null, high: null, low: null, close: 167.1235, volume: 0 },
+      { date: "2026-10-12", open: null, high: null, low: null, close: 167.7, volume: 0 },
     ]);
   });
 
   it("converts London prices in pence to pounds", () => {
     const d = parseYahooChart(chart("GBp", 3600, [1791788400], [8435.5]));
     expect(d.currency).toBe("GBP");
-    expect(d.closes).toEqual([{ date: "2026-10-12", close: 84.355 }]);
+    expect(d.closes).toEqual([{ date: "2026-10-12", open: null, high: null, low: null, close: 84.355, volume: 0 }]);
   });
 
   it("throws on an error response", () => {

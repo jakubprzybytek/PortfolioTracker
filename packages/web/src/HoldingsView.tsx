@@ -45,6 +45,11 @@ interface Group {
   sums: Sums;
 }
 
+/** Price in the instrument's currency (ETFs: EUR …; bonds: % of nominal). */
+const fmtPrice = (h: Holding) => (h.cleanPrice !== null && h.currency !== "PLN" ? `${fmtNum(h.cleanPrice)} ${h.currency}` : fmtNum(h.cleanPrice));
+const priceTitle = (h: Holding) =>
+  [h.priceDate, h.fx && `1 ${h.currency} = ${fmtNum(h.fx.rate, 4)} PLN (NBP, ${h.fx.date})`].filter(Boolean).join(" · ");
+
 interface InstrumentGroup {
   isin: string;
   first: Holding;
@@ -60,7 +65,7 @@ function HoldingRow({ h, label, account, detail, selected, onSelect }: { h: Hold
       <td className="left indent instrument">{label}</td>
       <td className="left">{detail ? typeLabel(h.type) : ""}</td>
       <td>{fmtInt(h.quantity)}</td>
-      <td title={h.priceDate ?? ""}>{detail ? fmtNum(h.cleanPrice) : ""}</td>
+      <td title={priceTitle(h)}>{detail ? fmtPrice(h) : ""}</td>
       <td>{detail ? fmtNum(h.accruedInterest) : ""}</td>
       <td>{fmtPln(h.value)}</td>
       <td>{fmtPln(h.cost)}</td>
@@ -228,7 +233,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                     </td>
                     <td className="left">{typeLabel(g.first.type)}</td>
                     <td>{fmtInt(g.holdings.reduce((n, h) => n + h.quantity, 0))}</td>
-                    <td title={g.first.priceDate ?? ""}>{fmtNum(g.first.cleanPrice)}</td>
+                    <td title={priceTitle(g.first)}>{fmtPrice(g.first)}</td>
                     <td>{fmtNum(g.first.accruedInterest)}</td>
                     <SumCells s={g.sums} />
                   </tr>

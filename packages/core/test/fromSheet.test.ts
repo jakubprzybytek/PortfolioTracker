@@ -4,7 +4,7 @@ import { parseTransactionFile } from "../src/transactions/schema.ts";
 
 const row = (r: Partial<SheetRow>): SheetRow => ({
   row: 2, account: "Bossa", date: "2025-03-20", ticker: "Gotówka", name: "", currency: "PLN", assetClass: "Gotówka", type: "Wpłata środków",
-  quantity: 1, price: 1, fee: 0, nominal: 1, totalPln: 0, comment: "", ...r,
+  quantity: 1, price: 1, fee: 0, fxRate: 1, nominal: 1, totalPln: 0, comment: "", ...r,
 });
 const instruments = new Map([["IZ0836", { isin: "PL0000117024" }]]);
 

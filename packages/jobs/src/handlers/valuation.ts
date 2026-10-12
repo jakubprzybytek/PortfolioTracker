@@ -8,6 +8,7 @@ import {
   today,
   valuePortfolio,
   type CouponRateItem,
+  type FxRateItem,
   type IsoDate,
   type PriceItem,
 } from "@portfolio/core";
@@ -39,18 +40,35 @@ export async function handler(event: ValuationEvent = {}) {
       priceHistory.set(i.isin, items.sort((a, b) => a.date.localeCompare(b.date)));
     }
 
+    // Exchange rates of the currencies instruments are priced in, walked forward the same way.
+    const currencies = [...new Set(tracked.map((i) => i.currency).filter((c) => c !== "PLN"))];
+    const fxHistory = new Map<string, FxRateItem[]>();
+    for (const c of currencies) fxHistory.set(c, (await repo.queryFxRates(c, "0000-00-00", to)).sort((a, b) => a.date.localeCompare(b.date)));
+
+    // Walk forward: each series keeps a cursor at its latest item on or before the day.
+    const cursor = <T extends { date: IsoDate }>(items: T[]) => {
+      let i = -1;
+      return (date: IsoDate): T | undefined => {
+        while (i + 1 < items.length && items[i + 1]!.date <= date) i++;
+        return i >= 0 ? items[i] : undefined;
+      };
+    };
+    const priceAt = [...priceHistory].map(([isin, items]) => [isin, cursor(items)] as const);
+    const fxAt = [...fxHistory].map(([c, items]) => [c, cursor(items)] as const);
+
     let written = 0;
     for (let date = from; date <= to; date = addDays(date, 1)) {
       const prices = new Map<string, PriceItem>();
-      for (const [isin, items] of priceHistory) {
-        let latest: PriceItem | undefined;
-        for (const p of items) {
-          if (p.date > date) break;
-          latest = p;
-        }
-        if (latest) prices.set(isin, latest);
+      for (const [isin, at] of priceAt) {
+        const p = at(date);
+        if (p) prices.set(isin, p);
       }
-      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates, accounts });
+      const fx = new Map<string, { mid: number; date: IsoDate }>();
+      for (const [c, at] of fxAt) {
+        const r = at(date);
+        if (r) fx.set(c, { mid: r.mid, date: r.date });
+      }
+      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates, accounts, fx });
       await repo.putSnapshot(snapshot, date === to);
       await repo.putPositionDays(snapshot); // per-position history for the Holdings row charts
       written++;

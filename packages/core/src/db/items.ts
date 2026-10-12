@@ -23,7 +23,14 @@ export interface InstrumentItem {
   terms?: BondTerms;
   /** Retail treasury bonds: the series' terms and published rates (from the Ministry file). */
   retail?: RetailTerms;
+  /** Share splits: from `date` on, one unit became `ratio` units (prices stored as traded, not adjusted). */
+  splits?: Split[];
   updatedAt: string;
+}
+
+export interface Split {
+  date: IsoDate;
+  ratio: number;
 }
 
 /** One retail series from the Ministry file ("Dane dotyczące obligacji detalicznych"). */
@@ -68,6 +75,18 @@ export interface ReferenceIndexItem {
   updatedAt: string;
 }
 
+/** NBP table A mid rate: PLN per unit of `currency` on `date` (business days only). */
+export interface FxRateItem {
+  PK: `FX#${string}`;
+  SK: IsoDate;
+  currency: string;
+  date: IsoDate;
+  mid: number;
+  /** NBP table number, e.g. "198/A/NBP/2026". */
+  table: string;
+  source: string;
+}
+
 export interface CouponRateItem {
   PK: `INST#${string}`;
   SK: `COUPON#${IsoDate}`;
@@ -98,7 +117,9 @@ export type TransactionType =
   | "WITHDRAWAL"
   | "FEE"
   | "TAX"
-  | "INTEREST";
+  | "INTEREST"
+  | "DIVIDEND"
+  | "SPLIT";
 
 export interface TransactionItem {
   PK: `ACCT#${string}`;
@@ -111,7 +132,11 @@ export interface TransactionItem {
   type: TransactionType;
   isin?: string;
   quantity?: number;
-  price?: number; // bonds: clean % of nominal; retail bonds: PLN per 100 PLN bond
+  price?: number; // bonds: clean % of nominal; retail bonds: PLN per 100 PLN bond; ETFs: in the instrument's currency
+  /** Foreign-currency trades: PLN per unit of the instrument's currency used by the broker (amount is in PLN). */
+  fxRate?: number;
+  /** SPLIT: each unit held becomes `ratio` units. */
+  ratio?: number;
   /** Retail bonds: when interest starts (the purchase date), if not the transaction date. */
   valueDate?: IsoDate;
   amount: number; // signed cash effect in `currency`: negative = money out
@@ -143,6 +168,8 @@ export interface HoldingSnapshot {
   flags: string[];
   /** Retail bonds: annual rate of the current period and of the one before (null in the first). */
   rate?: { current: number; previous: number | null };
+  /** Foreign-currency instruments: the NBP mid rate used (PLN per unit of `currency`) and its date. */
+  fx?: { rate: number; date: IsoDate };
 }
 
 /** An account's cash, and whether all of its assets are tracked (`incomplete` lists what isn't yet). */
@@ -207,6 +234,7 @@ export const keys = {
   price: (isin: string, venue: string, date: IsoDate) => ({ PK: `INST#${isin}` as const, SK: `PX#${venue}#${date}` as const }),
   pricePrefix: (isin: string, venue: string) => ({ PK: `INST#${isin}` as const, SK: `PX#${venue}#` as const }),
   referenceIndex: (month: string) => ({ PK: "CPI_REF" as const, SK: month }),
+  fxRate: (currency: string, date: IsoDate) => ({ PK: `FX#${currency}` as const, SK: date }),
   couponRate: (isin: string, periodStart: IsoDate) => ({ PK: `INST#${isin}` as const, SK: `COUPON#${periodStart}` as const }),
   transaction: (account: string, date: IsoDate, id: string) => ({ PK: `ACCT#${account}` as const, SK: `TX#${date}#${id}` as const }),
   snapshot: (date: IsoDate | "LATEST") => ({ PK: "PORTFOLIO" as const, SK: `SNAP#${date}` as const }),

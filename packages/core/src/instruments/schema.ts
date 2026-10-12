@@ -39,6 +39,8 @@ export const InstrumentInput = z.object({
    * "mf-retail" = the retail series `code` (e.g. EDO0332) from the imported Ministry retail-bond file.
    */
   terms: z.union([z.literal("mf"), z.literal("mf-retail"), BondTermsInput]).optional(),
+  /** Share splits (ETFs): from `date` on, one unit became `ratio` units. */
+  splits: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ratio: z.number().positive() })).optional(),
 });
 export type InstrumentInput = z.output<typeof InstrumentInput>;
 

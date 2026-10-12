@@ -1,21 +1,10 @@
 // Yahoo Finance chart API (unofficial, no key): daily closes for ETFs. The same endpoint the reference
 // sheet falls back to. https://query2.finance.yahoo.com/v8/finance/chart/<symbol>?period1&period2&interval=1d
 // `range=max` thins the series to monthly points, so the window is always given as period1/period2.
+// Symbols come from the instrument's sourceIds.yahoo (see core listingFromTicker).
 
 const BASE = "https://query2.finance.yahoo.com/v8/finance/chart/";
 const HEADERS = { "User-Agent": "Mozilla/5.0 (portfolio-tracker, personal use)", Accept: "application/json" };
-
-/** Sheet/Google-style exchange prefixes → Yahoo suffixes (as in the reference sheet's buildYahooSymbol). */
-const SUFFIX: Record<string, string> = { WSE: ".WA", LON: ".L", AMS: ".AS", EPA: ".PA", FRA: ".DE", GER: ".DE", ETR: ".DE", SWX: ".SW", BIT: ".MI", NYSE: "", NASDAQ: "" };
-
-/** "AMS:VWRL" → "VWRL.AS"; a plain Yahoo symbol is returned as is. */
-export function yahooSymbol(ticker: string): string {
-  const [exchange, code] = ticker.trim().toUpperCase().split(":");
-  if (!code) return exchange!;
-  const suffix = SUFFIX[exchange!];
-  if (suffix === undefined) throw new Error(`No Yahoo suffix for exchange ${exchange}`);
-  return code + suffix;
-}
 
 export interface YahooDaily {
   symbol: string;
@@ -23,7 +12,16 @@ export interface YahooDaily {
   exchange: string;
   timezone: string;
   /** Oldest first; days without a close are left out. */
-  closes: { date: string; close: number }[];
+  closes: YahooBar[];
+}
+
+export interface YahooBar {
+  date: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number;
+  volume: number;
 }
 
 interface ChartResponse {
@@ -31,7 +29,7 @@ interface ChartResponse {
     result?: {
       meta: { symbol: string; currency: string; exchangeName: string; exchangeTimezoneName: string; gmtoffset: number };
       timestamp?: number[];
-      indicators: { quote: { close: (number | null)[] }[] };
+      indicators: { quote: { open?: (number | null)[]; high?: (number | null)[]; low?: (number | null)[]; close: (number | null)[]; volume?: (number | null)[] }[] };
     }[];
     error?: { code: string; description: string } | null;
   };
@@ -42,14 +40,16 @@ export function parseYahooChart(json: ChartResponse): YahooDaily {
   const r = json.chart.result?.[0];
   if (!r) throw new Error(`Yahoo: ${json.chart.error?.description ?? "empty result"}`);
   const pence = r.meta.currency === "GBp";
-  const closes: { date: string; close: number }[] = [];
+  const px = (v: number | null | undefined) => (v === null || v === undefined ? null : Number((pence ? v / 100 : v).toFixed(4)));
+  const q = r.indicators.quote[0];
+  const closes: YahooBar[] = [];
   (r.timestamp ?? []).forEach((t, i) => {
-    const c = r.indicators.quote[0]?.close[i];
-    if (c === null || c === undefined) return;
+    const close = px(q?.close[i]);
+    if (close === null) return;
     const date = new Date((t + r.meta.gmtoffset) * 1000).toISOString().slice(0, 10);
-    const close = Number((pence ? c / 100 : c).toFixed(4));
-    if (closes.at(-1)?.date === date) closes[closes.length - 1] = { date, close };
-    else closes.push({ date, close });
+    const bar = { date, open: px(q?.open?.[i]), high: px(q?.high?.[i]), low: px(q?.low?.[i]), close, volume: q?.volume?.[i] ?? 0 };
+    if (closes.at(-1)?.date === date) closes[closes.length - 1] = bar;
+    else closes.push(bar);
   });
   return { symbol: r.meta.symbol, currency: pence ? "GBP" : r.meta.currency, exchange: r.meta.exchangeName, timezone: r.meta.exchangeTimezoneName, closes };
 }

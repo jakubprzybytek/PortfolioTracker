@@ -3,6 +3,7 @@
 // knows (by code); everything else is reported as skipped, with the reason.
 
 import * as XLSX from "xlsx";
+import { listingFromTicker } from "../instruments/listing.ts";
 import type { InstrumentInput } from "../instruments/schema.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
 import { privateAssetId, type ManualPriceInput } from "../prices/manual.ts";
@@ -27,6 +28,10 @@ export interface SheetRow {
   price: number;
   /** Commission, PLN. */
   fee: number;
+  /** "Kurs PLN transakcji": PLN per unit of `currency` used for the trade (1 for PLN). */
+  fxRate: number;
+  /** Split rows: units after per unit before ("100:1" in the quantity column → 100). */
+  splitRatio?: number;
   /** Nominal per bond for bonds (1 otherwise). */
   nominal: number;
   /** "Total PLN": buy = qty × price + fee; sell = qty × price − fee; others = the amount. Always positive. */
@@ -50,6 +55,8 @@ export interface SheetConversion {
   skipped: SkippedRow[];
   /** Retail bond series the transactions use: instruments to import (terms resolved from the Ministry file). */
   retailInstruments: InstrumentInput[];
+  /** ETFs the transactions use (listed in the ETF file): instruments with their Yahoo symbol and recorded splits. */
+  etfInstruments: InstrumentInput[];
   /** Manually valued assets (sheet class "Inne"): instruments with a private id, and their purchase prices. */
   manualInstruments: InstrumentInput[];
   manualPrices: ManualPriceInput[];
@@ -126,11 +133,13 @@ const round = (v: number, digits: number) => Math.round(v * 10 ** digits) / 10 *
 
 /**
  * @param instruments the app's instruments: code → ISIN and nominal (e.g. from data/instruments.json + bond terms)
+ * @param etfs the sheet's ETF tickers ("AMS:VWRL") → ISIN (the sheet has no ISINs; e.g. data/private/etfs.json)
  */
 export function convertSheetRows(
   rows: SheetRow[],
   instruments: Map<string, { isin: string; nominal?: number }>,
   retailSeries: Map<string, RetailTerms> = new Map(),
+  etfs: Map<string, { isin: string }> = new Map(),
 ): SheetConversion {
   const transactions: TransactionInput[] = [];
   const skipped: SkippedRow[] = [];
@@ -139,6 +148,7 @@ export function convertSheetRows(
     skipped.push({ row: r.row, date: r.date, account: r.account, ticker: r.ticker, type: r.type, reason, what: WHAT_BY_CLASS[r.assetClass] ?? r.assetClass });
   const manualUsed = new Map<string, InstrumentInput>();
   const manualPrices: ManualPriceInput[] = [];
+  const etfUsed = new Map<string, InstrumentInput>();
 
   for (const r of rows) {
     const note = r.comment.trim() || undefined;
@@ -178,6 +188,30 @@ export function convertSheetRows(
         transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: r.price, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
       else if (r.type === "Dywidenda / Odsetki") transactions.push({ date: r.date, account: r.account, type: "INTEREST", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
       else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
+      continue;
+    }
+
+    // ETFs: priced in their currency (Yahoo), traded through a PLN account at the broker's rate (`fxRate`).
+    const etf = etfs.get(r.ticker);
+    const listing = etf && listingFromTicker(r.ticker);
+    if (etf && listing) {
+      const isin = etf.isin;
+      const seen = etfUsed.get(isin);
+      const inst: InstrumentInput = seen ?? { isin, code: listing.code, name: r.name, type: "ETF", currency: "PLN", venue: listing.venue, sourceIds: { yahoo: listing.yahoo }, active: true, live: false };
+      if (inst.name === r.ticker || inst.name === listing.code) inst.name = r.name; // some rows carry only the ticker
+      const trade = r.type === "Zakup" || r.type === "Sprzedaż";
+      if (trade) inst.currency = r.currency;
+      etfUsed.set(isin, inst);
+      const fx = r.currency !== "PLN" && r.fxRate > 0 ? { fxRate: r.fxRate } : {};
+      if (r.type === "Zakup")
+        transactions.push({ date: r.date, account: r.account, type: "BUY", isin, quantity: r.quantity, price: r.price, ...fx, amount: -round(r.totalPln - r.fee, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+      else if (r.type === "Sprzedaż")
+        transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: r.price, ...fx, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+      else if (r.type === "Dywidenda / Odsetki") transactions.push({ date: r.date, account: r.account, type: "DIVIDEND", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
+      else if (r.type === "Split" && r.splitRatio) {
+        transactions.push({ date: r.date, account: r.account, type: "SPLIT", isin, ratio: r.splitRatio, amount: 0, currency: "PLN" });
+        inst.splits = [...(inst.splits ?? []), { date: r.date, ratio: r.splitRatio }];
+      } else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
       continue;
     }
 
@@ -236,7 +270,8 @@ export function convertSheetRows(
   const incomplete = new Map<string, Set<string>>();
   for (const s of skipped) incomplete.set(s.account, (incomplete.get(s.account) ?? new Set()).add(s.what));
   const accounts = [...new Set(rows.map((r) => r.account))].sort().map((account) => ({ account, incomplete: [...(incomplete.get(account) ?? [])].sort() }));
-  return { transactions, skipped, retailInstruments, manualInstruments: [...manualUsed.values()], manualPrices, accounts };
+  const etfInstruments = [...etfUsed.values()].sort((a, b) => a.code.localeCompare(b.code));
+  return { transactions, skipped, retailInstruments, etfInstruments, manualInstruments: [...manualUsed.values()], manualPrices, accounts };
 }
 
 /** Current prices of manually valued assets from the sheet's "Portfolio" tab (column K), dated `date`. */
@@ -252,6 +287,11 @@ export function readSheetManualPrices(content: Uint8Array, date: string): Manual
 
 const SHEET_NAME = "Transakcje";
 type Cell = string | number | boolean | Date | null | undefined;
+/** "100:1" → 100 (units after per unit before); undefined for anything else. */
+const splitRatio = (v: Cell): number | undefined => {
+  const m = /^\s*(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)\s*$/.exec(String(v ?? ""));
+  return m ? Number(m[1]!.replace(",", ".")) / Number(m[2]!.replace(",", ".")) : undefined;
+};
 const num = (v: Cell): number => (typeof v === "number" ? v : Number(String(v ?? "").replace(/\s/g, "").replace(",", ".")) || 0);
 const isoDate = (v: Cell): string => {
   if (v instanceof Date) return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, "0")}-${String(v.getDate()).padStart(2, "0")}`;
@@ -281,6 +321,8 @@ export function readSheetTransactions(content: Uint8Array): SheetRow[] {
       quantity: num(c[7]),
       price: num(c[8]),
       fee: num(c[9]),
+      fxRate: num(c[10]) || 1,
+      ...(splitRatio(c[7]) ? { splitRatio: splitRatio(c[7])! } : {}),
       nominal: num(c[11]) || 1,
       totalPln: num(c[12]),
       comment: String(c[13] ?? ""),

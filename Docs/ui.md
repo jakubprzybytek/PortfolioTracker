@@ -32,9 +32,9 @@ From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **
 - **Instrument:** one group per instrument (by code) with its total quantity, price and summed value/cost/gain/coupons; under it one row per account holding it. Cash is a last group with one row per account (incomplete ones greyed, not summed). The filters apply the same way.
 
 - **Grouped by account** (alphabetically); each group row shows the account's value (positions + cash), cost, gain, gain % and coupons. Each account ends with a **Cash** row; accounts holding only cash appear too. A total row appears when more than one account is shown.
-- **Incomplete accounts** (some of their assets aren't tracked yet, e.g. ETFs): the group row says what's missing, and the cash row is greyed and left out of the sums, because without the untracked purchases it's far too high.
+- **Incomplete accounts** (some of their assets aren't tracked yet, e.g. Catalyst bonds): the group row says what's missing, and the cash row is greyed and left out of the sums, because without the untracked purchases it's far too high.
 - **Instruments sorted by code** within each account.
-- **Columns:** instrument (code + name), asset type, quantity, clean price (% of nominal; price date on hover), accrued interest per bond, value, cost, gain (PLN, %), coupons received.
+- **Columns:** instrument (code + name), asset type, quantity, price (bonds: clean, % of nominal; ETFs: in their currency, e.g. "167,70 EUR"; price date and the NBP rate used on hover), accrued interest per bond, value (PLN), cost (PLN, as paid), gain (PLN, %), coupons/dividends received.
 - **Filters:** account, asset type ("Cash" shows only the cash rows); "Reset" clears them; "n of m holdings".
 - **Row chart:** clicking a holding row shows that position's value and cost over time (range 1M/6M/1Y/ALL); grouped by instrument, the group row shows the instrument across all accounts. The chart is a panel docked to the bottom of the window (1/3 of its height by default) while the list stays visible and scrolls above it; its top edge is a drag handle (size remembered in the browser); ✕ or Escape closes it. Cash rows have no chart.
 - **Manually valued** assets (e.g. a property fund share) show their latest manual price; in the Prices view it's tagged "manual" and never marked stale.
@@ -52,8 +52,8 @@ Kept deliberately short (a passive portfolio needs no daily statistics): what ea
 
 Economic indicators from data already stored (no extra source), same layout as Prices.
 
-- **Rows:** *Inflation, month on month* (CPI, previous month = 100, from `CPI_REF.wr`) and *CPI reference index* (`CPI_REF.w`, June 2003 = 100, the index behind IZ indexation). Columns: latest value, its month, the value a year earlier. Hover a row for what it is.
-- **Click a row:** its chart opens below: monthly bars around zero for the % series, a line for the index; ranges 1Y / 5Y (default) / 10Y / ALL (from 2003-07). Chart and range are in the URL.
+- **Groups:** *Inflation*: month on month (CPI, previous month = 100, from `CPI_REF.wr`) and the CPI reference index (`CPI_REF.w`, June 2003 = 100, the index behind IZ indexation). *Exchange rates*: EUR/PLN and USD/PLN, NBP mid rates (`FX#…`), daily since 2002. Columns: latest value, its date, the value a year earlier. Hover a row for what it is.
+- **Click a row:** its chart opens below: monthly bars around zero for the % series, a line for the index and the rates; ranges 1Y / 5Y (default) / 10Y / ALL. Monthly series count back from their latest month (1Y = 12 bars). Chart and range are in the URL.
 - **No 12-month inflation:** compounding the one-decimal monthly figures misses GUS's published y/y by up to ~0.3 pp, so that needs GUS's own y/y series (in the CSV the `monthly` job already downloads, not stored yet).
 
 ## Transactions
@@ -76,7 +76,8 @@ All transactions from `GET /transactions`.
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
 | `GET /prices` | held instruments: latest price + date, stale flag, price a year earlier and the change (`core/valuation/priceRows.ts`) |
 | `GET /holdings/history?isin&account&from&to` | a position's daily value, cost and quantity (`POS#…` items); without `account`, the instrument summed over the accounts holding it |
-| `GET /indicators` | all indicators with their full monthly series (`core/indicators/cpi.ts`): `[{ id, name, unit, note, points: [{ date: "YYYY-MM", value }] }]` |
+| `GET /indicators` | one row per indicator (`core/indicators/indicators.ts`): `[{ id, name, group, unit, frequency, note, latest: { date, value }, yearAgo }]` |
+| `GET /indicators/{id}?from&to` | one series, oldest first: `[{ date, value }]` (`cpi-mom`, `cpi-index`: by month; `fx-eur`, `fx-usd`: daily) |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |
 | `GET /status` | last run of each job |
 

@@ -1,37 +1,46 @@
+import { Fragment } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { fmtNum } from "./format.ts";
-import type { Indicator } from "./types.ts";
+import { addDays, fmtNum, today } from "./format.ts";
+import type { IndicatorPoint, IndicatorSummary } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
-type IndicatorPoint = Indicator["points"][number];
-
-/** Monthly data: ranges in years. */
+/** Ranges in years; monthly indicators are filtered by month on the server. */
 const RANGES = [
-  { key: "1Y", months: 12 },
-  { key: "5Y", months: 60 },
-  { key: "10Y", months: 120 },
-  { key: "ALL", months: null },
+  { key: "1Y", years: 1 },
+  { key: "5Y", years: 5 },
+  { key: "10Y", years: 10 },
+  { key: "ALL", years: null },
 ] as const;
 type RangeKey = (typeof RANGES)[number]["key"];
 
-const fmtValue = (i: Indicator, v: number | undefined) => (v === undefined ? "–" : i.unit === "%" ? `${fmtNum(v, 1)} %` : fmtNum(v, 2));
+const digits = (i: Pick<IndicatorSummary, "unit">) => (i.unit === "%" ? 1 : i.unit === "PLN" ? 4 : 2);
+const fmtValue = (i: Pick<IndicatorSummary, "unit">, v: number | undefined) =>
+  v === undefined ? "–" : i.unit === "%" ? `${fmtNum(v, 1)} %` : fmtNum(v, digits(i));
 
-/** The same month a year before the latest point. */
-const yearBefore = (points: IndicatorPoint[]): IndicatorPoint | undefined => {
-  const last = points.at(-1);
-  if (!last) return undefined;
-  const target = `${Number(last.date.slice(0, 4)) - 1}${last.date.slice(4)}`;
-  return points.find((p) => p.date === target);
-};
+/**
+ * First date of the range. Monthly indicators lag by a month or two, so they count back from their latest month
+ * (1Y = the last 12 months); daily ones from today.
+ */
+function rangeStart(years: number | null, i: IndicatorSummary | undefined): string {
+  if (years === null) return "1990-01-01";
+  if (i?.frequency === "monthly" && i.latest) {
+    const [y, m] = i.latest.date.split("-").map(Number) as [number, number];
+    const k = y * 12 + (m - 1) - (years * 12 - 1);
+    return `${Math.floor(k / 12)}-${String((k % 12) + 1).padStart(2, "0")}-01`;
+  }
+  return addDays(today(), -Math.round(years * 365.25));
+}
 
-/** Economic indicators from the stored data: latest value, its month, a year earlier. Clicking a row shows its chart. */
+/** Economic indicators from the stored data: latest value, its date, a year earlier. Clicking a row shows its chart. */
 export function IndicatorsView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
-  const rows = useApi<Indicator[]>("/indicators");
+  const rows = useApi<IndicatorSummary[]>("/indicators");
   const selected = params["chart"] ?? null;
   const range: RangeKey = RANGES.some((r) => r.key === params["range"]) ? (params["range"] as RangeKey) : "5Y";
+  const years = RANGES.find((r) => r.key === range)!.years;
   const sel = rows.data?.find((i) => i.id === selected);
-  const months = RANGES.find((r) => r.key === range)!.months;
-  const points = sel ? (months === null ? sel.points : sel.points.slice(-months)) : [];
+  const from = rangeStart(years, sel);
+  const series = useApi<IndicatorPoint[]>(sel ? `/indicators/${sel.id}` : null, { from, to: today() }, [sel?.id, from]);
+  const groups = [...new Set((rows.data ?? []).map((i) => i.group))];
 
   return (
     <>
@@ -47,34 +56,40 @@ export function IndicatorsView({ params, setParams }: { params: Record<string, s
             <tr>
               <th className="left">Indicator</th>
               <th>Latest</th>
-              <th>Month</th>
+              <th>Date</th>
               <th>A year earlier</th>
             </tr>
           </thead>
           <tbody>
-            {(rows.data ?? []).map((i) => {
-              const last = i.points.at(-1);
-              const before = yearBefore(i.points);
-              return (
-                <tr
-                  key={i.id}
-                  className={i.id === selected ? "selected" : ""}
-                  onClick={() => setParams({ ...params, chart: i.id === selected ? undefined : i.id })}
-                  style={{ cursor: "pointer" }}
-                  data-testid={`indicator-${i.id}`}
-                  title={i.note}
-                >
-                  <td className="left instrument">
-                    <strong>{i.name}</strong>
-                  </td>
-                  <td>{fmtValue(i, last?.value)}</td>
-                  <td>{last?.date ?? "no data"}</td>
-                  <td className="muted" title={before ? before.date : ""}>
-                    {fmtValue(i, before?.value)}
+            {groups.map((g) => (
+              <Fragment key={g}>
+                <tr className="group" data-testid={`indicator-group-${g}`}>
+                  <td className="left" colSpan={4}>
+                    {g}
                   </td>
                 </tr>
-              );
-            })}
+                {(rows.data ?? [])
+                  .filter((i) => i.group === g)
+                  .map((i) => (
+                    <tr
+                      key={i.id}
+                      className={`clickable${i.id === selected ? " selected" : ""}`}
+                      onClick={() => setParams({ ...params, chart: i.id === selected ? undefined : i.id })}
+                      data-testid={`indicator-${i.id}`}
+                      title={i.note}
+                    >
+                      <td className="left indent instrument">
+                        <strong>{i.name}</strong>
+                      </td>
+                      <td>{fmtValue(i, i.latest?.value)}</td>
+                      <td>{i.latest?.date ?? "no data"}</td>
+                      <td className="muted" title={i.yearAgo?.date ?? ""}>
+                        {fmtValue(i, i.yearAgo?.value)}
+                      </td>
+                    </tr>
+                  ))}
+              </Fragment>
+            ))}
           </tbody>
         </table>
       </div>
@@ -100,16 +115,16 @@ export function IndicatorsView({ params, setParams }: { params: Record<string, s
               </button>
             ))}
           </div>
-          <IndicatorChart indicator={sel} points={points} />
+          {series.error ? <p className="error">{series.error}</p> : <IndicatorChart indicator={sel} points={series.data ?? []} loading={series.loading} />}
         </>
       )}
     </>
   );
 }
 
-/** Percent changes as bars around zero (rises in the accent colour, falls grey); an index as a line. */
-function IndicatorChart({ indicator, points }: { indicator: Indicator; points: IndicatorPoint[] }) {
-  if (points.length === 0) return <p className="muted">No data.</p>;
+/** Percent changes as bars around zero (rises in the accent colour, falls grey); levels (index, rates) as a line. */
+function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSummary; points: IndicatorPoint[]; loading: boolean }) {
+  if (points.length === 0) return <p className="muted">{loading ? "Loading…" : "No data."}</p>;
   const tooltip = {
     formatter: (v: unknown) => [fmtValue(indicator, Number(v)), indicator.name],
     contentStyle: { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 },
@@ -121,7 +136,14 @@ function IndicatorChart({ indicator, points }: { indicator: Indicator; points: I
     <>
       <CartesianGrid stroke="var(--border)" vertical={false} />
       <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
-      <YAxis tick={{ fontSize: 11 }} width={56} stroke="var(--muted)" domain={pctDomain ?? ["auto", "auto"]} ticks={pctDomain && Array.from({ length: pctDomain[1]! - pctDomain[0]! + 1 }, (_, k) => pctDomain[0]! + k)} tickFormatter={(v: number) => fmtNum(v, indicator.unit === "%" ? 1 : 0)} />
+      <YAxis
+        tick={{ fontSize: 11 }}
+        width={56}
+        stroke="var(--muted)"
+        domain={pctDomain ?? ["auto", "auto"]}
+        ticks={pctDomain && Array.from({ length: pctDomain[1]! - pctDomain[0]! + 1 }, (_, k) => pctDomain[0]! + k)}
+        tickFormatter={(v: number) => fmtNum(v, indicator.unit === "%" ? 1 : indicator.unit === "PLN" ? 2 : 0)}
+      />
     </>
   );
   return (

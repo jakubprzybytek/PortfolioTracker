@@ -14,6 +14,7 @@ import {
   type AccountItem,
   type BackfillItem,
   type CouponRateItem,
+  type FxRateItem,
   type InstrumentItem,
   type JobRunItem,
   type PositionDayItem,
@@ -158,6 +159,34 @@ export class Repository {
       KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: { ":pk": "CPI_REF" },
     });
+  }
+
+  // --- exchange rates (NBP table A) ------------------------------------------------------------
+
+  putFxRates(items: Omit<FxRateItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut("market", items.map((r) => ({ ...keys.fxRate(r.currency, r.date), ...r })));
+  }
+
+  /** Rates of one currency in [from, to], oldest first. */
+  queryFxRates(currency: string, from: IsoDate, to: IsoDate): Promise<FxRateItem[]> {
+    return this.queryAll<FxRateItem>("market", {
+      KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
+      ExpressionAttributeValues: { ":pk": `FX#${currency}`, ":from": from, ":to": to },
+    });
+  }
+
+  /** The latest rate on or before `date`. */
+  async latestFxRate(currency: string, date: IsoDate): Promise<FxRateItem | undefined> {
+    const res = await this.doc.send(
+      new QueryCommand({
+        TableName: this.tables.market,
+        KeyConditionExpression: "PK = :pk AND SK <= :to",
+        ExpressionAttributeValues: { ":pk": `FX#${currency}`, ":to": date },
+        ScanIndexForward: false,
+        Limit: 1,
+      }),
+    );
+    return res.Items?.[0] as FxRateItem | undefined;
   }
 
   // --- retail bond series (Ministry file) -------------------------------------------------------

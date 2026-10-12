@@ -15,5 +15,15 @@
     "type": "FUND_MANUAL",
     "currency": "PLN",
     "venue": "MANUAL"
+  },
+  {
+    "isin": "IE00B3YCGJ38",
+    "code": "SPXS",
+    "name": "Invesco S&P 500 UCITS ETF (sample holding)",
+    "type": "ETF",
+    "currency": "EUR",
+    "venue": "XAMS",
+    "sourceIds": { "yahoo": "SPXS.AS" },
+    "splits": [{ "date": "2025-12-15", "ratio": 100 }]
   }
 ]
