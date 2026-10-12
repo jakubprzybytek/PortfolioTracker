@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { fmtPct, fmtPln, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
+import { AccountsTable } from "./AccountsTable.tsx";
+import { Allocation } from "./Allocation.tsx";
 import { PortfolioChart } from "./PortfolioChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
 import type { HistoryPoint, Snapshot, Status } from "./types.ts";
@@ -60,6 +62,12 @@ export function DashboardView() {
       <h2>Portfolio value</h2>
       <RangePicker value={range} onChange={setRange} testId="portfolio-range" />
       {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} />}
+
+      <h2>Accounts</h2>
+      <AccountsTable />
+
+      <h2>Allocation</h2>
+      {snap && <Allocation snapshot={snap} />}
 
       <h2>Jobs</h2>
       <div className="table-wrap">

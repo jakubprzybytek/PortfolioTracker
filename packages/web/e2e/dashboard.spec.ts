@@ -35,6 +35,28 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("price-chart")).toHaveCount(0);
   });
 
+  test("lists the accounts with net deposits, profit and XIRR; the incomplete one greyed and outside the total", async ({ page }) => {
+    const rows = page.getByTestId("account-row");
+    await expect(rows).toHaveCount(5);
+    expect(await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute("data-account")))).toEqual(["bonds", "broker", "etf", "foreign", "ike"]);
+    const broker = page.locator('tr[data-testid="account-row"][data-account="broker"]');
+    await expect(broker.locator("td").nth(1)).toHaveText("30 000,00 zł"); // net deposits
+    await expect(broker.locator("td").nth(6)).toHaveText(/%$/); // XIRR
+    await expect(page.locator('tr[data-testid="account-row"][data-account="etf"]')).toHaveClass(/muted/);
+    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("51 000,00 zł");
+  });
+
+  test("shows the allocation by asset type and by currency", async ({ page }) => {
+    await expect(page.getByTestId("alloc-type-CASH")).toContainText("Cash");
+    await expect(page.getByTestId("alloc-type-ETF")).toBeVisible();
+    await expect(page.getByTestId("alloc-type-BOND_CORPORATE")).toBeVisible();
+    await expect(page.getByTestId("alloc-currency-PLN")).toBeVisible();
+    await expect(page.getByTestId("alloc-currency-EUR")).toContainText(/\d+,\d+ %/);
+    const shares = await page.getByTestId("alloc-type").locator(".alloc-pct").allTextContents();
+    const sum = shares.reduce((s, t) => s + Number(t.replace(/[^\d,]/g, "").replace(",", ".")), 0);
+    expect(Math.abs(sum - 100)).toBeLessThan(0.5); // one decimal each
+  });
+
   test("lists job runs", async ({ page }) => {
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
     await expect(rows).toHaveCount(9);

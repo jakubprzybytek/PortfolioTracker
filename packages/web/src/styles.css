@@ -112,3 +112,10 @@ tr.clickable { cursor: pointer; }
 }
 td .sub { color: var(--muted); padding-left: 0.75rem; }
 button.link.expand { font-size: 0.85rem; white-space: nowrap; }
+.allocations { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px 32px; }
+.allocation { min-width: 0; }
+.allocation h3 { font-size: 0.9rem; font-weight: 600; margin: 0 0 6px; color: var(--muted); }
+.alloc-row { display: grid; grid-template-columns: 9rem minmax(40px, 1fr) 3.5rem 9rem; align-items: center; gap: 8px; font-size: 0.9rem; padding: 3px 0; }
+.alloc-bar { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+.alloc-bar span { display: block; height: 100%; background: var(--accent); }
+.alloc-pct, .alloc-value { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 8px; }

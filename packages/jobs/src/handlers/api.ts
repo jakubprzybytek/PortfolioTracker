@@ -4,6 +4,7 @@
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import {
   CPI_INDICATORS,
+  accountSummaries,
   addDays,
   adjustForSplits,
   cpiIndicators,
@@ -45,6 +46,11 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       case "GET /holdings": {
         const snap = await repo.getSnapshot("LATEST");
         return snap ? json(200, snap) : json(404, { error: "No valuation yet" });
+      }
+      case "GET /accounts": {
+        // Per account (latest snapshot): net deposits, value, cash, profit, income, costs, XIRR; total of the complete ones.
+        const [snap, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listTransactions()]);
+        return snap ? json(200, { date: snap.date, ...accountSummaries(snap, txs) }) : json(404, { error: "No valuation yet" });
       }
       case "GET /portfolio/history": {
         const snaps = await repo.querySnapshots(from, to);

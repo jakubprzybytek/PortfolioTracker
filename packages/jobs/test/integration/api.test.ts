@@ -140,6 +140,29 @@ describe(`API ${API}`, () => {
     expect(snap.totals.value).toBeCloseTo(snap.holdings.reduce((s, h) => s + h.value!, 0), 1);
   });
 
+  it("GET /accounts gives each account's net deposits, value, profit, income, costs and XIRR; the total skips incomplete ones", async () => {
+    type Row = { account: string; incomplete?: string[]; netDeposits: number; positions: number; cash: number; total: number; profit: number; income: number; costs: number; xirr: number | null };
+    const { status, body } = await get<{ date: string; accounts: Row[]; total: Row }>("/accounts");
+    expect(status).toBe(200);
+    const snap = (await get<SnapshotItem>("/holdings")).body;
+    expect(body.date).toBe(snap.date);
+    expect(body.accounts.map((a) => a.account)).toEqual(["bonds", "broker", "etf", "foreign", "ike"]);
+    const by = Object.fromEntries(body.accounts.map((a) => [a.account, a]));
+    expect(by["broker"]).toMatchObject({ netDeposits: 30000, cash: 5420.86, income: 914.2, costs: 50.88 }); // coupons 350 + 214.2 + 350; fees 31.8 + 19.08
+    expect(by["ike"]).toMatchObject({ netDeposits: 6000, cash: 99.49, income: 12.5, costs: 8.01 });
+    expect(by["bonds"]).toMatchObject({ netDeposits: 5000, cash: 1013.9, income: 70, costs: 8.1 });
+    expect(by["etf"]).toMatchObject({ incomplete: ["ETFs"], netDeposits: 2000, cash: 2000 });
+    for (const a of body.accounts) {
+      const positions = Math.round(snap.holdings.filter((h) => h.account === a.account).reduce((s, h) => s + h.value!, 0) * 100) / 100;
+      expect(a.positions, a.account).toBeCloseTo(positions, 2);
+      expect(a.total).toBeCloseTo(a.positions + a.cash, 2);
+      expect(a.profit).toBeCloseTo(a.total - a.netDeposits, 2);
+    }
+    expect(by["broker"]!.xirr).not.toBeNull();
+    expect(body.total).toMatchObject({ account: "Total", netDeposits: 51000, cash: 7197.39 }); // without the incomplete "etf"
+    expect(body.total.total).toBeCloseTo(snap.totals.value + snap.totals.cash!, 1);
+  });
+
   it("GET /portfolio/history returns one snapshot per day since the first transaction", async () => {
     const { status, body } = await get<{ date: string; totals: { value: number } }[]>("/portfolio/history?from=2025-02-01&to=2025-02-10");
     expect(status).toBe(200);
@@ -252,7 +275,7 @@ describe(`API ${API}`, () => {
   });
 
   it("requires a login: no token or a forged token gets 401", async () => {
-    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators", "/indicators/fx-eur"]) {
+    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators", "/indicators/fx-eur", "/accounts"]) {
       expect((await get(route, { auth: false })).status, route).toBe(401);
     }
     const forged = ["eyJhbGciOiJSUzI1NiJ9", "eyJzdWIiOiJ4IiwiY29nbml0bzpncm91cHMiOlsicG9ydGZvbGlvLXRyYWNrZXIiXX0", "c2ln"].join(".");
