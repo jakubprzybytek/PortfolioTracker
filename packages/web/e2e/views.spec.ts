@@ -73,6 +73,8 @@ test.describe("holdings view", () => {
     const broker = table.locator('tr[data-testid="holding-row"][data-account="broker"]');
     await expect(broker).toHaveCount(2);
     expect(await broker.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "IZ0836"]);
+    await expect(broker.nth(0).locator("td").nth(4)).toHaveText(/^\d+,\d{2}$/); // accrued interest per bond
+    await expect(broker.nth(1).locator("td").nth(4)).toHaveText(/^\d+,\d{2}$/);
     const ike = table.locator('tr[data-testid="holding-row"][data-account="ike"]');
     await expect(ike).toHaveCount(3);
     expect(await ike.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "EDO0935", "SAMPLE-APARTMENT"]);
@@ -126,6 +128,11 @@ test.describe("prices view", () => {
     await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
     await ds.click(); // click again: chart closes
     await expect(page.getByTestId("price-title")).toHaveCount(0);
+
+    // Transactions as markers: the sample BUY of IZ0836 on 2025-06-10 falls inside the full range
+    await page.getByTestId("price-IZ0836").click();
+    await page.getByTestId("price-range").getByRole("button", { name: "ALL" }).click();
+    await expect(page.getByTestId("price-chart").locator(".recharts-reference-dot")).toHaveCount(1);
 
     // Retail bond: the chart is its calculated value per bond
     await page.getByTestId("price-EDO0935").click();

@@ -20,27 +20,6 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("total-all")).toContainText("zł");
   });
 
-  test("lists the holdings with accrued interest and no data flags", async ({ page }) => {
-    const ds = page.getByTestId("holding-DS0432");
-    const iz = page.getByTestId("holding-IZ0836");
-    await expect(ds).toBeVisible();
-    await expect(iz).toBeVisible();
-    await expect(ds.locator("td").nth(1)).toHaveText("25"); // 20 in "broker" + 5 in "ike", one row per instrument
-    await expect(iz.locator("td").nth(1)).toHaveText("10");
-    await expect(ds.locator("td").nth(3)).not.toHaveText("–"); // accrued interest
-    await expect(iz.locator("td").nth(4)).toHaveText(/^9\d\d,\d\d$/); // value per bond ≈ 97x PLN (indexed nominal)
-    await expect(page.locator(".flag")).toHaveCount(0);
-  });
-
-  test("sorts the table by clicking a header", async ({ page }) => {
-    const firstCode = () => page.getByTestId("holdings-table").locator("tbody tr").first().locator("td").first().locator("strong").textContent();
-    await expect(page.getByTestId("holdings-table").locator("tbody tr")).toHaveCount(4); // DS0432, EDO0935 (retail), IZ0836, SAMPLE-APARTMENT (manual)
-    await page.getByRole("columnheader", { name: /^Instrument/ }).click();
-    expect(await firstCode()).toBe("DS0432");
-    await page.getByRole("columnheader", { name: /^Instrument/ }).click();
-    expect(await firstCode()).toBe("SAMPLE-APARTMENT");
-  });
-
   test("renders the portfolio chart and switches ranges", async ({ page }) => {
     const chart = page.getByTestId("portfolio-chart");
     await expect(chart.locator("svg.recharts-surface")).toBeVisible();
@@ -50,16 +29,10 @@ test.describe("dashboard", () => {
     await expect(chart.locator("svg.recharts-surface")).toBeVisible();
   });
 
-  test("selecting a holding shows its price chart with transaction markers", async ({ page }) => {
-    await page.getByTestId("holding-IZ0836").click();
-    await expect(page.getByTestId("price-title")).toContainText("IZ0836");
-    const chart = page.getByTestId("price-chart");
-    await expect(chart.locator("path.recharts-line-curve")).toHaveCount(1);
-    await page.getByTestId("price-range").getByRole("button", { name: "ALL" }).click();
-    // the sample BUY on 2025-06-10 falls inside the full range
-    await expect(chart.locator(".recharts-reference-dot")).toHaveCount(1);
-    await page.getByTestId("holding-DS0432").click();
-    await expect(page.getByTestId("price-title")).toContainText("DS0432");
+  test("shows totals, chart and jobs only (holdings and prices have their own views)", async ({ page }) => {
+    await expect(page.getByTestId("total-value")).toBeVisible();
+    await expect(page.getByTestId("holdings-table")).toHaveCount(0);
+    await expect(page.getByTestId("price-chart")).toHaveCount(0);
   });
 
   test("lists job runs", async ({ page }) => {

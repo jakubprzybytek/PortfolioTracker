@@ -22,8 +22,6 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 
 - **Totals:** total (positions + cash), value of positions, cash (only accounts whose assets are all tracked; the card says how many it leaves out), cost, gain (PLN and %), coupons and income received.
 - **Portfolio value over time:** from `PORTFOLIO/SNAP#<date>`, with a range selector (1M, 6M, 1Y, all).
-- **Holdings table:** one row per instrument, summed across accounts; sortable by any column. Clicking a row shows its price chart.
-- **Per-instrument price chart:** clean price as a line, transactions as markers.
 - **Jobs:** last run of each job; failed jobs also appear as a banner.
 
 ## Holdings
