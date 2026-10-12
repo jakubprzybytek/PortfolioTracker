@@ -149,7 +149,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, txs.map(({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...rest }) => rest));
       }
       case "GET /status": {
-        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "fx", "valuation", "backfill", "import", "monthly"];
+        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "fx", "valuation", "backfill", "import", "monthly"];
         const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.listJobRuns(j))[0] ?? null])));
         return json(200, { now: new Date().toISOString(), jobs: runs });
       }

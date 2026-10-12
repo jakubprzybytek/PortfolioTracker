@@ -4,6 +4,8 @@
 //
 // --etfs: the sheet's ETF tickers with their ISINs (the sheet has none): [{ "ticker": "AMS:VWRL", "isin": "IE00B3RBWM25" }].
 // Defaults to data/private/etfs.json when it exists.
+// --catalyst: the sheet's Catalyst tickers: [{ "ticker": "CPS0130", "isin": "PLCFRPT00070", "nominal": 1000, "name": "…" }].
+// Defaults to data/private/catalyst.json when it exists.
 //
 // Writes to data/private/ (gitignored), in import order:
 //   instruments.json   your retail bond series (with --mf-retail) and manually valued assets → imports/instruments/
@@ -33,6 +35,7 @@ const flag = (name: string) => {
 };
 const mfRetail = flag("--mf-retail");
 const etfFile = flag("--etfs") ?? (existsSync("data/private/etfs.json") ? "data/private/etfs.json" : undefined);
+const catalystFile = flag("--catalyst") ?? (existsSync("data/private/catalyst.json") ? "data/private/catalyst.json" : undefined);
 const [input] = args;
 if (!input) {
   console.error("Usage: node scripts/sheet-to-transactions.ts <export.xlsx> [--mf-retail <retail-bonds.xls>] [--etfs <etfs.json>]");
@@ -48,11 +51,17 @@ const etfs = new Map(
   etfFile ? (JSON.parse(readFileSync(etfFile, "utf8")) as { ticker: string; isin: string }[]).map((e) => [e.ticker, { isin: e.isin }] as const) : [],
 );
 if (!etfFile) console.warn("No --etfs file: ETFs are skipped.");
+const corporates = new Map(
+  catalystFile
+    ? (JSON.parse(readFileSync(catalystFile, "utf8")) as { ticker: string; isin: string; nominal: number; name: string }[]).map((c) => [c.ticker, c] as const)
+    : [],
+);
+if (!catalystFile) console.warn("No --catalyst file: Catalyst bonds are skipped.");
 
 const workbook = readFileSync(input);
 const rows = readSheetTransactions(workbook);
-const { transactions, skipped, retailInstruments, etfInstruments, manualInstruments, manualPrices, accounts } = convertSheetRows(rows, byCode, retail, etfs);
-const instrumentsOut = [...retailInstruments, ...etfInstruments, ...manualInstruments];
+const { transactions, skipped, retailInstruments, corporateInstruments, etfInstruments, manualInstruments, manualPrices, accounts } = convertSheetRows(rows, byCode, retail, etfs, corporates);
+const instrumentsOut = [...retailInstruments, ...corporateInstruments, ...etfInstruments, ...manualInstruments];
 const pricesOut = [...manualPrices, ...readSheetManualPrices(workbook, today())];
 
 // Same validation as the Import Lambda: fail here rather than after the upload.
@@ -74,8 +83,9 @@ const count = <T>(items: T[], key: (t: T) => string) =>
 console.log(`${rows.length} rows read, ${transactions.length} converted → ${OUT}/transactions.json`);
 for (const [type, n] of count(transactions, (t) => t.type)) console.log(`  ${type.padEnd(10)} ${n}`);
 console.log(
-  `${retailInstruments.length} retail series + ${etfInstruments.length} ETFs + ${manualInstruments.length} manually valued → ${OUT}/instruments.json; ${pricesOut.length} manual prices → ${OUT}/prices.json`,
+  `${retailInstruments.length} retail series + ${corporateInstruments.length} Catalyst bonds + ${etfInstruments.length} ETFs + ${manualInstruments.length} manually valued → ${OUT}/instruments.json; ${pricesOut.length} manual prices → ${OUT}/prices.json`,
 );
+for (const c of corporateInstruments) console.log(`  ${c.code.padEnd(8)} ${c.isin} ${c.venue.padEnd(8)} nominal ${c.nominal} ${c.active ? "held: BiznesRadar" : "closed: trade prices"}`);
 for (const e of etfInstruments) console.log(`  ${e.code.padEnd(6)} ${e.isin} ${e.venue} ${e.sourceIds["yahoo"]} ${e.currency}${e.splits ? " splits " + JSON.stringify(e.splits) : ""}`);
 console.log("accounts → accounts.json:");
 for (const a of accounts) console.log(`  ${a.account.padEnd(26)} ${a.incomplete.length ? "incomplete: " + a.incomplete.join(", ") : "complete"}`);

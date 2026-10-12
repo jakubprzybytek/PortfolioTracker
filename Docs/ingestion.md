@@ -25,11 +25,11 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 | `live-quotes` | every 15 min, 09:00–17:45 | EODHD delayed live (ETFs with `live = true`), optional EUR/PLN | `INST#…/LIVE`, `FX#EUR/LIVE` |
 | `fx` | 12:30, 16:30; also after importing a foreign-currency instrument | NBP table A: EUR, USD and every instrument currency, from the day after the last stored rate (first run: from 2002); revalues the affected days when older rates arrive for a held currency | `FX#<ccy>/<date>` |
 | `eod-gpw` | 18:30 | GPW archive daily XLS, all treasury bonds in one file (+ one file per missing day in the look-back; full history per bond weekly as a check) | `PX#XWAR#…` provisional |
-| `eod-catalyst` | 18:30, retried 20:30 and 23:00 if it failed | gpwcatalyst.pl corporate quotes page (one request for all bonds) + interest tables | `PX#CATALYST#…` provisional |
+| `eod-catalyst` | 19:30, and 08:00 Tue–Sat | BiznesRadar per bond (`sourceIds.biznesradar`): the first history page (last ~50 sessions, final; it lags a day) + today's quote (provisional), 2 s between requests. Full history per bond on import (backfill, ~16 pages) | `PX#CATALYST#…` |
 | `eod-etf` | 19:00, and 07:00 Tue–Sat | Yahoo chart API, last 14 days of every ETF (`sourceIds.yahoo`). A stored close that would move by more than 20 % isn't overwritten (looks like an unrecorded split; reported in the job note). Full history per ETF on import (backfill), split-adjusted history converted back with the instrument's `splits` | `PX#<venue>#…` final |
 | `valuation` | 22:30 | DynamoDB only | retail bond `PX#CALC#…`, `PORTFOLIO/SNAP#<date>`, `SNAP#LATEST` |
 | `eod-ibkr` | 07:00 (next day) | IBKR Flex statement for the previous day | `PX#IBKR#…` final, transactions, cash |
-| `recheck` | 07:15 (next day) | re-runs `eod-gpw`, `eod-catalyst` (page still shows D-1 before the 09:00 open) and `eod-eodhd` for D-1 | overwrites, sets `status = final` |
+| `recheck` | 07:15 (next day) | re-runs `eod-gpw` for D-1 | overwrites, sets `status = final` |
 | `valuation` | 07:30 (next day) | DynamoDB only | final snapshot for D-1 |
 | `monthly` | 16th, 10:00, retry daily until success (any day) | GUS CPI (monthly CSV); new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `SERIES#…/RATE#…` |
 
@@ -76,7 +76,7 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
 - The key is `INST#<isin>` + `PX#<venue>#<date>`; a re-run overwrites with the same or a better value.
 - A `final` item is only replaced by another `final` item if the values differ (logged).
 - Each daily run covers today plus the previous 10 trading days. Missing days are fetched again automatically, so a failed night heals itself.
-- **Exception: Catalyst corporate bonds.** gpwcatalyst.pl only shows the latest session. The only chances to capture day D are the evening runs on D and the 07:15 recheck on D+1. After that, a gap can only be filled from a backfill source (Bossa / Cbonds / Biznesradar).
+- **Catalyst corporate bonds** come from BiznesRadar, whose history page repairs any missed day of the last ~50 sessions (gpwcatalyst.pl, a snapshot without archive, isn't used).
 
 ## Failure handling
 

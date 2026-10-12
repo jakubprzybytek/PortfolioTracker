@@ -55,6 +55,11 @@ export interface SheetConversion {
   skipped: SkippedRow[];
   /** Retail bond series the transactions use: instruments to import (terms resolved from the Ministry file). */
   retailInstruments: InstrumentInput[];
+  /**
+   * Catalyst corporate bonds the transactions use (listed in the Catalyst file). Still held: priced from BiznesRadar.
+   * Already redeemed or sold (no longer quoted anywhere): priced from your own trades (`manualPrices`).
+   */
+  corporateInstruments: InstrumentInput[];
   /** ETFs the transactions use (listed in the ETF file): instruments with their Yahoo symbol and recorded splits. */
   etfInstruments: InstrumentInput[];
   /** Manually valued assets (sheet class "Inne"): instruments with a private id, and their purchase prices. */
@@ -134,12 +139,14 @@ const round = (v: number, digits: number) => Math.round(v * 10 ** digits) / 10 *
 /**
  * @param instruments the app's instruments: code → ISIN and nominal (e.g. from data/instruments.json + bond terms)
  * @param etfs the sheet's ETF tickers ("AMS:VWRL") → ISIN (the sheet has no ISINs; e.g. data/private/etfs.json)
+ * @param corporates the sheet's Catalyst tickers ("CPS0130") → ISIN, nominal and name (e.g. data/private/catalyst.json)
  */
 export function convertSheetRows(
   rows: SheetRow[],
   instruments: Map<string, { isin: string; nominal?: number }>,
   retailSeries: Map<string, RetailTerms> = new Map(),
   etfs: Map<string, { isin: string }> = new Map(),
+  corporates: Map<string, { isin: string; nominal: number; name: string }> = new Map(),
 ): SheetConversion {
   const transactions: TransactionInput[] = [];
   const skipped: SkippedRow[] = [];
@@ -149,6 +156,7 @@ export function convertSheetRows(
   const manualUsed = new Map<string, InstrumentInput>();
   const manualPrices: ManualPriceInput[] = [];
   const etfUsed = new Map<string, InstrumentInput>();
+  const corporateUsed = new Map<string, { input: InstrumentInput; quantity: number; tradePrices: ManualPriceInput[] }>();
 
   for (const r of rows) {
     const note = r.comment.trim() || undefined;
@@ -187,6 +195,30 @@ export function convertSheetRows(
       } else if (r.type === "Sprzedaż")
         transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: r.price, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
       else if (r.type === "Dywidenda / Odsetki") transactions.push({ date: r.date, account: r.account, type: "INTEREST", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
+      else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
+      continue;
+    }
+
+    // Catalyst corporate bonds: prices in % of nominal; no accrued interest (floating coupons, rates not tracked).
+    const corporate = r.assetClass === "Obligacje korporacyjne polskie" ? corporates.get(r.ticker) : undefined;
+    if (corporate) {
+      const { isin, nominal } = corporate;
+      const used = corporateUsed.get(isin) ?? {
+        input: { isin, code: r.ticker, name: corporate.name, type: "BOND_CORPORATE", currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: r.ticker }, active: true, live: false, nominal },
+        quantity: 0,
+        tradePrices: [],
+      };
+      corporateUsed.set(isin, used);
+      const pricePct = round((r.price / nominal) * 100, 4);
+      if (r.type === "Zakup") {
+        transactions.push({ date: r.date, account: r.account, type: "BUY", isin, quantity: r.quantity, price: pricePct, amount: -round(r.totalPln - r.fee, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+        used.quantity += r.quantity;
+        used.tradePrices.push({ isin, date: r.date, price: pricePct, currency: "PLN", note: "trade price" });
+      } else if (r.type === "Sprzedaż") {
+        transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: pricePct, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+        used.quantity -= r.quantity;
+        used.tradePrices.push({ isin, date: r.date, price: pricePct, currency: "PLN", note: "trade price" });
+      } else if (r.type === "Dywidenda / Odsetki") transactions.push({ date: r.date, account: r.account, type: "COUPON", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
       else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
       continue;
     }
@@ -271,7 +303,16 @@ export function convertSheetRows(
   for (const s of skipped) incomplete.set(s.account, (incomplete.get(s.account) ?? new Set()).add(s.what));
   const accounts = [...new Set(rows.map((r) => r.account))].sort().map((account) => ({ account, incomplete: [...(incomplete.get(account) ?? [])].sort() }));
   const etfInstruments = [...etfUsed.values()].sort((a, b) => a.code.localeCompare(b.code));
-  return { transactions, skipped, retailInstruments, etfInstruments, manualInstruments: [...manualUsed.values()], manualPrices, accounts };
+  // Bonds no longer held are mostly redeemed and gone from every quote page: their prices come from the trades.
+  const corporateInstruments: InstrumentInput[] = [];
+  for (const c of [...corporateUsed.values()].sort((a, b) => a.input.code.localeCompare(b.input.code))) {
+    if (c.quantity > 0) corporateInstruments.push(c.input);
+    else {
+      corporateInstruments.push({ ...c.input, venue: "MANUAL", sourceIds: {}, active: false });
+      manualPrices.push(...c.tradePrices);
+    }
+  }
+  return { transactions, skipped, retailInstruments, corporateInstruments, etfInstruments, manualInstruments: [...manualUsed.values()], manualPrices, accounts };
 }
 
 /** Current prices of manually valued assets from the sheet's "Portfolio" tab (column K), dated `date`. */

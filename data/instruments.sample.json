@@ -25,5 +25,15 @@
     "venue": "XAMS",
     "sourceIds": { "yahoo": "SPXS.AS" },
     "splits": [{ "date": "2025-12-15", "ratio": 100 }]
+  },
+  {
+    "isin": "PLKRK0000713",
+    "code": "KRU0827",
+    "name": "Kruk S.A. (WIBOR 3M + 3.3%) (sample holding)",
+    "type": "BOND_CORPORATE",
+    "currency": "PLN",
+    "venue": "CATALYST",
+    "sourceIds": { "biznesradar": "KRU0827" },
+    "nominal": 100
   }
 ]

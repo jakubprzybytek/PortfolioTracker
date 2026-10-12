@@ -37,6 +37,7 @@ From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **
 - **Columns:** instrument (code + name), asset type, quantity, price (bonds: clean, % of nominal; ETFs: in their currency, e.g. "167,70 EUR"; price date and the NBP rate used on hover), accrued interest per bond, value (PLN), cost (PLN, as paid), gain (PLN, %), coupons/dividends received.
 - **Filters:** account, asset type ("Cash" shows only the cash rows); "Reset" clears them; "n of m holdings".
 - **Row chart:** clicking a holding row shows that position's value and cost over time (range 1M/6M/1Y/ALL); grouped by instrument, the group row shows the instrument across all accounts. The chart is a panel docked to the bottom of the window (1/3 of its height by default) while the list stays visible and scrolls above it; its top edge is a drag handle (size remembered in the browser); ✕ or Escape closes it. Cash rows have no chart.
+- **Corporate bonds** (Catalyst): clean price, % of nominal; the accrued-interest column shows "–" (not tracked: floating coupons), so their value is below the market value with interest.
 - **Manually valued** assets (e.g. a property fund share) show their latest manual price; in the Prices view it's tagged "manual" and never marked stale.
 
 ## Prices

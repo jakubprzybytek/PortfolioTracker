@@ -105,6 +105,7 @@ export async function importInstruments(json: string) {
       live: i.live,
       ...(terms ? { terms } : {}),
       ...(retail ? { retail } : {}),
+      ...(i.nominal ? { nominal: i.nominal } : {}),
       ...(i.splits?.length ? { splits: [...i.splits].sort((x, y) => x.date.localeCompare(y.date)) } : {}),
     };
     const before = await repo.getInstrument(i.isin);

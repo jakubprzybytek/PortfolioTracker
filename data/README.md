@@ -19,6 +19,8 @@ aws s3 cp my-transactions.json s3://$BUCKET/imports/transactions/2026-10.json
 
 Transaction fields: `date`, `account`, `type` (`BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`, `DIVIDEND`, `SPLIT`), `isin`, `quantity`, `price` (bonds: clean % of nominal; ETFs: in the instrument's currency), `fxRate` (foreign-currency trades: the broker's PLN per unit), `ratio` (`SPLIT`: units after per unit before), `amount` (signed cash in PLN: negative = money out), `fee`, `currency` (default PLN), `note`, optional `id`.
 
+Corporate bonds (Catalyst): `"type": "BOND_CORPORATE"`, `"venue": "CATALYST"`, `"sourceIds": { "biznesradar": "KRU0827" }`, `"nominal": 100`. Prices are clean % of the nominal; no accrued interest. A bond no longer quoted: `"venue": "MANUAL"`, no source, prices from `imports/prices/` (% of nominal).
+
 ETF instruments: `"type": "ETF"`, `currency` of the listing, `venue` (`XAMS`, `XETR` …), `"sourceIds": { "yahoo": "VWRL.AS" }` and any `splits` (`[{ "date": "2025-12-15", "ratio": 100 }]`). Importing one loads its full price history from Yahoo and the NBP rates of its currency; recording a new split later reloads the history.
 
 `transactions.sample.json` (with `instruments.sample.json`, `prices.sample.json` and `accounts.sample.json`) is **made-up data** for trying the app out.
@@ -32,6 +34,7 @@ node scripts/sheet-to-transactions.ts ~/Downloads/portfolio.xlsx --mf-retail ~/D
 # → data/private/: instruments.json, prices.json, accounts.json, transactions.json (gitignored); import in that order
 ```
 
+- **Catalyst bonds:** list them in `data/private/catalyst.json` (`[{ "ticker": "CPS0130", "isin": "PLCFRPT00070", "nominal": 1000, "name": "Cyfrowy Polsat S.A. (WIBOR 6M + 3.85%)" }]`, from obligacje.pl; or `--catalyst <file>`). Buys/sells become % of nominal, coupons `COUPON` (as received, i.e. after tax in a taxable account). A bond still held is priced from BiznesRadar; one no longer held (usually redeemed) gets its trade prices as manual prices.
 - **ETFs:** the sheet has no ISINs, so list them in `data/private/etfs.json` (`[{ "ticker": "AMS:VWRL", "isin": "IE00B3RBWM25" }]`, or pass `--etfs <file>`). Their buys, sells, dividends and splits are converted (EUR price, PLN amount and fee, the trade's `fxRate`); the ETF instruments (venue and Yahoo symbol from the ticker's exchange, splits from the sheet's Split rows) go to `data/private/instruments.json`.
 - Converts what the app can value: cash movements (deposits, withdrawals, interest, costs), the instruments in [instruments.json](instruments.json) (matched by code) and retail treasury bonds: the sheet's `EDO-110332` becomes series EDO0332 (ISIN from the Ministry file) with interest from 2022-03-11 (`valueDate`); COI/ROR interest becomes `COUPON`. Your retail series go to `data/private/instruments.json`: import it after the `mf-retail` file. Everything else is listed as skipped, with the reason (retail bonds, Catalyst bonds, ETFs, IBKR bonds, currency positions …); it gets converted once the app supports it.
 - Bond prices: the sheet stores PLN per bond; the file gets % of nominal. Buy amounts exclude the fee (the sheet's total includes it).

@@ -7,6 +7,7 @@ import { API, get, repoRoot, uploadImport, waitFor } from "./setup.ts";
 const IZ = "PL0000117024";
 const DS = "PL0000113783";
 const SPXS = "IE00B3YCGJ38"; // sample ETF (EUR, Yahoo), split 100:1 on 2025-12-15
+const KRU = "PLKRK0000713"; // sample Catalyst corporate bond KRU0827 (BiznesRadar), nominal 100
 
 interface InstrumentOut {
   isin: string;
@@ -39,7 +40,7 @@ describe(`API ${API}`, () => {
     await uploadImport("accounts", "sample.json", readFileSync(path.join(repoRoot, "data/accounts.sample.json")));
     await waitFor(async () => {
       const inst = await get<InstrumentOut[]>("/instruments");
-      const ok = inst.status === 200 && [IZ, DS, SPXS].every((i) => inst.body.find((x) => x.isin === i)?.backfill?.status === "done");
+      const ok = inst.status === 200 && [IZ, DS, SPXS, KRU].every((i) => inst.body.find((x) => x.isin === i)?.backfill?.status === "done");
       return ok ? true : undefined;
     }, 240_000);
     // 3. Transactions: triggers the valuation. Wait for a snapshot that knows both instruments.
@@ -51,7 +52,7 @@ describe(`API ${API}`, () => {
       // The ETF needs NBP rates too (fetched when the instrument was imported).
       const clean = r.body.holdings.every((h) => !h.flags.includes("unknown_instrument") && !h.flags.includes("no_price") && !h.flags.includes("no_fx"));
       const ike = r.body.accounts?.["ike"]?.cash;
-      const etf = r.body.holdings.find((h) => h.code === "SPXS")?.quantity === 200;
+      const etf = r.body.holdings.find((h) => h.code === "SPXS")?.quantity === 200 && r.body.holdings.some((h) => h.code === "KRU0827");
       return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && codes.has("SAMPLE-APARTMENT") && etf && ike === 99.49 && clean ? true : undefined;
     }, 180_000);
     // The NBP import (EUR and USD back to 2002) writes rates as it goes; wait for the run to finish.
@@ -61,7 +62,7 @@ describe(`API ${API}`, () => {
   it("GET /status lists the last run of every job", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown> }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-etf", "eod-gpw", "eod-gpw-recheck", "fx", "import", "monthly", "valuation"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "fx", "import", "monthly", "valuation"]);
     expect(body.jobs["fx"]).toMatchObject({ status: "ok" });
     expect(body.jobs["import"]).toMatchObject({ status: "ok" });
   });
@@ -98,11 +99,11 @@ describe(`API ${API}`, () => {
   it("GET /holdings values the sample portfolio with accrued interest and IZ indexation", async () => {
     const snap = await waitFor(async () => {
       const r = await get<SnapshotItem>("/holdings");
-      return r.status === 200 && r.body.holdings.length >= 6 ? r.body : undefined;
+      return r.status === 200 && r.body.holdings.length >= 7 ? r.body : undefined;
     });
     expect(snap.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     // one holding per account and instrument, sorted by account then code
-    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["broker/DS0432", "broker/IZ0836", "foreign/SPXS", "ike/DS0432", "ike/EDO0935", "ike/SAMPLE-APARTMENT"]);
+    expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["bonds/KRU0827", "broker/DS0432", "broker/IZ0836", "foreign/SPXS", "ike/DS0432", "ike/EDO0935", "ike/SAMPLE-APARTMENT"]);
     const by = Object.fromEntries(snap.holdings.map((h) => [`${h.account}/${h.code}`, h])) as Record<string, HoldingSnapshot>;
     expect(by["broker/DS0432"]).toMatchObject({ quantity: 20, nominal: 1000, cost: 15931.8, couponsReceived: 700 });
     expect(by["broker/IZ0836"]).toMatchObject({ quantity: 10, cost: 9561.54, couponsReceived: 214.2 });
@@ -115,8 +116,13 @@ describe(`API ${API}`, () => {
     // Manually valued: the latest manual price (950 on 2026-09-30), never stale; its income counts as received.
     expect(by["ike/SAMPLE-APARTMENT"]).toMatchObject({ type: "FUND_MANUAL", quantity: 1, cost: 900, value: 950, gain: 50, couponsReceived: 12.5, flags: [] });
     // Cash per account; the incomplete account's cash is shown but not in the total.
-    expect(snap.accounts).toEqual({ broker: { cash: 5420.86 }, etf: { cash: 2000, incomplete: ["ETFs"] }, foreign: { cash: 663.14 }, ike: { cash: 99.49 } });
-    expect(snap.totals.cash).toBe(6183.49);
+    expect(snap.accounts).toEqual({ bonds: { cash: 1013.9 }, broker: { cash: 5420.86 }, etf: { cash: 2000, incomplete: ["ETFs"] }, foreign: { cash: 663.14 }, ike: { cash: 99.49 } });
+    expect(snap.totals.cash).toBe(7197.39);
+    // Catalyst corporate bond: clean price (% of nominal) x nominal 100, no accrued interest; the coupon counts as received.
+    const kru = by["bonds/KRU0827"]!;
+    expect(kru).toMatchObject({ type: "BOND_CORPORATE", quantity: 40, nominal: 100, accruedInterest: null, cost: 4056.1, couponsReceived: 70, flags: [] });
+    expect(kru.cleanPrice!).toBeGreaterThan(90);
+    expect(kru.value!).toBeCloseTo(40 * kru.cleanPrice!, 1);
     // ETF in EUR: 2 bought, x100 by the split; valued at the EUR close x NBP mid; cost as paid in PLN.
     const spxs = by["foreign/SPXS"]!;
     expect(spxs).toMatchObject({ type: "ETF", currency: "EUR", quantity: 200, cost: 9336.86, flags: [] });
@@ -166,19 +172,19 @@ describe(`API ${API}`, () => {
   it("GET /transactions lists all transactions newest first, with their instrument", async () => {
     const { status, body } = await get<{ date: string; account: string; type: string; isin?: string; instrument: { code: string; type: string } | null }[]>("/transactions");
     expect(status).toBe(200);
-    expect(body).toHaveLength(16);
+    expect(body).toHaveLength(19);
     const dates = body.map((t) => t.date);
     expect(dates).toEqual([...dates].sort().reverse());
     expect(body[0]).toMatchObject({ date: "2026-09-30", account: "ike", type: "INTEREST", instrument: { code: "SAMPLE-APARTMENT", type: "FUND_MANUAL" } });
     expect(body.filter((t) => t.type === "DEPOSIT").every((t) => t.instrument === null)).toBe(true);
-    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["broker", "etf", "foreign", "ike"]));
+    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["bonds", "broker", "etf", "foreign", "ike"]));
     expect(body.find((t) => t.type === "SPLIT")).toMatchObject({ account: "foreign", ratio: 100, amount: 0, instrument: { code: "SPXS", type: "ETF" } });
   });
 
   it("GET /prices lists held instruments with their latest price, its date and the 1-year change", async () => {
     const { status, body } = await get<{ code: string; price: number | null; priceDate: string | null; stale: boolean; change1y: number | null; yearAgo: { date: string } | null; rate?: unknown }[]>("/prices");
     expect(status).toBe(200);
-    expect(body.map((r) => r.code)).toEqual(["DS0432", "EDO0935", "IZ0836", "SAMPLE-APARTMENT", "SPXS"]);
+    expect(body.map((r) => r.code)).toEqual(["DS0432", "EDO0935", "IZ0836", "KRU0827", "SAMPLE-APARTMENT", "SPXS"]);
     // ETF: EUR price; the 1-year change compares on today's share basis across the split (not -99 %).
     const spxs = body.find((r) => r.code === "SPXS")!;
     expect(spxs).toMatchObject({ currency: "EUR", stale: false });
@@ -204,6 +210,16 @@ describe(`API ${API}`, () => {
     const before = body.filter((p) => p.date < "2025-12-15").at(-1)!.close;
     const after = body.find((p) => p.date >= "2025-12-15")!.close;
     expect(Math.abs(after / before - 1)).toBeLessThan(0.05);
+  });
+
+  it("GET /instruments/{isin}/prices: a Catalyst bond's daily clean prices from BiznesRadar, since its listing", async () => {
+    const inst = (await get<InstrumentOut[]>("/instruments")).body.find((i) => i.isin === KRU)!;
+    expect(inst).toMatchObject({ code: "KRU0827", backfill: { status: "done" } });
+    expect(inst.backfill!.from! <= "2022-09-30").toBe(true); // listed in August 2022
+    expect(inst.backfill!.rows!).toBeGreaterThan(700);
+    const { status, body } = await get<{ date: string; close: number }[]>(`/instruments/${KRU}/prices?from=2026-10-05&to=2026-10-09`);
+    expect(status).toBe(200);
+    expect(body.find((p) => p.date === "2026-10-09")).toMatchObject({ close: 100.45 });
   });
 
   it("GET /indicators lists inflation and NBP exchange rates with the latest value and a year earlier", async () => {

@@ -28,7 +28,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 ```
                          ┌──────────────────────────── AWS (SST v4) ────────────────────────────┐
 sst.aws.Cron ────────────┼─► Lambda eod-gpw        18:30   treasury bonds, daily all-bonds XLS   │
-                         ├─► Lambda eod-catalyst   18:30   corporate bonds, page snapshot        │
+                         ├─► Lambda eod-catalyst   19:30   corporate bonds (BiznesRadar)         │
                          │                         (+20:30, 23:00 retry, 07:15 recheck)          ├──► DynamoDB: market, transactions, holdings
                          ├─► Lambda monthly        16th    CPI, IZ reference index, retail rates  │        ▲
                          └─► Lambda valuation      22:30 + 07:30                                 │        │
@@ -88,7 +88,7 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 4. **ISIN is the internal key.** Each source's code/ticker is a mapping on the instrument.
 5. **Store raw, unadjusted prices**; events (coupons, redemptions, splits, dividends) are stored separately.
 6. **One code path for daily and backfill.** Every source adapter is `fetch → archive → parse → validate → upsert`; only the trigger and date range differ.
-7. **Every job is idempotent and repairs gaps** over a look-back window. The exception is Catalyst corporate bonds: their only daily source is a snapshot, so a missed day can't be re-fetched.
+7. **Every job is idempotent and repairs gaps** over a look-back window (Catalyst bonds too: BiznesRadar's history page covers the last ~50 sessions).
 8. **Keep every downloaded original in S3** (write-only) so parsers can be fixed and re-run.
 9. **Values are recorded from day one.** Where no free history exists, the app's own database becomes the history.
 
@@ -110,13 +110,12 @@ Phase 1:
 - [x] Retail bonds valued per lot from the rates in the MF retail file (no CPI needed).
 - [ ] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
 - [ ] Terms of each corporate bond held: fixed or floating, rate/margin, coupon dates, nominal.
-- [ ] Source of floating coupon rates per period: manual entry vs scraping the Catalyst interest tables.
-- [ ] Bossa EOD files: log in and check whether Catalyst bonds are included (corporate backfill).
-- [ ] Catalyst scraper PoC (cells don't line up with headers; read by position). The reference sheet's offsets and its instruments-list page (nominal + accrued interest) are in data-sources.md.
-- [ ] Check the bossa.pl website quote JSON (`_cat_bonds`) as a daily source for Catalyst bonds (data-sources.md).
+- [x] Catalyst corporate bonds: prices from BiznesRadar (history + daily), valued at clean price × nominal; terms (ISIN, nominal) from obligacje.pl into `data/private/catalyst.json`. Redeemed bonds (gone from every quote page) are priced from your own trades. Bossa Akcje i Obligacje and IKZE Bossa are complete; their cash matches the sheet to the grosz.
+- [ ] Accrued interest of corporate bonds is not tracked (your choice: all are floating WIBOR + margin and WIBOR history isn't free). Values are clean, so they're below the sheet's (which adds the accrued interest from gpwcatalyst.pl) by up to a period's interest. Options later: rates from the coupons received, or hand-entered rates.
+- [x] Bossa: the public EOD files (`/pub/`) are gone (only CFD reports left); the quote JSON (`_cat_bonds`, with ISINs) is frozen at 2026-10-02 (NOL3 outage).
 - [x] SST: `CronV2` (EventBridge Scheduler) takes `timezone: "Europe/Warsaw"`.
 - [x] GUS monthly CPI m/m equals the MF calculator's `WR_k` (31 of 32 months 2024-01…2026-08; January differs by design, see data-sources.md). Source: the GUS CSV, no key (BDL has yearly CPI only).
-- [ ] Confirm the Catalyst page still shows D-1 at 07:15 on a weekday (seen on a Saturday only).
+- [ ] gpwcatalyst.pl (and gpwbenchmark.pl) stopped answering from here on 2026-10-12 evening (TLS handshake hangs; the home page too). Not used now; recheck before relying on it for accrued interest.
 - [x] GPW archive: full history per bond, or one file per day for all treasury bonds; no "last N" option (PoC, 2026-10-10).
 - [x] Corporate bonds: not in the GPW archive; gpwcatalyst.pl lists all corporate bonds, snapshot only.
 - [x] IZ indexed nominal and accrued interest: computed with the Ministry's method; exact match with published values.

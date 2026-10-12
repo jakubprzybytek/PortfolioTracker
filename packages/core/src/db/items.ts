@@ -4,7 +4,7 @@ import type { IsoDate } from "../dates.ts";
 import type { BondTerms } from "../bonds/terms.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
 
-export type InstrumentType = "BOND_LISTED" | "BOND_RETAIL" | "ETF" | "BOND_IBKR" | "FUND_MANUAL" | "CASH";
+export type InstrumentType = "BOND_LISTED" | "BOND_CORPORATE" | "BOND_RETAIL" | "ETF" | "BOND_IBKR" | "FUND_MANUAL" | "CASH";
 
 export interface InstrumentItem {
   PK: `INST#${string}`;
@@ -21,6 +21,8 @@ export interface InstrumentItem {
   active: boolean;
   live: boolean;
   terms?: BondTerms;
+  /** Bonds without terms (corporate bonds): nominal per bond; prices are % of it, value = clean price × nominal. */
+  nominal?: number;
   /** Retail treasury bonds: the series' terms and published rates (from the Ministry file). */
   retail?: RetailTerms;
   /** Share splits: from `date` on, one unit became `ratio` units (prices stored as traded, not adjusted). */

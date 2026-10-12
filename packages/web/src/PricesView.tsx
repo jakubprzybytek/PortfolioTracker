@@ -127,7 +127,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
               {sel?.code ?? selected}{" "}
               <span className="muted" style={{ fontWeight: 400 }}>
                 {sel && sel.name !== sel.code ? sel.name : ""}
-                {sel?.type === "BOND_LISTED"
+                {sel?.type === "BOND_LISTED" || sel?.type === "BOND_CORPORATE"
                   ? " · clean price, % of nominal"
                   : sel?.type === "BOND_RETAIL"
                     ? " · value per bond, PLN (calculated, nominal 100)"
@@ -147,7 +147,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                 prices={prices.data ?? []}
                 transactions={txs.data ?? []}
                 calculated={sel?.type === "BOND_RETAIL"}
-                unit={sel?.type === "BOND_LISTED" ? "%" : (sel?.currency ?? "")}
+                unit={sel?.type === "BOND_LISTED" || sel?.type === "BOND_CORPORATE" ? "%" : (sel?.currency ?? "")}
               />
             )}
           </div>

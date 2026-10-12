@@ -3,6 +3,8 @@
 
 import { Resource } from "sst";
 import { invokeAsync, repo, runJob } from "../lib/context.ts";
+import { today } from "@portfolio/core";
+import { BIZNESRADAR_SOURCE_ID, backfillBiznesradarHistory } from "../lib/catalystJobs.ts";
 import { YAHOO_SOURCE_ID, backfillYahooHistory } from "../lib/etfJobs.ts";
 import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
 
@@ -36,6 +38,18 @@ export async function backfillInstrument(isin: string): Promise<{ status: string
       return { status: "done", ...result };
     } catch (err) {
       await repo.putBackfillStatus({ isin, status: "failed", source: YAHOO_SOURCE_ID, note: String((err as Error).message) });
+      throw err;
+    }
+  }
+
+  if (inst.sourceIds[BIZNESRADAR_SOURCE_ID]) {
+    await repo.putBackfillStatus({ isin, status: "running", source: BIZNESRADAR_SOURCE_ID });
+    try {
+      const result = await backfillBiznesradarHistory(inst, today());
+      await repo.putBackfillStatus({ isin, status: "done", source: BIZNESRADAR_SOURCE_ID, ...result });
+      return { status: "done", ...result };
+    } catch (err) {
+      await repo.putBackfillStatus({ isin, status: "failed", source: BIZNESRADAR_SOURCE_ID, note: String((err as Error).message) });
       throw err;
     }
   }

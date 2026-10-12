@@ -90,6 +90,10 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       nominal = v.nominal;
       accruedInterest = v.accruedInterest;
       if (price) valuePerUnit = dirtyValue(price.close, v);
+    } else if (inst?.nominal) {
+      // Corporate bonds: clean price (% of nominal) × nominal; accrued interest isn't tracked (floating coupons).
+      nominal = inst.nominal;
+      if (price) valuePerUnit = Number(((price.close / 100) * inst.nominal).toFixed(6));
     } else if (price) {
       valuePerUnit = price.close;
     }

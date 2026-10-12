@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | UCITS ETFs on EU exchanges | Xetra, LSE, Euronext listings | Yahoo chart API (EODHD if it gets blocked) | – (EODHD delayed live API, later) | Yahoo (full daily history, one request per ETF) |
 | Polish treasury bonds on GPW / Catalyst | DS, PS, WZ, IZ series | GPW archive: daily XLS with all treasury bonds | – | GPW archive: full history per bond (1 request each) |
-| Polish corporate bonds on Catalyst | fixed and floating coupons | gpwcatalyst.pl corporate quotes page (snapshot, no archive) | – | Bossa EOD files → Cbonds trial → Biznesradar |
+| Polish corporate bonds on Catalyst | fixed and floating coupons | BiznesRadar: history page + today's quote | – | BiznesRadar: full history per bond (~16 pages) |
 | Polish retail treasury bonds (not traded) | EDO, COI, ROD, ROR … | Calculated from terms + CPI | – | Calculated; checked against obligacjeskarbowe.pl interest tables |
 | EU government bonds at IBKR | Bunds, OATs, T-bills | IBKR Flex Web Service (mark price) | – | IBKR Flex (period statements); Bundesbank for the Bund |
 | Manually valued assets | e.g. real-estate projects | Manual entry | – | Manual |
@@ -76,7 +76,15 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - For each corporate bond held, the coupon type (fixed or floating) has to be taken from its terms.
 - **Check:** each coupon you enter as a transaction should equal the computed interest on the payment date. Flag a mismatch.
 
-### gpwcatalyst.pl – Catalyst corporate bonds
+### BiznesRadar – Catalyst corporate bonds (used, 2026-10-12)
+- `biznesradar.pl/notowania-historyczne/<CODE>[,<page>]`: daily open/max/min/close (clean, % of nominal), volume, turnover; 50 sessions per page, newest first; the page links the last page number. Lags a day (Monday evening it ended on Friday). `biznesradar.pl/notowania/<CODE>`: the latest quote in cells `pr_t_close`, `pr_t_open` …, its date in `pr_t_date`'s `<time datetime>`. Client: `jobs/lib/biznesradar.ts`.
+- Coverage: every bond still listed, from its listing (KRU0827: 755 sessions since 2022-08-29). A redeemed bond answers 404: no history.
+- Scraping a public site for personal use, one page every 2 s. The reference sheet uses it too (for corporate bonds).
+
+### obligacje.pl – corporate bond terms
+- `obligacje.pl/pl/obligacja/<CODE>`: issuer, ISIN, nominal, coupon type ("zmienne WIBOR 6M + 3.85%"), current rate (listed bonds only), first days of interest periods, record and payment dates, maturity. Used once, by hand, to build `data/private/catalyst.json` (ticker → ISIN, nominal, name); no past rates.
+
+### gpwcatalyst.pl – Catalyst corporate bonds (not used)
 - **Not in the GPW archive:** the gpw.pl archive has only treasury and state-guaranteed bonds (DS, IZ, PS, WZ, EUR, FPC…; checked 2026-10-10). Corporate bonds are only on gpwcatalyst.pl.
 - **URL:** `https://gpwcatalyst.pl/notowania-obligacji-obligacje-korporacyjne`. One page lists all ~280 corporate bonds; codes can carry a suffix, e.g. ` /S` for the Warsaw Sustainable Segment.
 - **Data:** issuer, code, segment, reference price, open, min/max, last trade date/time and volume, last price, change, number of trades, best bid/ask with order count and size, turnover. Interest tables (`statystyki-tabele-odsetkowe`) give accrued interest.
@@ -87,7 +95,10 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - **Instruments list** `o-instrumentach-instrumenty-notowane`: every listed bond with its current nominal and accrued interest on one page. The reference sheet reads both from it (see reference/ReferenceFeatures.md); a candidate cross-check for our computed accrued interest.
 - The reference sheet parses the quotes page by position too: ticker in the first or second cell, market code next, reference price 3 cells after the ticker, last price 9 cells after; rows with market other than `GPW` are skipped.
 
-### Bossa (DM BOŚ) EOD files – Catalyst backfill candidate
+- **Unreachable from here since 2026-10-12** (TLS handshake hangs, home page included; GPW Benchmark too).
+
+### Bossa (DM BOŚ) EOD files – Catalyst backfill candidate (gone)
+- Checked 2026-10-12: `bossa.pl/pub/` redirects to `info.bossa.pl/pub/`, which only holds CFD reports; the EOD files are gone. The quote JSON below works and carries ISINs, but its data is frozen at 2026-10-02 (NOL3 outage).
 - bossa.pl → Pliki z danymi → EOD (login required). Terms: personal, non-commercial use only.
 - Historically the standard free source of full GPW/Catalyst history (MetaStock and text formats). **Current contents are not yet verified.**
 - bossaAPI is not usable: NOL3 has been unavailable since 2026-10-02 and the new API is in a private pilot.

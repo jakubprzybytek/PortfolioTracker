@@ -31,6 +31,7 @@ export const rangeFrom = (key: RangeKey): string => {
 /** Readable labels for instrument types (the "asset type" filters). Cash movements have no instrument: "CASH". */
 export const TYPE_LABELS: Record<string, string> = {
   BOND_LISTED: "Listed bond",
+  BOND_CORPORATE: "Corporate bond",
   BOND_RETAIL: "Retail bond",
   BOND_IBKR: "Bond (IBKR)",
   ETF: "ETF",

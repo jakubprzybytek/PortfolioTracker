@@ -126,6 +126,19 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
+    // Catalyst corporate bonds (BiznesRadar): evening for today's quote, morning for yesterday's final session.
+    new sst.aws.CronV2("EodCatalyst", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/eodCatalyst.handler" },
+      schedule: "cron(30 19 ? * MON-FRI *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
+    new sst.aws.CronV2("RecheckCatalyst", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/eodCatalyst.handler" },
+      schedule: "cron(0 8 ? * TUE-SAT *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
     // NBP table A is published around 12:00 on business days; the afternoon run catches a late table.
     new sst.aws.CronV2("FxNoon", { function: fx.arn, schedule: "cron(30 12 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
     new sst.aws.CronV2("FxAfternoon", { function: fx.arn, schedule: "cron(30 16 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
