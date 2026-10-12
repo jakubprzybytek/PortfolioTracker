@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChartPanel } from "./ChartPanel.tsx";
+import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
 import { fmtNum, fmtPct, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { PriceChart } from "./PriceChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
@@ -9,15 +11,33 @@ import { useApi } from "./useApi.ts";
 const fmtPrice = (r: PriceRow) =>
   r.rate ? `${fmtNum(r.rate.current * 100)} % p.a.` : r.price === null ? "–" : r.type.startsWith("BOND") ? `${fmtNum(r.price)} %` : `${fmtNum(r.price)} ${r.currency}`;
 
-/** Held instruments: latest price, its date, change over a year. Clicking a row shows its price chart. */
+/**
+ * Held instruments: latest price, its date, change over a year. Filter by asset type. Clicking a row shows its price
+ * chart in a resizable panel docked to the bottom (as in Holdings); the open chart and the filter are in the URL.
+ */
 export function PricesView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const rows = useApi<PriceRow[]>("/prices");
+  const type = params["type"] ?? "";
   const selected = params["chart"] ?? null;
   const [range, setRange] = useState<RangeKey>("1Y");
+  const [panelHeight, setPanelHeight] = useState(0);
   const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, { from: rangeFrom(range), to: today() }, [selected, range]);
   const txs = useApi<Transaction[]>(selected ? `/instruments/${selected}/transactions` : null, {}, [selected]);
-  const sel = rows.data?.find((r) => r.isin === selected);
-  const newest = rows.data?.map((r) => r.priceDate).filter((d): d is string => !!d).sort().at(-1);
+  const all = rows.data ?? [];
+  const shown = all.filter((r) => !type || r.type === type);
+  const types = useMemo(() => uniqueOptions(all, (r) => ({ value: r.type, label: typeLabel(r.type) })), [all]);
+  const sel = all.find((r) => r.isin === selected);
+  const newest = all.map((r) => r.priceDate).filter((d): d is string => !!d).sort().at(-1);
+  const closeChart = useCallback(() => setParams({ ...params, chart: undefined }), [params, setParams]);
+
+  // Keep the clicked row visible above the panel.
+  useEffect(() => {
+    if (!selected || panelHeight === 0) return;
+    const row = document.querySelector<HTMLElement>("tr.selected");
+    if (!row) return;
+    const bottom = row.getBoundingClientRect().bottom;
+    if (bottom > window.innerHeight - panelHeight) window.scrollBy({ top: bottom - (window.innerHeight - panelHeight) + 16, behavior: "smooth" });
+  }, [selected, panelHeight]);
 
   return (
     <>
@@ -28,6 +48,10 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
         </span>
       </header>
       {rows.error && <p className="error">{rows.error}</p>}
+
+      <FilterBar active={!!type} onReset={() => setParams({ chart: selected ?? undefined })} summary={rows.loading ? "Loading…" : `${shown.length} of ${all.length} instruments`}>
+        <FilterSelect label="Asset type" value={type} options={types} onChange={(v) => setParams({ ...params, type: v || undefined })} testId="filter-type" />
+      </FilterBar>
 
       <div className="table-wrap">
         <table data-testid="prices-table" className="static">
@@ -41,12 +65,12 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             </tr>
           </thead>
           <tbody>
-            {(rows.data ?? []).map((r) => (
+            {shown.map((r) => (
               <tr
                 key={r.isin}
-                className={r.isin === selected ? "selected" : ""}
-                onClick={() => setParams({ chart: r.isin === selected ? undefined : r.isin })}
-                style={{ cursor: "pointer" }}
+                className={`clickable${r.isin === selected ? " selected" : ""}`}
+                onClick={() => setParams({ ...params, chart: r.isin === selected ? undefined : r.isin })}
+                title="Show its price over time"
                 data-testid={`price-${r.code}`}
               >
                 <td className="left instrument">
@@ -81,10 +105,10 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                 )}
               </tr>
             ))}
-            {!rows.loading && (rows.data ?? []).length === 0 && (
+            {!rows.loading && shown.length === 0 && (
               <tr>
                 <td className="left muted" colSpan={5}>
-                  Nothing held yet.
+                  {all.length === 0 ? "Nothing held yet." : "No instruments of this type."}
                 </td>
               </tr>
             )}
@@ -92,18 +116,42 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
         </table>
       </div>
 
+      {/* Room below the list so its last rows can scroll above the docked chart. */}
+      {selected && <div style={{ height: panelHeight }} aria-hidden />}
       {selected && (
-        <>
-          <h2 data-testid="price-title">
-            {sel?.code ?? selected}{" "}
-            <span className="muted" style={{ fontWeight: 400 }}>
-              {sel?.name}
-              {sel?.type === "BOND_LISTED" ? " · clean price, % of nominal" : sel?.type === "BOND_RETAIL" ? " · value per bond, PLN (calculated, nominal 100)" : ""}
+        <ChartPanel
+          onClose={closeChart}
+          onHeight={setPanelHeight}
+          title={
+            <span data-testid="price-title">
+              {sel?.code ?? selected}{" "}
+              <span className="muted" style={{ fontWeight: 400 }}>
+                {sel && sel.name !== sel.code ? sel.name : ""}
+                {sel?.type === "BOND_LISTED"
+                  ? " · clean price, % of nominal"
+                  : sel?.type === "BOND_RETAIL"
+                    ? " · value per bond, PLN (calculated, nominal 100)"
+                    : sel
+                      ? ` · close, ${sel.currency}`
+                      : ""}
+              </span>
             </span>
-          </h2>
+          }
+        >
           <RangePicker value={range} onChange={setRange} testId="price-range" />
-          {prices.error ? <p className="error">{prices.error}</p> : <PriceChart prices={prices.data ?? []} transactions={txs.data ?? []} calculated={sel?.type === "BOND_RETAIL"} />}
-        </>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            {prices.error ? (
+              <p className="error">{prices.error}</p>
+            ) : (
+              <PriceChart
+                prices={prices.data ?? []}
+                transactions={txs.data ?? []}
+                calculated={sel?.type === "BOND_RETAIL"}
+                unit={sel?.type === "BOND_LISTED" ? "%" : (sel?.currency ?? "")}
+              />
+            )}
+          </div>
+        </ChartPanel>
       )}
     </>
   );

@@ -2,8 +2,23 @@ import { CartesianGrid, ComposedChart, Line, ReferenceDot, ResponsiveContainer, 
 import { fmtNum } from "./format.ts";
 import type { Price, Transaction } from "./types.ts";
 
-/** Market close (bonds: % of nominal), or for retail bonds (`calculated`) the value per bond in PLN (nominal 100). */
-export function PriceChart({ prices, transactions, calculated = false }: { prices: Price[]; transactions: Transaction[]; calculated?: boolean }) {
+/**
+ * Market close (bonds: % of nominal; others in `unit`, e.g. EUR), or for retail bonds (`calculated`) the value per bond in PLN
+ * (nominal 100). Fills its parent's height unless `height` is given.
+ */
+export function PriceChart({
+  prices,
+  transactions,
+  calculated = false,
+  unit = "%",
+  height,
+}: {
+  prices: Price[];
+  transactions: Transaction[];
+  calculated?: boolean;
+  unit?: string;
+  height?: number;
+}) {
   if (prices.length === 0) return <p className="muted">No prices in this range.</p>;
   const data = prices.map((p) => ({ date: p.date, close: p.close, traded: p.traded, volume: p.volume }));
   const byDate = new Map(data.map((d) => [d.date, d.close]));
@@ -17,7 +32,7 @@ export function PriceChart({ prices, transactions, calculated = false }: { price
     .filter((m): m is NonNullable<typeof m> => m !== null);
 
   return (
-    <div data-testid="price-chart" style={{ width: "100%", height: 260 }}>
+    <div data-testid="price-chart" style={{ width: "100%", height: height ?? "100%" }}>
       <ResponsiveContainer>
         <ComposedChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -27,7 +42,7 @@ export function PriceChart({ prices, transactions, calculated = false }: { price
             formatter={(v, _name, item) =>
               calculated
                 ? [`${fmtNum(Number(v))} PLN`, "Value per bond"]
-                : [`${fmtNum(Number(v))} %${(item?.payload as { traded?: boolean } | undefined)?.traded === false ? " (no trades)" : ""}`, "Close"]
+                : [`${fmtNum(Number(v))} ${unit}${(item?.payload as { traded?: boolean } | undefined)?.traded === false ? " (no trades)" : ""}`, "Close"]
             }
             contentStyle={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 }}
           />

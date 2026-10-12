@@ -10,7 +10,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 |---|---|
 | `#/` | Dashboard (default) |
 | `#/holdings?group=instrument&account=…&type=…&chart=<ISIN>&chartAccount=…` | Holdings (`group` absent = by account; `chart` = the open row chart) |
-| `#/prices?chart=<ISIN>` | Prices |
+| `#/prices?type=…&chart=<ISIN>` | Prices |
 | `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 
@@ -43,10 +43,10 @@ From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **
 
 Kept deliberately short (a passive portfolio needs no daily statistics): what each held instrument is worth per unit, and whether that price is current.
 
-- **One row per held instrument** (latest snapshot), sorted by code; no filters.
+- **One row per held instrument** (latest snapshot), sorted by code. **Filter:** asset type ("Reset", "n of m instruments"), kept in the URL.
 - **Columns:** instrument (code + name), type, price (bonds: clean, % of nominal; others: in their currency), price date (grey with a "stale" tag when older than a week), **1 year**: change since the price on or before the same day a year earlier (hover shows that price and date; "–" without a year of history).
 - **Retail bonds** aren't traded: price = this year's interest rate ("5,00 % p.a."), date = "calculated", 1 year = the previous year's rate. Their chart shows the calculated value per bond of your lots (PLN, nominal 100, so it reads like % of nominal), from the first purchase; each new interest year changes the slope.
-- **Click a row:** its price chart opens below (range selector, transactions as markers); click again to close. The open chart is in the URL (`?chart=<ISIN>`).
+- **Click a row:** its price chart opens in the panel docked to the bottom, as in Holdings (resizable by its top edge, size shared with Holdings; ✕, Escape or a second click closes it): range selector, transactions as markers; ETFs in their currency on today's share basis. The open chart is in the URL (`?chart=<ISIN>`) and stays open while filtering.
 
 ## Indicators
 

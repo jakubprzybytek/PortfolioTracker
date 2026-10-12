@@ -143,6 +143,39 @@ test.describe("prices view", () => {
     await expect(page.getByTestId("price-title")).toContainText("value per bond, PLN (calculated");
     await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
   });
+
+  test("the chart docks in the resizable bottom panel; the list filters by asset type", async ({ page }) => {
+    await page.goto("/#/prices");
+    const rows = page.getByTestId("prices-table").locator("tbody tr");
+    await expect(rows).toHaveCount(5);
+    await page.getByTestId("price-SPXS").click();
+    const panel = page.getByTestId("chart-panel");
+    await expect(panel).toBeVisible();
+    await expect(page.getByTestId("prices-table")).toBeVisible(); // the list stays visible above
+    await expect(page.getByTestId("price-title")).toContainText("close, EUR");
+    await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
+    const before = (await panel.boundingBox())!.height;
+    expect(before).toBeGreaterThan(250); // a third of the 900 px window
+    expect(before).toBeLessThan(350);
+
+    // filter by type: in the URL, keeps the open chart
+    await page.getByTestId("filter-type").selectOption({ label: "Listed bond" });
+    await expect(rows).toHaveCount(2);
+    await expect(page).toHaveURL(/type=BOND_LISTED/);
+    await expect(page).toHaveURL(/chart=IE00B3YCGJ38/);
+    await expect(page.getByTestId("filters-summary")).toHaveText("2 of 5 instruments");
+    await page.getByTestId("filter-type").selectOption({ label: "ETF" });
+    await expect(rows).toHaveCount(1);
+    await page.reload();
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByTestId("chart-panel")).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("chart-panel")).toHaveCount(0);
+    await expect(page).not.toHaveURL(/chart=/);
+    await page.getByTestId("filters-reset").click();
+    await expect(rows).toHaveCount(5);
+  });
 });
 
 test.describe("holdings grouped by instrument", () => {
