@@ -100,12 +100,16 @@ export default $config({
       notifications: [{ name: "Imports", function: importer.arn, events: ["s3:ObjectCreated:*"], filterPrefix: "imports/" }],
     });
 
-    new sst.aws.CronV2("EodGpw", {
-      function: { ...defaults, handler: "packages/jobs/src/handlers/eodGpw.handler" },
-      schedule: "cron(30 18 ? * MON-FRI *)",
-      timezone: WARSAW,
-      retries: 2,
-    });
+    // GPW publishes the day's archive file some time after 18:30 (not there at 18:30 on 2026-10-12, there by 23:27):
+    // two evening runs before the 22:30 valuation; each fills any missing weekday of the look-back.
+    for (const [name, at] of [["EodGpw", "30 20"], ["EodGpwLate", "0 22"]] as const) {
+      new sst.aws.CronV2(name, {
+        function: { ...defaults, handler: "packages/jobs/src/handlers/eodGpw.handler" },
+        schedule: `cron(${at} ? * MON-FRI *)`,
+        timezone: WARSAW,
+        retries: 2,
+      });
+    }
     new sst.aws.CronV2("RecheckGpw", {
       function: { ...defaults, handler: "packages/jobs/src/handlers/eodGpw.handler" },
       schedule: "cron(15 7 ? * TUE-SAT *)",

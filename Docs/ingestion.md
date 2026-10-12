@@ -24,7 +24,7 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 |---|---|---|---|
 | `live-quotes` | every 15 min, 09:00–17:45 | EODHD delayed live (ETFs with `live = true`), optional EUR/PLN | `INST#…/LIVE`, `FX#EUR/LIVE` |
 | `fx` | 12:30, 16:30; also after importing a foreign-currency instrument | NBP table A: EUR, USD and every instrument currency, from the day after the last stored rate (first run: from 2002); revalues the affected days when older rates arrive for a held currency | `FX#<ccy>/<date>` |
-| `eod-gpw` | 18:30 | GPW archive daily XLS, all treasury bonds in one file (+ one file per missing day in the look-back; full history per bond weekly as a check) | `PX#XWAR#…` provisional |
+| `eod-gpw` | 20:30 and 22:00 (GPW publishes the day's file after 18:30; today's file missing = "not published yet") | GPW archive daily XLS, all treasury bonds in one file (+ one file per missing day in the look-back; full history per bond weekly as a check) | `PX#XWAR#…` provisional |
 | `eod-catalyst` | 19:30, and 08:00 Tue–Sat | BiznesRadar per bond (`sourceIds.biznesradar`): the first history page (last ~50 sessions, final; it lags a day) + today's quote (provisional), 2 s between requests. Full history per bond on import (backfill, ~16 pages) | `PX#CATALYST#…` |
 | `eod-etf` | 19:00, and 07:00 Tue–Sat | Yahoo chart API, last 14 days of every ETF (`sourceIds.yahoo`). A stored close that would move by more than 20 % isn't overwritten (looks like an unrecorded split; reported in the job note). Full history per ETF on import (backfill), split-adjusted history converted back with the instrument's `splits` | `PX#<venue>#…` final |
 | `valuation` | 22:30 | DynamoDB only | retail bond `PX#CALC#…`, `PORTFOLIO/SNAP#<date>`, `SNAP#LATEST` |

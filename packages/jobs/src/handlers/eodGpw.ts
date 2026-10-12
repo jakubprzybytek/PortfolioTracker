@@ -37,7 +37,8 @@ export async function handler(event: EodGpwEvent = {}) {
     for (const [i, d] of missing.entries()) {
       if (i > 0) await new Promise((r) => setTimeout(r, PAUSE_MS));
       const n = await ingestGpwDay(d, tracked, status);
-      notes.push(`${d}: ${n === null ? "no session" : `${n} rows`}`);
+      // No file for today yet usually means "not published yet" (the later run and the morning re-check try again).
+      notes.push(`${d}: ${n === null ? (d === end && !event.final ? "not published yet" : "no session") : `${n} rows`}`);
       itemsWritten += n ?? 0;
     }
     return { itemsWritten, note: notes.join(", ") };

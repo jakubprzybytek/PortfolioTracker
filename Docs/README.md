@@ -27,9 +27,9 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 
 ```
                          ┌──────────────────────────── AWS (SST v4) ────────────────────────────┐
-sst.aws.Cron ────────────┼─► Lambda eod-gpw        18:30   treasury bonds, daily all-bonds XLS   │
+sst.aws.Cron ────────────┼─► Lambda eod-gpw  20:30, 22:00   treasury bonds, daily all-bonds XLS   │
                          ├─► Lambda eod-catalyst   19:30   corporate bonds (BiznesRadar)         │
-                         │                         (+20:30, 23:00 retry, 07:15 recheck)          ├──► DynamoDB: market, transactions, holdings
+                         │                         (+08:00 next morning)                         ├──► DynamoDB: market, transactions, holdings
                          ├─► Lambda monthly        16th    CPI, IZ reference index, retail rates  │        ▲
                          └─► Lambda valuation      22:30 + 07:30                                 │        │
                                                                                                  │   Lambda backfill  ◄── manual (sst shell / CLI)
