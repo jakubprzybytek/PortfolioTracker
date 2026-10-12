@@ -31,7 +31,7 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 | `eod-ibkr` | 07:00 (next day) | IBKR Flex statement for the previous day | `PX#IBKR#…` final, transactions, cash |
 | `recheck` | 07:15 (next day) | re-runs `eod-gpw`, `eod-catalyst` (page still shows D-1 before the 09:00 open) and `eod-eodhd` for D-1 | overwrites, sets `status = final` |
 | `valuation` | 07:30 (next day) | DynamoDB only | final snapshot for D-1 |
-| `monthly` | 16th, 10:00, retry daily until success (any day) | GUS BDL CPI; new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `SERIES#…/RATE#…` |
+| `monthly` | 16th, 10:00, retry daily until success (any day) | GUS CPI (monthly CSV); new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `SERIES#…/RATE#…` |
 
 The jobs group into a few short windows a day. With DynamoDB this doesn't matter for cost; it keeps the schedule easy to follow.
 
@@ -86,4 +86,4 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
 
 ## Secrets
 
-API keys (GUS BDL now; EODHD and IBKR Flex token later) are `sst.Secret`s (`sst secret set …`), linked to the functions that need them.
+API keys (EODHD and IBKR Flex token, later) are `sst.Secret`s (`sst secret set …`), linked to the functions that need them.

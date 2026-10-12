@@ -29,7 +29,7 @@ Reference data and transactions come first, because they define which instrument
 | 2 | Exchange calendars (XWAR, XETRA, LSE …) for the backfill years | Exchange holiday lists | free | manual |
 | 3 | Transactions and cash | Existing sheet export, broker CSVs, IBKR Flex | free | script per format |
 | 4 | FX (EUR, USD → PLN) | NBP API, chunks of 93 days | free | script |
-| 5 | CPI, IZ reference index, IZ series terms | MF calculator `kalkulatorodsetek.xlsm` (file import) + GUS BDL | free | import |
+| 5 | CPI, IZ reference index, IZ series terms | MF calculator `kalkulatorodsetek.xlsm` (file import) + GUS CPI CSV | free | import |
 | 6 | Retail bond rate periods | Terms of issue + CPI → computed; checked against obligacjeskarbowe.pl interest tables | free | script + manual check |
 | 7 | ETFs: prices, splits, dividends | EODHD, one paid month (plan kept afterwards for live quotes) | ≈ $20 | script |
 | 8 | Treasury bonds on GPW | GPW archive XLS, one file per bond with full history | free | script (PoC done) |
@@ -51,7 +51,7 @@ Reference data and transactions come first, because they define which instrument
 
 ### 4–6. FX, CPI, retail bonds
 - NBP: `/api/exchangerates/rates/a/eur/{from}/{to}/` in ≤ 93-day windows.
-- CPI from GUS BDL; check the variable ID for "CPI, same month previous year = 100" before the first run.
+- CPI from the GUS monthly CSV (data-sources.md); the MF calculator covers the history, the `monthly` job appends new months.
 - Retail bonds:
   - Generate `SERIES#…/RATE#…` from the first-period rate plus CPI + margin for later periods.
   - Run the calculator for every day.

@@ -72,8 +72,6 @@ aws s3 cp data/instruments.json  s3://$BUCKET/imports/instruments/instruments.js
 aws s3 cp <transactions.json>    s3://$BUCKET/imports/transactions/2026-10.json                 # triggers valuation
 ```
 
-Optional: `npx sst secret set GusApiKey <key> --stage dev` enables the monthly CPI update from GUS BDL.
-
 ## Tests
 
 ```sh

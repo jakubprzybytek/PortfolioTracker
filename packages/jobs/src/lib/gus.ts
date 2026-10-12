@@ -1,26 +1,45 @@
-// GUS BDL API: monthly CPI, previous month = 100 (variable id to confirm; see Docs/README.md open items).
+// GUS monthly CPI, from the CSV "Miesięczne wskaźniki cen towarów i usług konsumpcyjnych od 1982 roku"
+// (the same file the reference spreadsheet uses). No API key. The file name changes with updates, so the
+// link is found on the page. Windows-1250, ";"-separated, columns:
+// Nazwa zmiennej;Jednostka terytorialna;Sposób prezentacji;Rok;Miesiąc;Wartość;Flaga
+// Each month has five rows (bases); we use "Poprzedni miesiąc = 100". Months not published yet have an empty value.
 
-const BDL = "https://bdl.stat.gov.pl/api/v1";
-/** BDL variable: "Wskaźniki cen towarów i usług konsumpcyjnych, miesiąc poprzedni = 100" (ogółem). */
-export const GUS_CPI_MOM_VARIABLE = process.env["GUS_CPI_VARIABLE_ID"] ?? "217230";
+const PAGE =
+  "https://stat.gov.pl/obszary-tematyczne/ceny-handel/wskazniki-cen/wskazniki-cen-towarow-i-uslug-konsumpcyjnych-pot-inflacja-/miesieczne-wskazniki-cen-towarow-i-uslug-konsumpcyjnych-od-1982-roku/";
+const HEADERS = { "User-Agent": "portfolio-tracker (personal use)" };
+const MONTH_ON_MONTH = "poprzedni miesiąc = 100";
 
-/** Fetches CPI m/m for the given "YYYY-MM" months as fractions (100.3 → 0.003). Months GUS doesn't have yet are omitted. */
-export async function fetchGusCpiMonthOnMonth(months: string[], apiKey: string): Promise<{ month: string; wr: number }[]> {
-  const years = [...new Set(months.map((m) => m.slice(0, 4)))];
+/** The CSV's path on stat.gov.pl, e.g. "/download/gfx/…/miesiecznewskaznikicen…_8.csv", or undefined. */
+export function findCpiCsvLink(html: string): string | undefined {
+  const links = [...html.matchAll(/<a\b[^>]*\bhref="([^"]+\.csv)"[^>]*>([\s\S]*?)<\/a>/gi)].map((m) => ({ href: m[1]!, text: m[0] }));
+  return (links.find((l) => /wskaźniki cen towarów i usług konsumpcyjnych/i.test(l.text)) ?? links[0])?.href;
+}
+
+/** CPI m/m per "YYYY-MM" as a fraction (100.3 → 0.003), oldest first; months without a value are left out. */
+export function parseCpiCsv(text: string): { month: string; wr: number }[] {
   const out: { month: string; wr: number }[] = [];
-  for (const year of years) {
-    const url = `${BDL}/data/by-variable/${GUS_CPI_MOM_VARIABLE}?unit-level=0&year=${year}&format=json&page-size=100`;
-    const res = await fetch(url, { headers: { "X-ClientId": apiKey, Accept: "application/json" } });
-    if (!res.ok) throw new Error(`GUS BDL: HTTP ${res.status} for ${url}`);
-    const json = (await res.json()) as { results?: { values?: { year: string; attrId: number; val: number }[] }[] };
-    const values = json.results?.[0]?.values ?? [];
-    // BDL monthly values carry the period in `attrId`? No: monthly data uses "id" per period; keep it defensive.
-    for (const v of values as unknown as { year: string; val: number; period?: string | number }[]) {
-      const period = Number(String(v.period ?? "").replace(/\D/g, ""));
-      if (!period || period < 1 || period > 12) continue;
-      const month = `${v.year}-${String(period).padStart(2, "0")}`;
-      if (months.includes(month)) out.push({ month, wr: Math.round((v.val - 100) * 1000) / 100000 });
-    }
+  for (const line of text.split(/\r?\n/)) {
+    const [, , basis, year, month, value] = line.split(";");
+    if (basis?.trim().toLowerCase() !== MONTH_ON_MONTH || !value?.trim()) continue;
+    const v = Number(value.replace(",", "."));
+    if (!/^\d{4}$/.test(year!) || !(Number(month) >= 1 && Number(month) <= 12) || !Number.isFinite(v)) continue;
+    // One decimal from GUS: (v − 100) / 100, rounded to drop float noise.
+    out.push({ month: `${year}-${month!.padStart(2, "0")}`, wr: Math.round((v - 100) * 10) / 1000 });
   }
   return out.sort((a, b) => a.month.localeCompare(b.month));
+}
+
+export function decodeCpiCsv(content: Uint8Array): string {
+  return new TextDecoder("windows-1250").decode(content);
+}
+
+export async function fetchGusCpiFile(): Promise<{ url: string; content: Uint8Array }> {
+  const page = await fetch(PAGE, { headers: HEADERS });
+  if (!page.ok) throw new Error(`GUS CPI page: HTTP ${page.status}`);
+  const link = findCpiCsvLink(await page.text());
+  if (!link) throw new Error("GUS CPI page: no link to the CSV (page layout changed?)");
+  const url = new URL(link, "https://stat.gov.pl").toString();
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) throw new Error(`GUS CPI file: HTTP ${res.status}`);
+  return { url, content: new Uint8Array(await res.arrayBuffer()) };
 }

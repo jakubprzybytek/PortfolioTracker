@@ -107,7 +107,7 @@ Phase 1:
 - [x] Split the single DynamoDB table into `market`, `transactions` and `holdings` (data-storage.md), with per-function table links.
 - [ ] `prod`: re-import MF calculator and instruments into the new tables (backfill runs again); then drop the old `Table` (still declared in `sst.config.ts` for `prod` only, linked to nothing; removing the block leaves it in AWS because of `removal: retain`, so delete it in the console afterwards).
 - [ ] Load `prod`: MF calculator, `data/instruments.json`, and your real transactions (export of the sheet), plus retail bond series with purchase dates. `int` and `dev` hold `data/transactions.sample.json` (made-up).
-- [ ] Wire the retail bond calculator (`core/bonds/retail.ts`) into instruments/valuation once the series are known; needs a CPI y/y source (GUS).
+- [x] Retail bonds valued per lot from the rates in the MF retail file (no CPI needed).
 - [ ] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
 - [ ] Terms of each corporate bond held: fixed or floating, rate/margin, coupon dates, nominal.
 - [ ] Source of floating coupon rates per period: manual entry vs scraping the Catalyst interest tables.
@@ -115,7 +115,7 @@ Phase 1:
 - [ ] Catalyst scraper PoC (cells don't line up with headers; read by position). The reference sheet's offsets and its instruments-list page (nominal + accrued interest) are in data-sources.md.
 - [ ] Check the bossa.pl website quote JSON (`_cat_bonds`) as a daily source for Catalyst bonds (data-sources.md).
 - [x] SST: `CronV2` (EventBridge Scheduler) takes `timezone: "Europe/Warsaw"`.
-- [ ] Confirm that GUS's monthly CPI m/m (one decimal) equals the `WR_k` in the MF calculator for recent months, and the BDL variable id used in `packages/jobs/src/lib/gus.ts` (needs a GUS key: `sst secret set GusApiKey`).
+- [x] GUS monthly CPI m/m equals the MF calculator's `WR_k` (31 of 32 months 2024-01…2026-08; January differs by design, see data-sources.md). Source: the GUS CSV, no key (BDL has yearly CPI only).
 - [ ] Confirm the Catalyst page still shows D-1 at 07:15 on a weekday (seen on a Saturday only).
 - [x] GPW archive: full history per bond, or one file per day for all treasury bonds; no "last N" option (PoC, 2026-10-10).
 - [x] Corporate bonds: not in the GPW archive; gpwcatalyst.pl lists all corporate bonds, snapshot only.

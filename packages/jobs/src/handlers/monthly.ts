@@ -6,7 +6,7 @@ import { Resource } from "sst";
 import { archiveRaw, invokeAsync, repo, runJob } from "../lib/context.ts";
 import { fetchRetailFile } from "../lib/mfRetail.ts";
 import { importRetailRates } from "./import.ts";
-import { fetchGusCpiMonthOnMonth } from "../lib/gus.ts";
+import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv } from "../lib/gus.ts";
 import { fetchMfIndexRatios } from "../lib/mfPage.ts";
 
 export async function handler() {
@@ -19,19 +19,35 @@ export async function handler() {
     const notes: string[] = [];
     let itemsWritten = 0;
 
-    // 1. Append missing months from GUS (CPI for month M is final around the 15th of M+1).
-    const apiKey = Resource.GusApiKey.value;
+    // 1. Append missing months from the GUS CPI file (CPI for month M is published around the 15th of M+1).
+    // Append only: stored months are never overwritten. January matters here: the MF index keeps GUS's first
+    // (preliminary) January figure, while the GUS file later shows the revised one.
     const wanted: string[] = [];
     for (let m = shiftMonth(last, 1); m < today().slice(0, 7); m = shiftMonth(m, 1)) wanted.push(m);
-    if (wanted.length > 0 && apiKey !== "not-set") {
-      const fetched = await fetchGusCpiMonthOnMonth(wanted, apiKey);
-      if (fetched.length > 0) {
-        const rebuilt = buildReferenceIndex([...months, ...fetched]);
-        const newOnes = rebuilt.filter((m) => fetched.some((f) => f.month === m.month));
-        itemsWritten += await repo.putReferenceIndex(newOnes, "gus-bdl");
-        notes.push(`added ${newOnes.map((m) => `${m.month}=${m.w}`).join(", ")}`);
-      } else notes.push(`GUS has no CPI yet for ${wanted.join(", ")}`);
-    } else if (wanted.length > 0) notes.push(`GUS key not set; missing ${wanted.join(", ")}`);
+    if (wanted.length > 0) {
+      try {
+        const { url, content } = await fetchGusCpiFile();
+        await archiveRaw("gus-cpi", today(), "cpi-monthly.csv", content);
+        // Only consecutive months after the last stored one: the index is a chain.
+        const published = new Map(parseCpiCsv(decodeCpiCsv(content)).map((r) => [r.month, r.wr]));
+        const fetched: { month: string; wr: number }[] = [];
+        for (const month of wanted) {
+          const wr = published.get(month);
+          if (wr === undefined) break;
+          fetched.push({ month, wr });
+        }
+        if (fetched.length > 0) {
+          const rebuilt = buildReferenceIndex([...months, ...fetched]);
+          const newOnes = rebuilt.filter((m) => fetched.some((f) => f.month === m.month));
+          itemsWritten += await repo.putReferenceIndex(newOnes, url);
+          notes.push(`added ${newOnes.map((m) => `${m.month}=${m.w}`).join(", ")}`);
+        }
+        const missing = wanted.slice(fetched.length);
+        if (missing.length > 0) notes.push(`GUS has no CPI yet for ${missing.join(", ")}`);
+      } catch (err) {
+        notes.push(`GUS CPI failed: ${(err as Error).message}`);
+      }
+    }
 
     // 2. Cross-check against the MF published ratios for IZ bonds we track.
     const index = toReferenceIndex(buildReferenceIndex([...months, ...(await repo.listReferenceIndex()).map((m) => ({ month: m.month, wr: m.wr }))]));

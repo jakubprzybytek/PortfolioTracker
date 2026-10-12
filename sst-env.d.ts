@@ -22,10 +22,6 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Bucket"
     }
-    "GusApiKey": {
-      "type": "sst.sst.Secret"
-      "value": string
-    }
     "Holdings": {
       "name": string
       "type": "sst.aws.Dynamo"

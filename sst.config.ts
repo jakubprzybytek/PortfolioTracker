@@ -62,10 +62,8 @@ export default $config({
     // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload.
     const files = new sst.aws.Bucket("Files");
 
-    const gusApiKey = new sst.Secret("GusApiKey", "not-set");
-
     // Each function links only the tables it needs (Docs/data-storage.md, "Access per function").
-    const link = [files, gusApiKey];
+    const link = [files];
     const defaults = { link: [...link, market], timeout: "5 minutes" as const, memory: "512 MB" as const };
 
     // --- jobs ----------------------------------------------------------------------------------

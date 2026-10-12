@@ -47,7 +47,7 @@ Sources:
 | Source | What | Use |
 |---|---|---|
 | **MF calculator** `kalkulatorodsetek.xlsm` ([gov.pl/web/finanse/kalkulatory2](https://www.gov.pl/web/finanse/kalkulatory2)), updated monthly | Sheet "Dane CPI": monthly `WR_k` and `W(n)` since 2003-07. Sheet "Indeksowane": every IZ series with ISIN, issue/maturity, `BaseRef`, coupon, coupon periods | Backfill: load the `W(n)` series and the IZ terms once. Read as data only; the calculation is in VBA macros, which we don't run |
-| **GUS CPI m/m** (BDL API, already planned for retail bonds) | Monthly CPI, previous month = 100 | Ongoing: append `WR_k` each month and compute the next `W(n)`. Needed by the 1st of month M+2 at the latest |
+| **GUS CPI m/m** (monthly CSV, see below) | Monthly CPI, previous month = 100 | Ongoing: append `WR_k` each month and compute the next `W(n)`. Needed by the 1st of month M+2 at the latest |
 | **MF page** [Współczynniki indeksacji](https://www.gov.pl/web/finanse/wspolczynniki-indeksacji2) | Daily ratio + accrued interest for IZ0831/IZ0836, current and next month only (HTML table, no file) | Monthly cross-check of our calculation |
 
 - **Valuation date:** for portfolio value on day D use `ratio(D)`. To reproduce a trade's settlement amount, use `ratio(T+2)`.
@@ -87,9 +87,11 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - bossaAPI is not usable: NOL3 has been unavailable since 2026-10-02 and the new API is in a private pilot.
 - **Website quote JSON (not verified):** the reference sheet reads current quotes from `bossa.pl/fl_api/API/GPW/v2/Q/C/<category>` (`_cat_shares`, `_cat_nConnect`, `_cat_etf`, `_cat_bonds`): one request per category, fields `_quote`, `_quote_ref`, `_change_pnts`, `_change_proc`. An undocumented endpoint behind the website: check terms and whether `_cat_bonds` covers Catalyst corporates before relying on it.
 
-### GUS BDL – CPI
-- `bdl.stat.gov.pl/api/v1`, free API key. Monthly CPI (y/y, previous year = 100); used for EDO/COI/ROD rate resets and IZ indexation.
-- Final figure published around mid-month.
+### GUS – CPI (monthly CSV)
+- **Source:** "Miesięczne wskaźniki cen towarów i usług konsumpcyjnych od 1982 roku" on [stat.gov.pl](https://stat.gov.pl/obszary-tematyczne/ceny-handel/wskazniki-cen/wskazniki-cen-towarow-i-uslug-konsumpcyjnych-pot-inflacja-/miesieczne-wskazniki-cen-towarow-i-uslug-konsumpcyjnych-od-1982-roku/), the same file the reference sheet uses. No key. One CSV (~230 KB, Windows-1250, `;`) with every month since 1982 in five bases (previous month = 100, same month of the previous year = 100, December of the previous year = 100, …); months not published yet have an empty value. The file name changes with updates, so the link is found on the page.
+- **Used for:** IZ indexation (previous month = 100 → `WR_k`). Retail bonds take their rates from the MF file instead.
+- Published around the 15th of the following month. The `monthly` job appends only months after the last stored one and never overwrites: for January the MF index keeps GUS's first (preliminary) figure, while the CSV later shows the revised one (2026-01: MF 0.6, CSV 100.7). The other 31 months 2024-01…2026-08 match the MF calculator exactly.
+- **Not used:** the BDL API (`bdl.stat.gov.pl`) has CPI only as yearly data (to 2025). The DBW API (`api-dbw.stat.gov.pl`, no key) has monthly CPI (variable 305, section 1698 from 2026, totals: goods 14916914, households 6902025), but returns the whole breakdown per month (~19,500 rows, 4 pages) and its section id changed with COICOP 2018. Parser: `jobs/lib/gus.ts`.
 
 ### Retail bonds (obligacje detaliczne) – Ministry of Finance file
 - **Source:** "Dane dotyczące obligacji detalicznych" (XLS) on [gov.pl/web/finanse/obligacje-detaliczne1](https://www.gov.pl/web/finanse/obligacje-detaliczne1), updated monthly. One tab per kind (EDO, COI, ROD, ROS, TOS, ROR, DOR …); per series: **ISIN**, term, sale period, issue and rollover price ("Cena zamiany", e.g. 99.90), the **rate actually paid in each year** (per month for ROR/DOR), the interest per bond the Ministry published (per period for COI/ROR/DOR, the total at maturity for EDO/ROD/ROS/TOS) and the margin.
