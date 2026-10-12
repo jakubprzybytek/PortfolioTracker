@@ -217,6 +217,7 @@ export default $config({
     api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
     api.route("GET /transactions", apiHandler, auth);
     api.route("GET /prices", apiHandler, auth);
+    api.route("GET /accounts", apiHandler, auth);
     api.route("GET /indicators", apiHandler, auth);
     api.route("GET /indicators/{id}", apiHandler, auth);
     api.route("GET /holdings/history", apiHandler, auth);
