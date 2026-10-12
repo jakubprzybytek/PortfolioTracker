@@ -179,21 +179,37 @@ test.describe("prices view", () => {
 });
 
 test.describe("holdings grouped by instrument", () => {
-  test("groups by instrument with one row per account, cash last; the choice is in the URL and works with filters", async ({ page }) => {
+  test("one row per instrument with its account; several accounts expand on demand; cash last; in the URL, works with filters", async ({ page }) => {
     await page.goto("/#/holdings");
     await page.getByTestId("group-by").getByRole("button", { name: "Instrument" }).click();
     await expect(page).toHaveURL(/group=instrument/);
     const table = page.getByTestId("holdings-by-account");
     await expect(page.getByTestId("instrument-cash")).toBeVisible(); // data loaded
-    const order = await table.locator("tr.group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
+    const order = await table.locator('tr[data-testid^="instrument-"]').evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
     expect(order).toEqual(["instrument-DS0432", "instrument-EDO0935", "instrument-IZ0836", "instrument-SAMPLE-APARTMENT", "instrument-SPXS", "instrument-cash"]);
+    await expect(page.getByTestId("holding-row")).toHaveCount(0); // nothing expanded: one row per instrument
 
-    // DS0432 is held in two accounts: 20 + 5
+    // Held in one account: the account in its own column, no sub-rows
+    await expect(page.getByTestId("instrument-IZ0836").locator("td").nth(1)).toHaveText("broker");
+    await expect(page.getByTestId("instrument-SPXS").locator("td").nth(1)).toHaveText("foreign");
+    // DS0432 is held in two accounts (20 + 5): one summed row that expands
     const ds = page.getByTestId("instrument-DS0432");
+    await expect(ds.locator("td").nth(1)).toHaveText("▸ 2 accounts");
     await expect(ds.locator("td").nth(2)).toHaveText("25");
-    const dsRows = page.getByTestId("holding-row").filter({ has: page.locator("td:first-child", { hasText: /^(broker|ike)$/ }) });
-    await expect(dsRows.first()).toBeVisible();
-    // cash: one row per account, the incomplete one greyed
+    await page.getByTestId("expand-DS0432").click();
+    await expect(page).not.toHaveURL(/chart=/); // the toggle doesn't open the chart
+    const dsRows = table.locator('tr[data-testid="holding-row"][data-isin="PL0000113783"]');
+    await expect(dsRows).toHaveCount(2);
+    await expect(dsRows.nth(0).locator("td").nth(1)).toHaveText("└ broker");
+    await expect(dsRows.nth(0).locator("td").nth(2)).toHaveText("20");
+    await expect(dsRows.nth(1).locator("td").nth(2)).toHaveText("5");
+    await page.getByTestId("expand-DS0432").click();
+    await expect(dsRows).toHaveCount(0);
+
+    // Cash: one row (complete accounts summed), expands to one row per account, the incomplete one greyed
+    await expect(page.getByTestId("instrument-cash").locator("td").nth(1)).toHaveText("▸ 4 accounts");
+    await expect(page.getByTestId("cash-row")).toHaveCount(0);
+    await page.getByTestId("expand-cash").click();
     await expect(page.getByTestId("cash-row")).toHaveCount(4);
     await expect(table.locator('tr[data-testid="cash-row"][data-account="etf"]')).toHaveClass(/muted/);
 
@@ -201,6 +217,7 @@ test.describe("holdings grouped by instrument", () => {
     await expect(page.getByTestId("instrument-cash")).toBeVisible();
     await page.getByTestId("filter-account").selectOption("ike");
     await expect(page).toHaveURL(/group=instrument/);
+    await expect(page.getByTestId("instrument-DS0432").locator("td").nth(1)).toHaveText("ike"); // now in one account
     await expect(page.getByTestId("instrument-DS0432").locator("td").nth(2)).toHaveText("5");
     await expect(page.getByTestId("instrument-IZ0836")).toHaveCount(0); // not held in ike
 
@@ -254,6 +271,11 @@ test.describe("holdings row chart", () => {
     await expect(page.getByTestId("holding-chart").locator("path.recharts-area-area")).toHaveCount(2);
     await page.getByTestId("chart-panel-close").click();
     await expect(page.getByTestId("chart-panel")).toHaveCount(0);
+
+    // An instrument in one account: its row is that position
+    await page.getByTestId("instrument-SPXS").click();
+    await expect(page).toHaveURL(/chart=IE00B3YCGJ38&chartAccount=foreign/);
+    await expect(page.getByTestId("chart-panel-title")).toContainText("foreign");
   });
 });
 

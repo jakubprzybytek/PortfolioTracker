@@ -29,7 +29,7 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **Group by** switches between two layouts (kept in the URL):
 
 - **Account** (default): described below.
-- **Instrument:** one group per instrument (by code) with its total quantity, price and summed value/cost/gain/coupons; under it one row per account holding it. Cash is a last group with one row per account (incomplete ones greyed, not summed). The filters apply the same way.
+- **Instrument:** one row per instrument (by code), the second column showing the account it's held in. An instrument held in several accounts shows "▸ n accounts" with its total quantity and summed value/cost/gain/coupons; the arrow expands it into one row per account (the row itself opens the all-accounts chart). Cash is the last row: complete accounts summed, "▸ n accounts" expands it (incomplete ones greyed, not summed). The filters apply the same way.
 
 - **Grouped by account** (alphabetically); each group row shows the account's value (positions + cash), cost, gain, gain % and coupons. Each account ends with a **Cash** row; accounts holding only cash appear too. A total row appears when more than one account is shown.
 - **Incomplete accounts** (some of their assets aren't tracked yet, e.g. Catalyst bonds): the group row says what's missing, and the cash row is greyed and left out of the sums, because without the untracked purchases it's far too high.

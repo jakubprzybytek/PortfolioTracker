@@ -59,11 +59,28 @@ interface InstrumentGroup {
 }
 
 /** One holding as a row; `label` is what goes in the first column (the instrument, or the account). */
-function HoldingRow({ h, label, account, detail, selected, onSelect }: { h: Holding; label: ReactNode; account: string; detail: boolean; selected: boolean; onSelect: () => void }) {
+function HoldingRow({
+  h,
+  label,
+  second,
+  account,
+  detail,
+  selected,
+  onSelect,
+}: {
+  h: Holding;
+  label: ReactNode;
+  /** Second column: the asset type by default. */
+  second?: ReactNode;
+  account: string;
+  detail: boolean;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   return (
     <tr data-testid="holding-row" data-account={account} data-isin={h.isin} className={`clickable${selected ? " selected" : ""}`} onClick={onSelect} title="Show its value over time">
       <td className="left indent instrument">{label}</td>
-      <td className="left">{detail ? typeLabel(h.type) : ""}</td>
+      <td className="left">{second ?? typeLabel(h.type)}</td>
       <td>{fmtInt(h.quantity)}</td>
       <td title={priceTitle(h)}>{detail ? fmtPrice(h) : ""}</td>
       <td>{detail ? fmtNum(h.accruedInterest) : ""}</td>
@@ -76,15 +93,33 @@ function HoldingRow({ h, label, account, detail, selected, onSelect }: { h: Hold
   );
 }
 
-function CashRow({ account, cash, incomplete, label }: { account: string; cash: number; incomplete: boolean; label: ReactNode }) {
+function CashRow({ account, cash, incomplete, label, second = typeLabel("CASH") }: { account: string; cash: number; incomplete: boolean; label: ReactNode; second?: ReactNode }) {
   return (
     <tr data-testid="cash-row" data-account={account} className={incomplete ? "muted" : ""}>
       <td className="left indent">{label}</td>
-      <td className="left">{typeLabel("CASH")}</td>
+      <td className="left">{second}</td>
       <td colSpan={3}></td>
       <td title={incomplete ? "Incomplete: purchases of untracked assets are missing, so this is too high. Not included in the sums." : ""}>{fmtPln(cash)}</td>
       <td colSpan={4}></td>
     </tr>
+  );
+}
+
+/** "▸ 2 accounts": expands an instrument (or cash) held in several accounts into one row per account. */
+function ExpandToggle({ open, count, onToggle, testId }: { open: boolean; count: number; onToggle: () => void; testId: string }) {
+  return (
+    <button
+      type="button"
+      className="link expand"
+      aria-expanded={open}
+      onClick={(e) => {
+        e.stopPropagation(); // the row's own click opens the chart
+        onToggle();
+      }}
+      data-testid={testId}
+    >
+      {open ? "▾" : "▸"} {count} accounts
+    </button>
   );
 }
 
@@ -97,7 +132,8 @@ const IncompleteFlag = ({ what }: { what: string[] }) => (
 /**
  * Latest snapshot, grouped by account (default) or by instrument (`?group=instrument`).
  * By account: accounts alphabetically, instruments sorted by code, then the account's cash.
- * By instrument: instruments by code with one row per account, then a Cash group with one row per account.
+ * By instrument: one row per instrument (by code) with the account it's in; one held in several accounts shows
+ * "▸ n accounts" and expands into one row per account. Cash is one row the same way.
  * An incomplete account (not all of its assets tracked yet) shows its cash greyed and leaves it out of the sums.
  * Filters: account, asset type ("Cash" shows only the cash rows).
  */
@@ -107,6 +143,14 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const accounts = useMemo(() => snap.data?.accounts ?? {}, [snap.data]);
   const { account = "", type = "" } = params;
   const byInstrument = params["group"] === "instrument";
+  // By instrument: instruments (ISIN, or "cash") expanded into their accounts.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setExpanded((e) => {
+      const next = new Set(e);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
 
   // Row chart: `chart` = ISIN, `chartAccount` = one account's position (absent: the instrument across accounts).
   const chartIsin = params["chart"];
@@ -119,6 +163,11 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const closeChart = useCallback(() => setParams({ ...params, chart: undefined, chartAccount: undefined }), [params, setParams]);
   const isSelected = (isin: string, acct?: string) => chartIsin === isin && chartAccount === acct;
   const chartHolding = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin);
+
+  // A chart opened (e.g. from the URL) on one account of a multi-account instrument: show that row.
+  useEffect(() => {
+    if (byInstrument && chartIsin && chartAccount) setExpanded((e) => (e.has(chartIsin) ? e : new Set(e).add(chartIsin)));
+  }, [byInstrument, chartIsin, chartAccount]);
 
   // Keep the clicked row visible above the panel.
   useEffect(() => {
@@ -206,10 +255,10 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
         <table data-testid="holdings-by-account" className="static">
           <thead>
             <tr>
-              <th className="left">{byInstrument ? "Instrument ▲ / account" : "Instrument ▲"}</th>
-              <th className="left">Asset type</th>
+              <th className="left">Instrument ▲</th>
+              <th className="left">{byInstrument ? "Account" : "Asset type"}</th>
               <th>Qty</th>
-              <th>Price %</th>
+              <th title="Bonds: % of nominal; others in their currency">Price</th>
               <th>Accrued</th>
               <th>Value</th>
               <th>Cost</th>
@@ -220,57 +269,108 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           </thead>
           <tbody>
             {byInstrument &&
-              instrumentGroups.map((g) => (
-                <Fragment key={g.isin}>
-                  <tr
-                    className={`group clickable${isSelected(g.isin) ? " selected" : ""}`}
-                    data-testid={`instrument-${g.first.code}`}
-                    onClick={() => select(g.isin)}
-                    title="Show its value over time (all accounts)"
-                  >
-                    <td className="left instrument">
-                      {g.first.code} <span className="muted">{g.first.name !== g.first.code ? g.first.name : ""} · {g.holdings.length}</span>
-                    </td>
-                    <td className="left">{typeLabel(g.first.type)}</td>
-                    <td>{fmtInt(g.holdings.reduce((n, h) => n + h.quantity, 0))}</td>
-                    <td title={priceTitle(g.first)}>{fmtPrice(g.first)}</td>
-                    <td>{fmtNum(g.first.accruedInterest)}</td>
-                    <SumCells s={g.sums} />
-                  </tr>
-                  {g.holdings.map((h) => (
-                    <HoldingRow
-                      key={`${g.isin}/${accountOf(h)}`}
-                      h={h}
-                      account={accountOf(h)}
-                      label={accountOf(h)}
-                      detail={false}
-                      selected={isSelected(g.isin, accountOf(h))}
-                      onSelect={() => select(g.isin, accountOf(h))}
+              instrumentGroups.map((g) => {
+                const multi = g.holdings.length > 1;
+                const open = multi && expanded.has(g.isin);
+                const only = g.holdings[0]!;
+                const label = (
+                  <>
+                    <strong>{g.first.code}</strong> <span className="muted">{g.first.name !== g.first.code ? g.first.name : ""}</span>
+                  </>
+                );
+                // Held in one account: the instrument row is that position (its chart, its account).
+                if (!multi)
+                  return (
+                    <tr
+                      key={g.isin}
+                      className={`clickable${isSelected(g.isin, accountOf(only)) ? " selected" : ""}`}
+                      data-testid={`instrument-${g.first.code}`}
+                      data-account={accountOf(only)}
+                      onClick={() => select(g.isin, accountOf(only))}
+                      title="Show its value over time"
+                    >
+                      <td className="left instrument">{label}</td>
+                      <td className="left">{accountOf(only)}</td>
+                      <td>{fmtInt(only.quantity)}</td>
+                      <td title={priceTitle(only)}>{fmtPrice(only)}</td>
+                      <td>{fmtNum(only.accruedInterest)}</td>
+                      <SumCells s={g.sums} />
+                    </tr>
+                  );
+                return (
+                  <Fragment key={g.isin}>
+                    <tr
+                      className={`clickable${isSelected(g.isin) ? " selected" : ""}`}
+                      data-testid={`instrument-${g.first.code}`}
+                      onClick={() => select(g.isin)}
+                      title="Show its value over time (all accounts)"
+                    >
+                      <td className="left instrument">{label}</td>
+                      <td className="left">
+                        <ExpandToggle open={open} count={g.holdings.length} onToggle={() => toggle(g.isin)} testId={`expand-${g.first.code}`} />
+                      </td>
+                      <td>{fmtInt(g.holdings.reduce((n, h) => n + h.quantity, 0))}</td>
+                      <td title={priceTitle(g.first)}>{fmtPrice(g.first)}</td>
+                      <td>{fmtNum(g.first.accruedInterest)}</td>
+                      <SumCells s={g.sums} />
+                    </tr>
+                    {open &&
+                      g.holdings.map((h) => (
+                        <HoldingRow
+                          key={`${g.isin}/${accountOf(h)}`}
+                          h={h}
+                          account={accountOf(h)}
+                          label=""
+                          second={<span className="sub">└ {accountOf(h)}</span>}
+                          detail={false}
+                          selected={isSelected(g.isin, accountOf(h))}
+                          onSelect={() => select(g.isin, accountOf(h))}
+                        />
+                      ))}
+                  </Fragment>
+                );
+              })}
+            {byInstrument && cashRows.length === 1 && (
+              <CashRow
+                account={cashRows[0]!.name}
+                cash={cashRows[0]!.cash!}
+                incomplete={cashRows[0]!.incomplete.length > 0}
+                label={<strong>Cash</strong>}
+                second={
+                  <>
+                    {cashRows[0]!.name} {cashRows[0]!.incomplete.length > 0 && <IncompleteFlag what={cashRows[0]!.incomplete} />}
+                  </>
+                }
+              />
+            )}
+            {byInstrument && cashRows.length > 1 && (
+              <Fragment key="cash">
+                <tr data-testid="instrument-cash">
+                  <td className="left">
+                    <strong>Cash</strong>
+                  </td>
+                  <td className="left">
+                    <ExpandToggle open={expanded.has("cash")} count={cashRows.length} onToggle={() => toggle("cash")} testId="expand-cash" />
+                  </td>
+                  <td colSpan={3}></td>
+                  <td title="Accounts whose assets are all tracked (incomplete ones are greyed when expanded)">{fmtPln(cashSums.value)}</td>
+                  <td colSpan={4}></td>
+                </tr>
+                {expanded.has("cash") &&
+                  cashRows.map((g) => (
+                    <CashRow
+                      key={g.name}
+                      account={g.name}
+                      cash={g.cash!}
+                      incomplete={g.incomplete.length > 0}
+                      label=""
+                      second={
+                        <>
+                          <span className="sub">└ {g.name}</span> {g.incomplete.length > 0 && <IncompleteFlag what={g.incomplete} />}
+                        </>
+                      }
                     />
                   ))}
-                </Fragment>
-              ))}
-            {byInstrument && cashRows.length > 0 && (
-              <Fragment key="cash">
-                <tr className="group" data-testid="instrument-cash">
-                  <td className="left" colSpan={5}>
-                    Cash <span className="muted">· {cashRows.length}</span>
-                  </td>
-                  <SumCells s={cashSums} />
-                </tr>
-                {cashRows.map((g) => (
-                  <CashRow
-                    key={g.name}
-                    account={g.name}
-                    cash={g.cash!}
-                    incomplete={g.incomplete.length > 0}
-                    label={
-                      <>
-                        {g.name} {g.incomplete.length > 0 && <IncompleteFlag what={g.incomplete} />}
-                      </>
-                    }
-                  />
-                ))}
               </Fragment>
             )}
             {!byInstrument &&

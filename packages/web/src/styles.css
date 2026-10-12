@@ -110,3 +110,5 @@ tr.clickable { cursor: pointer; }
   .chart-panel { left: 0; padding: 0 12px 8px; }
   .chart-panel-handle { margin: 0 -12px; }
 }
+td .sub { color: var(--muted); padding-left: 0.75rem; }
+button.link.expand { font-size: 0.85rem; white-space: nowrap; }
