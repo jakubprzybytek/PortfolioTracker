@@ -143,7 +143,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             </span>
           }
         >
-          <RangePicker value={range} onChange={setRange} testId="price-range" />
+          <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />
           <div style={{ flex: 1, minHeight: 0 }}>
             {prices.error ? (
               <p className="error">{prices.error}</p>

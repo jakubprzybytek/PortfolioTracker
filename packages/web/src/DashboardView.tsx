@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fmtPct, fmtPln, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
 import { AccountsTable } from "./AccountsTable.tsx";
-import { Allocation } from "./Allocation.tsx";
+import { Allocation, AssetMix } from "./Allocation.tsx";
 import { Skeleton, SkeletonRows } from "./Placeholders.tsx";
 import { PortfolioChart } from "./PortfolioChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
@@ -61,9 +61,11 @@ export function DashboardView() {
         <Card loading={cardsLoading} label="Coupons received" value={fmtPln(totals?.couponsReceived)} testId="total-coupons" />
       </section>
 
+      {snap ? <AssetMix snapshot={snap} /> : holdings.loading && <div className="asset-mix"><Skeleton height={14} testId="asset-mix-skeleton" /></div>}
+
       <h2>Portfolio value</h2>
-      <RangePicker value={range} onChange={setRange} testId="portfolio-range" />
-      {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} loading={!history.data && history.loading} />}
+      <RangePicker value={range} onChange={setRange} busy={history.loading} testId="portfolio-range" />
+      {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} loading={history.loading} />}
 
       <h2>Accounts</h2>
       <AccountsTable />

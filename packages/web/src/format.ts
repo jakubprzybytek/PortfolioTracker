@@ -6,10 +6,10 @@ export const fmtPln = (v: number | null | undefined): string => (v === null || v
 export const fmtNum = (v: number | null | undefined, digits = 2): string =>
   v === null || v === undefined ? "–" : new Intl.NumberFormat("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
 export const fmtPct = (v: number | null | undefined): string => (v === null || v === undefined ? "–" : `${pct.format(v)} %`);
-/** Short axis labels for narrow charts: 950, 12,5 k, 57 k, 1,6 M. */
+/** Short axis labels for narrow charts: 950, 12,5k, 57k, 1,6M (no space: the chart would wrap the label there). */
 export const fmtCompact = (v: number): string => {
   const a = Math.abs(v);
-  return a >= 1e6 ? `${fmtNum(v / 1e6, 1)} M` : a >= 1e4 ? `${fmtNum(v / 1e3, 0)} k` : a >= 1e3 ? `${fmtNum(v / 1e3, 1)} k` : fmtNum(v, 0);
+  return a >= 1e6 ? `${fmtNum(v / 1e6, 1)}M` : a >= 1e4 ? `${fmtNum(v / 1e3, 0)}k` : a >= 1e3 ? `${fmtNum(v / 1e3, 1)}k` : fmtNum(v, 0);
 };
 export const fmtInt = (v: number | null | undefined): string => (v === null || v === undefined ? "–" : num.format(v));
 export const signClass = (v: number | null | undefined): string => (v === null || v === undefined || v === 0 ? "" : v > 0 ? "pos" : "neg");

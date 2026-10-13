@@ -4,6 +4,7 @@ import { APP_VERSION } from "./api.ts";
 import { currentSession, logout, type Session } from "./auth.ts";
 import { DashboardView } from "./DashboardView.tsx";
 import { HoldingsView } from "./HoldingsView.tsx";
+import { Icon } from "./Icons.tsx";
 import { IndicatorsView } from "./IndicatorsView.tsx";
 import { LoginForm } from "./LoginForm.tsx";
 import { PricesView } from "./PricesView.tsx";
@@ -37,31 +38,64 @@ export function App() {
 
 function Shell({ email }: { email: string }) {
   const [route, setParams] = useRoute();
+  // Phone: the menu opens over the page from the ☰ button; any navigation, a tap outside or Escape closes it.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const hash = window.location.hash;
+  useEffect(() => setMenuOpen(false), [hash, route.view]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   return (
     <div className="layout">
       <nav className="sidebar" aria-label="Views">
         <div className="sidebar-inner">
-          <h1>Portfolio Tracker</h1>
-          <ul>
-            {VIEWS.map((v) => (
-              <li key={v.view}>
-                <a href={v.path} aria-current={route.view === v.view ? "page" : undefined} data-testid={`nav-${v.view}`}>
-                  {v.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-          <footer className="muted">
-            <div className="user" data-testid="user-email" title={email}>
-              {email}
-            </div>
-            <button type="button" className="link" onClick={() => void logout()} data-testid="logout">
-              Log out
+          <div className="topbar">
+            <h1 className="brand">
+              <a href="#/">
+                <img src="/favicon.svg" alt="" width={26} height={26} />
+                Portfolio <span className="light">Tracker</span>
+              </a>
+            </h1>
+            <button
+              type="button"
+              className="menu-toggle"
+              aria-expanded={menuOpen}
+              aria-controls="nav-menu"
+              aria-label={menuOpen ? "Close the menu" : "Open the menu"}
+              onClick={() => setMenuOpen((o) => !o)}
+              data-testid="menu-toggle"
+            >
+              <Icon name={menuOpen ? "close" : "menu"} />
             </button>
-            <div data-testid="version">Portfolio Tracker {APP_VERSION}</div>
-          </footer>
+          </div>
+          <div id="nav-menu" className={`nav-menu${menuOpen ? " open" : ""}`} data-testid="nav-menu">
+            <ul>
+              {VIEWS.map((v) => (
+                <li key={v.view}>
+                  <a href={v.path} aria-current={route.view === v.view ? "page" : undefined} data-testid={`nav-${v.view}`} onClick={() => setMenuOpen(false)}>
+                    <Icon name={v.view} />
+                    {v.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <footer className="muted">
+              <div className="user" data-testid="user-email" title={email}>
+                {email}
+              </div>
+              <button type="button" className="link logout" onClick={() => void logout()} data-testid="logout">
+                <Icon name="logout" size={16} />
+                Log out
+              </button>
+              <div data-testid="version">Portfolio Tracker {APP_VERSION}</div>
+            </footer>
+          </div>
         </div>
+        {menuOpen && <div className="nav-backdrop" onClick={() => setMenuOpen(false)} aria-hidden data-testid="nav-backdrop" />}
       </nav>
       <main>
         {route.view === "dashboard" && <DashboardView />}

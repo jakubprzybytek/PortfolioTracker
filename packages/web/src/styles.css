@@ -29,20 +29,36 @@ main { max-width: 1280px; width: 100%; padding: 16px 24px; }
 h1 { font-size: 1.15rem; margin: 0 0 16px; }
 /* The nav cell spans the whole page height (so does its border); the inner part stays in view while scrolling. */
 .sidebar { border-right: 1px solid var(--border); }
-.sidebar-inner { padding: 16px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
+.sidebar-inner { padding: 16px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 16px; }
+.topbar { display: flex; align-items: center; gap: 8px; }
+h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
+.brand a { display: flex; align-items: center; gap: 8px; color: var(--fg); text-decoration: none; white-space: nowrap; }
+.brand img { flex: none; }
+.brand .light { font-weight: 400; color: var(--muted); }
+.menu-toggle { display: none; margin-left: auto; width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--fg); cursor: pointer; place-items: center; }
+.nav-menu { display: flex; flex-direction: column; flex: 1; }
 .sidebar ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.sidebar a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--fg); text-decoration: none; }
-.sidebar a:hover { background: var(--row); }
-.sidebar a[aria-current="page"] { background: var(--accent); color: white; }
+.sidebar ul a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: var(--fg); text-decoration: none; }
+.sidebar ul a .icon { color: var(--muted); flex: none; }
+.sidebar ul a:hover { background: var(--row); }
+.sidebar ul a[aria-current="page"] { background: var(--accent); color: white; }
+.sidebar ul a[aria-current="page"] .icon { color: white; }
 .sidebar footer { margin-top: auto; font-size: 0.75rem; display: flex; flex-direction: column; gap: 4px; }
+.sidebar footer .logout { display: inline-flex; align-items: center; gap: 6px; }
+.nav-backdrop { display: none; }
 @media (max-width: 720px) {
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .sidebar { border-right: 0; border-bottom: 1px solid var(--border); }
-  .sidebar-inner { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 16px; }
-  .sidebar h1 { margin: 0; }
-  .sidebar ul { flex-direction: row; flex-wrap: wrap; }
-  .sidebar footer { margin: 0 0 0 auto; font-size: 0.85rem; }
-  .sidebar .user, .sidebar footer [data-testid="version"] { display: none; }
+  /* A slim bar on top (logo, name, ☰); the menu opens over the page below it. */
+  .sidebar { border-right: 0; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 30; background: var(--bg); }
+  .sidebar-inner { position: static; height: auto; padding: 10px 16px; gap: 0; }
+  .topbar { position: relative; z-index: 2; }
+  .menu-toggle { display: grid; }
+  .nav-menu { display: none; }
+  .nav-menu.open { display: flex; position: absolute; top: 100%; left: 0; right: 0; z-index: 2; background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12); padding: 8px; }
+  .nav-menu.open ul a { padding: 11px 12px; font-size: 1.05rem; gap: 12px; }
+  .nav-menu.open footer { margin-top: 6px; padding: 10px 12px 4px; border-top: 1px solid var(--border); font-size: 0.85rem; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; }
+  .nav-menu.open footer .logout { grid-row: span 2; align-self: center; font-size: 1rem; }
+  .nav-backdrop { display: block; position: fixed; inset: 0; z-index: 1; background: rgba(17, 24, 39, 0.3); }
   main { padding: 16px; }
 }
 .view-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; }
@@ -129,13 +145,47 @@ tr.skeleton-row:hover { background: none; }
 @keyframes skeleton-pulse { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .skeleton, .skeleton-bar { animation: none; } }
 .chart-message { display: flex; align-items: center; justify-content: center; }
+/* Chart skeleton: grid lines, a faint rising line, a light sweeping across. */
+.chart-skeleton { position: relative; overflow: hidden; border-radius: 8px; background: repeating-linear-gradient(to bottom, transparent 0 calc(25% - 1px), var(--border) calc(25% - 1px) 25%); }
+.chart-skeleton svg { position: absolute; inset: 12px 0 0 0; width: 100%; height: calc(100% - 12px); }
+.chart-skeleton .area { fill: color-mix(in srgb, var(--accent) 9%, transparent); }
+.chart-skeleton .line { fill: none; stroke: color-mix(in srgb, var(--accent) 35%, transparent); stroke-width: 2; }
+.chart-skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--bg) 75%, transparent) 50%, transparent 80%); transform: translateX(-100%); animation: chart-sweep 1.6s ease-in-out infinite; }
+@keyframes chart-sweep { to { transform: translateX(100%); } }
+/* A chart reloading: dimmed, spinner on top. */
+.chart-frame { position: relative; }
+.chart-busy { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 55%, transparent); border-radius: 6px; }
+.chart-busy .spinner { width: 28px; height: 28px; border-width: 3px; margin: 0; }
+.spinner { display: inline-block; width: 0.8em; height: 0.8em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -0.1em; margin-right: 6px; color: var(--accent); }
+.range button.active .spinner { color: white; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.range button:disabled { cursor: progress; }
+.range button:disabled:not(.active) { opacity: 0.5; }
+@media (prefers-reduced-motion: reduce) { .chart-skeleton::after { animation: none; } .spinner { animation-duration: 2s; } }
 .card .value .skeleton-bar { width: 7rem; height: 1em; }
 /* Closed accounts (nothing left in them): greyed, below the open ones, folded by default. */
 tr.closed td { color: var(--muted); }
 /* Foreign cash next to the account's PLN cash. */
 td .ccy { color: var(--muted); font-weight: 400; }
+/* Asset mix: one bar split by asset class, legend below. */
+.asset-mix { margin-top: 16px; }
+.mix-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--border); gap: 2px; }
+.mix-bar span { display: block; height: 100%; }
+.mix-legend { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 0.9rem; }
+.mix-legend li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.mix-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.mix-SHARES { background: var(--accent); }
+.mix-BONDS { background: #f59e0b; }
+.mix-CASH { background: #10b981; }
+.mix-OTHER { background: #a78bfa; }
 @media (max-width: 720px) {
   td.instrument { min-width: 12rem; }
+  /* Cards two per row: smaller figures so 1 577 174,28 zł fits. */
+  .cards { gap: 8px; }
+  .card { padding: 10px 12px; min-width: 0; flex-basis: calc(50% - 4px); }
+  .card .value { font-size: 1.02rem; }
+  .card .label, .card .note { font-size: 0.75rem; }
+  .mix-legend { font-size: 0.85rem; gap: 4px 14px; }
   /* Allocation: label, bar and share; the PLN amount is in each row's tooltip. */
   .alloc-row { grid-template-columns: minmax(0, 8rem) minmax(30px, 1fr) 3.5rem; }
   .alloc-value { display: none; }

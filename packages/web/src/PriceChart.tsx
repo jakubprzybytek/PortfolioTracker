@@ -1,7 +1,7 @@
 import { CartesianGrid, ComposedChart, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmtNum } from "./format.ts";
-import { ChartPlaceholder } from "./Placeholders.tsx";
-import { chartMargin, useNarrow } from "./useNarrow.ts";
+import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
+import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
 import type { Price, Transaction } from "./types.ts";
 
 /**
@@ -37,12 +37,12 @@ export function PriceChart({
     .filter((m): m is NonNullable<typeof m> => m !== null);
 
   return (
-    <div data-testid="price-chart" style={{ width: "100%", height: height ?? "100%" }}>
+    <div className="chart-frame" data-testid="price-chart" style={{ width: "100%", height: height ?? "100%" }}>
       <ResponsiveContainer>
         <ComposedChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
-          <YAxis tick={{ fontSize: 11 }} width={narrow ? 44 : 60} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
+          <YAxis {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
           <Tooltip
             formatter={(v, _name, item) =>
               calculated
@@ -57,6 +57,7 @@ export function PriceChart({
           ))}
         </ComposedChart>
       </ResponsiveContainer>
+      <ChartBusy busy={loading} />
     </div>
   );
 }

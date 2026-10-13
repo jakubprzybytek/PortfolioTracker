@@ -478,7 +478,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
             </>
           }
         >
-          <RangePicker value={range} onChange={setRange} testId="holding-range" />
+          <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />
           <div style={{ flex: 1, minHeight: 0 }}>
             {history.error ? <p className="error">{history.error}</p> : <ValueChart testId="holding-chart" data={history.data ?? []} loading={history.loading} />}
           </div>

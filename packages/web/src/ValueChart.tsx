@@ -1,7 +1,7 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmtCompact, fmtPln } from "./format.ts";
-import { ChartPlaceholder } from "./Placeholders.tsx";
-import { chartMargin, useNarrow } from "./useNarrow.ts";
+import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
+import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
 
 export interface ValuePoint {
   date: string;
@@ -11,14 +11,14 @@ export interface ValuePoint {
 
 /**
  * Value (area) and what was paid (dashed) over time, in PLN. Fills its parent's height unless `height` is given.
- * Until the first data arrives (`loading`), a placeholder of the same size.
+ * Until the first data arrives (`loading`), a placeholder of the same size; reloading (a new range), dimmed with a spinner.
  */
 export function ValueChart({ data, testId, height, loading = false }: { data: ValuePoint[]; testId: string; height?: number; loading?: boolean }) {
   const narrow = useNarrow();
   if (data.length === 0) return <ChartPlaceholder loading={loading} height={height ?? "100%"}>No valuation history in this range.</ChartPlaceholder>;
   const gradient = `val-${testId}`;
   return (
-    <div data-testid={testId} style={{ width: "100%", height: height ?? "100%" }}>
+    <div className="chart-frame" data-testid={testId} style={{ width: "100%", height: height ?? "100%" }}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={chartMargin(narrow)}>
           <defs>
@@ -29,7 +29,7 @@ export function ValueChart({ data, testId, height, loading = false }: { data: Va
           </defs>
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
-          <YAxis tick={{ fontSize: 11 }} width={narrow ? 44 : 80} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => (narrow ? fmtCompact(v) : Math.round(v).toLocaleString("pl-PL"))} />
+          <YAxis {...(narrow ? narrowYAxis : { width: 80, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => (narrow ? fmtCompact(v) : Math.round(v).toLocaleString("pl-PL"))} />
           <Tooltip
             formatter={(v, name) => [fmtPln(Number(v)), name === "value" ? "Value" : "Cost"]}
             contentStyle={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 }}
@@ -38,6 +38,7 @@ export function ValueChart({ data, testId, height, loading = false }: { data: Va
           <Area type="monotone" dataKey="value" stroke="var(--accent)" fill={`url(#${gradient})`} dot={false} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
+      <ChartBusy busy={loading} />
     </div>
   );
 }

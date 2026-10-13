@@ -90,10 +90,72 @@ test.describe("dashboard", () => {
     expect(Math.abs(sum - 100)).toBeLessThan(0.5); // one decimal each
   });
 
+  test("sums up the asset mix: shares, bonds, cash and other", async ({ page }) => {
+    const mix = page.getByTestId("asset-mix");
+    await expect(mix).toBeVisible();
+    for (const k of ["SHARES", "BONDS", "CASH", "OTHER"]) await expect(page.getByTestId(`asset-mix-${k}`)).toBeVisible();
+    await expect(page.getByTestId("asset-mix-SHARES")).toContainText("Shares"); // the ETF
+    const shares = await mix.locator("li strong").allTextContents();
+    const sum = shares.reduce((s, t) => s + Number(t.replace(/[^\d,]/g, "").replace(",", ".")), 0);
+    expect(Math.abs(sum - 100)).toBeLessThan(0.5);
+  });
+
+  test("while a new range loads: buttons disabled, the chart dimmed with a spinner", async ({ page }) => {
+    await expect(page.getByTestId("portfolio-chart").locator("svg.recharts-surface")).toBeVisible();
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    await page.route("**/portfolio/history**", async (route) => {
+      await gate;
+      await route.continue();
+    });
+    const range = page.getByTestId("portfolio-range");
+    await range.getByRole("button", { name: "ALL" }).click();
+    await expect(page.getByTestId("chart-busy")).toBeVisible();
+    await expect(range.getByRole("button", { name: "1M" })).toBeDisabled();
+    await expect(range).toHaveAttribute("aria-busy", "true");
+    release();
+    await expect(page.getByTestId("chart-busy")).toHaveCount(0);
+    await expect(range.getByRole("button", { name: "1M" })).toBeEnabled();
+  });
+
   test("lists job runs", async ({ page }) => {
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
     await expect(rows).toHaveCount(9);
     await expect(page.getByTestId("jobs-table")).toContainText("valuation");
     await expect(page.getByTestId("jobs-table")).toContainText("ok");
+  });
+});
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the menu opens from the ☰ button, navigates and closes", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Portfolio Tracker");
+    await expect(page.getByTestId("nav-holdings")).toBeHidden();
+    await page.getByTestId("menu-toggle").click();
+    await expect(page.getByTestId("menu-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("user-email")).toBeVisible();
+    await page.getByTestId("nav-holdings").click();
+    await expect(page).toHaveURL(/#\/holdings$/);
+    await expect(page.getByTestId("nav-holdings")).toBeHidden();
+    await page.getByTestId("menu-toggle").click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("nav-menu")).toBeHidden();
+    await page.getByTestId("menu-toggle").click();
+    await page.getByTestId("nav-backdrop").click({ position: { x: 200, y: 800 } });
+    await expect(page.getByTestId("nav-menu")).toBeHidden();
+  });
+
+  test("summary figures fit their cards; the chart spans the width", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("total-value")).not.toContainText("–");
+    const overflowing = await page.locator(".card .value").evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).length);
+    expect(overflowing).toBe(0);
+    const chart = page.getByTestId("portfolio-chart");
+    await expect(chart.locator("svg.recharts-surface")).toBeVisible();
+    const plot = await chart.locator(".recharts-cartesian-grid").boundingBox();
+    expect(plot!.x).toBeLessThan(20); // no column for the axis labels: they sit inside the plot
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 });

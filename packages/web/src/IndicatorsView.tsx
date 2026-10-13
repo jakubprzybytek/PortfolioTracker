@@ -1,10 +1,11 @@
 import { Fragment } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { addDays, fmtNum, today } from "./format.ts";
-import { ChartPlaceholder, SkeletonRows } from "./Placeholders.tsx";
+import { ChartBusy, ChartPlaceholder, SkeletonRows } from "./Placeholders.tsx";
+import { RangePicker } from "./RangePicker.tsx";
 import type { IndicatorPoint, IndicatorSummary } from "./types.ts";
 import { useApi } from "./useApi.ts";
-import { chartMargin, useNarrow } from "./useNarrow.ts";
+import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
 
 /** Ranges in years; monthly indicators are filtered by month on the server. */
 const RANGES = [
@@ -105,19 +106,13 @@ export function IndicatorsView({ params, setParams }: { params: Record<string, s
               · {sel.note}
             </span>
           </h2>
-          <div className="range" data-testid="indicator-range">
-            {RANGES.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                className={r.key === range ? "active" : ""}
-                aria-pressed={r.key === range}
-                onClick={() => setParams({ ...params, range: r.key === "5Y" ? undefined : r.key })}
-              >
-                {r.key}
-              </button>
-            ))}
-          </div>
+          <RangePicker
+            value={range}
+            options={RANGES.map((r) => r.key)}
+            onChange={(key) => setParams({ ...params, range: key === "5Y" ? undefined : key })}
+            busy={series.loading}
+            testId="indicator-range"
+          />
           {series.error ? <p className="error">{series.error}</p> : <IndicatorChart indicator={sel} points={series.data ?? []} loading={series.loading} />}
         </>
       )}
@@ -146,8 +141,7 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
       <CartesianGrid stroke="var(--border)" vertical={false} />
       <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
       <YAxis
-        tick={{ fontSize: 11 }}
-        width={narrow ? 40 : 56}
+        {...(narrow ? narrowYAxis : { width: 56, tick: { fontSize: 11 } })}
         stroke="var(--muted)"
         domain={pctDomain ?? ["auto", "auto"]}
         ticks={pctDomain && Array.from({ length: pctDomain[1]! - pctDomain[0]! + 1 }, (_, k) => pctDomain[0]! + k)}
@@ -156,7 +150,7 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
     </>
   );
   return (
-    <div data-testid="indicator-chart" data-points={points.length} style={{ width: "100%", height: 320 }}>
+    <div className="chart-frame" data-testid="indicator-chart" data-points={points.length} style={{ width: "100%", height: 320 }}>
       <ResponsiveContainer>
         {indicator.unit === "%" ? (
           <BarChart data={points} margin={chartMargin(narrow)}>
@@ -177,6 +171,7 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
           </LineChart>
         )}
       </ResponsiveContainer>
+      <ChartBusy busy={loading} />
     </div>
   );
 }

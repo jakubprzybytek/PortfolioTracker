@@ -4,11 +4,15 @@ A small React app (Vite, `sst.aws.StaticSite`) that reads through the `api` Lamb
 
 ## Loading
 
-Parts still loading hold their space with grey, gently pulsing placeholders (`Placeholders.tsx`): table rows, charts at their final height, the Dashboard cards and allocation. An empty chart shows its message at the chart's height. So the page doesn't jump when data arrives.
+Parts still loading hold their space with placeholders (`Placeholders.tsx`), so the page doesn't jump when data arrives: grey, gently pulsing table rows, Dashboard cards and allocation; for a chart, its outline at its final height (grid lines, a faint rising line, a light sweeping across). An empty chart shows its message at the chart's height.
 
-On a phone (≤ 720 px) charts reach the screen edges, with short axis labels (57 k, 1,6 M).
+A chart reloading (another range) stays in place, dimmed with a spinner; its range buttons are disabled meanwhile, the chosen one spinning.
+
+On a phone (≤ 720 px) charts reach the screen edges: the y-axis labels (short: 57k, 1,6M) sit inside the plot, above their grid lines.
 
 ## Navigation
+
+A menu with the coin logo and the app's name: a sidebar on a computer; on a phone a slim bar on top whose ☰ button opens the menu over the page (any choice, a tap outside or Escape closes it), with the user and "Log out" at its foot.
 
 Hash routes, so the static site stays one page (no CloudFront rewrites) and every view, including its filters, can be bookmarked:
 
@@ -27,6 +31,7 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 ## Dashboard
 
 - **Totals:** total (positions + cash), value of positions, cash (only accounts whose assets are all tracked; the card says how many it leaves out), cost, gain (PLN and %), coupons and income received.
+- **Asset mix:** one bar split into shares (ETFs), bonds (all bond types), cash (PLN and foreign) and other (manually valued), with each share and amount: positions plus the cash of complete accounts, as in the totals.
 - **Portfolio value over time:** from `PORTFOLIO/SNAP#<date>`, with a range selector (1M, 6M, 1Y, all).
 - **Accounts** (`GET /accounts`): per account net deposits (deposits − withdrawals; transfers between your accounts count on both sides), positions, cash, total, profit (total − net deposits), **XIRR** (money-weighted annual return of the deposits and withdrawals plus today's total, `core/valuation/accounts.ts`), income (coupons, interest, dividends) and costs (commissions, fees, taxes). Incomplete accounts are greyed and left out of the total row. **Closed** accounts (no positions, no cash left) come last, folded into one greyed row "▸ n closed accounts" that expands them (with the date they were emptied); their profit stays in the total.
 - **Allocation:** bars by asset type and by currency (positions of all accounts + cash of the complete ones, as in the totals), share and amount (on a phone the amount is in the row tooltip). Foreign cash counts as Cash.

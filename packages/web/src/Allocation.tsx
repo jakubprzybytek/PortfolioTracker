@@ -59,3 +59,47 @@ export function Allocation({ snapshot }: { snapshot: Snapshot }) {
     </div>
   );
 }
+
+/** Asset classes of the big picture; instrument types map onto them (all ETFs held are equity funds). */
+const ASSET_CLASS: Record<string, string> = {
+  ETF: "SHARES",
+  BOND_LISTED: "BONDS",
+  BOND_CORPORATE: "BONDS",
+  BOND_RETAIL: "BONDS",
+  BOND_IBKR: "BONDS",
+  CURRENCY: "CASH",
+  CASH: "CASH",
+  FUND_MANUAL: "OTHER",
+};
+const CLASS_LABELS: Record<string, string> = { SHARES: "Shares", BONDS: "Bonds", CASH: "Cash", OTHER: "Other" };
+const CLASS_ORDER = ["SHARES", "BONDS", "CASH", "OTHER"];
+
+/**
+ * The big picture in one bar: shares, bonds, cash and other (manually valued), as shares of positions + cash of
+ * the fully tracked accounts.
+ */
+export function AssetMix({ snapshot }: { snapshot: Snapshot }) {
+  const byClass = new Map<string, number>();
+  const add = (key: string, value: number) => byClass.set(key, (byClass.get(key) ?? 0) + value);
+  for (const h of snapshot.holdings) if (h.value) add(ASSET_CLASS[h.type] ?? "OTHER", h.value);
+  add("CASH", snapshot.totals.cash ?? 0);
+  const total = [...byClass.values()].reduce((s, v) => s + v, 0);
+  const slices = CLASS_ORDER.filter((k) => (byClass.get(k) ?? 0) > 0).map((key) => ({ key, value: byClass.get(key)!, share: total ? byClass.get(key)! / total : 0 }));
+  return (
+    <section className="asset-mix" data-testid="asset-mix" aria-label="Asset mix">
+      <div className="mix-bar" aria-hidden>
+        {slices.map((s) => (
+          <span key={s.key} className={`mix-${s.key}`} style={{ width: `${(s.share * 100).toFixed(2)}%` }} title={`${CLASS_LABELS[s.key]}: ${fmtNum(s.share * 100, 1)} %`} />
+        ))}
+      </div>
+      <ul className="mix-legend">
+        {slices.map((s) => (
+          <li key={s.key} data-testid={`asset-mix-${s.key}`} title={fmtPln(s.value)}>
+            <i className={`mix-dot mix-${s.key}`} aria-hidden />
+            {CLASS_LABELS[s.key]} <strong>{fmtNum(s.share * 100, 1)} %</strong> <span className="muted">{fmtPln(s.value)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
