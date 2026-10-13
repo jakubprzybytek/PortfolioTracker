@@ -67,18 +67,25 @@ export default $config({
     const defaults = { link: [...link, market], timeout: "5 minutes" as const, memory: "512 MB" as const };
 
     // --- jobs ----------------------------------------------------------------------------------
+    // Revaluations requested by imports, backfills, FX and the monthly job go through a FIFO queue with one message group:
+    // Lambda then runs them one at a time, in order. Overlapping runs could end with the older data written last
+    // (SNAP#LATEST without the newest transactions). Reserved concurrency would do it too, but the account's limit
+    // (50) doesn't allow reserving any.
+    const valuationQueue = new sst.aws.Queue("ValuationQueue", { fifo: true, visibilityTimeout: "16 minutes" });
+
     const valuation = new sst.aws.Function("Valuation", {
       ...defaults,
       handler: "packages/jobs/src/handlers/valuation.handler",
       timeout: "15 minutes",
-      link: [...link, market, transactions, holdings],
+      link: [...link, market, transactions, holdings, valuationQueue], // the queue link lets it receive and delete
     });
+    valuationQueue.subscribe(valuation.arn, { batch: { size: 1 } });
 
     const backfill = new sst.aws.Function("Backfill", {
       ...defaults,
       handler: "packages/jobs/src/handlers/backfill.handler",
       timeout: "15 minutes",
-      link: [...link, market, valuation],
+      link: [...link, market, valuationQueue],
     });
 
     // NBP exchange rates; also started by an import that brings a foreign-currency instrument.
@@ -86,7 +93,7 @@ export default $config({
       ...defaults,
       handler: "packages/jobs/src/handlers/fx.handler",
       timeout: "10 minutes",
-      link: [...link, market, transactions, valuation],
+      link: [...link, market, transactions, valuationQueue],
     });
 
     const importer = new sst.aws.Function("Import", {
@@ -94,7 +101,7 @@ export default $config({
       handler: "packages/jobs/src/handlers/import.handler",
       timeout: "15 minutes",
       // Starts the backfill of new instruments directly (a stream on a new table misses early inserts).
-      link: [...link, market, transactions, valuation, backfill, fx],
+      link: [...link, market, transactions, valuationQueue, backfill, fx],
     });
     files.notify({
       notifications: [{ name: "Imports", function: importer.arn, events: ["s3:ObjectCreated:*"], filterPrefix: "imports/" }],
@@ -148,7 +155,7 @@ export default $config({
     new sst.aws.CronV2("FxAfternoon", { function: fx.arn, schedule: "cron(30 16 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
     new sst.aws.CronV2("Monthly", {
       // Revalues when the Ministry publishes new retail-bond rates.
-      function: { ...defaults, handler: "packages/jobs/src/handlers/monthly.handler", link: [...link, market, valuation] },
+      function: { ...defaults, handler: "packages/jobs/src/handlers/monthly.handler", link: [...link, market, valuationQueue] },
       schedule: "cron(0 10 16 * ? *)",
       timezone: WARSAW,
       retries: 2,

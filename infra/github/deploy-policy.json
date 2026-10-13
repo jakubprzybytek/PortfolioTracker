@@ -40,6 +40,14 @@
       "Resource": "*"
     },
     {
+      "Sid": "Queues",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:*"
+      ],
+      "Resource": "arn:aws:sqs:*:198805281865:portfolio-tracker-*"
+    },
+    {
       "Sid": "Data",
       "Effect": "Allow",
       "Action": [

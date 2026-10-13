@@ -1,5 +1,6 @@
 // Values the portfolio: one date by default (today), or every day from `from` to `to`.
-// Invoked on a schedule, after imports/backfills, or manually with { from, to }.
+// Runs only from the FIFO queue (one at a time, in order). A direct invocation (the 22:30/07:30 schedules, or by hand
+// with { from, to, reason }) just queues its request, so it can't overlap a run started by an import or backfill.
 
 import {
   addDays,
@@ -12,7 +13,8 @@ import {
   type IsoDate,
   type PriceItem,
 } from "@portfolio/core";
-import { repo, runJob } from "../lib/context.ts";
+import type { SQSEvent } from "aws-lambda";
+import { queueValuation, repo, runJob } from "../lib/context.ts";
 
 export interface ValuationEvent {
   from?: IsoDate;
@@ -20,7 +22,16 @@ export interface ValuationEvent {
   reason?: string;
 }
 
-export async function handler(event: ValuationEvent = {}) {
+export async function handler(event: ValuationEvent | SQSEvent = {}) {
+  if (!("Records" in event)) {
+    await queueValuation(event);
+    return { queued: true };
+  }
+  for (const record of event.Records) await revalue(JSON.parse(record.body) as ValuationEvent);
+  return { processed: event.Records.length };
+}
+
+async function revalue(event: ValuationEvent) {
   return runJob("valuation", async () => {
     const [instruments, transactions, refIndex, accounts] = await Promise.all([repo.listInstruments(), repo.listTransactions(), repo.listReferenceIndex(), repo.listAccounts()]);
     const referenceIndex = toReferenceIndex(refIndex);

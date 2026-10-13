@@ -45,6 +45,8 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
 
 ## Valuation job
 
+**One run at a time.** Imports, backfills, the FX job and the monthly job ask for a revaluation by sending a message to the `ValuationQueue` (SQS FIFO, one message group); the valuation function consumes it one message at a time, in order, so each run reads the data as it is when it starts. A direct invocation (the 22:30 and 07:30 schedules, or by hand with `{ from, to, reason }`) only queues its request. Before this, overlapping runs could finish in the wrong order and leave `SNAP#LATEST` without the newest transactions (seen on `int`, 2026-10-13). Reserved concurrency would have been simpler, but the account's limit (50) leaves nothing to reserve.
+
 1. Load instruments, transactions, latest prices (`PX` items ≤ date), FX for the date, CPI and rate periods.
 2. **Retail bonds:**
    - Compute the value per bond for each series: 100 PLN + accrued interest according to the rate periods and the compounding rule (EDO compounds yearly, COI/ROD per their terms).

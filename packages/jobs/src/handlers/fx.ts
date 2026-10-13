@@ -4,7 +4,7 @@
 
 import { Resource } from "sst";
 import { addDays, firstTransactionDate, today, type IsoDate } from "@portfolio/core";
-import { invokeAsync, repo, runJob } from "../lib/context.ts";
+import { queueValuation, repo, runJob } from "../lib/context.ts";
 import { NBP_FIRST_DATE, fetchNbpRates } from "../lib/nbp.ts";
 
 /** Always kept (exchange rates in the Indicators view), whatever is held. */
@@ -32,7 +32,7 @@ export async function handler(event: { to?: IsoDate } = {}) {
       if (foreign.has(currency) && rates[0]!.date < to && (!earliestNew || rates[0]!.date < earliestNew)) earliestNew = rates[0]!.date;
     }
     const first = earliestNew && firstTransactionDate(await repo.listTransactions());
-    if (earliestNew && first) await invokeAsync(Resource.Valuation.name, { from: earliestNew > first ? earliestNew : first, reason: "fx" });
+    if (earliestNew && first) await queueValuation({ from: earliestNew > first ? earliestNew : first, reason: "fx" });
     return { itemsWritten: written, note: notes.join("; ") || "up to date" };
   });
 }

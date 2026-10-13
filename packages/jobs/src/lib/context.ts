@@ -3,6 +3,8 @@
 import { Resource } from "sst";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
+import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { Repository, type IsoDate } from "@portfolio/core";
 
@@ -34,6 +36,17 @@ export async function archiveRaw(source: string, date: IsoDate, fileName: string
 /** Fire-and-forget invocation of another function (used to queue a valuation re-run). */
 export async function invokeAsync(functionName: string, payload: object): Promise<void> {
   await lambda.send(new InvokeCommand({ FunctionName: functionName, InvocationType: "Event", Payload: JSON.stringify(payload) }));
+}
+
+const sqs = new SQSClient({});
+
+/**
+ * Asks for a revaluation. It goes through a FIFO queue with one message group, so runs happen one at a time and in
+ * order: each reads the data as it is when it starts. (Only for functions linked to the queue.)
+ */
+export async function queueValuation(payload: object): Promise<void> {
+  const queueUrl = (Resource as unknown as { ValuationQueue: { url: string } }).ValuationQueue.url;
+  await sqs.send(new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: JSON.stringify(payload), MessageGroupId: "valuation", MessageDeduplicationId: randomUUID() }));
 }
 
 /** Runs a job body and records a JOB#/RUN# item with the outcome. Rethrows so Lambda retries apply. */

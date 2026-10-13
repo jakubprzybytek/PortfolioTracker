@@ -2,7 +2,7 @@
 // without a backfill status, or manually (see Docs/backfill.md).
 
 import { Resource } from "sst";
-import { invokeAsync, repo, runJob } from "../lib/context.ts";
+import { queueValuation, repo, runJob } from "../lib/context.ts";
 import { interpolatePricePath, today, type PriceItem } from "@portfolio/core";
 import { BIZNESRADAR_SOURCE_ID, backfillBiznesradarHistory } from "../lib/catalystJobs.ts";
 import { YAHOO_SOURCE_ID, backfillYahooHistory } from "../lib/etfJobs.ts";
@@ -100,7 +100,7 @@ export async function handler(event: BackfillEvent) {
       results[isin] = r;
       itemsWritten += r.rows ?? 0;
     }
-    if (revalue && itemsWritten > 0) await invokeAsync(Resource.Valuation.name, { reason: "backfill", isins });
+    if (revalue && itemsWritten > 0) await queueValuation({ reason: "backfill", isins });
     return { itemsWritten, note: JSON.stringify(results) };
   });
 }

@@ -3,7 +3,7 @@
 
 import { buildReferenceIndex, indexRatioAt, shiftMonth, toReferenceIndex, today } from "@portfolio/core";
 import { Resource } from "sst";
-import { archiveRaw, invokeAsync, repo, runJob } from "../lib/context.ts";
+import { archiveRaw, queueValuation, repo, runJob } from "../lib/context.ts";
 import { fetchRetailFile } from "../lib/mfRetail.ts";
 import { importRetailRates } from "./import.ts";
 import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv } from "../lib/gus.ts";
@@ -76,7 +76,7 @@ export async function handler() {
       const r = await importRetailRates(content, url);
       itemsWritten += r.series + r.refreshed;
       notes.push(`retail: ${r.series} series, ${r.refreshed} instruments refreshed`);
-      if (r.refreshed > 0) await invokeAsync(Resource.Valuation.name, { reason: "retail-rates" });
+      if (r.refreshed > 0) await queueValuation({ reason: "retail-rates" });
     } catch (err) {
       notes.push(`retail file failed: ${(err as Error).message}`);
     }

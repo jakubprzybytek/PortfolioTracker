@@ -56,7 +56,7 @@ describe(`API ${API}`, () => {
       const ike = r.body.accounts?.["ike"]?.cash;
       const etf = r.body.holdings.find((h) => h.code === "SPXS")?.quantity === 200 && r.body.holdings.some((h) => h.code === "KRU0827") && r.body.holdings.some((h) => h.isin === BUND);
       return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && codes.has("SAMPLE-APARTMENT") && etf && ike === 99.49 && clean ? true : undefined;
-    }, 180_000);
+    }, 420_000); // revaluations run one at a time (queued), each up to a minute
     // The NBP import (EUR and USD back to 2002) writes rates as it goes; wait for the run to finish.
     await waitFor(async () => ((await get<{ jobs: Record<string, { status: string } | null> }>("/status")).body.jobs["fx"]?.status === "ok" ? true : undefined), 300_000);
   });

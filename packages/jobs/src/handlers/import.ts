@@ -20,7 +20,7 @@ import {
   type InstrumentItem,
   type RetailTerms,
 } from "@portfolio/core";
-import { invokeAsync, repo, runJob } from "../lib/context.ts";
+import { invokeAsync, queueValuation, repo, runJob } from "../lib/context.ts";
 import type { BackfillEvent } from "./backfill.ts";
 
 const s3 = new S3Client({});
@@ -177,7 +177,7 @@ export async function handler(event: S3Event) {
       notes.push(result.note);
       revalue ||= !key.includes("/instruments/"); // new instruments get valued after their backfill instead
     }
-    if (revalue) await invokeAsync(Resource.Valuation.name, { reason: "import" });
+    if (revalue) await queueValuation({ reason: "import" });
     return { itemsWritten, note: notes.join("; ") };
   });
 }
