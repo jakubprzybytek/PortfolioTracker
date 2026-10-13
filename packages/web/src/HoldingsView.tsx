@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
+import { ManualValues } from "./ManualValues.tsx";
 import { FilterBar, FilterSelect, uniqueOptions, type Option } from "./Filters.tsx";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
@@ -519,7 +520,10 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
             </>
           }
         >
-          <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />
+          <div className="chart-tools">
+            <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />
+            {chartHolding?.type === "FUND_MANUAL" && <ManualValues key={chartHolding.isin} isin={chartHolding.isin} code={chartHolding.code} currency={chartHolding.currency} />}
+          </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             {history.error ? <p className="error">{history.error}</p> : <ValueChart testId="holding-chart" data={history.data ?? []} loading={history.loading} />}
           </div>

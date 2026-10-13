@@ -21,7 +21,7 @@ export type ManualTransaction = z.output<typeof ManualTransaction>;
 export const INSTRUMENT_TYPES = new Set(["BUY", "SELL", "COUPON", "REDEMPTION", "DIVIDEND", "SPLIT"]);
 
 /** 2026-02-30 has the right shape but isn't a day. */
-const isCalendarDate = (d: string): boolean => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) === d;
+export const isCalendarDate = (d: string): boolean => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) === d;
 
 /**
  * Checks what the schema can't: a real calendar date, an instrument where the type needs one, a quantity for trades, a ratio for splits.

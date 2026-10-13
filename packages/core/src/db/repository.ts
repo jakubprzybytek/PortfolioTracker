@@ -121,6 +121,10 @@ export class Repository {
     });
   }
 
+  async deletePrice(isin: string, venue: string, date: IsoDate): Promise<void> {
+    await this.doc.send(new DeleteCommand({ TableName: this.tables.market, Key: keys.price(isin, venue, date) }));
+  }
+
   /** The latest price on or before `date`. */
   async latestPrice(isin: string, venue: string, date: IsoDate): Promise<PriceItem | undefined> {
     const { PK, SK } = keys.pricePrefix(isin, venue);

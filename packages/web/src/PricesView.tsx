@@ -3,6 +3,7 @@ import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
 import { fmtNum, fmtPct, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
+import { ManualValues } from "./ManualValues.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { PriceChart } from "./PriceChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
@@ -96,7 +97,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                       {r.priceDate ?? "no price"}
                       {r.stale && r.priceDate && <span className="flag">stale</span>}
                       {r.manual && (
-                        <span className="flag" title="Entered by hand (imports/prices/)">
+                        <span className="flag" title="Valued by hand: open the chart for a new value">
                           manual
                         </span>
                       )}
@@ -143,7 +144,10 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             </span>
           }
         >
-          <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />
+          <div className="chart-tools">
+            <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />
+            {sel?.manual && <ManualValues key={sel.isin} isin={sel.isin} code={sel.code} currency={sel.currency} />}
+          </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             {prices.error ? (
               <p className="error">{prices.error}</p>

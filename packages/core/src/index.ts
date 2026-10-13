@@ -29,3 +29,4 @@ export * from "./prices/splits.ts";
 export * from "./instruments/listing.ts";
 export * from "./valuation/accounts.ts";
 export * from "./prices/pricePath.ts";
+export * from "./backup/export.ts";

@@ -160,6 +160,14 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
+    // Backup of accounts, instruments, hand-entered prices and transactions (the data that exists nowhere else) to
+    // exports/<date>/ in the bucket, in the import formats.
+    new sst.aws.CronV2("Export", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/export.handler", link: [...link, market, transactions] },
+      schedule: "cron(0 4 1 * ? *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
     new sst.aws.CronV2("ValuationEvening", { function: valuation.arn, schedule: "cron(30 22 ? * MON-FRI *)", timezone: WARSAW });
     new sst.aws.CronV2("ValuationMorning", { function: valuation.arn, schedule: "cron(30 7 ? * TUE-SAT *)", timezone: WARSAW });
 
@@ -223,6 +231,8 @@ export default $config({
     api.route("GET /instruments", apiHandler, auth);
     api.route("GET /instruments/{isin}/prices", apiHandler, auth);
     api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
+    api.route("POST /instruments/{isin}/prices", apiHandler, auth);
+    api.route("DELETE /instruments/{isin}/prices/{date}", apiHandler, auth);
     api.route("GET /transactions", apiHandler, auth);
     api.route("POST /transactions", apiHandler, auth);
     api.route("PUT /transactions/{id}", apiHandler, auth);

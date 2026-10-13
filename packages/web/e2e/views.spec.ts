@@ -307,6 +307,29 @@ test.describe("prices view", () => {
     await page.getByTestId("filters-reset").click();
     await expect(rows).toHaveCount(7);
   });
+
+  test("an asset valued by hand takes a new value from its chart panel, and the value can be deleted", async ({ page }) => {
+    await page.goto("/#/prices?chart=ZZSAMPLEAPA0");
+    await expect(page.getByTestId("price-title")).toContainText("SAMPLE-APARTMENT");
+    await page.getByTestId("manual-value-open").click();
+    const list = page.getByTestId("manual-value-list");
+    await expect(list).toContainText("2026-09-30");
+    // Dated before the sample's latest value, so the valuation of today doesn't change.
+    await page.getByTestId("manual-value-date").fill("2026-07-16");
+    await page.getByTestId("manual-value-price").fill("930,5");
+    await page.getByTestId("manual-value-save").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("SAMPLE-APARTMENT: value 930,50 PLN on 2026-07-16 saved");
+    await expect(list).toContainText("2026-07-16");
+    await page.getByTestId("manual-value-delete-2026-07-16").click();
+    await expect(page.getByTestId("manual-value-delete-2026-07-16")).toHaveText("Delete?");
+    await page.getByTestId("manual-value-delete-2026-07-16").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("value of 2026-07-16 deleted");
+    await expect(list).not.toContainText("2026-07-16");
+    // A listed bond has a price source: no form.
+    await page.goto("/#/prices?chart=PL0000113783");
+    await expect(page.getByTestId("price-title")).toContainText("DS0432");
+    await expect(page.getByTestId("manual-value-open")).toHaveCount(0);
+  });
 });
 
 test.describe("holdings grouped by instrument", () => {

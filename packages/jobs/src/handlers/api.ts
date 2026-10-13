@@ -1,5 +1,5 @@
 // HTTP API for the UI (see Docs/ui.md). Reads, plus adding/editing/deleting transactions and adding instruments
-// (the "Add transaction" form). Every route needs a Cognito login (checked by API Gateway) in one of the stage's
+// (the "Add transaction" form), and new values of hand-valued assets. Every route needs a Cognito login (checked by API Gateway) in one of the stage's
 // access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
@@ -15,6 +15,7 @@ import {
   accountSummaries,
   netDepositsByDate,
   checkManualTransaction,
+  isCalendarDate,
   listedTreasuryInstrument,
   newTransactionId,
   parseManualPrices,
@@ -145,6 +146,36 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const prices = adjustForSplits(await repo.queryPrices(isin, inst.venue, from, to), inst.splits);
         return json(200, prices.map(({ PK: _p, SK: _s, ...rest }) => rest));
       }
+      case "POST /instruments/{isin}/prices": {
+        // A new value of a hand-valued asset (venue MANUAL): { date, price } per unit in the instrument's currency.
+        if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
+        const inst = await repo.getInstrument(isin);
+        if (!inst) return json(404, { error: "Unknown instrument" });
+        if (inst.venue !== "MANUAL") return json(400, { error: `${inst.code} has a price source; only hand-valued assets take a value here` });
+        const body = bodyOf(event) as { date?: unknown; price?: unknown; note?: unknown } | undefined;
+        const date = typeof body?.date === "string" ? body.date : "";
+        const price = typeof body?.price === "number" ? body.price : NaN;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isCalendarDate(date)) return json(400, { error: "date: needs a date (YYYY-MM-DD)" });
+        if (date > addDays(today(), 1)) return json(400, { error: "date: not in the future" }); // a day ahead: UTC vs the user's clock
+        if (!(price > 0)) return json(400, { error: "price: needs a positive number" });
+        const note = typeof body?.note === "string" && body.note.trim() ? body.note.trim() : undefined;
+        const [item] = parseManualPrices(JSON.stringify([{ isin, date, price, currency: inst.currency, ...(note ? { note } : {}) }]), APP_SOURCE);
+        await repo.putPrices([item!]);
+        await queueValuation({ reason: "value entered", from: date });
+        const { PK: _p, SK: _s, ...out } = item!;
+        return json(201, out);
+      }
+      case "DELETE /instruments/{isin}/prices/{date}": {
+        const date = event.pathParameters?.["date"] ?? "";
+        if (!isin || !ISIN.test(isin) || !isCalendarDate(date)) return json(400, { error: "Needs an ISIN and a date" });
+        const inst = await repo.getInstrument(isin);
+        if (!inst || inst.venue !== "MANUAL") return json(400, { error: "Only values entered by hand can be deleted" });
+        const [existing] = await repo.queryPrices(isin, "MANUAL", date, date);
+        if (!existing) return json(404, { error: `No value on ${date}` });
+        await repo.deletePrice(isin, "MANUAL", date);
+        await queueValuation({ reason: "value deleted", from: date });
+        return json(200, { isin, date });
+      }
       case "GET /indicators": {
         // One row per indicator: latest value and the one a year earlier (series via /indicators/{id}).
         const cpi = cpiIndicators(await repo.listReferenceIndex()).map((i) => summarize(i, i.points));
@@ -266,7 +297,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, txs.map(withoutKeys));
       }
       case "GET /status": {
-        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "fx", "valuation", "backfill", "import", "monthly"];
+        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "fx", "valuation", "backfill", "import", "monthly", "export"];
         const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.listJobRuns(j))[0] ?? null])));
         return json(200, { now: new Date().toISOString(), jobs: runs });
       }

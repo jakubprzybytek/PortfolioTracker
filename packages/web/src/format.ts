@@ -30,7 +30,11 @@ export function addDays(date: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
-export const today = (): string => new Date().toISOString().slice(0, 10);
+/** Today on this device's calendar (not UTC: after midnight in Poland UTC still says yesterday). */
+export const today = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 export type RangeKey = "1M" | "6M" | "1Y" | "ALL";
 export const RANGES: { key: RangeKey; days: number | null }[] = [
@@ -70,4 +74,10 @@ export const TX_TYPE_LABELS: Record<string, string> = {
   DIVIDEND: "Dividend",
   SPLIT: "Split",
   EXCHANGE: "Currency exchange",
+};
+
+/** "1 234,56" or "1234.56" → 1234.56; empty → undefined; not a number → NaN. */
+export const parseNum = (s: string): number | undefined => {
+  const t = s.replace(/[\s ]/g, "").replace(",", ".");
+  return t === "" ? undefined : Number(t);
 };

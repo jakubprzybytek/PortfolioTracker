@@ -30,6 +30,8 @@ export const TransactionInput = z.object({
   valueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   currency: z.string().length(3).default("PLN"),
   note: z.string().optional(),
+  /** Where the row came from ("app", an import file): kept by a backup, so a restore doesn't relabel app entries. */
+  source: z.string().optional(),
 });
 export type TransactionInput = z.input<typeof TransactionInput>;
 
@@ -61,6 +63,6 @@ export function parseTransactionFile(json: string, source: string): Omit<Transac
   const parsed = TransactionFile.parse(JSON.parse(json));
   return parsed.map((t) => {
     const { id: _ignored, ...rest } = t;
-    return { ...rest, id: transactionId(t), source };
+    return { ...rest, id: transactionId(t), source: rest.source ?? source };
   });
 }

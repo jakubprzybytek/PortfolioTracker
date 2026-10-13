@@ -50,7 +50,11 @@ function Shell({ email }: { email: string }) {
     const t = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(t);
   }, [toast]);
-  const txForm = useMemo(() => ({ open: (editing?: Transaction) => setForm({ editing }), version }), [version]);
+  const saved = useCallback((message: string) => {
+    setToast(`${message} The valuation updates in about a minute.`);
+    setVersion((v) => v + 1);
+  }, []);
+  const txForm = useMemo(() => ({ open: (editing?: Transaction) => setForm({ editing }), saved, version }), [saved, version]);
   // Phone: the menu opens over the page from the ☰ button; any navigation, a tap outside or Escape closes it.
   const [menuOpen, setMenuOpen] = useState(false);
   const hash = window.location.hash;
@@ -133,8 +137,7 @@ function Shell({ email }: { email: string }) {
           onClose={() => setForm(null)}
           onSaved={(message) => {
             setForm(null);
-            setToast(`${message} The valuation updates in about a minute.`);
-            setVersion((v) => v + 1);
+            saved(message);
           }}
         />
       )}

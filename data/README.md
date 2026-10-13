@@ -6,7 +6,7 @@ Upload a file to the bucket under `imports/<kind>/` and the `Import` Lambda load
 |---|---|---|
 | `mf-calculator` | `imports/mf-calculator/<name>.xlsm` | Ministry of Finance `kalkulatorodsetek.xlsm` from [gov.pl/web/finanse/kalkulatory2](https://www.gov.pl/web/finanse/kalkulatory2): CPI reference index + treasury bond terms. Import this first. |
 | `mf-retail` | `imports/mf-retail/<name>.xls` | Ministry of Finance "Dane dotyczące obligacji detalicznych" from [gov.pl/web/finanse/obligacje-detaliczne1](https://www.gov.pl/web/finanse/obligacje-detaliczne1): every retail bond series with its rates. Import before retail instruments. The `monthly` job also fetches it. |
-| `prices` | `imports/prices/<name>.json` | Manual prices for assets without a price source: `[{ "isin": "ZZ…", "date": "2026-10-11", "price": 1000, "currency": "PLN" }]`. Upload a new file whenever you have a new value. |
+| `prices` | `imports/prices/<name>.json` | Manual prices for assets without a price source: `[{ "isin": "ZZ…", "date": "2026-10-11", "price": 1000, "currency": "PLN" }]`. A new value is easier entered in the app ("New value" in the asset's chart panel). |
 | `accounts` | `imports/accounts/<name>.json` | `[{ "account": "…", "incomplete": ["ETFs"] }]`: accounts whose assets aren't all tracked yet (their cash is shown greyed and not totalled). Written by the converter. |
 | `instruments` | `imports/instruments/<name>.json` | Instruments to track ([instruments.json](instruments.json)). `"terms": "mf"` resolves bond terms from the calculator by code. A new instrument starts its own history backfill. |
 | `transactions` | `imports/transactions/<name>.json` | Your transactions ([transactions.sample.json](transactions.sample.json) shows the format). Re-importing the same file is safe: ids are derived from the row contents. |
@@ -24,6 +24,17 @@ Corporate bonds (Catalyst): `"type": "BOND_CORPORATE"`, `"venue": "CATALYST"`, `
 ETF instruments: `"type": "ETF"`, `currency` of the listing, `venue` (`XAMS`, `XETR` …), `"sourceIds": { "yahoo": "VWRL.AS" }` and any `splits` (`[{ "date": "2025-12-15", "ratio": 100 }]`). Importing one loads its full price history from Yahoo and the NBP rates of its currency; recording a new split later reloads the history.
 
 `transactions.sample.json` (with `instruments.sample.json`, `prices.sample.json` and `accounts.sample.json`) is **made-up data** for trying the app out.
+
+## Restoring from a backup
+
+The `Export` job writes `exports/<date>/{accounts,instruments,prices,transactions}.json` on the 1st of every month (Docs/data-storage.md). Each file is in the format above, so a restore is uploading them, in this order, after the MF calculator and the retail-bond file:
+
+```sh
+D=exports/2026-11-01
+for k in accounts instruments prices transactions; do aws s3 cp s3://$BUCKET/$D/$k.json s3://$BUCKET/imports/$k/restore-$k.json; done
+```
+
+Transactions keep their ids and sources, so restoring into a table that still has them changes nothing.
 
 ## Transactions from the reference spreadsheet
 

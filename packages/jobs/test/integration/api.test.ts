@@ -64,7 +64,7 @@ describe(`API ${API}`, () => {
   it("GET /status lists the last run of every job", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown> }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "fx", "import", "monthly", "valuation"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "export", "fx", "import", "monthly", "valuation"]);
     expect(body.jobs["fx"]).toMatchObject({ status: "ok" });
     expect(body.jobs["import"]).toMatchObject({ status: "ok" });
   });
@@ -347,6 +347,30 @@ describe(`API ${API}`, () => {
     expect(await mine()).toEqual([]);
     expect((await send("DELETE", `/transactions/${id}?account=api-test`)).status).toBe(404);
     expect((await send("PUT", "/transactions/0000000000000000?account=api-test", { date: "2099-01-03", account: "api-test", type: "DEPOSIT", amount: 1 })).status).toBe(404);
+  });
+
+  it("POST/DELETE /instruments/{isin}/prices record and remove a value of a hand-valued asset, checking it first", async () => {
+    // Dated before the sample's latest value (950 on 2026-09-30), so today's valuation doesn't change meanwhile.
+    const APT = "ZZSAMPLEAPA0";
+    const values = async () => (await get<{ date: string; close: number; venue: string }[]>(`/instruments/${APT}/prices?from=2026-01-01&to=2026-12-31`)).body;
+    expect((await send<{ error: string }>("POST", `/instruments/${DS}/prices`, { date: "2026-07-15", price: 99 })).body.error).toContain("price source");
+    expect((await send("POST", `/instruments/${APT}/prices`, { date: "2099-01-01", price: 920 })).status).toBe(400);
+    expect((await send("POST", `/instruments/${APT}/prices`, { date: "2026-02-30", price: 920 })).status).toBe(400);
+    expect((await send("POST", `/instruments/${APT}/prices`, { date: "2026-07-15", price: 0 })).status).toBe(400);
+
+    const created = await send<{ date: string; close: number; venue: string; source: string }>("POST", `/instruments/${APT}/prices`, { date: "2026-07-15", price: 920 });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ date: "2026-07-15", close: 920, venue: "MANUAL", source: "app" });
+    expect((await values()).map((p) => [p.date, p.close])).toEqual([
+      ["2026-06-01", 900],
+      ["2026-07-15", 920],
+      ["2026-09-30", 950],
+    ]);
+
+    expect((await send("DELETE", `/instruments/${APT}/prices/2026-07-15`)).status).toBe(200);
+    expect((await values()).map((p) => p.date)).toEqual(["2026-06-01", "2026-09-30"]);
+    expect((await send("DELETE", `/instruments/${APT}/prices/2026-07-15`)).status).toBe(404);
+    expect((await send("DELETE", `/instruments/${DS}/prices/2026-07-15`)).status).toBe(400);
   });
 
   it("GET /instruments/lookup finds a tracked instrument or proposes a treasury series; POST /instruments checks its input", async () => {

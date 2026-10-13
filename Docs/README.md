@@ -131,7 +131,7 @@ Later phases:
 
 ## Outstanding work (2026-10-14)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 18, 7, 19, 8.
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 19, 8.
 
 ### Correctness and accuracy
 1. **Foreign bonds at IBKR are priced by calculation** (constant yield from the trades to 100 % at maturity), not quoted; the sheet's price for one of them differs by about 1 %. Mark prices from IBKR Flex (11) would settle it.
@@ -142,7 +142,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed.
 
 ### Missing compared with the sheet
-7. **Update the value of a hand-valued asset** (`FUND_MANUAL`) in the app: its value came from the sheet, and there's no form for a new valuation yet. Most pressing now that the sheet isn't the source.
+7. ~~Update the value of a hand-valued asset~~ Done (2026-10-14): "New value" in its chart panel (Prices, Holdings), values listed and deletable (ui.md).
 8. **Targets and rebalancing:** target share per asset class (the sheet has them), target vs actual next to the asset mix, amount to buy or sell.
 9. **Closed positions:** realised gain is shown as a total (Dashboard, per account); still missing: the list of closed positions and sales, and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
@@ -155,7 +155,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 15. **`prod`: the "EUR cash" / "USD cash" instruments** (`CURRENCY`) are unused since IBKR is kept per currency: mark them inactive.
 16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
-18. **Monthly export of `transactions` to S3** (data-storage.md plans it; point-in-time recovery covers only 35 days): the table is now the only copy of what's entered in the app.
+18. ~~Monthly export of `transactions` to S3~~ Done (2026-10-14): the `Export` job backs up accounts, instruments, prices entered by hand and transactions to `exports/<date>/` on the 1st, in the import formats (data-storage.md, restore: data/README.md).
 
 ### Beyond the sheet
 19. **Hold or sell a bond:** is a bond worth selling now rather than holding it to maturity? Once owned, what was paid doesn't matter: compare the **yield if held** (what it still pays from today: coupons and 100 % at maturity, after tax, against what selling it would bring today) with an **alternative** for the same period, after the cost of switching.

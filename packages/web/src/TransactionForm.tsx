@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, apiSend } from "./api.ts";
-import { TX_TYPE_LABELS, addDays, fmtMoney, fmtNum, today, typeLabel } from "./format.ts";
+import { TX_TYPE_LABELS, addDays, fmtMoney, fmtNum, parseNum, today, typeLabel } from "./format.ts";
 import type { AccountSummary, Instrument, Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -26,11 +26,6 @@ const NEW_KINDS: { kind: NewKind; label: string }[] = [
   { kind: "manual", label: "Other asset, valued by hand" },
 ];
 
-/** "1 234,56" or "1234.56" → 1234.56; empty → undefined; not a number → NaN. */
-const parseNum = (s: string): number | undefined => {
-  const t = s.replace(/[\s ]/g, "").replace(",", ".");
-  return t === "" ? undefined : Number(t);
-};
 const str = (n: number | undefined) => (n === undefined ? "" : String(n).replace(".", ","));
 
 const isBond = (i: Instrument) => i.type === "BOND_LISTED" || i.type === "BOND_CORPORATE" || i.type === "BOND_IBKR";
