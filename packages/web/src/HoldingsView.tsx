@@ -489,7 +489,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
             {groupCount > 1 && (
               <tr className="total" data-testid="holdings-total">
                 <td className="left" colSpan={5}>
-                  Total <span className="muted">(cash of incomplete accounts not included)</span>
+                  Total {groups.some((g) => g.incomplete.length > 0) && <span className="muted">(cash of incomplete accounts not included)</span>}
                 </td>
                 <SumCells s={total} />
               </tr>

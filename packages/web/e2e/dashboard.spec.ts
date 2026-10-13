@@ -56,7 +56,8 @@ test.describe("dashboard", () => {
     await expect(broker.locator("td").nth(5)).toHaveText(/^0,00\s*zł$/); // realised: nothing sold
     await expect(broker.locator("td").nth(6)).toHaveText(/%$/); // XIRR
     await expect(page.locator('tr[data-testid="account-row"][data-account="etf"]')).toHaveClass(/muted/);
-    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("66 403,69 zł"); // incl. the closed account's −20, and eur: 5 000 + 100 EUR at 4.2369
+    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("66 403,69 zł");
+    await expect(page.getByTestId("accounts-total").locator("td").first()).toHaveText("Total (fully tracked accounts)"); // "etf" isn't // incl. the closed account's −20, and eur: 5 000 + 100 EUR at 4.2369
   });
 
   test("folds closed accounts into one greyed row; they stay in the total", async ({ page }) => {

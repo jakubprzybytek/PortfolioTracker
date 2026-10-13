@@ -5,7 +5,8 @@ import type { AccountSummary } from "./types.ts";
 
 const pct = (v: number | null) => (v === null ? "–" : fmtPct(v * 100));
 
-function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
+/** `partial`: the total row when some account isn't fully tracked (it's left out, so say so). */
+function Row({ a, total = false, partial = false }: { a: AccountSummary; total?: boolean; partial?: boolean }) {
   const incomplete = !!a.incomplete?.length;
   return (
     <tr
@@ -23,7 +24,7 @@ function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
       <td className="left">
         {total ? (
           <>
-            Total <span className="muted">(fully tracked accounts)</span>
+            Total {partial && <span className="muted">(fully tracked accounts)</span>}
           </>
         ) : (
           <>
@@ -121,7 +122,7 @@ export function AccountsTable({ data }: { data: AccountsData }) {
             </tr>
           )}
           {showClosed && closed.map((a) => <Row key={a.account} a={a} />)}
-          {data.data && <Row a={data.data.total} total />}
+          {data.data && <Row a={data.data.total} total partial={data.data.accounts.some((a) => a.incomplete?.length)} />}
         </tbody>
       </table>
     </div>
