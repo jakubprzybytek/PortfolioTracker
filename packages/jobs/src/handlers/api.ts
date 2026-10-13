@@ -107,7 +107,8 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         // Held instruments (latest snapshot): latest price, its date, and the price a year earlier.
         const [snap, instruments] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments()]);
         const held = new Set((snap?.holdings ?? []).filter((h) => h.quantity > 0).map((h) => h.isin));
-        const shown = instruments.filter((i) => held.has(i.isin));
+        // Currencies held (IBKR cash) have no price of their own: their rates are in the Indicators view.
+        const shown = instruments.filter((i) => held.has(i.isin) && i.type !== "CURRENCY");
         const day = today();
         const latest = new Map<string, PriceItem>();
         const yearAgo = new Map<string, PriceItem>();

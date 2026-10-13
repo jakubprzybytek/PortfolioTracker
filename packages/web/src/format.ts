@@ -33,9 +33,10 @@ export const TYPE_LABELS: Record<string, string> = {
   BOND_LISTED: "Listed bond",
   BOND_CORPORATE: "Corporate bond",
   BOND_RETAIL: "Retail bond",
-  BOND_IBKR: "Bond (IBKR)",
+  BOND_IBKR: "Foreign bond",
   ETF: "ETF",
   FUND_MANUAL: "Manually valued",
+  CURRENCY: "Currency",
   CASH: "Cash",
 };
 export const typeLabel = (type: string): string => TYPE_LABELS[type] ?? type;

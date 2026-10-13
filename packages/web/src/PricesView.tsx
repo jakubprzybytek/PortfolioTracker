@@ -129,6 +129,8 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                 {sel && sel.name !== sel.code ? sel.name : ""}
                 {sel?.type === "BOND_LISTED" || sel?.type === "BOND_CORPORATE"
                   ? " · clean price, % of nominal"
+                  : sel?.type === "BOND_IBKR"
+                    ? ` · calculated (constant yield between your trades and redemption), % of nominal in ${sel.currency}`
                   : sel?.type === "BOND_RETAIL"
                     ? " · value per bond, PLN (calculated, nominal 100)"
                     : sel
@@ -147,7 +149,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                 prices={prices.data ?? []}
                 transactions={txs.data ?? []}
                 calculated={sel?.type === "BOND_RETAIL"}
-                unit={sel?.type === "BOND_LISTED" || sel?.type === "BOND_CORPORATE" ? "%" : (sel?.currency ?? "")}
+                unit={sel?.type === "BOND_LISTED" || sel?.type === "BOND_CORPORATE" || sel?.type === "BOND_IBKR" ? "%" : (sel?.currency ?? "")}
               />
             )}
           </div>

@@ -3,5 +3,6 @@
   { "account": "broker" },
   { "account": "ike" },
   { "account": "foreign" },
+  { "account": "ibkr" },
   { "account": "etf", "incomplete": ["ETFs"] }
 ]

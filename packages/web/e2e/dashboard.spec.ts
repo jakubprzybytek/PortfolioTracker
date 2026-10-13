@@ -14,8 +14,8 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("total-value")).not.toContainText("–");
     await expect(page.getByTestId("total-gain")).toContainText("%");
     await expect(page.getByTestId("total-coupons")).toContainText("996,70"); // bond coupons (incl. the corporate bond's 70) + the manual asset's income
-    // Cash: bonds + broker + foreign + ike; the incomplete "etf" account is left out and the card says so
-    await expect(page.getByTestId("total-cash")).toContainText("7197,39");
+    // Cash: bonds + broker + foreign + ibkr + ike; the incomplete "etf" account is left out and the card says so
+    await expect(page.getByTestId("total-cash")).toContainText("8597,39");
     await expect(page.getByTestId("total-cash")).toContainText("1 incomplete account not included");
     await expect(page.getByTestId("total-all")).toContainText("zł");
   });
@@ -37,13 +37,13 @@ test.describe("dashboard", () => {
 
   test("lists the accounts with net deposits, profit and XIRR; the incomplete one greyed and outside the total", async ({ page }) => {
     const rows = page.getByTestId("account-row");
-    await expect(rows).toHaveCount(5);
-    expect(await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute("data-account")))).toEqual(["bonds", "broker", "etf", "foreign", "ike"]);
+    await expect(rows).toHaveCount(6);
+    expect(await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute("data-account")))).toEqual(["bonds", "broker", "etf", "foreign", "ibkr", "ike"]);
     const broker = page.locator('tr[data-testid="account-row"][data-account="broker"]');
     await expect(broker.locator("td").nth(1)).toHaveText("30 000,00 zł"); // net deposits
     await expect(broker.locator("td").nth(6)).toHaveText(/%$/); // XIRR
     await expect(page.locator('tr[data-testid="account-row"][data-account="etf"]')).toHaveClass(/muted/);
-    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("51 000,00 zł");
+    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("61 000,00 zł");
   });
 
   test("shows the allocation by asset type and by currency", async ({ page }) => {

@@ -43,7 +43,12 @@ const EPS = 1e-9;
  */
 export function positionsAt(transactions: TransactionItem[], date: IsoDate): Map<string, Position> {
   const positions = new Map<string, Position>();
-  const sorted = [...transactions].filter((t) => t.date <= date && t.isin).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  // Within a day: buys first, sales last (a same-day sale of what was just bought, e.g. currency at IBKR, must not be
+  // clipped to the holding before the buy).
+  const rank = (t: TransactionItem) => (t.type === "BUY" ? 0 : t.type === "SELL" || t.type === "REDEMPTION" ? 2 : 1);
+  const sorted = [...transactions]
+    .filter((t) => t.date <= date && t.isin)
+    .sort((a, b) => a.date.localeCompare(b.date) || rank(a) - rank(b) || a.id.localeCompare(b.id));
   for (const t of sorted) {
     const isin = t.isin!;
     const key = positionKey(t.account, isin);

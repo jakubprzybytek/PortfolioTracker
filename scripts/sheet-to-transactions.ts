@@ -60,8 +60,14 @@ if (!catalystFile) console.warn("No --catalyst file: Catalyst bonds are skipped.
 
 const workbook = readFileSync(input);
 const rows = readSheetTransactions(workbook);
-const { transactions, skipped, retailInstruments, corporateInstruments, etfInstruments, manualInstruments, manualPrices, accounts } = convertSheetRows(rows, byCode, retail, etfs, corporates);
-const instrumentsOut = [...retailInstruments, ...corporateInstruments, ...etfInstruments, ...manualInstruments];
+const { transactions, skipped, retailInstruments, corporateInstruments, ibkrInstruments, etfInstruments, manualInstruments, manualPrices, accounts } = convertSheetRows(
+  rows,
+  byCode,
+  retail,
+  etfs,
+  corporates,
+);
+const instrumentsOut = [...retailInstruments, ...corporateInstruments, ...ibkrInstruments, ...etfInstruments, ...manualInstruments];
 const pricesOut = [...manualPrices, ...readSheetManualPrices(workbook, today())];
 
 // Same validation as the Import Lambda: fail here rather than after the upload.
@@ -83,9 +89,11 @@ const count = <T>(items: T[], key: (t: T) => string) =>
 console.log(`${rows.length} rows read, ${transactions.length} converted → ${OUT}/transactions.json`);
 for (const [type, n] of count(transactions, (t) => t.type)) console.log(`  ${type.padEnd(10)} ${n}`);
 console.log(
-  `${retailInstruments.length} retail series + ${corporateInstruments.length} Catalyst bonds + ${etfInstruments.length} ETFs + ${manualInstruments.length} manually valued → ${OUT}/instruments.json; ${pricesOut.length} manual prices → ${OUT}/prices.json`,
+  `${retailInstruments.length} retail series + ${corporateInstruments.length} Catalyst bonds + ${ibkrInstruments.length} IBKR (bonds, currencies) + ${etfInstruments.length} ETFs + ${manualInstruments.length} manually valued → ${OUT}/instruments.json; ${pricesOut.length} manual prices → ${OUT}/prices.json`,
 );
 for (const c of corporateInstruments) console.log(`  ${c.code.padEnd(8)} ${c.isin} ${c.venue.padEnd(8)} nominal ${c.nominal} ${c.active ? "held: BiznesRadar" : "closed: trade prices"}`);
+for (const i of ibkrInstruments)
+  console.log(`  ${i.code.padEnd(12)} ${i.type.padEnd(9)} ${i.currency} ${i.name}${i.pricePath ? ` path ${i.pricePath.length} points → ${i.pricePath.at(-1)!.date}` : ""}`);
 for (const e of etfInstruments) console.log(`  ${e.code.padEnd(6)} ${e.isin} ${e.venue} ${e.sourceIds["yahoo"]} ${e.currency}${e.splits ? " splits " + JSON.stringify(e.splits) : ""}`);
 console.log("accounts → accounts.json:");
 for (const a of accounts) console.log(`  ${a.account.padEnd(26)} ${a.incomplete.length ? "incomplete: " + a.incomplete.join(", ") : "complete"}`);

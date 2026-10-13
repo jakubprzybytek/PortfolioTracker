@@ -72,9 +72,12 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       continue;
     }
 
-    const price = ctx.prices.get(p.isin);
-    if (!price) flags.push("no_price");
-    else if (price.venue !== "MANUAL" && daysBetween(price.lastTradeDate ?? price.date, date) > staleAfterDays) flags.push("stale_price");
+    // Foreign currency held in an account (IBKR): one unit is worth one unit of its currency; no price needed.
+    const isCurrency = inst?.type === "CURRENCY";
+    const price = isCurrency ? undefined : ctx.prices.get(p.isin);
+    if (!price) {
+      if (!isCurrency) flags.push("no_price");
+    } else if (price.venue !== "MANUAL" && daysBetween(price.lastTradeDate ?? price.date, date) > staleAfterDays) flags.push("stale_price");
 
     let nominal: number | null = null;
     let accruedInterest: number | null = null;
@@ -94,6 +97,8 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       // Corporate bonds: clean price (% of nominal) × nominal; accrued interest isn't tracked (floating coupons).
       nominal = inst.nominal;
       if (price) valuePerUnit = Number(((price.close / 100) * inst.nominal).toFixed(6));
+    } else if (isCurrency) {
+      valuePerUnit = 1;
     } else if (price) {
       valuePerUnit = price.close;
     }

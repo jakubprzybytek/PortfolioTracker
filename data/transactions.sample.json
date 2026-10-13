@@ -17,5 +17,9 @@
   { "date": "2025-12-15", "account": "foreign", "type": "SPLIT", "isin": "IE00B3YCGJ38", "ratio": 100, "amount": 0, "note": "100:1 split" },
   { "date": "2026-03-02", "account": "bonds", "type": "DEPOSIT", "amount": 5000, "note": "account with a Catalyst corporate bond (sample data)" },
   { "date": "2026-03-03", "account": "bonds", "type": "BUY", "isin": "PLKRK0000713", "quantity": 40, "price": 101.2, "amount": -4048, "fee": 8.1, "note": "clean % of the 100 PLN nominal" },
-  { "date": "2026-05-12", "account": "bonds", "type": "COUPON", "isin": "PLKRK0000713", "amount": 70 }
+  { "date": "2026-05-12", "account": "bonds", "type": "COUPON", "isin": "PLKRK0000713", "amount": 70 },
+  { "date": "2025-10-01", "account": "ibkr", "type": "DEPOSIT", "amount": 10000, "note": "broker account with foreign cash and a foreign bond (sample data)" },
+  { "date": "2025-10-02", "account": "ibkr", "type": "BUY", "isin": "ZZWALUTYEUR0", "quantity": 2000, "price": 1, "fxRate": 4.3, "amount": -8600, "note": "PLN → EUR" },
+  { "date": "2025-10-02", "account": "ibkr", "type": "BUY", "isin": "DE0001102523", "quantity": 2, "price": 95.952, "fxRate": 4.3, "amount": -8251.87, "note": "2 × 959.52 EUR" },
+  { "date": "2025-10-02", "account": "ibkr", "type": "SELL", "isin": "ZZWALUTYEUR0", "quantity": 1919.04, "price": 1, "fxRate": 4.3, "amount": 8251.87, "note": "EUR spent on the bond" }
 ]

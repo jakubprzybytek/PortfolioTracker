@@ -48,6 +48,7 @@ Kept deliberately short (a passive portfolio needs no daily statistics): what ea
 
 - **One row per held instrument** (latest snapshot), sorted by code. **Filter:** asset type ("Reset", "n of m instruments"), kept in the URL.
 - **Columns:** instrument (code + name), type, price (bonds: clean, % of nominal; others: in their currency), price date (grey with a "stale" tag when older than a week), **1 year**: change since the price on or before the same day a year earlier (hover shows that price and date; "–" without a year of history).
+- **Foreign bonds at IBKR:** calculated prices (% of nominal), see data-sources.md. Currencies held (EUR/USD cash) aren't listed: their rates are in Indicators.
 - **Retail bonds** aren't traded: price = this year's interest rate ("5,00 % p.a."), date = "calculated", 1 year = the previous year's rate. Their chart shows the calculated value per bond of your lots (PLN, nominal 100, so it reads like % of nominal), from the first purchase; each new interest year changes the slope.
 - **Click a row:** its price chart opens in the panel docked to the bottom, as in Holdings (resizable by its top edge, size shared with Holdings; ✕, Escape or a second click closes it): range selector, transactions as markers; ETFs in their currency on today's share basis. The open chart is in the URL (`?chart=<ISIN>`) and stays open while filtering.
 

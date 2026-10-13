@@ -8,7 +8,7 @@
 | Polish treasury bonds on GPW / Catalyst | DS, PS, WZ, IZ series | GPW archive: daily XLS with all treasury bonds | – | GPW archive: full history per bond (1 request each) |
 | Polish corporate bonds on Catalyst | fixed and floating coupons | BiznesRadar: history page + today's quote | – | BiznesRadar: full history per bond (~16 pages) |
 | Polish retail treasury bonds (not traded) | EDO, COI, ROD, ROR … | Calculated from terms + CPI | – | Calculated; checked against obligacjeskarbowe.pl interest tables |
-| EU government bonds at IBKR | Bunds, OATs, T-bills | IBKR Flex Web Service (mark price) | – | IBKR Flex (period statements); Bundesbank for the Bund |
+| Foreign government bonds at IBKR | Bunds, OATs, US T-bills (zero-coupon) | Calculated: constant yield between your trades and redemption at maturity (`pricePath`) | – | Same, computed once on import. Later: IBKR Flex (mark prices) |
 | Manually valued assets | e.g. real-estate projects | Manual entry | – | Manual |
 | Cash | savings accounts, broker cash | From transactions / manual balances | – | Broker CSV / sheet import |
 
@@ -117,7 +117,11 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - **Per lot:** interest runs from each purchase's own date (transaction field `valueDate`), so lots of one series bought days apart differ slightly. Checked against the reference sheet: all 21 open lots identical to the grosz per bond on 2026-10-11.
 - A period whose rate isn't in the file yet keeps the last rate and is flagged `rate_pending`.
 
-### IBKR Flex Web Service – IBKR bonds, positions, cash
+### Foreign bonds at IBKR – calculated prices (used, 2026-10-13)
+- All held are zero-coupon (FR 0 % Feb 2027, DE 0 % Nov 2027, US T-bill Oct 2026), short and held to maturity. The instrument's `pricePath` holds your trade prices (% of nominal 1000) and, while held, 100 % at maturity (parsed from IBKR's name, "DE Govt 0.0 Nov15'27"); the backfill stores one price per weekday in between at a constant yield (`core/prices/pricePath.ts`) as `PX#CALC#…`. Exact at every trade and at maturity; between them it ignores market moves (a fraction of a percent for bonds this short). A new trade (re-import) recomputes the path.
+- Foreign cash at IBKR is a position per currency (`CURRENCY`, "EUR cash"), bought and sold with PLN at the trade's rate like the reference sheet's `Waluty_EUR`, valued at the NBP mid rate; the account's PLN cash is then the sheet's (−0.06).
+
+### IBKR Flex Web Service – IBKR bonds, positions, cash (later)
 - Token + query ID; plain HTTPS request; works from Lambda (no gateway).
 - Data: positions with IBKR's mark prices and accrued interest, trades, cash, dividends/coupons.
 - Not used: TWS API / Client Portal Web API (need an always-on gateway with 2FA re-login, which doesn't fit the serverless design).

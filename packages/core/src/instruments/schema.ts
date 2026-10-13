@@ -28,7 +28,7 @@ export const InstrumentInput = z.object({
   isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}\d$/),
   code: z.string().min(1),
   name: z.string().min(1),
-  type: z.enum(["BOND_LISTED", "BOND_CORPORATE", "BOND_RETAIL", "ETF", "BOND_IBKR", "FUND_MANUAL", "CASH"]),
+  type: z.enum(["BOND_LISTED", "BOND_CORPORATE", "BOND_RETAIL", "ETF", "BOND_IBKR", "FUND_MANUAL", "CURRENCY", "CASH"]),
   currency: z.string().length(3).default("PLN"),
   venue: z.string().default("XWAR"),
   sourceIds: z.record(z.string(), z.string()).default({}),
@@ -41,6 +41,8 @@ export const InstrumentInput = z.object({
   terms: z.union([z.literal("mf"), z.literal("mf-retail"), BondTermsInput]).optional(),
   /** Corporate bonds (no terms): nominal per bond, e.g. 1000 or 100; prices are % of it. */
   nominal: z.number().positive().optional(),
+  /** Foreign bonds without a price source: known prices (% of nominal), interpolated at a constant yield in between. */
+  pricePath: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), price: z.number().positive() })).optional(),
   /** Share splits (ETFs): from `date` on, one unit became `ratio` units. */
   splits: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ratio: z.number().positive() })).optional(),
 });

@@ -43,16 +43,16 @@ describe("convertSheetRows", () => {
       [
         row({ row: 5, ticker: "EDO-110332", assetClass: "Obligacje skarbowe polskie", type: "Zakup" }),
         row({ row: 6, ticker: "AMS:VWRL", assetClass: "Akcje zagraniczne", currency: "EUR", type: "Zakup" }),
-        row({ row: 7, ticker: "Waluty_EUR", assetClass: "Waluty", currency: "EUR", type: "Zakup" }),
+        row({ row: 7, ticker: "WSE:PZU", assetClass: "Akcje polskie", type: "Zakup" }),
         row({ row: 8, ticker: "IZ0836", assetClass: "Obligacje skarbowe polskie", type: "Split" }),
       ],
       instruments,
     );
     expect(transactions).toHaveLength(0);
     expect(skipped.map((s) => [s.row, s.reason])).toEqual([
-      [5, "retail bond: no ISIN; calculator not wired in yet"],
-      [6, "ETF/share: phase 2 (prices, dividends, splits, FX)"],
-      [7, "currency position: not modelled (foreign cash comes from cash balances later)"],
+      [5, "retail bond: series not in the Ministry file (pass --mf-retail)"],
+      [6, "ETF: not in the ETF file (data/private/etfs.json)"],
+      [7, 'unknown instrument (class "Akcje polskie")'],
       [8, 'IZ0836: unsupported type "Split"'],
     ]);
   });

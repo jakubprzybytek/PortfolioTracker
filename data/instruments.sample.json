@@ -35,5 +35,26 @@
     "venue": "CATALYST",
     "sourceIds": { "biznesradar": "KRU0827" },
     "nominal": 100
+  },
+  {
+    "isin": "DE0001102523",
+    "code": "DE0001102523",
+    "name": "DE Govt 0.0 Nov15'27 (sample holding)",
+    "type": "BOND_IBKR",
+    "currency": "EUR",
+    "venue": "CALC",
+    "nominal": 1000,
+    "pricePath": [
+      { "date": "2025-10-02", "price": 95.952 },
+      { "date": "2027-11-15", "price": 100 }
+    ]
+  },
+  {
+    "isin": "ZZWALUTYEUR0",
+    "code": "EUR",
+    "name": "EUR cash",
+    "type": "CURRENCY",
+    "currency": "EUR",
+    "venue": "FX"
   }
 ]

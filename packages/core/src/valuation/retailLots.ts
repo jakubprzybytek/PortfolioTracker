@@ -14,7 +14,9 @@ export interface RetailLot {
 /** Open lots of one account's position on `date`: buys add a lot, sells and redemptions take from the oldest (FIFO). */
 export function retailLotsAt(transactions: TransactionItem[], date: IsoDate): RetailLot[] {
   const lots: RetailLot[] = [];
-  const sorted = transactions.filter((t) => t.date <= date).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  // Within a day: buys before sales (as in positionsAt).
+  const rank = (t: TransactionItem) => (t.type === "BUY" ? 0 : t.type === "SELL" || t.type === "REDEMPTION" ? 2 : 1);
+  const sorted = transactions.filter((t) => t.date <= date).sort((a, b) => a.date.localeCompare(b.date) || rank(a) - rank(b) || a.id.localeCompare(b.id));
   for (const t of sorted) {
     const qty = t.quantity ?? 0;
     if (t.type === "BUY" && qty > 0) lots.push({ valueDate: t.valueDate ?? t.date, quantity: qty });

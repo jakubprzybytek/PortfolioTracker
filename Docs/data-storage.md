@@ -61,10 +61,11 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 
 | Field | Example |
 |---|---|
-| `isin`, `name`, `type` | `IE00B3RBWM25`, "Vanguard FTSE All-World", `ETF` / `BOND_LISTED` / `BOND_RETAIL` / `BOND_IBKR` / `FUND_MANUAL` / `CASH` |
+| `isin`, `name`, `type` | `IE00B3RBWM25`, "Vanguard FTSE All-World", `ETF` / `BOND_LISTED` / `BOND_CORPORATE` / `BOND_RETAIL` / `BOND_IBKR` / `FUND_MANUAL` / `CURRENCY` (foreign cash held in an account: one unit = 1 of its currency, valued at the NBP rate) / `CASH` |
 | `currency`, `venue` | `EUR`, `XAMS` (MIC of the listing prices come from: `XAMS` Euronext Amsterdam, `XETR` Xetra, `XWAR` GPW) |
 | `sourceIds` | `{ "yahoo": "VWRL.AS" }`, `{ "gpw": "<CODE>" }`, later `{ "ibkr_conid": "…" }` |
 | `nominal` | Corporate bonds (`BOND_CORPORATE`, no terms): nominal per bond (1000 or 100); prices are clean % of it; value = clean % × nominal, no accrued interest |
+| `pricePath` | Foreign bonds at IBKR (`BOND_IBKR`, `venue = CALC`, `nominal` 1000): known prices `[{ date, price }]` (% of nominal: your trades, redemption at maturity); the backfill writes a price per weekday in between at a constant yield |
 | `splits` | ETFs: `[{ "date": "2025-12-15", "ratio": 100 }]`: from `date` on one unit became `ratio` units. Prices are stored as traded; charts and the 1-year change divide earlier prices by later splits (`core/prices/splits.ts`) |
 | `live` | `true` for instruments polled intraday |
 | `active` | `false` once sold/matured (jobs skip inactive instruments) |
@@ -182,6 +183,8 @@ GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
 `type`: `BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`, `DIVIDEND`, `SPLIT`.
 Foreign-currency trades (ETFs at Bossa): `price` in the instrument's currency, `amount` and `fee` in PLN, `fxRate` = the broker's PLN per unit. `SPLIT`: `ratio` (units after per unit before), `amount` 0; the position's quantity × `ratio`, cost unchanged. `DIVIDEND` counts as income received, like coupons.
 `valueDate` (optional): retail bonds, when interest starts if not the transaction date. Retail positions are valued per lot (each buy; sales take the oldest lots first).
+
+**Same-day order:** buys before sales (then the rest), so a sale of what was bought the same day (currency at IBKR) isn't clipped.
 
 **Cost basis: FIFO.** Positions keep their open lots (one per buy, oldest first); a sale or redemption takes the oldest lots first, a partly sold lot keeping its cost per unit, and records the matched cost and the proceeds (`core/valuation/positions.ts`). A split multiplies every lot's units. Same as the reference sheet and Polish tax (PIT-38).
 

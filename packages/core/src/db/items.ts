@@ -4,7 +4,7 @@ import type { IsoDate } from "../dates.ts";
 import type { BondTerms } from "../bonds/terms.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
 
-export type InstrumentType = "BOND_LISTED" | "BOND_CORPORATE" | "BOND_RETAIL" | "ETF" | "BOND_IBKR" | "FUND_MANUAL" | "CASH";
+export type InstrumentType = "BOND_LISTED" | "BOND_CORPORATE" | "BOND_RETAIL" | "ETF" | "BOND_IBKR" | "FUND_MANUAL" | "CURRENCY" | "CASH";
 
 export interface InstrumentItem {
   PK: `INST#${string}`;
@@ -25,6 +25,11 @@ export interface InstrumentItem {
   nominal?: number;
   /** Retail treasury bonds: the series' terms and published rates (from the Ministry file). */
   retail?: RetailTerms;
+  /**
+   * Prices without a market source (foreign government bonds at IBKR): known points (your trades, and redemption at
+   * maturity), % of nominal. Daily prices in between are interpolated at a constant yield and stored as PX#CALC.
+   */
+  pricePath?: { date: IsoDate; price: number }[];
   /** Share splits: from `date` on, one unit became `ratio` units (prices stored as traded, not adjusted). */
   splits?: Split[];
   updatedAt: string;

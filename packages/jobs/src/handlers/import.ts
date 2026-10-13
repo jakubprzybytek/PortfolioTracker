@@ -106,6 +106,7 @@ export async function importInstruments(json: string) {
       ...(terms ? { terms } : {}),
       ...(retail ? { retail } : {}),
       ...(i.nominal ? { nominal: i.nominal } : {}),
+      ...(i.pricePath?.length ? { pricePath: [...i.pricePath].sort((x, y) => x.date.localeCompare(y.date)) } : {}),
       ...(i.splits?.length ? { splits: [...i.splits].sort((x, y) => x.date.localeCompare(y.date)) } : {}),
     };
     const before = await repo.getInstrument(i.isin);
@@ -116,7 +117,10 @@ export async function importInstruments(json: string) {
     const hasSource = Object.keys(i.sourceIds).length > 0;
     // A newly recorded split changes how the (split-adjusted) source history converts back: load it again.
     const splitsChanged = JSON.stringify(before?.splits ?? []) !== JSON.stringify(item.splits ?? []);
-    if (hasSource && (splitsChanged || !(await repo.getBackfillStatus(i.isin)))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
+    // Calculated prices: recompute whenever the known points change (a new trade).
+    const pathChanged = JSON.stringify(before?.pricePath ?? []) !== JSON.stringify(item.pricePath ?? []);
+    if (item.pricePath?.length && pathChanged) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
+    else if (hasSource && (splitsChanged || !(await repo.getBackfillStatus(i.isin)))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
   }
   // Instruments priced in another currency need NBP rates for their whole history: fetch what's missing now.
   if (inputs.some((i) => i.currency !== "PLN")) await invokeAsync(Resource.Fx.name, {});

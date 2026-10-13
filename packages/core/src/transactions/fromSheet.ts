@@ -60,6 +60,11 @@ export interface SheetConversion {
    * Already redeemed or sold (no longer quoted anywhere): priced from your own trades (`manualPrices`).
    */
   corporateInstruments: InstrumentInput[];
+  /**
+   * IBKR: foreign government bonds (nominal 1000 in their currency, prices calculated from your trades and redemption
+   * at maturity) and the foreign cash held there as currency positions ("Waluty_EUR" → EUR).
+   */
+  ibkrInstruments: InstrumentInput[];
   /** ETFs the transactions use (listed in the ETF file): instruments with their Yahoo symbol and recorded splits. */
   etfInstruments: InstrumentInput[];
   /** Manually valued assets (sheet class "Inne"): instruments with a private id, and their purchase prices. */
@@ -125,12 +130,12 @@ const CASH_TYPES: Record<string, { type: TransactionInput["type"]; sign: 1 | -1 
 
 /** Why rows of an unknown instrument are skipped, per sheet asset class. */
 const SKIP_REASON_BY_CLASS: Record<string, string> = {
-  "Obligacje skarbowe polskie": "retail bond: no ISIN; calculator not wired in yet",
-  "Obligacje korporacyjne polskie": "Catalyst bond: not set up (ISIN, terms, prices)",
-  "Akcje zagraniczne": "ETF/share: phase 2 (prices, dividends, splits, FX)",
-  "Obligacje korporacyjne zagraniczne": "ETF/share: phase 2 (prices, dividends, splits, FX)",
-  "Obligacje skarbowe zagraniczne": "foreign bond: phase 3 (IBKR)",
-  Waluty: "currency position: not modelled (foreign cash comes from cash balances later)",
+  "Obligacje skarbowe polskie": "retail bond: series not in the Ministry file (pass --mf-retail)",
+  "Obligacje korporacyjne polskie": "Catalyst bond: not in the Catalyst file (data/private/catalyst.json)",
+  "Akcje zagraniczne": "ETF: not in the ETF file (data/private/etfs.json)",
+  "Obligacje korporacyjne zagraniczne": "ETF: not in the ETF file (data/private/etfs.json)",
+  "Obligacje skarbowe zagraniczne": "foreign bond: the ticker isn't an ISIN",
+  Waluty: "currency position: ticker isn't Waluty_<CCY>",
   Inne: "manually valued asset: not set up",
 };
 
@@ -156,6 +161,8 @@ export function convertSheetRows(
   const manualUsed = new Map<string, InstrumentInput>();
   const manualPrices: ManualPriceInput[] = [];
   const etfUsed = new Map<string, InstrumentInput>();
+  const foreignBonds = new Map<string, { input: InstrumentInput; quantity: number; maturity?: string; points: { date: string; price: number }[] }>();
+  const currencies = new Map<string, InstrumentInput>();
   const corporateUsed = new Map<string, { input: InstrumentInput; quantity: number; tradePrices: ManualPriceInput[] }>();
 
   for (const r of rows) {
@@ -195,6 +202,46 @@ export function convertSheetRows(
       } else if (r.type === "Sprzedaż")
         transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: r.price, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
       else if (r.type === "Dywidenda / Odsetki") transactions.push({ date: r.date, account: r.account, type: "INTEREST", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
+      else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
+      continue;
+    }
+
+    // Foreign cash at IBKR: the sheet buys and sells it with PLN like a position ("Waluty_EUR"); so do we.
+    if (r.assetClass === "Waluty" && /^Waluty_[A-Z]{3}$/.test(r.ticker)) {
+      const ccy = r.ticker.slice(-3);
+      const isin = privateAssetId(r.ticker);
+      if (!currencies.has(isin)) currencies.set(isin, { isin, code: ccy, name: `${ccy} cash`, type: "CURRENCY", currency: ccy, venue: "FX", sourceIds: {}, active: true, live: false });
+      if (r.type === "Zakup") transactions.push({ date: r.date, account: r.account, type: "BUY", isin, quantity: r.quantity, price: 1, fxRate: r.fxRate, amount: -round(r.totalPln - r.fee, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+      else if (r.type === "Sprzedaż") transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: 1, fxRate: r.fxRate, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+      else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
+      continue;
+    }
+
+    // Foreign government bonds at IBKR: the ticker is the ISIN; price per bond of 1000 in the bond's currency.
+    if (r.assetClass === "Obligacje skarbowe zagraniczne" && /^[A-Z]{2}[A-Z0-9]{9}\d$/.test(r.ticker)) {
+      const isin = r.ticker;
+      const fb = foreignBonds.get(isin) ?? {
+        input: { isin, code: isin, name: r.name, type: "BOND_IBKR", currency: r.currency, venue: "CALC", sourceIds: {}, active: true, live: false, nominal: 1000 },
+        quantity: 0,
+        points: [],
+      };
+      foreignBonds.set(isin, fb);
+      const maturity = maturityFromName(r.name);
+      if (maturity) {
+        fb.maturity = maturity;
+        if (fb.input.name === isin) fb.input.name = r.name; // some rows carry only the ISIN
+      }
+      const pricePct = round(r.price / 10, 4); // per 1000 nominal → %
+      const fx = r.fxRate > 0 && r.fxRate !== 1 ? { fxRate: r.fxRate } : {};
+      if (r.type === "Zakup") {
+        transactions.push({ date: r.date, account: r.account, type: "BUY", isin, quantity: r.quantity, price: pricePct, ...fx, amount: -round(r.totalPln - r.fee, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+        fb.quantity += r.quantity;
+        fb.points.push({ date: r.date, price: pricePct });
+      } else if (r.type === "Sprzedaż") {
+        transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: pricePct, ...fx, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
+        fb.quantity -= r.quantity;
+        fb.points.push({ date: r.date, price: pricePct });
+      } else if (r.type === "Dywidenda / Odsetki") transactions.push({ date: r.date, account: r.account, type: "COUPON", isin, amount: round(r.totalPln, 2), currency: "PLN", ...(note ? { note } : {}) });
       else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
       continue;
     }
@@ -312,7 +359,16 @@ export function convertSheetRows(
       manualPrices.push(...c.tradePrices);
     }
   }
-  return { transactions, skipped, retailInstruments, corporateInstruments, etfInstruments, manualInstruments: [...manualUsed.values()], manualPrices, accounts };
+  // Still held: the path runs on to redemption at 100 % on the maturity date.
+  const ibkrInstruments: InstrumentInput[] = [
+    ...[...foreignBonds.values()].map((fb): InstrumentInput => {
+      const points = [...fb.points];
+      if (fb.quantity > 0 && fb.maturity) points.push({ date: fb.maturity, price: 100 });
+      return { ...fb.input, active: fb.quantity > 0, pricePath: points.sort((a, b) => a.date.localeCompare(b.date)) };
+    }),
+    ...currencies.values(),
+  ];
+  return { transactions, skipped, retailInstruments, corporateInstruments, ibkrInstruments, etfInstruments, manualInstruments: [...manualUsed.values()], manualPrices, accounts };
 }
 
 /** Current prices of manually valued assets from the sheet's "Portfolio" tab (column K), dated `date`. */
@@ -328,6 +384,14 @@ export function readSheetManualPrices(content: Uint8Array, date: string): Manual
 
 const SHEET_NAME = "Transakcje";
 type Cell = string | number | boolean | Date | null | undefined;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** IBKR's bond names end with the maturity: "DE Govt 0.0 Nov15'27" → 2027-11-15. */
+export function maturityFromName(name: string): string | undefined {
+  const m = /([A-Z][a-z]{2})(\d{2})'(\d{2})\s*$/.exec(name);
+  const month = m ? MONTHS.indexOf(m[1]!) : -1;
+  return m && month >= 0 ? `20${m[3]}-${String(month + 1).padStart(2, "0")}-${m[2]}` : undefined;
+}
+
 /** "100:1" → 100 (units after per unit before); undefined for anything else. */
 const splitRatio = (v: Cell): number | undefined => {
   const m = /^\s*(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)\s*$/.exec(String(v ?? ""));

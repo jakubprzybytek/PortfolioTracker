@@ -21,7 +21,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 |---|---|
 | **1 – Polish bonds** (now) | Treasury bonds on GPW (fixed and inflation-linked IZ), Catalyst corporate bonds, retail bonds (EDO, COI, ROD); transactions import; daily valuation incl. accrued interest; table + charts |
 | 2 – ETFs | Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; later "live" (15-min delayed) quotes |
-| 3 – IBKR, FX | IBKR Flex (EU government bonds), NBP exchange rates |
+| 3 – IBKR, FX | Done from the sheet: foreign bonds (calculated prices), EUR/USD cash as positions, NBP rates. Later: IBKR Flex for new trades and mark prices |
 
 ## Architecture
 
@@ -127,4 +127,5 @@ Later phases:
 - [x] ETFs: Yahoo prices (history converted back to traded prices with the recorded splits: Yahoo has no split event for SPXS.AS), NBP rates since 2002, valuation in PLN, the sheet's ETF transactions (buys, sells, dividends, the SPXS 100:1 split). Bossa Zagranica and IKE Bossa are complete.
 - [x] Cost basis FIFO (as the reference sheet and Polish tax): a sale takes the oldest lots first; each sale's matched cost and proceeds are kept for a closed-positions view. Checked against the sheet: all 12 comparable positions equal to the grosz (SPXS 102,153.29, EUNK, IJPA, EMIM).
 - [ ] ISIN + venue for every ETF.
-- [ ] IBKR Flex: when the daily statement for day D becomes available.
+- [x] IBKR from the sheet: currency positions (EUR, USD) and foreign zero-coupon bonds with calculated prices; IBKR is complete (PLN cash −0.06, EUR 0.95, USD 1,190.01, bonds: quantities and costs equal to the sheet). All 753 sheet rows convert; every account is complete.
+- [ ] IBKR Flex Web Service: new IBKR trades and mark prices without the sheet (needs a Flex Query + token from you); when the daily statement for day D becomes available.

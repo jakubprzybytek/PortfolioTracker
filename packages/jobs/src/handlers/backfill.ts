@@ -3,7 +3,7 @@
 
 import { Resource } from "sst";
 import { invokeAsync, repo, runJob } from "../lib/context.ts";
-import { today } from "@portfolio/core";
+import { interpolatePricePath, today, type PriceItem } from "@portfolio/core";
 import { BIZNESRADAR_SOURCE_ID, backfillBiznesradarHistory } from "../lib/catalystJobs.ts";
 import { YAHOO_SOURCE_ID, backfillYahooHistory } from "../lib/etfJobs.ts";
 import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
@@ -52,6 +52,36 @@ export async function backfillInstrument(isin: string): Promise<{ status: string
       await repo.putBackfillStatus({ isin, status: "failed", source: BIZNESRADAR_SOURCE_ID, note: String((err as Error).message) });
       throw err;
     }
+  }
+
+  // Calculated prices (foreign bonds at IBKR): the whole path from the first trade to maturity, at once.
+  if (inst.pricePath?.length) {
+    const fetchedAt = new Date().toISOString();
+    const items = interpolatePricePath(inst.pricePath).map(
+      (p): PriceItem => ({
+        PK: `INST#${isin}`,
+        SK: `PX#${inst.venue}#${p.date}`,
+        isin,
+        venue: inst.venue,
+        date: p.date,
+        open: null,
+        high: null,
+        low: null,
+        close: p.price,
+        volume: 0,
+        trades: 0,
+        turnover: 0,
+        traded: true,
+        currency: inst.currency,
+        source: "calculated",
+        fetchedAt,
+        status: "final",
+      }),
+    );
+    const rows = await repo.putPrices(items);
+    const result = { from: items[0]!.date, to: items.at(-1)!.date, rows, note: "calculated: constant yield between your trades and redemption" };
+    await repo.putBackfillStatus({ isin, status: "done", source: "calculated", ...result });
+    return { status: "done", ...result };
   }
 
   // No source can provide history for this instrument (e.g. Catalyst corporate bonds): say so.
