@@ -8,9 +8,26 @@
 | Polish treasury bonds on GPW / Catalyst | DS, PS, WZ, IZ series | GPW archive: daily XLS with all treasury bonds | – | GPW archive: full history per bond (1 request each) |
 | Polish corporate bonds on Catalyst | fixed and floating coupons | BiznesRadar: history page + today's quote | – | BiznesRadar: full history per bond (~16 pages) |
 | Polish retail treasury bonds (not traded) | EDO, COI, ROD, ROR … | Calculated from terms + CPI | – | Calculated; checked against obligacjeskarbowe.pl interest tables |
-| Foreign government bonds at IBKR | Bunds, OATs, US T-bills (zero-coupon) | Calculated: constant yield between your trades and redemption at maturity (`pricePath`) | – | Same, computed once on import. Later: IBKR Flex (mark prices) |
+| Foreign government bonds at IBKR | Bunds, OATs, US T-bills (zero-coupon) | Calculated: constant yield between your trades and redemption at maturity (`pricePath`, trade prices from the IBKR statements) | – | Same, computed once on import. Later: IBKR Flex (mark prices) |
 | Manually valued assets | e.g. real-estate projects | Manual entry | – | Manual |
-| Cash | savings accounts, broker cash | From transactions / manual balances | – | Broker CSV / sheet import |
+| Cash | savings accounts, broker cash | From transactions | – | IBKR activity statements (CSV); the sheet import for the other accounts |
+
+## Where transactions come from
+
+Transactions are the only data the app can't fetch or rebuild (data-storage.md). Three sources, by account:
+
+| Source | Accounts | Since | How |
+|---|---|---|---|
+| **The app** ("Add transaction" form, ui.md) | all | 2026-10-13 | Entered by you; `source: "app"`. **The app is now the record**: new transactions go here, not into the spreadsheet. |
+| **The reference spreadsheet** ("Transakcje" tab) | all but IBKR | history up to 2026-10-13 | Converted once by `scripts/sheet-to-transactions.ts` (data/README.md). Not re-imported any more: its newer rows would duplicate what's entered in the app. |
+| **IBKR activity statements** (CSV) | IBKR | whole history | Converted by `scripts/ibkr-statements-to-transactions.ts`; replaced the sheet's IBKR rows on 2026-10-13 (below). |
+
+### IBKR activity statements – IBKR transactions (used, 2026-10-13)
+- **Source:** Client Portal → Performance & Reports → Statements → Activity, a period of at most a year, format CSV. A file is a stack of sections (`Deposits & Withdrawals`, `Trades`, `Interest`, `Withholding Tax`, `Corporate Actions`, `Financial Instrument Information` …), each with its own header row. The files carry your name and account number: keep them out of the repo.
+- **Why not the sheet:** the sheet booked IBKR in PLN and rounded the conversions to the grosz; it also missed some commissions, the accrued interest paid with a purchase, a coupon (booked as part of a sale) and the broker interest, and carried a wrong ISIN for one T-bill. Rebuilt from the statements, the cash per currency equals each statement's ending cash to the cent and the cost basis of every position equals IBKR's; the total barely moved, the profit shifted between realised gain, income and fees.
+- **Booked as** (`core/transactions/ibkrStatement.ts`): deposits on the day IBKR credited them; forex trades netted per day and currency pair into one `EXCHANGE` (IBKR's automatic conversions buy and sell within a minute), their commissions (charged in EUR) as one `FEE` a day; bond and bill trades per 1000 nominal at the clean price, the commission as the fee; accrued interest paid with a purchase added to its cost; coupons, broker interest, withholding tax; maturities as `REDEMPTION` at 100 on the report date. Overlapping statements are merged (a row counts once).
+- **Not in the statements:** interest accrued but not paid yet ("Interest Accruals"); it becomes a transaction when IBKR posts it.
+- **Repeat** (to check the app against IBKR, or to rebuild the account): download every statement since the account was opened, run the script, compare its "cash at the end" with the last statement's Cash Report; to replace the stored history, back up and delete the account's imported transactions (keep the `source: "app"` ones the statements don't cover yet), then import the file.
 
 ## Source details
 
@@ -119,9 +136,11 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 
 ### Foreign bonds at IBKR – calculated prices (used, 2026-10-13)
 - Meant for zero-coupon government bonds (Bunds, OATs, US T-bills), short and held to maturity. The instrument's `pricePath` holds your trade prices (% of nominal 1000) and, while held, 100 % at maturity (parsed from IBKR's name, "DE Govt 0.0 Nov15'27"); the backfill stores one price per weekday in between at a constant yield (`core/prices/pricePath.ts`) as `PX#CALC#…`. Exact at every trade and at maturity; between them it ignores market moves (a fraction of a percent for bonds this short). A new trade (re-import) recomputes the path.
-- IBKR is kept in its currencies (2026-10-13): trades, fees and redemptions in the currency paid (EUR, USD), conversions as `EXCHANGE`, cash per currency, the account's own currency EUR. The sheet booked everything in PLN (currency positions `Waluty_EUR` bought and sold with PLN; a trade and the sale of the currency that paid for it as two rows of equal PLN value); `core/transactions/nativeLedger.ts` pairs those back (sheet conversion `--native IBKR=EUR`). Checked: the cash per currency equals the sheet's currency positions to the cent.
+- The trade prices in `pricePath` are IBKR's (statement `T. Price`); a new trade means adding its price to the instrument (re-import it) so the path is recomputed.
+- IBKR is kept in its currencies (2026-10-13): trades, fees and redemptions in the currency paid (EUR, USD), conversions as `EXCHANGE`, cash per currency, the account's own currency EUR. Its transactions come from the IBKR activity statements (above). Before that they were converted from the sheet, which booked everything in PLN (currency positions `Waluty_EUR` bought and sold with PLN); `core/transactions/nativeLedger.ts` pairs those back (sheet conversion `--native IBKR=EUR`) and stays for converting the sheet.
 
 ### IBKR Flex Web Service – IBKR bonds, positions, cash (later)
+- Would replace downloading statements by hand: the same activity data, fetched by a job.
 - Token + query ID; plain HTTPS request; works from Lambda (no gateway).
 - Data: positions with IBKR's mark prices and accrued interest, trades, cash, dividends/coupons.
 - Not used: TWS API / Client Portal Web API (need an always-on gateway with 2FA re-login, which doesn't fit the serverless design).

@@ -21,7 +21,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 |---|---|
 | **1 – Polish bonds** (now) | Treasury bonds on GPW (fixed and inflation-linked IZ), Catalyst corporate bonds, retail bonds (EDO, COI, ROD); transactions import; daily valuation incl. accrued interest; table + charts |
 | 2 – ETFs | Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; later "live" (15-min delayed) quotes |
-| 3 – IBKR, FX | Done from the sheet: foreign bonds (calculated prices), EUR/USD cash as positions, NBP rates. Later: IBKR Flex for new trades and mark prices |
+| 3 – IBKR, FX | Done: foreign bonds (calculated prices), cash per currency, NBP rates; IBKR's history from its activity statements. Later: IBKR Flex for new trades and mark prices |
 
 ## Architecture
 
@@ -83,7 +83,7 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 
 1. **DynamoDB on-demand is the only database.** No idle cost, no cold start; Aurora Serverless was rejected because polling keeps it awake. Volume is tiny.
    Three tables by lifecycle: `market` (instruments, prices, reference data; rebuildable), `transactions` (your input; the only irreplaceable data) and `holdings` (snapshots computed by valuation). See [data-storage.md](data-storage.md).
-2. **Transactions are entered by you.** The history came from a file import (the spreadsheet, converted); new ones are added in the app ("Add transaction" form on Transactions, Docs/ui.md). Coupon payments you enter are also used to check the calculated accrued interest.
+2. **Transactions are entered by you.** The history came from file imports (the spreadsheet, converted; IBKR from its activity statements); new ones are added in the app ("Add transaction" form on Transactions, Docs/ui.md), which is now the record. Sources: data-sources.md, "Where transactions come from". Coupon payments you enter are also used to check the calculated accrued interest.
 3. **Accrued interest is computed, not fetched.** It comes from each bond's terms. The only external input is the coupon rate per period of floating-rate corporate bonds (see data-sources.md).
 4. **ISIN is the internal key.** Each source's code/ticker is a mapping on the instrument.
 5. **Store raw, unadjusted prices**; events (coupons, redemptions, splits, dividends) are stored separately.
@@ -127,10 +127,11 @@ Later phases:
 - [x] Currencies all equal (2026-10-13): amounts and fees in the currency paid, `EXCHANGE`, cash per account and currency, PLN at NBP D-1 (Polish tax), accounts with their own currency (IBKR: EUR, its summary in EUR too). IBKR history re-converted from the sheet: cash per currency equal to its currency positions.
 - [x] "Add transaction" form: add, edit, delete transactions in the app; new instruments by kind (treasury series by code, ETF by ticker, corporate bond, hand-valued asset). From 2026-10-13 the app, not the spreadsheet, is where transactions are entered.
 - [x] IBKR from the sheet: currency positions (EUR, USD) and foreign zero-coupon bonds with calculated prices; IBKR is complete (cash per currency, bond quantities and costs equal to the sheet). All 753 sheet rows convert; every account is complete.
+- [x] IBKR from its activity statements (2026-10-13): `scripts/ibkr-statements-to-transactions.ts`; the account's history rebuilt from IBKR's own records (cash per currency and cost basis equal to the statements; missing commissions, a coupon and interest added; one T-bill's ISIN corrected).
 
-## Outstanding work (2026-10-13)
+## Outstanding work (2026-10-14)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it. Compared with the sheet on 2026-10-13: quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 7, 18, 8.
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 7, 18, 8.
 
 ### Correctness and accuracy
 1. **Foreign bonds at IBKR are priced by calculation** (constant yield from the trades to 100 % at maturity), not quoted; the sheet's price for one of them differs by about 1 %. Mark prices from IBKR Flex (11) would settle it.
@@ -145,7 +146,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 8. **Targets and rebalancing:** target share per asset class (the sheet has them), target vs actual next to the asset mix, amount to buy or sell.
 9. **Closed positions:** realised gain is shown as a total (Dashboard, per account); still missing: the list of closed positions and sales, and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
-11. **IBKR Flex Web Service:** IBKR trades and mark prices without typing them (needs a Flex Query and a token).
+11. **IBKR Flex Web Service:** IBKR trades and mark prices without typing them or downloading statements (needs a Flex Query and a token).
 12. **More Dashboard charts:** income per year, drawdown, allocation over time.
 13. **Asset class per instrument:** bond ETFs are recognised by "Bond" in the name; an explicit setting would be safer (gold, mixed funds).
 
@@ -153,5 +154,5 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 14. **`prod`: drop the old `Table`** (declared in `sst.config.ts` for `prod` only, linked to nothing; removing the block leaves it in AWS because of `removal: retain`, so delete it in the console afterwards).
 15. **`prod`: the "EUR cash" / "USD cash" instruments** (`CURRENCY`) are unused since IBKR is kept per currency: mark them inactive.
 16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
-17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements.
+17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
 18. **Monthly export of `transactions` to S3** (data-storage.md plans it; point-in-time recovery covers only 35 days): the table is now the only copy of what's entered in the app.

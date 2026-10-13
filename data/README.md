@@ -41,3 +41,15 @@ node scripts/sheet-to-transactions.ts ~/Downloads/portfolio.xlsx --mf-retail ~/D
 - Bond prices: the sheet stores PLN per bond; the file gets % of nominal. Buy amounts exclude the fee (the sheet's total includes it).
 - Ids are derived from the row contents, so re-running the script and re-importing never duplicates transactions, even after the sheet re-sorts its rows. Identical rows (e.g. two equal deposits on one day) get distinct ids.
 - The file is validated with the same schema as the Import Lambda before it's written.
+- The app is now where transactions are entered: don't re-import the sheet into `prod` (its newer rows would duplicate them). IBKR comes from its statements instead (below).
+
+## IBKR transactions from activity statements
+
+`scripts/ibkr-statements-to-transactions.ts` converts IBKR activity statements (Client Portal → Performance & Reports → Statements → Activity, CSV, at most a year each) into the IBKR account's transactions, in its currencies (rules: [Docs/data-sources.md](../Docs/data-sources.md)):
+
+```sh
+node scripts/ibkr-statements-to-transactions.ts ~/Downloads/statement-2024.csv ~/Downloads/statement-2025.csv ~/Downloads/statement-2026.csv
+# → data/private/ibkr-from-statements.json; prints the cash per currency at the end (check it against the last statement's Cash Report)
+```
+
+Pass every statement since the account was opened: the file is the account's whole history. To replace what's stored, back up and delete the account's imported transactions (keep those entered in the app), then upload the file to `imports/transactions/`. Bills and bonds need their instruments (`BOND_IBKR`, `pricePath` from the statement's trade prices) imported first.

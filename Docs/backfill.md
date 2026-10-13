@@ -27,14 +27,14 @@ Reference data and transactions come first, because they define which instrument
 |---|---|---|---|---|
 | 1 | Instruments: ISIN, type, currency, venue, source tickers, bond terms (coupon type, rate/margin, dates, nominal; floating: rate per period) | Sheet + terms of issue / MF calculator / gpwcatalyst.pl | free | manual + import |
 | 2 | Exchange calendars (XWAR, XETRA, LSE …) for the backfill years | Exchange holiday lists | free | manual |
-| 3 | Transactions and cash | Existing sheet export, broker CSVs, IBKR Flex | free | script per format |
+| 3 | Transactions and cash | Sheet export (done), IBKR activity statements (done); later IBKR Flex | free | script per format |
 | 4 | FX (EUR, USD → PLN) | NBP API, chunks of 93 days | free | script |
 | 5 | CPI, IZ reference index, IZ series terms | MF calculator `kalkulatorodsetek.xlsm` (file import) + GUS CPI CSV | free | import |
 | 6 | Retail bond rate periods | Terms of issue + CPI → computed; checked against obligacjeskarbowe.pl interest tables | free | script + manual check |
 | 7 | ETFs: prices, splits, dividends | EODHD, one paid month (plan kept afterwards for live quotes) | ≈ $20 | script |
 | 8 | Treasury bonds on GPW | GPW archive XLS, one file per bond with full history | free | script (PoC done) |
 | 9 | Catalyst corporate bonds | Bossa EOD files → Cbonds trial → Biznesradar (see below) | free / trial | depends |
-| 10 | EU government bonds at IBKR | IBKR Flex statements per period; Bundesbank for German Bunds | free | script |
+| 10 | EU government bonds at IBKR | Calculated from the trade prices (done); later IBKR Flex mark prices; Bundesbank for German Bunds | free | script |
 | 11 | Portfolio snapshots | `valuation` job run for every date in the range | free | script |
 
 ## Per step
@@ -45,8 +45,8 @@ Reference data and transactions come first, because they define which instrument
 - Bonds: nominal, coupon, maturity, coupon schedule from the issuer's terms or gpwcatalyst.pl.
 
 ### 3. Transactions
-- Entered by you. Phase 1: a CSV/JSON file uploaded to `imports/transactions/` (format to be defined); later possibly a form in the UI.
-- One importer per format (own file format first; broker CSVs and IBKR Flex XML later).
+- Entered by you: the app's "Add transaction" form, or a JSON file uploaded to `imports/transactions/` (format: data/README.md).
+- One converter per format, writing that JSON: the reference sheet (`scripts/sheet-to-transactions.ts`), IBKR activity statements (`scripts/ibkr-statements-to-transactions.ts`); IBKR Flex XML later.
 - `tx_id` = broker id where available, else a hash of (date, isin, type, quantity, amount), so re-imports don't create duplicates.
 
 ### 4–6. FX, CPI, retail bonds
@@ -82,6 +82,7 @@ Try in this order and stop at the first that works:
 Accrued interest is computed by the valuation from each bond's terms. Floating-rate bonds also need the coupon rate of every past period since purchase (entered once, or taken from the Catalyst interest tables).
 
 ### 10. IBKR bonds
+- Done without Flex: prices calculated between the trade prices and 100 % at maturity (data-sources.md). With Flex:
 - Flex query with a custom date range; positions include IBKR's mark price and accrued interest per day.
 - Flex limits the length of one statement period, so run it in chunks (e.g. monthly) and merge.
 - German Bunds: optionally cross-check with the Bundesbank daily price series.
