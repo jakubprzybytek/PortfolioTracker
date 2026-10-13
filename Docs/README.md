@@ -105,17 +105,14 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 
 Phase 1:
 - [x] Split the single DynamoDB table into `market`, `transactions` and `holdings` (data-storage.md), with per-function table links.
-- [ ] `prod`: re-import MF calculator and instruments into the new tables (backfill runs again); then drop the old `Table` (still declared in `sst.config.ts` for `prod` only, linked to nothing; removing the block leaves it in AWS because of `removal: retain`, so delete it in the console afterwards).
-- [ ] Load `prod`: MF calculator, `data/instruments.json`, and your real transactions (export of the sheet), plus retail bond series with purchase dates. `int` and `dev` hold `data/transactions.sample.json` (made-up).
+- [x] Load `prod`: MF calculator, `data/instruments.json`, and your real transactions (export of the sheet), plus retail bond series with purchase dates. `int` and `dev` hold `data/transactions.sample.json` (made-up).
 - [x] Retail bonds valued per lot from the rates in the MF retail file (no CPI needed).
-- [ ] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
-- [ ] Terms of each corporate bond held: fixed or floating, rate/margin, coupon dates, nominal.
+- [x] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
+- [x] Terms of each corporate bond held: ISIN and nominal (`data/private/catalyst.json`); rates and coupon dates aren't needed while values are clean (see Outstanding work).
 - [x] Catalyst corporate bonds: prices from BiznesRadar (history + daily), valued at clean price × nominal; terms (ISIN, nominal) from obligacje.pl into `data/private/catalyst.json`. Redeemed bonds (gone from every quote page) are priced from your own trades. The accounts holding them are complete; their cash matches the sheet to the grosz.
-- [ ] Accrued interest of corporate bonds is not tracked (your choice: all are floating WIBOR + margin and WIBOR history isn't free). Values are clean, so they're below the sheet's (which adds the accrued interest from gpwcatalyst.pl) by up to a period's interest. Options later: rates from the coupons received, or hand-entered rates.
 - [x] Bossa: the public EOD files (`/pub/`) are gone (only CFD reports left); the quote JSON (`_cat_bonds`, with ISINs) is frozen at 2026-10-02 (NOL3 outage).
 - [x] SST: `CronV2` (EventBridge Scheduler) takes `timezone: "Europe/Warsaw"`.
 - [x] GUS monthly CPI m/m equals the MF calculator's `WR_k` (31 of 32 months 2024-01…2026-08; January differs by design, see data-sources.md). Source: the GUS CSV, no key (BDL has yearly CPI only).
-- [ ] gpwcatalyst.pl (and gpwbenchmark.pl) stopped answering from here on 2026-10-12 evening (TLS handshake hangs; the home page too). Not used now; recheck before relying on it for accrued interest.
 - [x] GPW archive: full history per bond, or one file per day for all treasury bonds; no "last N" option (PoC, 2026-10-10).
 - [x] Corporate bonds: not in the GPW archive; gpwcatalyst.pl lists all corporate bonds, snapshot only.
 - [x] IZ indexed nominal and accrued interest: computed with the Ministry's method; exact match with published values.
@@ -126,8 +123,35 @@ Later phases:
 - [x] ETF source: Yahoo chart API works from Lambda for all 10 ETFs in the sheet, full daily history (data-sources.md). EODHD stays the fallback.
 - [x] ETFs: Yahoo prices (history converted back to traded prices with the recorded splits: Yahoo has no split event for SPXS.AS), NBP rates since 2002, valuation in PLN, the sheet's ETF transactions (buys, sells, dividends, the SPXS 100:1 split). The ETF accounts are complete.
 - [x] Cost basis FIFO (as the reference sheet and Polish tax): a sale takes the oldest lots first; each sale's matched cost and proceeds are kept for a closed-positions view. Checked against the sheet: every comparable position equal to the grosz.
-- [ ] ISIN + venue for every ETF.
+- [x] ISIN + venue for every ETF (`data/private/etfs.json`, checked against FT).
 - [x] Currencies all equal (2026-10-13): amounts and fees in the currency paid, `EXCHANGE`, cash per account and currency, PLN at NBP D-1 (Polish tax), accounts with their own currency (IBKR: EUR, its summary in EUR too). IBKR history re-converted from the sheet: cash per currency equal to its currency positions.
 - [x] "Add transaction" form: add, edit, delete transactions in the app; new instruments by kind (treasury series by code, ETF by ticker, corporate bond, hand-valued asset). From 2026-10-13 the app, not the spreadsheet, is where transactions are entered.
 - [x] IBKR from the sheet: currency positions (EUR, USD) and foreign zero-coupon bonds with calculated prices; IBKR is complete (cash per currency, bond quantities and costs equal to the sheet). All 753 sheet rows convert; every account is complete.
-- [ ] IBKR Flex Web Service: new IBKR trades and mark prices without the sheet (needs a Flex Query + token from you); when the daily statement for day D becomes available.
+
+## Outstanding work (2026-10-13)
+
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it. Compared with the sheet on 2026-10-13: quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 7, 18, 5, 8.
+
+### Correctness and accuracy
+1. **Foreign bonds at IBKR are priced by calculation** (constant yield from the trades to 100 % at maturity), not quoted; the sheet's price for one of them differs by about 1 %. Mark prices from IBKR Flex (11) would settle it.
+2. **Accrued interest of listed treasury bonds:** a few grosz per bond below the sheet's for IZ0836 (the sheet likely counts to settlement, T+2). Check which convention to follow.
+3. **Corporate bonds are valued clean,** without accrued interest (a choice: all are floating WIBOR + margin and WIBOR history isn't free); about 0.1 % of the portfolio below the sheet. Options: rates from the coupons received, or hand-entered rates. gpwcatalyst.pl (the sheet's source) stopped answering from here on 2026-10-12; recheck before relying on it.
+4. **Holdings row charts after an edit or a delete:** days of a position that no longer exists aren't removed (`POS#` items), so its chart can show stale days.
+5. **Dashboard cards vs the chart:** Value, Cost and Gain cover positions only and the gain is unrealised, while the chart is positions + cash against net deposits. Replace with a Profit card (total − net deposits) and split realised / unrealised gain.
+6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed.
+
+### Missing compared with the sheet
+7. **Update the value of a hand-valued asset** (`FUND_MANUAL`) in the app: its value came from the sheet, and there's no form for a new valuation yet. Most pressing now that the sheet isn't the source.
+8. **Targets and rebalancing:** target share per asset class (the sheet has them), target vs actual next to the asset mix, amount to buy or sell.
+9. **Closed positions and realised profit:** the FIFO result of every sale is kept (`Position.realised`) but not shown; per year also a PIT-38 summary (proceeds, costs, profit at NBP D-1).
+10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
+11. **IBKR Flex Web Service:** IBKR trades and mark prices without typing them (needs a Flex Query and a token).
+12. **More Dashboard charts:** income per year, drawdown, allocation over time.
+13. **Asset class per instrument:** bond ETFs are recognised by "Bond" in the name; an explicit setting would be safer (gold, mixed funds).
+
+### Operations and housekeeping
+14. **`prod`: drop the old `Table`** (declared in `sst.config.ts` for `prod` only, linked to nothing; removing the block leaves it in AWS because of `removal: retain`, so delete it in the console afterwards).
+15. **`prod`: the "EUR cash" / "USD cash" instruments** (`CURRENCY`) are unused since IBKR is kept per currency: mark them inactive.
+16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
+17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements.
+18. **Monthly export of `transactions` to S3** (data-storage.md plans it; point-in-time recovery covers only 35 days): the table is now the only copy of what's entered in the app.
