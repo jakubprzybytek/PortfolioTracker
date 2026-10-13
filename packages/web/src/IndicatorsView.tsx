@@ -106,14 +106,16 @@ export function IndicatorsView({ params, setParams }: { params: Record<string, s
               · {sel.note}
             </span>
           </h2>
-          <RangePicker
-            value={range}
-            options={RANGES.map((r) => r.key)}
-            onChange={(key) => setParams({ ...params, range: key === "5Y" ? undefined : key })}
-            busy={series.loading}
-            testId="indicator-range"
-          />
-          {series.error ? <p className="error">{series.error}</p> : <IndicatorChart indicator={sel} points={series.data ?? []} loading={series.loading} />}
+          <section className="panel">
+            <RangePicker
+              value={range}
+              options={RANGES.map((r) => r.key)}
+              onChange={(key) => setParams({ ...params, range: key === "5Y" ? undefined : key })}
+              busy={series.loading}
+              testId="indicator-range"
+            />
+            {series.error ? <p className="error">{series.error}</p> : <IndicatorChart indicator={sel} points={series.data ?? []} loading={series.loading} />}
+          </section>
         </>
       )}
     </>

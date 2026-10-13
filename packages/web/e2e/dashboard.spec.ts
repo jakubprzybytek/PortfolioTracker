@@ -15,7 +15,7 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("total-gain")).toContainText("%");
     await expect(page.getByTestId("total-coupons")).toContainText("996,70"); // bond coupons (incl. the corporate bond's 70) + the manual asset's income
     // Cash: bonds + broker + foreign + ibkr + ike; the incomplete "etf" account is left out and the card says so
-    await expect(page.getByTestId("total-cash")).toContainText("8597,39");
+    await expect(page.getByTestId("total-cash")).toContainText("8 597,39");
     await expect(page.getByTestId("total-cash")).toContainText("1 incomplete account not included");
     await expect(page.getByTestId("total-all")).toContainText("zł");
   });
@@ -147,6 +147,14 @@ test.describe("on a phone", () => {
     await expect(page.getByTestId("nav-menu")).toBeHidden();
   });
 
+  test("a row chart opens at half the screen height", async ({ page }) => {
+    await page.goto("/#/holdings");
+    await page.evaluate(() => window.localStorage.removeItem("portfolio-tracker.chartPanel.height.phone"));
+    await page.getByTestId("holding-row").first().click();
+    const box = await page.getByTestId("chart-panel").boundingBox();
+    expect(Math.abs(box!.height - 844 / 2)).toBeLessThan(2);
+  });
+
   test("summary figures fit their cards; the chart spans the width", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("total-value")).not.toContainText("–");
@@ -155,7 +163,8 @@ test.describe("on a phone", () => {
     const chart = page.getByTestId("portfolio-chart");
     await expect(chart.locator("svg.recharts-surface")).toBeVisible();
     const plot = await chart.locator(".recharts-cartesian-grid").boundingBox();
-    expect(plot!.x).toBeLessThan(20); // no column for the axis labels: they sit inside the plot
+    const frame = await chart.boundingBox();
+    expect(plot!.x - frame!.x).toBeLessThan(4); // no column for the axis labels: they sit inside the plot
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 });

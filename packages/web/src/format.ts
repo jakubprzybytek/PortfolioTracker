@@ -1,10 +1,12 @@
-const pln = new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 2 });
-const num = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2 });
+// Thousands grouped from 1000 on ("8 597,39"; Polish style otherwise starts at 10 000), easier to read in columns.
+const always = { useGrouping: "always" } as unknown as Intl.NumberFormatOptions;
+const pln = new Intl.NumberFormat("pl-PL", { style: "currency", currency: "PLN", maximumFractionDigits: 2, ...always });
+const num = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2, ...always });
 const pct = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2, signDisplay: "exceptZero" });
 
 export const fmtPln = (v: number | null | undefined): string => (v === null || v === undefined ? "–" : pln.format(v));
 export const fmtNum = (v: number | null | undefined, digits = 2): string =>
-  v === null || v === undefined ? "–" : new Intl.NumberFormat("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+  v === null || v === undefined ? "–" : new Intl.NumberFormat("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits, ...always }).format(v);
 export const fmtPct = (v: number | null | undefined): string => (v === null || v === undefined ? "–" : `${pct.format(v)} %`);
 /** Short axis labels for narrow charts: 950, 12,5k, 57k, 1,6M (no space: the chart would wrap the label there). */
 export const fmtCompact = (v: number): string => {

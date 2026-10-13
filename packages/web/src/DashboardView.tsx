@@ -64,8 +64,10 @@ export function DashboardView() {
       {snap ? <AssetMix snapshot={snap} /> : holdings.loading && <div className="asset-mix"><Skeleton height={14} testId="asset-mix-skeleton" /></div>}
 
       <h2>Portfolio value</h2>
-      <RangePicker value={range} onChange={setRange} busy={history.loading} testId="portfolio-range" />
-      {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} loading={history.loading} />}
+      <section className="panel">
+        <RangePicker value={range} onChange={setRange} busy={history.loading} testId="portfolio-range" />
+        {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} loading={history.loading} />}
+      </section>
 
       <h2>Accounts</h2>
       <AccountsTable />
@@ -90,7 +92,7 @@ export function DashboardView() {
               <tr key={name}>
                 <td className="left">{name}</td>
                 <td className="left muted">{j?.finishedAt?.replace("T", " ").slice(0, 16) ?? "never"}</td>
-                <td className={`left ${j?.status === "failed" ? "neg" : j ? "pos" : "muted"}`}>{j?.status ?? "–"}</td>
+                <td className={`left ${j?.status === "failed" ? "status-failed" : j ? "status-ok" : "muted"}`}>{j?.status ?? "–"}</td>
                 <td className="left muted" style={{ whiteSpace: "normal", maxWidth: 600 }}>
                   {j?.note ?? ""}
                 </td>

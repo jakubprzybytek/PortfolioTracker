@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-const KEY = "portfolio-tracker.chartPanel.height";
 const MIN_PX = 160;
 const MAX_FRACTION = 0.75;
+/** Phone-sized screen (as the stylesheet's mobile layout): the panel starts at half the screen, its height remembered apart. */
+const narrow = () => window.matchMedia("(max-width: 720px)").matches;
+const storageKey = () => (narrow() ? "portfolio-tracker.chartPanel.height.phone" : "portfolio-tracker.chartPanel.height");
 
 const initialFraction = (): number => {
-  const saved = Number(window.localStorage.getItem(KEY));
-  return saved > 0 && saved <= MAX_FRACTION ? saved : 1 / 3;
+  const saved = Number(window.localStorage.getItem(storageKey()));
+  return saved > 0 && saved <= MAX_FRACTION ? saved : narrow() ? 1 / 2 : 1 / 3;
 };
 
 /**
@@ -47,7 +49,7 @@ export function ChartPanel({ title, onClose, onHeight, children }: { title: Reac
     if (!dragging.current) return;
     dragging.current = false;
     setFraction((f) => {
-      window.localStorage.setItem(KEY, String(f));
+      window.localStorage.setItem(storageKey(), String(f));
       return f;
     });
   }, []);

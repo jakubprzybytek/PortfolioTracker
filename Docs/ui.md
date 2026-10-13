@@ -2,6 +2,12 @@
 
 A small React app (Vite, `sst.aws.StaticSite`) that reads through the `api` Lambda. Four views, switched from a menu on the left (a top bar on narrow screens).
 
+## Style ("Calm")
+
+Readability first: a light grey page with white panels (tables, cards, charts, allocation), 15 px text, secondary text in a darker grey, figures in equal-width digits so columns line up, thousands grouped from 1000 on (8 597,39 zł), uppercase column headers, gains and losses marked ▲ / ▼ as well as green / red, a heavy line above totals. The same in dark mode (follows the system). All in `styles.css` (colours as CSS variables at the top).
+
+Row charts (Holdings, Prices) open in a panel at the bottom: a third of the screen height on a computer, half on a phone; dragging its edge resizes it (remembered per device size).
+
 ## Loading
 
 Parts still loading hold their space with placeholders (`Placeholders.tsx`), so the page doesn't jump when data arrives: grey, gently pulsing table rows, Dashboard cards and allocation; for a chart, its outline at its final height (grid lines, a faint rising line, a light sweeping across). An empty chart shows its message at the chart's height.

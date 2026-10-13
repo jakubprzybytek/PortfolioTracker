@@ -68,7 +68,7 @@ test.describe("holdings view", () => {
     const groupOrder = await table.locator("tr.group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
     expect(groupOrder).toEqual(["account-bonds", "account-broker", "account-etf", "account-foreign", "account-ibkr", "account-ike"]);
     // each account ends with its cash; the incomplete account shows only cash, greyed, with a note
-    await expect(table.locator('tr[data-testid="cash-row"][data-account="broker"]')).toContainText("5420,86");
+    await expect(table.locator('tr[data-testid="cash-row"][data-account="broker"]')).toContainText("5 420,86");
     await expect(page.getByTestId("account-etf").getByTestId("incomplete")).toContainText("ETFs not tracked yet");
     await expect(table.locator('tr[data-testid="cash-row"][data-account="etf"]')).toHaveClass(/muted/);
     const broker = table.locator('tr[data-testid="holding-row"][data-account="broker"]');
