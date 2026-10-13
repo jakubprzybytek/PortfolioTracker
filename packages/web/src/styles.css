@@ -88,13 +88,14 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
 .filters button { cursor: pointer; }
 .filters button:disabled { cursor: default; opacity: 0.5; }
 .filters select { width: var(--w, 11rem); text-overflow: ellipsis; }
+.filters button.reset { display: grid; place-items: center; padding: 0; width: 34px; height: 34px; }
 @media (max-width: 720px) {
   /* Dropdowns side by side, sharing the row with Reset; the count goes below. */
   .filters { gap: 6px; align-items: center; }
   .filter { flex: 1 1 0; min-width: 0; }
   .filter > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .filters select { width: 100%; padding: 6px 4px 6px 8px; font-size: 0.85rem; }
-  .filters button { flex: none; padding: 6px 9px; font-size: 0.85rem; }
+  .filter.wide { flex-basis: 100%; }
   .filters-summary { flex-basis: 100%; font-size: 0.8rem; }
   .filter.unset select { color: var(--muted); }
   .filter select option { color: var(--fg); }

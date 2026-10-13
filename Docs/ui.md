@@ -30,7 +30,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 
-Changing a filter replaces the history entry, so "back" goes to the previous view, not the previous filter. Filter dropdowns have a fixed width (no jump when their options load); on a phone they share one row with "Reset", the label shown inside the dropdown while nothing is picked, the count below. No router library: `packages/web/src/route.ts`.
+Changing a filter replaces the history entry, so "back" goes to the previous view, not the previous filter. Filter dropdowns have a fixed width (no jump when their options load); on a phone they share one row with the reset button (↺; Transactions: the instrument on a row of its own), the label shown inside the dropdown while nothing is picked, the count below. No router library: `packages/web/src/route.ts`.
 
 "Asset type" is the instrument type (`BOND_LISTED` → "Listed bond", `BOND_RETAIL`, `ETF`, `BOND_IBKR`, `FUND_MANUAL`, `CASH`); transactions without an instrument (deposits, fees) count as "Cash". The reference sheet's 12 asset classes aren't modelled yet.
 

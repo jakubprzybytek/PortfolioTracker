@@ -51,7 +51,7 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
       {txs.error && <p className="error">{txs.error}</p>}
 
       <FilterBar active={!!(instrument || account || type)} onReset={() => setParams({})} summary={txs.loading ? "Loading…" : `${rows.length} of ${all.length} transactions`}>
-        <FilterSelect label="Instrument" value={instrument} options={options.instrument} onChange={set("instrument")} testId="filter-instrument" width="16rem" />
+        <FilterSelect label="Instrument" value={instrument} options={options.instrument} onChange={set("instrument")} testId="filter-instrument" width="16rem" wide />
         <FilterSelect label="Account" value={account} options={options.account} onChange={set("account")} testId="filter-account" width="13rem" />
         <FilterSelect label="Asset type" value={type} options={options.type} onChange={set("type")} testId="filter-type" />
       </FilterBar>
