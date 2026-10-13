@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { fmtPct, fmtPln, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
-import { AccountsTable } from "./AccountsTable.tsx";
+import { AccountsTable, type AccountsResponse } from "./AccountsTable.tsx";
 import { Allocation, AssetMix } from "./Allocation.tsx";
 import { Skeleton, SkeletonRows } from "./Placeholders.tsx";
 import { PortfolioChart } from "./PortfolioChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
-import type { HistoryPoint, Snapshot, Status } from "./types.ts";
+import type { AccountSummary, HistoryPoint, Snapshot, Status } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
 function Card({ label, value, className, testId, note, loading }: { label: string; value: string; className?: string; testId: string; note?: string; loading: boolean }) {
@@ -18,12 +18,39 @@ function Card({ label, value, className, testId, note, loading }: { label: strin
   );
 }
 
+/**
+ * Where the profit comes from (fully tracked accounts): open positions, sales and redemptions, income, fees outside
+ * trades, and the rest (exchange-rate effects on cash, positions without a price), adding up to the profit.
+ */
+function ProfitBreakdown({ summary, loading }: { summary?: AccountSummary; loading: boolean }) {
+  const parts: { key: string; label: string; value?: number; title: string }[] = [
+    { key: "unrealised", label: "Unrealised gain", value: summary?.unrealised, title: "Open positions: value now − what they cost (FIFO)" },
+    { key: "realised", label: "Realised gain", value: summary?.realised, title: "Sales and redemptions: proceeds − what the units sold cost (FIFO); in PLN at NBP D-1, as for tax" },
+    { key: "income", label: "Income", value: summary?.income, title: "Dividends, coupons and interest received" },
+    { key: "fees", label: "Fees and taxes", value: summary === undefined ? undefined : summary.fees ? -summary.fees : 0, title: "Account fees, taxes, exchange fees (trade commissions are in the cost and the proceeds)" },
+    { key: "other", label: "Currency and other", value: summary?.other, title: "The rest of the profit: exchange-rate effects on cash, a broker's spread, positions without a price" },
+  ];
+  return (
+    <section className="breakdown panel" data-testid="profit-breakdown" aria-label="Profit breakdown">
+      {parts.map((p) => (
+        <div key={p.key} className="breakdown-part" title={p.title} data-testid={`profit-${p.key}`}>
+          <span className="label">{p.label}</span>
+          <span className={`value ${signClass(p.value)}`}>{loading ? <span className="skeleton-bar" /> : fmtPln(p.value)}</span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export function DashboardView() {
   const [range, setRange] = useState<RangeKey>("1Y");
 
   const holdings = useApi<Snapshot>("/holdings");
   const history = useApi<HistoryPoint[]>("/portfolio/history", { from: rangeFrom(range), to: today() }, [range]);
   const status = useApi<Status>("/status");
+  const summaries = useApi<AccountsResponse>("/accounts");
+  const sum = summaries.data?.total;
+  const sumLoading = !summaries.data && summaries.loading;
 
   const snap = holdings.data;
   const totals = snap?.totals;
@@ -53,13 +80,19 @@ export function DashboardView() {
       )}
 
       <section className="cards" data-testid="totals">
-        <Card loading={cardsLoading} label="Total" value={fmtPln(totals && cash !== undefined ? totals.value + cash : totals?.value)} testId="total-all" note="positions + cash" />
-        <Card loading={cardsLoading} label="Value" value={fmtPln(totals?.value)} testId="total-value" note="positions" />
+        <Card loading={cardsLoading} label="Total" value={fmtPln(totals && cash !== undefined ? totals.value + cash : totals?.value)} testId="total-all" note={totals ? `positions ${fmtPln(totals.value)} + cash` : undefined} />
         <Card loading={cardsLoading} label="Cash" value={fmtPln(cash)} testId="total-cash" note={incomplete ? `${incomplete} incomplete account${incomplete > 1 ? "s" : ""} not included` : undefined} />
-        <Card loading={cardsLoading} label="Cost" value={fmtPln(totals?.cost)} testId="total-cost" />
-        <Card loading={cardsLoading} label="Gain" value={`${fmtPln(totals?.gain)}${totals && totals.cost ? ` (${fmtPct((totals.gain / totals.cost) * 100)})` : ""}`} className={signClass(totals?.gain)} testId="total-gain" />
-        <Card loading={cardsLoading} label="Coupons received" value={fmtPln(totals?.couponsReceived)} testId="total-coupons" />
+        <Card loading={sumLoading} label="Net deposits" value={fmtPln(sum?.netDeposits)} testId="total-deposits" note="money put in − taken out" />
+        <Card
+          loading={sumLoading}
+          label="Profit"
+          value={fmtPln(sum?.profit)}
+          className={signClass(sum?.profit)}
+          testId="total-profit"
+          note={sum ? [sum.netDeposits ? `${fmtPct((sum.profit / sum.netDeposits) * 100)} of net deposits` : "", sum.xirr != null ? `XIRR ${fmtPct(sum.xirr * 100)} a year` : ""].filter(Boolean).join(" · ") : undefined}
+        />
       </section>
+      <ProfitBreakdown summary={sum} loading={sumLoading} />
 
       {snap ? <AssetMix snapshot={snap} /> : holdings.loading && <div className="asset-mix"><Skeleton height={14} testId="asset-mix-skeleton" /></div>}
 
@@ -72,7 +105,7 @@ export function DashboardView() {
       </section>
 
       <h2>Accounts</h2>
-      <AccountsTable />
+      <AccountsTable data={summaries} />
 
       <h2>Allocation</h2>
       {snap ? <Allocation snapshot={snap} /> : holdings.loading && <Skeleton height={230} testId="allocation-skeleton" />}

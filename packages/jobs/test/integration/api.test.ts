@@ -175,6 +175,11 @@ describe(`API ${API}`, () => {
     // emptied (1000 in, 20 interest, 1020 out): closed, its profit still in the total
     expect(by["closed"]).toMatchObject({ closed: true, lastDate: "2025-07-01", netDeposits: -20, positions: 0, cash: 0, total: 0, profit: 20, income: 20 });
     expect(by["broker"]!.closed).toBeUndefined();
+    // The profit split: open positions + sales and redemptions + income − fees outside trades + the rest
+    expect(by["broker"]).toMatchObject({ realised: 0, fees: 0 });
+    expect(by["closed"]).toMatchObject({ unrealised: 0, realised: 0, income: 20, other: 0 });
+    for (const a of [...body.accounts, body.total] as (Row & { unrealised: number; realised: number; fees: number; other: number })[])
+      expect(a.unrealised + a.realised + a.income - a.fees + a.other, a.account).toBeCloseTo(a.profit, 1);
     for (const a of body.accounts) {
       const positions = Math.round(snap.holdings.filter((h) => h.account === a.account).reduce((s, h) => s + h.value!, 0) * 100) / 100;
       expect(a.positions, a.account).toBeCloseTo(positions, 2);

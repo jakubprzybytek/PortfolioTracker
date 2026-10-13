@@ -7,7 +7,7 @@ test.describe("navigation", () => {
   test("the side menu switches views and keeps the URL in sync", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("nav-dashboard")).toHaveAttribute("aria-current", "page");
-    await expect(page.getByTestId("total-value")).toBeVisible();
+    await expect(page.getByTestId("total-all")).toBeVisible();
 
     await page.getByTestId("nav-holdings").click();
     await expect(page).toHaveURL(/#\/holdings$/);

@@ -112,7 +112,8 @@ export function positionsAt(transactions: TransactionItem[], date: IsoDate, fx?:
     const currencies = new Set(p.lots.map((l) => l.currency));
     const [only] = currencies;
     if (currencies.size === 1 && only !== "PLN") p.costNative = { amount: round2(p.lots.reduce((s, l) => s + l.costNative, 0)), currency: only! };
-    if (p.quantity <= 0 && p.couponsReceived === 0) positions.delete(key);
+    // Fully sold and nothing else to tell: gone. With sales on record it stays (closed, quantity 0) for realised gains.
+    if (p.quantity <= 0 && p.couponsReceived === 0 && p.realised.length === 0) positions.delete(key);
   }
   return positions;
 }

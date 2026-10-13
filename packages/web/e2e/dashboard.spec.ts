@@ -10,10 +10,16 @@ test.describe("dashboard", () => {
   test("shows the valuation date and totals", async ({ page }) => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Portfolio Tracker");
     await expect(page.getByTestId("snapshot-date")).toHaveText(/Valuation as of \d{4}-\d{2}-\d{2}/);
-    await expect(page.getByTestId("total-value")).toContainText("zł");
-    await expect(page.getByTestId("total-value")).not.toContainText("–");
-    await expect(page.getByTestId("total-gain")).toContainText("%");
-    await expect(page.getByTestId("total-coupons")).toContainText("996,70"); // bond coupons (incl. the corporate bond's 70) + the manual asset's income
+    await expect(page.getByTestId("total-deposits")).toContainText("66 403,69 zł");
+    await expect(page.getByTestId("total-profit")).toContainText("%");
+    await expect(page.getByTestId("total-profit")).toContainText("XIRR");
+    // Where the profit comes from: the parts add up to it
+    await expect(page.getByTestId("profit-income")).toContainText("1 016,70 zł"); // coupons, the manual asset's income, the closed account's interest
+    const num = (t: string) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", "."));
+    const profit = num((await page.getByTestId("total-profit").locator(".value").textContent())!);
+    const parts = await page.getByTestId("profit-breakdown").locator(".value").allTextContents();
+    expect(parts).toHaveLength(5);
+    expect(Math.abs(parts.reduce((s, t) => s + num(t), 0) - profit)).toBeLessThan(0.02);
     // Cash: bonds + broker + foreign + ibkr + ike (8 597,39) + eur (its EUR and USD at today's rate); the incomplete
     // "etf" account is left out and the card says so
     await expect(page.getByTestId("total-cash")).toContainText(/\d\s\d{3},\d{2}\s*zł/);
@@ -31,7 +37,7 @@ test.describe("dashboard", () => {
   });
 
   test("shows totals, chart and jobs only (holdings and prices have their own views)", async ({ page }) => {
-    await expect(page.getByTestId("total-value")).toBeVisible();
+    await expect(page.getByTestId("total-all")).toBeVisible();
     await expect(page.getByTestId("holdings-table")).toHaveCount(0);
     await expect(page.getByTestId("price-chart")).toHaveCount(0);
   });
@@ -46,7 +52,9 @@ test.describe("dashboard", () => {
     await expect(base.locator("td").nth(1)).toHaveText("1 275,28 EUR");
     const broker = page.locator('tr[data-testid="account-row"][data-account="broker"]');
     await expect(broker.locator("td").nth(1)).toHaveText("30 000,00 zł"); // net deposits
-    await expect(broker.locator("td").nth(6)).toHaveText(/%$/); // XIRR
+    await expect(broker.locator("td").nth(6)).toHaveText(/zł$/); // unrealised
+    await expect(broker.locator("td").nth(7)).toHaveText(/^0,00\s*zł$/); // realised: nothing sold
+    await expect(broker.locator("td").nth(8)).toHaveText(/%$/); // XIRR
     await expect(page.locator('tr[data-testid="account-row"][data-account="etf"]')).toHaveClass(/muted/);
     await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("66 403,69 zł"); // incl. the closed account's −20, and eur: 5 000 + 100 EUR at 4.2369
   });
@@ -181,7 +189,7 @@ test.describe("on a phone", () => {
 
   test("summary figures fit their cards; the chart spans the width", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByTestId("total-value")).not.toContainText("–");
+    await expect(page.getByTestId("total-all")).not.toContainText("–");
     const overflowing = await page.locator(".card .value").evaluateAll((els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1).length);
     expect(overflowing).toBe(0);
     const chart = page.getByTestId("portfolio-chart");

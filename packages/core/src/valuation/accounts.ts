@@ -5,6 +5,7 @@ import type { IsoDate } from "../dates.ts";
 import type { SnapshotItem, TransactionItem } from "../db/items.ts";
 import { round2 } from "../bonds/izIndex.ts";
 import { rateD1, rateOn, type FxHistory } from "./fx.ts";
+import { positionsAt } from "./positions.ts";
 
 export interface AccountSummary {
   account: string;
@@ -27,6 +28,16 @@ export interface AccountSummary {
   income: number;
   /** Commissions on trades, fees and taxes paid. */
   costs: number;
+  /**
+   * Where the profit comes from: `unrealised` (open positions: value − FIFO cost), `realised` (sales and redemptions:
+   * proceeds − FIFO cost), `income`, minus `fees` (fees and taxes not part of a trade: account fees, taxes, exchange
+   * fees; trade commissions are in the cost or the proceeds), and `other`: the rest (exchange-rate effects on cash, a
+   * broker's spread, positions without a price), so the parts add up to `profit`. All PLN, NBP D-1.
+   */
+  unrealised: number;
+  realised: number;
+  fees: number;
+  other: number;
   /** Money-weighted annual return of the deposits and withdrawals plus today's total; null when not computable. */
   xirr: number | null;
   firstDate: IsoDate;
@@ -105,6 +116,10 @@ export function accountSummaries(
     return { currency, netDeposits, total, profit: round2(total - netDeposits), xirr: Number.isNaN(total) ? null : xirr([...flows, { date, amount: total }]) };
   };
 
+  // Realised gains: every sale and redemption so far, FIFO (positions keep their sales even when closed).
+  const realisedBy = new Map<string, number>();
+  for (const p of positionsAt(txs, date, fx).values()) realisedBy.set(p.account, (realisedBy.get(p.account) ?? 0) + p.realised.reduce((s, r) => s + r.proceeds - r.cost, 0));
+
   const rows = [...names].sort((a, b) => a.localeCompare(b)).map((account): AccountSummary => {
     const own = txs.filter((t) => t.account === account);
     const info = snapshot.accounts?.[account];
@@ -115,6 +130,11 @@ export function accountSummaries(
     const held = snapshot.holdings.some((h) => h.account === account && h.quantity !== 0);
     const closed = !info?.incomplete?.length && !held && cash === 0 && own.length > 0;
     const netDeposits = round2(-flows.reduce((s, f) => s + f.amount, 0));
+    const profit = round2(total - netDeposits);
+    const income = round2(own.filter((t) => INCOME.has(t.type)).reduce((s, t) => s + plnOf(t), 0));
+    const unrealised = round2(snapshot.holdings.filter((h) => h.account === account && h.value !== null).reduce((s, h) => s + (h.value! - h.cost), 0));
+    const realised = round2(realisedBy.get(account) ?? 0);
+    const fees = round2(own.reduce((s, t) => s + plnOf(t, t.type === "FEE" || t.type === "TAX" ? -t.amount : t.type === "EXCHANGE" ? (t.fee ?? 0) : 0), 0));
     return {
       account,
       ...(info?.incomplete?.length ? { incomplete: info.incomplete } : {}),
@@ -123,8 +143,12 @@ export function accountSummaries(
       positions,
       cash,
       total,
-      profit: round2(total - netDeposits),
-      income: round2(own.filter((t) => INCOME.has(t.type)).reduce((s, t) => s + plnOf(t), 0)),
+      profit,
+      income,
+      unrealised,
+      realised,
+      fees,
+      other: round2(profit - unrealised - realised - income + fees),
       costs: round2(own.reduce((s, t) => s + plnOf(t, (t.fee ?? 0) + (t.type === "FEE" || t.type === "TAX" ? -t.amount : 0)), 0)),
       xirr: xirr([...flows, { date, amount: total }]),
       firstDate: own.map((t) => t.date).sort()[0] ?? date,
@@ -134,7 +158,8 @@ export function accountSummaries(
   });
 
   const complete = rows.filter((r) => !r.incomplete);
-  const sum = (k: "netDeposits" | "positions" | "cash" | "total" | "profit" | "income" | "costs") => round2(complete.reduce((s, r) => s + r[k], 0));
+  const sum = (k: "netDeposits" | "positions" | "cash" | "total" | "profit" | "income" | "costs" | "unrealised" | "realised" | "fees" | "other") =>
+    round2(complete.reduce((s, r) => s + r[k], 0));
   const completeNames = new Set(complete.map((r) => r.account));
   const total: AccountSummary = {
     account: "Total",
@@ -145,6 +170,10 @@ export function accountSummaries(
     profit: sum("profit"),
     income: sum("income"),
     costs: sum("costs"),
+    unrealised: sum("unrealised"),
+    realised: sum("realised"),
+    fees: sum("fees"),
+    other: sum("other"),
     xirr: xirr([...flowsOf(txs.filter((t) => completeNames.has(t.account))), { date, amount: sum("total") }]),
     firstDate: complete.map((r) => r.firstDate).sort()[0] ?? date,
     lastDate: complete.map((r) => r.lastDate).sort().at(-1) ?? date,

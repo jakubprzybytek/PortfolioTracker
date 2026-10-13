@@ -57,4 +57,18 @@ describe("accountSummaries", () => {
     expect(accounts.find((a) => a.account === "b")!.closed).toBeUndefined(); // incomplete, not closed
     expect(total).toMatchObject({ netDeposits: 9460, profit: 805 });
   });
+
+  it("splits the profit: unrealised + realised (FIFO) + income − fees not in a trade; the rest is `other`", () => {
+    const ts = [
+      tx({ date: "2025-01-01", type: "DEPOSIT", amount: 10000 }),
+      tx({ date: "2025-01-02", type: "BUY", isin: "X", quantity: 10, amount: -9000, fee: 20 }), // lot cost 9020
+      tx({ date: "2025-03-01", type: "SELL", isin: "X", quantity: 4, amount: 4000 }), // 4000 − 4/10 × 9020 = 392
+      tx({ date: "2025-06-01", type: "COUPON", isin: "X", amount: 300 }),
+      tx({ date: "2025-07-01", type: "FEE", amount: -15 }),
+      tx({ date: "2025-08-01", type: "WITHDRAWAL", amount: -500 }),
+    ];
+    const s = { date: "2026-01-01", holdings: [{ account: "a", isin: "X", value: 6000, cost: 5412, quantity: 6 } as HoldingSnapshot], accounts: { a: { cash: 4765 } } };
+    const a = accountSummaries(s, ts).accounts[0]!;
+    expect(a).toMatchObject({ netDeposits: 9500, total: 10765, profit: 1265, unrealised: 588, realised: 392, income: 300, fees: 15, other: 0 });
+  });
 });

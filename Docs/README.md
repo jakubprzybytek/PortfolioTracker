@@ -130,20 +130,20 @@ Later phases:
 
 ## Outstanding work (2026-10-13)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it. Compared with the sheet on 2026-10-13: quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 7, 18, 5, 8.
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it. Compared with the sheet on 2026-10-13: quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 7, 18, 8.
 
 ### Correctness and accuracy
 1. **Foreign bonds at IBKR are priced by calculation** (constant yield from the trades to 100 % at maturity), not quoted; the sheet's price for one of them differs by about 1 %. Mark prices from IBKR Flex (11) would settle it.
 2. **Accrued interest of listed treasury bonds:** a few grosz per bond below the sheet's for IZ0836 (the sheet likely counts to settlement, T+2). Check which convention to follow.
 3. **Corporate bonds are valued clean,** without accrued interest (a choice: all are floating WIBOR + margin and WIBOR history isn't free); about 0.1 % of the portfolio below the sheet. Options: rates from the coupons received, or hand-entered rates. gpwcatalyst.pl (the sheet's source) stopped answering from here on 2026-10-12; recheck before relying on it.
 4. **Holdings row charts after an edit or a delete:** days of a position that no longer exists aren't removed (`POS#` items), so its chart can show stale days.
-5. **Dashboard cards vs the chart:** Value, Cost and Gain cover positions only and the gain is unrealised, while the chart is positions + cash against net deposits. Replace with a Profit card (total − net deposits) and split realised / unrealised gain.
+5. ~~Dashboard cards vs the chart~~ Done (2026-10-13): Total, Cash, Net deposits, Profit cards; the profit split into unrealised, realised, income, fees, currency and other; unrealised and realised per account.
 6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed.
 
 ### Missing compared with the sheet
 7. **Update the value of a hand-valued asset** (`FUND_MANUAL`) in the app: its value came from the sheet, and there's no form for a new valuation yet. Most pressing now that the sheet isn't the source.
 8. **Targets and rebalancing:** target share per asset class (the sheet has them), target vs actual next to the asset mix, amount to buy or sell.
-9. **Closed positions and realised profit:** the FIFO result of every sale is kept (`Position.realised`) but not shown; per year also a PIT-38 summary (proceeds, costs, profit at NBP D-1).
+9. **Closed positions:** realised gain is shown as a total (Dashboard, per account); still missing: the list of closed positions and sales, and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
 11. **IBKR Flex Web Service:** IBKR trades and mark prices without typing them (needs a Flex Query and a token).
 12. **More Dashboard charts:** income per year, drawdown, allocation over time.

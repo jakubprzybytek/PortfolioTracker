@@ -2,7 +2,6 @@ import { Fragment, useState } from "react";
 import { fmtMoney, fmtPct, fmtPln, signClass } from "./format.ts";
 import { SkeletonRows } from "./Placeholders.tsx";
 import type { AccountSummary } from "./types.ts";
-import { useApi } from "./useApi.ts";
 
 const pct = (v: number | null) => (v === null ? "–" : fmtPct(v * 100));
 
@@ -38,6 +37,8 @@ function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
       <td>{fmtPln(a.cash)}</td>
       <td>{fmtPln(a.total)}</td>
       <td className={signClass(a.profit)}>{fmtPln(a.profit)}</td>
+      <td className={signClass(a.unrealised)}>{fmtPln(a.unrealised)}</td>
+      <td className={signClass(a.realised)}>{fmtPln(a.realised)}</td>
       <td className={signClass(a.xirr)} title={`Money-weighted annual return since ${a.firstDate}`}>
         {pct(a.xirr)}
       </td>
@@ -60,6 +61,7 @@ function BaseRow({ a }: { a: AccountSummary }) {
       <td></td>
       <td>{fmtMoney(b.total, b.currency)}</td>
       <td className={signClass(b.profit)}>{fmtMoney(b.profit, b.currency)}</td>
+      <td colSpan={2}></td>
       <td className={signClass(b.xirr)}>{pct(b.xirr)}</td>
       <td colSpan={2}></td>
     </tr>
@@ -70,8 +72,21 @@ function BaseRow({ a }: { a: AccountSummary }) {
  * Per account: money put in, its value now, profit and the annual return (XIRR); total of the fully tracked accounts.
  * Closed accounts (emptied) come last, folded into one row ("▸ n closed accounts"); they stay in the total.
  */
-export function AccountsTable() {
-  const data = useApi<{ date: string; accounts: AccountSummary[]; total: AccountSummary }>("/accounts");
+/** `GET /accounts`. */
+export interface AccountsResponse {
+  date: string;
+  accounts: AccountSummary[];
+  total: AccountSummary;
+}
+
+/** The request's state, as the Dashboard loads it. */
+export interface AccountsData {
+  data?: AccountsResponse;
+  error?: string;
+  loading: boolean;
+}
+
+export function AccountsTable({ data }: { data: AccountsData }) {
   const [showClosed, setShowClosed] = useState(false);
   if (data.error) return <p className="error">{data.error}</p>;
   const open = data.data?.accounts.filter((a) => !a.closed) ?? [];
@@ -87,13 +102,15 @@ export function AccountsTable() {
             <th>Cash</th>
             <th>Total</th>
             <th title="Total − net deposits: everything gained, realised or not, after costs">Profit</th>
+            <th title="Open positions: value now − what they cost (FIFO)">Unrealised</th>
+            <th title="Sales and redemptions: proceeds − what the units sold cost (FIFO), PLN at NBP D-1">Realised</th>
             <th title="Money-weighted annual return (XIRR) of deposits, withdrawals and today's total">XIRR</th>
             <th title="Coupons, interest and dividends received">Income</th>
             <th title="Commissions, fees and taxes paid">Costs</th>
           </tr>
         </thead>
         <tbody>
-          {!data.data && <SkeletonRows rows={6} cols={9} />}
+          {!data.data && <SkeletonRows rows={6} cols={11} />}
           {open.map((a) => (
             <Fragment key={a.account}>
               <Row a={a} />
@@ -102,7 +119,7 @@ export function AccountsTable() {
           ))}
           {closed.length > 0 && (
             <tr className="closed" data-testid="closed-accounts">
-              <td className="left" colSpan={9}>
+              <td className="left" colSpan={11}>
                 <button type="button" className="link expand" aria-expanded={showClosed} onClick={() => setShowClosed((s) => !s)} data-testid="toggle-closed">
                   {showClosed ? "▾" : "▸"} {closed.length} closed account{closed.length > 1 ? "s" : ""}
                 </button>
