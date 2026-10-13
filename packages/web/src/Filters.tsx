@@ -1,17 +1,22 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { useNarrow } from "./useNarrow.ts";
 
 export interface Option {
   value: string;
   label: string;
 }
 
-/** A labelled dropdown with an "All" entry (value ""). */
-export function FilterSelect({ label, value, options, onChange, testId }: { label: string; value: string; options: Option[]; onChange: (value: string) => void; testId: string }) {
+/**
+ * A labelled dropdown with an "All" entry (value ""). Its width is fixed (`width`), so it doesn't jump when the options
+ * arrive. On phones the dropdowns share a row: the label is hidden and the empty entry shows it instead, greyed.
+ */
+export function FilterSelect({ label, value, options, onChange, testId, width = "11rem" }: { label: string; value: string; options: Option[]; onChange: (value: string) => void; testId: string; width?: string }) {
+  const narrow = useNarrow();
   return (
-    <label className="filter">
+    <label className={value ? "filter" : "filter unset"} style={{ "--w": width } as CSSProperties}>
       <span className="muted">{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId}>
-        <option value="">All</option>
+        <option value="">{narrow ? label : "All"}</option>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -29,7 +34,7 @@ export function FilterBar({ children, active, onReset, summary }: { children: Re
       <button type="button" onClick={onReset} disabled={!active} data-testid="filters-reset">
         Reset
       </button>
-      <span className="muted" data-testid="filters-summary">
+      <span className="muted filters-summary" data-testid="filters-summary">
         {summary}
       </span>
     </div>

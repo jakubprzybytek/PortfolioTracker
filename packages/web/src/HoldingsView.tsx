@@ -375,7 +375,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
       </div>
 
       <FilterBar active={!!(account || type)} onReset={() => setParams({ group: params["group"], chart: chartIsin, chartAccount })} summary={snap.loading ? "Loading…" : `${shownCount} of ${all.length} holdings`}>
-        <FilterSelect label="Account" value={account} options={options.account} onChange={set("account")} testId="filter-account" />
+        <FilterSelect label="Account" value={account} options={options.account} onChange={set("account")} testId="filter-account" width="13rem" />
         <FilterSelect label="Asset type" value={type} options={options.type} onChange={set("type")} testId="filter-type" />
       </FilterBar>
 

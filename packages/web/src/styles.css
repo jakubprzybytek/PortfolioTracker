@@ -87,6 +87,18 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
 .filters select, .filters button { font: inherit; font-size: 0.9rem; font-weight: 400; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); }
 .filters button { cursor: pointer; }
 .filters button:disabled { cursor: default; opacity: 0.5; }
+.filters select { width: var(--w, 11rem); text-overflow: ellipsis; }
+@media (max-width: 720px) {
+  /* Dropdowns side by side, sharing the row with Reset; the count goes below. */
+  .filters { gap: 6px; align-items: center; }
+  .filter { flex: 1 1 0; min-width: 0; }
+  .filter > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .filters select { width: 100%; padding: 6px 4px 6px 8px; font-size: 0.85rem; }
+  .filters button { flex: none; padding: 6px 9px; font-size: 0.85rem; }
+  .filters-summary { flex-basis: 100%; font-size: 0.8rem; }
+  .filter.unset select { color: var(--muted); }
+  .filter select option { color: var(--fg); }
+}
 table.static th { cursor: default; }
 tr.group td { font-weight: 600; background: var(--row); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 tr.total td { font-weight: 700; border-top: 2px solid var(--fg); border-bottom: 0; }
