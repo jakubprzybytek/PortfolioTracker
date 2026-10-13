@@ -1,6 +1,6 @@
 # GitHub Actions deploy role
 
-The CD workflow (`.github/workflows/cd.yml`) assumes the role `GitHub-PortfolioTracker` through the account's existing GitHub OIDC provider, following the `GitHub-<Repo>` convention used by the other repos. The role's ARN comes from the repository secret **`AWS_ROLE_ARN`** (`arn:aws:iam::<account>:role/GitHub-PortfolioTracker`), so the AWS account number stays out of this public repo.
+The CD workflow (`.github/workflows/cd.yml`) assumes the role `GitHub-PortfolioTracker` through the account's existing GitHub OIDC provider, following the `GitHub-<Repo>` convention used by the other repos. The workflow builds the role's ARN from the repository secret **`AWS_ACCOUNT`** (the AWS account number), so the number stays out of this public repo and is masked in the public Actions logs.
 
 The IAM documents that need the account number are kept locally in `infra/github/private/` (gitignored): `trust-policy.json` and the rendered `deploy-policy.json`. The committed `deploy-policy.json` has `ACCOUNT_ID` in its place.
 
@@ -24,7 +24,7 @@ aws iam attach-role-policy --role-name GitHub-PortfolioTracker --policy-arn arn:
 aws iam attach-role-policy --role-name GitHub-PortfolioTracker --policy-arn arn:aws:iam::$ACCOUNT_ID:policy/PortfolioTracker-Deployment
 ```
 
-Then add the repository secret `AWS_ROLE_ARN` (Settings → Secrets and variables → Actions) with `arn:aws:iam::<account>:role/GitHub-PortfolioTracker`.
+Then add the repository secret `AWS_ACCOUNT` (Settings → Secrets and variables → Actions) with the account number.
 
 - **Trust policy** (`infra/github/private/trust-policy.json`): allows `sts:AssumeRoleWithWebIdentity` from the federated principal `arn:aws:iam::<account>:oidc-provider/token.actions.githubusercontent.com`, with `token.actions.githubusercontent.com:aud` = `sts.amazonaws.com` and `token.actions.githubusercontent.com:sub` (StringLike) limited to this repository, in both forms GitHub uses:
   - `repo:jakubprzybytek/PortfolioTracker:*` (classic)
