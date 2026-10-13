@@ -1,6 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
   BatchWriteCommand,
+  DeleteCommand,
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
@@ -220,6 +221,20 @@ export class Repository {
       "transactions",
       items.map((t) => ({ ...keys.transaction(t.account, t.date, t.id), GSI1PK: "TX", GSI1SK: `${t.date}#${t.id}`, ...t })),
     );
+  }
+
+  /** One transaction of an account by its id (any date). */
+  async findTransaction(account: string, id: string): Promise<TransactionItem | undefined> {
+    const items = await this.queryAll<TransactionItem>("transactions", {
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      FilterExpression: "id = :id",
+      ExpressionAttributeValues: { ":pk": `ACCT#${account}`, ":sk": "TX#", ":id": id },
+    });
+    return items[0];
+  }
+
+  async deleteTransaction(t: Pick<TransactionItem, "account" | "date" | "id">): Promise<void> {
+    await this.doc.send(new DeleteCommand({ TableName: this.tables.transactions, Key: keys.transaction(t.account, t.date, t.id) }));
   }
 
   /** Replaces the metadata of the given accounts (others are left alone). */

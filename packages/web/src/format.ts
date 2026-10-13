@@ -58,4 +58,6 @@ export const TX_TYPE_LABELS: Record<string, string> = {
   FEE: "Fee",
   TAX: "Tax",
   INTEREST: "Interest",
+  DIVIDEND: "Dividend",
+  SPLIT: "Split",
 };

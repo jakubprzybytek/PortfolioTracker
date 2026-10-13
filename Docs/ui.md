@@ -37,7 +37,7 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 ## Dashboard
 
 - **Totals:** total (positions + cash), value of positions, cash (only accounts whose assets are all tracked; the card says how many it leaves out), cost, gain (PLN and %), coupons and income received.
-- **Asset mix:** one bar split into shares (ETFs), bonds (all bond types), cash (PLN and foreign) and other (manually valued), with each share and amount: positions plus the cash of complete accounts, as in the totals.
+- **Asset mix:** one bar split into shares (ETFs), bonds (all bond types, and ETFs with "Bond" in their name, e.g. high-yield bond ETFs), cash (PLN and foreign) and other (manually valued), with each share and amount: positions plus the cash of complete accounts, as in the totals.
 - **Portfolio value over time:** from `PORTFOLIO/SNAP#<date>`, with a range selector (1M, 6M, 1Y, all).
 - **Accounts** (`GET /accounts`): per account net deposits (deposits − withdrawals; transfers between your accounts count on both sides), positions, cash, total, profit (total − net deposits), **XIRR** (money-weighted annual return of the deposits and withdrawals plus today's total, `core/valuation/accounts.ts`), income (coupons, interest, dividends) and costs (commissions, fees, taxes). Incomplete accounts are greyed and left out of the total row. **Closed** accounts (no positions, no cash left) come last, folded into one greyed row "▸ n closed accounts" that expands them (with the date they were emptied); their profit stays in the total.
 - **Allocation:** bars by asset type and by currency (positions of all accounts + cash of the complete ones, as in the totals), share and amount (on a phone the amount is in the row tooltip). Foreign cash counts as Cash.
@@ -84,11 +84,25 @@ All transactions from `GET /transactions`.
 - **Sorted by date, newest first** (fixed).
 - **Columns:** date, account, type, instrument (code + name), asset type, quantity, price, amount (signed: red = money out), fee, note.
 - **Filters:** instrument (including "(no instrument)" for cash movements), account, asset type; "Reset"; "n of m transactions".
-- Read-only: transactions come from the file import (data/README.md).
+- **Add transaction** (button) opens a form; a row opens it to edit or delete that transaction (deleting asks to confirm). Saving revalues from the transaction's date (about a minute); a message says so.
+
+### The form (`TransactionForm.tsx`)
+
+- Date, type (buy, sell, coupon, dividend, redemption, deposit, withdrawal, interest, fee, tax, split), account (or a new one).
+- **Instrument** for buys, sells, coupons, dividends, redemptions and splits (optional for interest): the tracked ones first, then those no longer held, then **New instrument…**:
+  - *Treasury bond by code*: "Find" looks it up (`GET /instruments/lookup`): retail series (EDO1036) from the Ministry file, listed ones (DS1030) from the MF calculator terms; added on save, its terms and prices follow.
+  - *ETF*: ticker with exchange (AMS:VWRL, FRA:EUNK, LON:CSPX …), ISIN, name, currency: priced from Yahoo.
+  - *Corporate bond*: code, ISIN, name, nominal (1000 or 100): priced from BiznesRadar.
+  - *Other asset*: name and code; valued by hand (a buy records its price as the asset's value that day).
+  - Foreign bonds at IBKR aren't offered yet (their prices are calculated from the trades; later from IBKR Flex).
+- Quantity and price (bonds: % of nominal; retail: PLN per bond, prefilled 100; ETFs: in their currency), the broker's rate for a foreign instrument (prefilled with the NBP rate of the day or the last before), fee.
+- **Amount** in PLN, as a positive number (the type gives the direction: buys, fees, taxes, withdrawals take money out). For trades it is suggested from quantity × price (bonds × nominal, foreign × rate; sell: net of the fee) until you type your own: for a bond add the accrued interest, as on the broker's note. A line below shows the account's cash change.
+- The server checks it again (`core/transactions/manual.ts`: real dates, an instrument where needed, the direction of the money) and returns the problem, shown in the form.
+- From here on transactions are entered in the app (source `app`, random id). Re-importing the spreadsheet would add its newer rows a second time: the history up to the switch came from it, new ones come from the form.
 
 ## API (Lambda `api`)
 
-| Endpoint | Reads |
+| Endpoint | What |
 |---|---|
 | `GET /holdings` | `SNAP#LATEST` (holdings per account and instrument) |
 | `GET /accounts` | `{ date, accounts: AccountSummary[], total }` (latest snapshot + all transactions) |
@@ -102,6 +116,13 @@ All transactions from `GET /transactions`.
 | `GET /indicators/{id}?from&to` | one series, oldest first: `[{ date, value }]` (`cpi-mom`, `cpi-index`: by month; `fx-eur`, `fx-usd`: daily) |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |
 | `GET /status` | last run of each job |
+| `POST /transactions` | adds one (body: a transaction as in the import file, without `id`); 201 with it, 400 with the problem |
+| `PUT /transactions/{id}?account=` | replaces it (same id; a new date or account moves it) |
+| `DELETE /transactions/{id}?account=` | deletes it |
+| `GET /instruments/lookup?code=` | `{ tracked, instrument }`: a tracked instrument, or a treasury series to add (404: unknown) |
+| `POST /instruments` | adds one: a full instrument (as in the import file) or `{ kind: "treasury" \| "etf" \| "corporate" \| "manual", … }`; starts its price history; 409 if tracked |
+
+Writes queue a revaluation from the earliest date touched.
 
 The UI loads all transactions and filters them in the browser; at a few hundred to a few thousand rows that's one small request.
 

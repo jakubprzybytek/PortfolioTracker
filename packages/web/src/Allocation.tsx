@@ -60,7 +60,7 @@ export function Allocation({ snapshot }: { snapshot: Snapshot }) {
   );
 }
 
-/** Asset classes of the big picture; instrument types map onto them (all ETFs held are equity funds). */
+/** Asset classes of the big picture; instrument types map onto them (ETFs: by what they hold, see assetClassOf). */
 const ASSET_CLASS: Record<string, string> = {
   ETF: "SHARES",
   BOND_LISTED: "BONDS",
@@ -74,14 +74,17 @@ const ASSET_CLASS: Record<string, string> = {
 const CLASS_LABELS: Record<string, string> = { SHARES: "Shares", BONDS: "Bonds", CASH: "Cash", OTHER: "Other" };
 const CLASS_ORDER = ["SHARES", "BONDS", "CASH", "OTHER"];
 
+/** An ETF holding bonds ("… Corporate Bond UCITS ETF") counts as bonds; other ETFs as shares. */
+export const assetClassOf = (h: { type: string; name: string }): string => (h.type === "ETF" && /\bbond/i.test(h.name) ? "BONDS" : (ASSET_CLASS[h.type] ?? "OTHER"));
+
 /**
- * The big picture in one bar: shares, bonds, cash and other (manually valued), as shares of positions + cash of
+ * The big picture in one bar: shares, bonds (incl. bond ETFs), cash and other (manually valued), as shares of positions + cash of
  * the fully tracked accounts.
  */
 export function AssetMix({ snapshot }: { snapshot: Snapshot }) {
   const byClass = new Map<string, number>();
   const add = (key: string, value: number) => byClass.set(key, (byClass.get(key) ?? 0) + value);
-  for (const h of snapshot.holdings) if (h.value) add(ASSET_CLASS[h.type] ?? "OTHER", h.value);
+  for (const h of snapshot.holdings) if (h.value) add(assetClassOf(h), h.value);
   add("CASH", snapshot.totals.cash ?? 0);
   const total = [...byClass.values()].reduce((s, v) => s + v, 0);
   const slices = CLASS_ORDER.filter((k) => (byClass.get(k) ?? 0) > 0).map((key) => ({ key, value: byClass.get(key)!, share: total ? byClass.get(key)! / total : 0 }));

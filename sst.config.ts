@@ -214,7 +214,8 @@ export default $config({
       ...defaults,
       handler: "packages/jobs/src/handlers/api.handler",
       timeout: "30 seconds" as const,
-      link: [...link, market, transactions, holdings],
+      // Writes (the "Add transaction" form) queue a revaluation; a new instrument starts its history backfill and FX rates.
+      link: [...link, market, transactions, holdings, valuationQueue, backfill, fx],
       environment: { ACCESS_GROUPS: accessGroups($app.stage).join(",") },
     };
     api.route("GET /holdings", apiHandler, auth);
@@ -223,6 +224,11 @@ export default $config({
     api.route("GET /instruments/{isin}/prices", apiHandler, auth);
     api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
     api.route("GET /transactions", apiHandler, auth);
+    api.route("POST /transactions", apiHandler, auth);
+    api.route("PUT /transactions/{id}", apiHandler, auth);
+    api.route("DELETE /transactions/{id}", apiHandler, auth);
+    api.route("GET /instruments/lookup", apiHandler, auth);
+    api.route("POST /instruments", apiHandler, auth);
     api.route("GET /prices", apiHandler, auth);
     api.route("GET /accounts", apiHandler, auth);
     api.route("GET /indicators", apiHandler, auth);

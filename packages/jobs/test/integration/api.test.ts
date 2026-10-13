@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { HoldingSnapshot, SnapshotItem } from "@portfolio/core";
-import { API, get, repoRoot, uploadImport, waitFor } from "./setup.ts";
+import { API, get, repoRoot, send, uploadImport, waitFor } from "./setup.ts";
 
 const IZ = "PL0000117024";
 const DS = "PL0000113783";
@@ -298,9 +298,66 @@ describe(`API ${API}`, () => {
     expect((await get("/indicators/fx-gbp")).status).toBe(404);
   });
 
+  it("POST/PUT/DELETE /transactions add, edit and delete a transaction from the form, checking it first", async () => {
+    // Dated far ahead in its own account: no valuation day covers it, so the other figures don't move meanwhile.
+    type Tx = { id: string; account: string; date: string; type: string; amount: number; source: string; isin?: string };
+    const bad = await send<{ error: string }>("POST", "/transactions", { date: "2099-01-02", account: "api-test", type: "BUY", quantity: 1, amount: -10 });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toContain("BUY needs an instrument");
+    expect((await send<{ error: string }>("POST", "/transactions", { date: "2099-01-02", account: "api-test", type: "BUY", isin: "PL0000999999", quantity: 1, amount: -10 })).body.error).toContain("Unknown instrument");
+    expect((await send<{ error: string }>("POST", "/transactions", { date: "2099-01-02", account: "api-test", type: "DEPOSIT", amount: -10 })).body.error).toContain("money in");
+    expect((await send("POST", "/transactions", { date: "2099-13-45", account: "api-test", type: "DEPOSIT", amount: 10 })).status).toBe(400);
+
+    const created = await send<Tx>("POST", "/transactions", { date: "2099-01-02", account: "api-test", type: "DEPOSIT", amount: 100, note: "integration test" });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ account: "api-test", date: "2099-01-02", type: "DEPOSIT", amount: 100, currency: "PLN", source: "app" });
+    const id = created.body.id;
+    expect(id).toMatch(/^[0-9a-f]{16}$/);
+    const mine = async () => (await get<Tx[]>("/transactions")).body.filter((t) => t.account === "api-test");
+    expect(await mine()).toEqual([expect.objectContaining({ id, amount: 100 })]);
+
+    // Editing keeps the id; a new date moves it (the old row is gone).
+    const edited = await send<Tx>("PUT", `/transactions/${id}?account=api-test`, { date: "2099-01-03", account: "api-test", type: "DEPOSIT", amount: 150 });
+    expect(edited.status).toBe(200);
+    expect(edited.body).toMatchObject({ id, date: "2099-01-03", amount: 150, source: "app" });
+    expect(await mine()).toEqual([expect.objectContaining({ id, date: "2099-01-03", amount: 150 })]);
+
+    expect((await send("DELETE", `/transactions/${id}?account=api-test`)).status).toBe(200);
+    expect(await mine()).toEqual([]);
+    expect((await send("DELETE", `/transactions/${id}?account=api-test`)).status).toBe(404);
+    expect((await send("PUT", "/transactions/0000000000000000?account=api-test", { date: "2099-01-03", account: "api-test", type: "DEPOSIT", amount: 1 })).status).toBe(404);
+  });
+
+  it("GET /instruments/lookup finds a tracked instrument or proposes a treasury series; POST /instruments checks its input", async () => {
+    type Lookup = { tracked: boolean; instrument: { isin: string; code: string; name: string; type: string; terms?: unknown; sourceIds: Record<string, string> } };
+    const tracked = await get<Lookup>("/instruments/lookup?code=edo0935");
+    expect(tracked.body).toMatchObject({ tracked: true, instrument: { code: "EDO0935", type: "BOND_RETAIL" } });
+    // Not tracked: a retail series from the Ministry file, a listed one from the MF calculator.
+    const retail = await get<Lookup>("/instruments/lookup?code=EDO1036");
+    expect(retail.status).toBe(200);
+    expect(retail.body).toMatchObject({ tracked: false, instrument: { code: "EDO1036", type: "BOND_RETAIL", terms: "mf-retail", name: "Obligacje skarbowe EDO1036 (emerytalne 10-letnie)" } });
+    expect(retail.body.instrument.isin).toMatch(/^PL0000\d{6}$/);
+    const listed = await get<Lookup>("/instruments/lookup?code=DS1035");
+    expect(listed.body).toMatchObject({ tracked: false, instrument: { code: "DS1035", type: "BOND_LISTED", terms: "mf", sourceIds: { gpw: "DS1035" } } });
+    expect(listed.body.instrument.name).toMatch(/^Obligacje skarbowe DS1035 \(stałe/);
+    expect((await get("/instruments/lookup?code=NOPE123")).status).toBe(404);
+
+    expect((await send("POST", "/instruments", { isin: "XX", code: "X" })).status).toBe(400);
+    const dup = await send<{ error: string }>("POST", "/instruments", { isin: DS, code: "DS0432", name: "DS0432", type: "BOND_LISTED", terms: "mf", sourceIds: { gpw: "DS0432" } });
+    expect(dup.status).toBe(409);
+    // From the form: a kind and a few fields, completed by the server.
+    expect((await send<{ error: string }>("POST", "/instruments", { kind: "treasury", code: "DS0432" })).status).toBe(409);
+    expect((await send<{ error: string }>("POST", "/instruments", { kind: "treasury", code: "NOPE123" })).body.error).toContain("no such treasury series");
+    expect((await send<{ error: string }>("POST", "/instruments", { kind: "etf", isin: "IE00B3RBWM25", ticker: "XYZ:VWRL", name: "x", currency: "EUR" })).body.error).toContain("Unknown exchange");
+    expect((await send("POST", "/instruments", { kind: "corporate", code: "X" })).status).toBe(400);
+  });
+
   it("requires a login: no token or a forged token gets 401", async () => {
     for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators", "/indicators/fx-eur", "/accounts"]) {
       expect((await get(route, { auth: false })).status, route).toBe(401);
+    }
+    for (const [method, route] of [["POST", "/transactions"], ["PUT", "/transactions/x?account=a"], ["DELETE", "/transactions/x?account=a"], ["POST", "/instruments"]] as const) {
+      expect((await fetch(API + route, { method, body: method === "DELETE" ? undefined : "{}" })).status, `${method} ${route}`).toBe(401);
     }
     const forged = ["eyJhbGciOiJSUzI1NiJ9", "eyJzdWIiOiJ4IiwiY29nbml0bzpncm91cHMiOlsicG9ydGZvbGlvLXRyYWNrZXIiXX0", "c2ln"].join(".");
     expect((await get("/holdings", { token: forged })).status).toBe(401);

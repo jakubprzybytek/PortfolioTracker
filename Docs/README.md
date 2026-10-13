@@ -83,7 +83,7 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 
 1. **DynamoDB on-demand is the only database.** No idle cost, no cold start; Aurora Serverless was rejected because polling keeps it awake. Volume is tiny.
    Three tables by lifecycle: `market` (instruments, prices, reference data; rebuildable), `transactions` (your input; the only irreplaceable data) and `holdings` (snapshots computed by valuation). See [data-storage.md](data-storage.md).
-2. **Transactions are entered by you.** Start with a file import (CSV/JSON uploaded to S3); add a form later if needed. Coupon payments you enter are also used to check the calculated accrued interest.
+2. **Transactions are entered by you.** The history came from a file import (the spreadsheet, converted); new ones are added in the app ("Add transaction" form on Transactions, Docs/ui.md). Coupon payments you enter are also used to check the calculated accrued interest.
 3. **Accrued interest is computed, not fetched.** It comes from each bond's terms. The only external input is the coupon rate per period of floating-rate corporate bonds (see data-sources.md).
 4. **ISIN is the internal key.** Each source's code/ticker is a mapping on the instrument.
 5. **Store raw, unadjusted prices**; events (coupons, redemptions, splits, dividends) are stored separately.
@@ -127,5 +127,6 @@ Later phases:
 - [x] ETFs: Yahoo prices (history converted back to traded prices with the recorded splits: Yahoo has no split event for SPXS.AS), NBP rates since 2002, valuation in PLN, the sheet's ETF transactions (buys, sells, dividends, the SPXS 100:1 split). The ETF accounts are complete.
 - [x] Cost basis FIFO (as the reference sheet and Polish tax): a sale takes the oldest lots first; each sale's matched cost and proceeds are kept for a closed-positions view. Checked against the sheet: every comparable position equal to the grosz.
 - [ ] ISIN + venue for every ETF.
+- [x] "Add transaction" form: add, edit, delete transactions in the app; new instruments by kind (treasury series by code, ETF by ticker, corporate bond, hand-valued asset). From 2026-10-13 the app, not the spreadsheet, is where transactions are entered.
 - [x] IBKR from the sheet: currency positions (EUR, USD) and foreign zero-coupon bonds with calculated prices; IBKR is complete (cash per currency, bond quantities and costs equal to the sheet). All 753 sheet rows convert; every account is complete.
 - [ ] IBKR Flex Web Service: new IBKR trades and mark prices without the sheet (needs a Flex Query + token from you); when the daily statement for day D becomes available.

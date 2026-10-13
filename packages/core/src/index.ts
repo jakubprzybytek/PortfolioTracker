@@ -18,6 +18,7 @@ export * from "./prices/manual.ts";
 export * from "./accounts/schema.ts";
 export * from "./transactions/schema.ts";
 export * from "./transactions/fromSheet.ts";
+export * from "./transactions/manual.ts";
 export * from "./instruments/schema.ts";
 export * from "./bonds/retail.ts";
 export * from "./indicators/indicators.ts";

@@ -85,7 +85,8 @@ const WHAT_BY_CLASS: Record<string, string> = {
   Inne: "other assets",
 };
 
-const RETAIL_LABELS: Record<string, string> = {
+/** Polish names of the retail series kinds (EDO → emerytalne 10-letnie). */
+export const RETAIL_LABELS: Record<string, string> = {
   EDO: "emerytalne 10-letnie",
   COI: "indeksowane 4-letnie",
   ROD: "rodzinne 12-letnie",

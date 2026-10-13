@@ -1,10 +1,23 @@
-// HTTP API for the UI (see Docs/ui.md). Read-only. Every route needs a Cognito login (checked by API Gateway)
-// in one of the stage's access groups (checked here).
+// HTTP API for the UI (see Docs/ui.md). Reads, plus adding/editing/deleting transactions and adding instruments
+// (the "Add transaction" form). Every route needs a Cognito login (checked by API Gateway) in one of the stage's
+// access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import {
+  APP_SOURCE,
   CPI_INDICATORS,
+  InstrumentInput,
+  ManualTransaction,
+  NewInstrument,
+  corporateInstrument,
+  etfInstrument,
+  manualInstrument,
   accountSummaries,
+  checkManualTransaction,
+  listedTreasuryInstrument,
+  newTransactionId,
+  parseManualPrices,
+  retailInstrument,
   addDays,
   adjustForSplits,
   cpiIndicators,
@@ -17,10 +30,12 @@ import {
   yearBefore,
   type IndicatorSummary,
   type PriceItem,
+  type TransactionItem,
 } from "@portfolio/core";
 import { FX_CURRENCIES } from "./fx.ts";
 import { hasAnyGroup } from "../lib/access.ts";
-import { repo } from "../lib/context.ts";
+import { queueValuation, repo } from "../lib/context.ts";
+import { importInstruments, mfTermsByCode } from "./import.ts";
 
 const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({
   statusCode: status,
@@ -32,6 +47,44 @@ const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 
 /** Comma-separated, set per stage in sst.config.ts (accessGroups). */
 const ACCESS_GROUPS = (process.env["ACCESS_GROUPS"] ?? "portfolio-tracker").split(",");
+
+/** JSON body of a POST/PUT (API Gateway may pass it base64-encoded). */
+const bodyOf = (event: APIGatewayProxyEventV2WithJWTAuthorizer): unknown => {
+  if (!event.body) return undefined;
+  return JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body);
+};
+
+type TxOut = Omit<TransactionItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">;
+const withoutKeys = ({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...rest }: TransactionItem): TxOut => rest;
+
+/**
+ * Validates a transaction from the form and stores it (new id, or `id` when editing). A buy of a manually valued
+ * asset also records its price that day, so it has a value. Then revalues from the earliest day touched.
+ */
+async function saveTransaction(input: unknown, existing?: TransactionItem): Promise<APIGatewayProxyResultV2> {
+  const parsed = ManualTransaction.safeParse(input);
+  if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+  const t = parsed.data;
+  const instruments = await repo.listInstruments();
+  const problems = checkManualTransaction(t, new Set(instruments.map((i) => i.isin)));
+  if (problems.length) return json(400, { error: problems.join("; ") });
+  const item: TxOut = { ...t, id: existing?.id ?? newTransactionId(), source: existing?.source ?? APP_SOURCE };
+  if (existing && (existing.date !== item.date || existing.account !== item.account)) await repo.deleteTransaction(existing);
+  await repo.putTransactions([item]);
+  const inst = t.isin ? instruments.find((i) => i.isin === t.isin) : undefined;
+  if (inst?.type === "FUND_MANUAL" && t.type === "BUY" && t.price) await repo.putPrices(parseManualPrices(JSON.stringify([{ isin: inst.isin, date: t.date, price: t.price }]), APP_SOURCE));
+  const from = existing && existing.date < item.date ? existing.date : item.date;
+  await queueValuation({ reason: existing ? "transaction edited" : "transaction added", from });
+  return json(existing ? 200 : 201, item);
+}
+
+/** A treasury series by code: retail (EDO1036 …) from the Ministry file, listed (DS1030 …) from the MF calculator terms. */
+async function treasurySeries(code: string): Promise<InstrumentInput | undefined> {
+  const retail = await repo.getRetailSeries(code);
+  if (retail) return retailInstrument(retail);
+  const listed = (await mfTermsByCode()).get(code);
+  return listed ? listedTreasuryInstrument(listed) : undefined;
+}
 
 export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
   if (!hasAnyGroup(event.requestContext.authorizer?.jwt?.claims, ACCESS_GROUPS)) return json(403, { error: "This account has no access" });
@@ -150,10 +203,53 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         rows.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
         return json(200, rows);
       }
+      case "POST /transactions":
+        return await saveTransaction(bodyOf(event));
+      case "PUT /transactions/{id}":
+      case "DELETE /transactions/{id}": {
+        const id = event.pathParameters?.["id"];
+        const account = q["account"];
+        if (!id || !account) return json(400, { error: "Needs the transaction id and ?account=" });
+        const existing = await repo.findTransaction(account, id);
+        if (!existing) return json(404, { error: `No transaction ${id} in ${account}` });
+        if (route.startsWith("PUT")) return await saveTransaction(bodyOf(event), existing);
+        await repo.deleteTransaction(existing);
+        await queueValuation({ reason: "transaction deleted", from: existing.date });
+        return json(200, withoutKeys(existing));
+      }
+      case "GET /instruments/lookup": {
+        // A code typed in the form: an instrument already tracked, or a treasury series to add.
+        const code = (q["code"] ?? "").trim().toUpperCase();
+        if (!code) return json(400, { error: "Needs ?code=" });
+        const tracked = (await repo.listInstruments()).find((i) => i.code.toUpperCase() === code || i.isin === code);
+        if (tracked) return json(200, { tracked: true, instrument: tracked });
+        const found = await treasurySeries(code);
+        return found ? json(200, { tracked: false, instrument: found }) : json(404, { error: `${code}: no such treasury series in the Ministry data` });
+      }
+      case "POST /instruments": {
+        // Either a full instrument (as in an import file) or { kind, … } from the form, completed here.
+        const body = bodyOf(event) as { kind?: string } | undefined;
+        let input: InstrumentInput | undefined;
+        if (body?.kind) {
+          const n = NewInstrument.safeParse(body);
+          if (!n.success) return json(400, { error: n.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+          const d = n.data;
+          input =
+            d.kind === "treasury" ? await treasurySeries(d.code.toUpperCase()) : d.kind === "etf" ? etfInstrument(d) : d.kind === "corporate" ? corporateInstrument(d) : manualInstrument(d);
+          if (!input) return json(400, { error: d.kind === "treasury" ? `${d.code}: no such treasury series in the Ministry data` : "Unknown exchange: use e.g. AMS:VWRL, FRA:EUNK, LON:CSPX" });
+        } else {
+          const parsed = InstrumentInput.safeParse(body);
+          if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+          input = parsed.data;
+        }
+        if (await repo.getInstrument(input.isin)) return json(409, { error: `${input.code} (${input.isin}) is already tracked` });
+        await importInstruments(JSON.stringify([input])); // starts its price history backfill (and FX rates)
+        return json(201, await repo.getInstrument(input.isin));
+      }
       case "GET /instruments/{isin}/transactions": {
         if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
         const txs = (await repo.listTransactions()).filter((t) => t.isin === isin);
-        return json(200, txs.map(({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...rest }) => rest));
+        return json(200, txs.map(withoutKeys));
       }
       case "GET /status": {
         const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "fx", "valuation", "backfill", "import", "monthly"];

@@ -57,6 +57,72 @@ test.describe("transactions view", () => {
   });
 });
 
+test.describe("adding transactions", () => {
+  test("adds, edits and deletes a transaction from the form", async ({ page }) => {
+    // Dated far ahead in its own account, so no valuation day (and no other test) sees it meanwhile.
+    await page.goto("/#/transactions");
+    await expect(page.getByTestId("transaction-row").first()).toBeVisible();
+    await page.getByTestId("tx-add").click();
+    const form = page.getByTestId("tx-form");
+    await expect(form).toBeVisible();
+    await page.getByTestId("tx-date").fill("2099-03-04");
+    await page.getByTestId("tx-type").selectOption("DEPOSIT");
+    await page.getByTestId("tx-account").selectOption("__new_account__");
+    await page.getByTestId("tx-new-account").fill("e2e-test");
+    await page.getByTestId("tx-amount").fill("250");
+    await expect(page.getByTestId("tx-summary")).toContainText("Cash in e2e-test: 250,00 zł");
+    await page.getByTestId("tx-note").fill("E2E test");
+    await page.getByTestId("tx-save").click();
+    await expect(form).toBeHidden();
+    await expect(page.getByTestId("tx-toast")).toContainText("Transaction added.");
+    const row = page.locator('tr[data-testid="transaction-row"]').filter({ hasText: "e2e-test" });
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText("2099-03-04");
+    await expect(row).toContainText("250,00 zł");
+
+    // Edit: the form opens with its values; a new amount replaces the old.
+    await row.click();
+    await expect(page.getByTestId("tx-amount")).toHaveValue("250");
+    await page.getByTestId("tx-amount").fill("300");
+    await page.getByTestId("tx-save").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("Transaction updated.");
+    await expect(row).toContainText("300,00 zł");
+
+    // Delete, after confirming.
+    await row.click();
+    await page.getByTestId("tx-delete").click();
+    await page.getByTestId("tx-delete-confirm").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("Transaction deleted.");
+    await expect(row).toHaveCount(0);
+  });
+
+  test("suggests a bond buy's amount and finds a new treasury series by code; the server's objections show", async ({ page }) => {
+    await page.goto("/#/transactions");
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-type").selectOption("BUY");
+    await page.getByTestId("tx-instrument").selectOption({ label: "DS0432 · Obligacje skarbowe DS0432 (stałe 1,75 %)" });
+    await page.getByTestId("tx-quantity").fill("10");
+    await page.getByTestId("tx-price").fill("80,5");
+    await expect(page.getByTestId("tx-amount")).toHaveValue("8050"); // 10 × 80.5 % × 1000
+    await page.getByTestId("tx-fee").fill("16,10");
+    await expect(page.getByTestId("tx-summary")).toContainText("8 066,10 zł");
+
+    await page.getByTestId("tx-instrument").selectOption("__new__");
+    await page.getByTestId("tx-new-code").fill("EDO1036");
+    await page.getByTestId("tx-lookup").click();
+    await expect(page.getByTestId("tx-new-instrument")).toContainText("Obligacje skarbowe EDO1036 (emerytalne 10-letnie)");
+
+    // Server-side check: a deposit with nothing in it.
+    await page.getByTestId("tx-type").selectOption("DEPOSIT");
+    await page.getByTestId("tx-amount").fill("0");
+    await page.getByTestId("tx-amount").fill("");
+    await page.getByTestId("tx-save").click();
+    await expect(page.getByTestId("tx-error")).toHaveText("Enter the amount");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("tx-form")).toBeHidden();
+  });
+});
+
 test.describe("holdings view", () => {
   test("groups holdings by account, sorted alphabetically", async ({ page }) => {
     await page.goto("/#/holdings");
