@@ -57,7 +57,7 @@ describe("IBKR positions and valuation", () => {
     const p = positionsAt(txs, "2025-12-31");
     expect(p.get(positionKey("IBKR", EUR))).toMatchObject({ quantity: 134, cost: 570.84 }); // 5000 − 4866 EUR, at 4.26
     expect(p.get(positionKey("IBKR", OAT))).toMatchObject({ quantity: 5, cost: 20729.16 });
-    expect(cashByAccount(txs, "2025-12-31").get("IBKR")).toBe(-1300); // 20000 − 21300 + 20729.16 − 20729.16
+    expect(cashByAccount(txs, "2025-12-31").get("IBKR")?.get("PLN")).toBe(-1300); // 20000 − 21300 + 20729.16 − 20729.16
   });
 
   it("values the currency at the NBP rate and the bond at its calculated price × nominal × rate", () => {

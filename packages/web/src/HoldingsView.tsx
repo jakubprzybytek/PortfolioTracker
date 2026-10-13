@@ -3,7 +3,7 @@ import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, uniqueOptions, type Option } from "./Filters.tsx";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
-import { fmtInt, fmtNum, fmtPct, fmtPln, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
+import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtPln, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { RangePicker } from "./RangePicker.tsx";
 import { ValueChart, type ValuePoint } from "./ValueChart.tsx";
 import type { Holding, Snapshot } from "./types.ts";
@@ -41,8 +41,10 @@ function SumCells({ s }: { s: Sums }) {
 interface Group {
   name: string;
   holdings: Holding[];
-  /** Cash row, when shown (the account's cash is non-zero or it's incomplete). */
+  /** Cash row, when shown (the account's cash is non-zero or it's incomplete): its PLN value. */
   cash: number | null;
+  /** The cash per currency (PLN and others, each with its PLN value); one line without a currency for PLN-only accounts. */
+  cashLines: CashLine[];
   incomplete: string[];
   sums: Sums;
 }
@@ -116,7 +118,7 @@ function HoldingRow({
       <td title={priceTitle(h)}>{detail ? fmtPrice(h) : ""}</td>
       <td>{detail ? fmtNum(h.accruedInterest) : ""}</td>
       <td>{fmtPln(h.value)}</td>
-      <td>{fmtPln(h.cost)}</td>
+      <td title={h.costNative ? `Paid ${fmtMoney(h.costNative.amount, h.costNative.currency)}; in PLN at the NBP rate of the day before each purchase` : ""}>{fmtPln(h.cost)}</td>
       <td className={signClass(h.gain)}>{fmtPln(h.gain)}</td>
       <td className={signClass(h.gainPct)}>{fmtPct(h.gainPct)}</td>
       <td>{fmtPln(h.couponsReceived)}</td>
@@ -124,13 +126,43 @@ function HoldingRow({
   );
 }
 
-function CashRow({ account, cash, incomplete, label, second = typeLabel("CASH") }: { account: string; cash: number; incomplete: boolean; label: ReactNode; second?: ReactNode }) {
+interface CashLine {
+  /** Absent: the account holds only PLN. */
+  currency?: string;
+  amount: number;
+  /** In PLN (null: no exchange rate). */
+  value: number | null;
+  rate?: number;
+}
+
+/**
+ * An account's cash: one line, or one per currency it holds (each with its amount, the NBP rate and its PLN value),
+ * the account's own currency first, then the others alphabetically.
+ */
+const cashLinesOf = (info: { cash: number; baseCurrency?: string; currencies?: Record<string, { amount: number; value: number | null; rate?: number }> }): CashLine[] =>
+  info.currencies
+    ? Object.entries(info.currencies)
+        .filter(([, c]) => c.amount !== 0)
+        .sort(([a], [b]) => {
+          const base = info.baseCurrency ?? "PLN";
+          return a === base ? -1 : b === base ? 1 : a.localeCompare(b);
+        })
+        .map(([currency, c]) => ({ currency, amount: c.amount, value: c.value, ...(c.rate ? { rate: c.rate } : {}) }))
+    : [{ amount: info.cash, value: info.cash }];
+
+function CashRow({ account, line, incomplete, label, second = typeLabel("CASH") }: { account: string; line: CashLine; incomplete: boolean; label: ReactNode; second?: ReactNode }) {
+  const foreign = line.currency && line.currency !== "PLN";
   return (
-    <tr data-testid="cash-row" data-account={account} className={incomplete ? "muted" : ""}>
-      <td className="left indent">{label}</td>
+    <tr data-testid="cash-row" data-account={account} data-currency={line.currency ?? "PLN"} className={incomplete ? "muted" : ""}>
+      <td className="left indent">
+        {label}
+        {line.currency && <span className="ccy"> {line.currency}</span>}
+      </td>
       <td className="left">{second}</td>
-      <td colSpan={3}></td>
-      <td title={incomplete ? "Incomplete: purchases of untracked assets are missing, so this is too high. Not included in the sums." : ""}>{fmtPln(cash)}</td>
+      <td>{foreign ? `${fmtNum(line.amount)} ${line.currency}` : ""}</td>
+      <td title={foreign && line.rate ? `1 ${line.currency} = ${fmtNum(line.rate, 4)} PLN (NBP)` : ""}>{foreign && line.rate ? `${fmtNum(line.rate, 4)} PLN` : ""}</td>
+      <td></td>
+      <td title={incomplete ? "Incomplete: purchases of untracked assets are missing, so this is too high. Not included in the sums." : ""}>{fmtPln(line.value)}</td>
       <td colSpan={4}></td>
     </tr>
   );
@@ -232,7 +264,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
         const holdings = all.filter((h) => accountOf(h) === name && (!type || shownType(h) === type)).sort(byCode);
         const showCash = (!type || type === "CASH") && info !== undefined && (info.cash !== 0 || incomplete.length > 0);
         const cash = showCash ? info.cash : null;
-        return { name, holdings, cash, incomplete, sums: sums(holdings, cash !== null && incomplete.length === 0 ? cash : 0) };
+        return { name, holdings, cash, cashLines: showCash ? cashLinesOf(info) : [], incomplete, sums: sums(holdings, cash !== null && incomplete.length === 0 ? cash : 0) };
       })
       .filter((g) => g.holdings.length > 0 || g.cash !== null);
   }, [options.account, accounts, all, account, type]);
@@ -367,17 +399,22 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
             {!snap.data && snap.loading && <SkeletonRows rows={10} cols={10} />}
             {byInstrument && instrumentRows.map(renderInstrument)}
             {byInstrument && cashRows.length === 1 && (
-              <CashRow
-                account={cashRows[0]!.name}
-                cash={cashRows[0]!.cash!}
-                incomplete={cashRows[0]!.incomplete.length > 0}
-                label={<strong>Cash</strong>}
-                second={
-                  <>
-                    {cashRows[0]!.name} {cashRows[0]!.incomplete.length > 0 && <IncompleteFlag what={cashRows[0]!.incomplete} />}
-                  </>
-                }
-              />
+              <>
+                {cashRows[0]!.cashLines.map((line) => (
+                  <CashRow
+                    key={line.currency ?? "PLN"}
+                    account={cashRows[0]!.name}
+                    line={line}
+                    incomplete={cashRows[0]!.incomplete.length > 0}
+                    label={<strong>Cash</strong>}
+                    second={
+                      <>
+                        {cashRows[0]!.name} {cashRows[0]!.incomplete.length > 0 && <IncompleteFlag what={cashRows[0]!.incomplete} />}
+                      </>
+                    }
+                  />
+                ))}
+              </>
             )}
             {byInstrument && cashRows.length > 1 && (
               <Fragment key="cash">
@@ -393,20 +430,22 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                   <td colSpan={4}></td>
                 </tr>
                 {expanded.has("cash") &&
-                  cashRows.map((g) => (
-                    <CashRow
-                      key={g.name}
-                      account={g.name}
-                      cash={g.cash!}
-                      incomplete={g.incomplete.length > 0}
-                      label=""
-                      second={
-                        <>
-                          <span className="sub">└ {g.name}</span> {g.incomplete.length > 0 && <IncompleteFlag what={g.incomplete} />}
-                        </>
-                      }
-                    />
-                  ))}
+                  cashRows.flatMap((g) =>
+                    g.cashLines.map((line) => (
+                      <CashRow
+                        key={`${g.name}/${line.currency ?? "PLN"}`}
+                        account={g.name}
+                        line={line}
+                        incomplete={g.incomplete.length > 0}
+                        label=""
+                        second={
+                          <>
+                            <span className="sub">└ {g.name}</span> {g.incomplete.length > 0 && <IncompleteFlag what={g.incomplete} />}
+                          </>
+                        }
+                      />
+                    )),
+                  )}
               </Fragment>
             )}
             {byInstrument && foreignCashGroups.map(renderInstrument)}
@@ -431,7 +470,9 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                     label={labelOf(h)}
                   />
                 ))}
-                {g.cash !== null && <CashRow account={g.name} cash={g.cash} incomplete={g.incomplete.length > 0} label={<strong>Cash</strong>} />}
+                {g.cashLines.map((line) => (
+                  <CashRow key={line.currency ?? "PLN"} account={g.name} line={line} incomplete={g.incomplete.length > 0} label={<strong>Cash</strong>} />
+                ))}
                 {g.holdings.filter(isForeignCash).map((h) => (
                   <HoldingRow
                     key={`${g.name}/${h.isin}`}

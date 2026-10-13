@@ -38,8 +38,8 @@ describe("positionsAt", () => {
     // FIFO: the 5 sold come from the first lot (8010 for 10 → 4005 out); the second lot (8210) is untouched
     expect(p.cost).toBe(12215);
     expect(p.lots).toEqual([
-      { date: "2025-01-10", quantity: 5, cost: 4005 },
-      { date: "2025-03-10", quantity: 10, cost: 8210 },
+      { date: "2025-01-10", quantity: 5, cost: 4005, costNative: 4005, currency: "PLN" },
+      { date: "2025-03-10", quantity: 10, cost: 8210, costNative: 8210, currency: "PLN" },
     ]);
     expect(p.realised).toEqual([{ date: "2025-06-01", quantity: 5, proceeds: 4150, cost: 4005 }]);
     expect(p.couponsReceived).toBe(350);

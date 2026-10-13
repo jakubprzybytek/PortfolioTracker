@@ -61,7 +61,7 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 
 | Field | Example |
 |---|---|
-| `isin`, `name`, `type` | `IE00B3RBWM25`, "Vanguard FTSE All-World", `ETF` / `BOND_LISTED` / `BOND_CORPORATE` / `BOND_RETAIL` / `BOND_IBKR` / `FUND_MANUAL` / `CURRENCY` (foreign cash held in an account: one unit = 1 of its currency, valued at the NBP rate) / `CASH` |
+| `isin`, `name`, `type` | `IE00B3RBWM25`, "Vanguard FTSE All-World", `ETF` / `BOND_LISTED` / `BOND_CORPORATE` / `BOND_RETAIL` / `BOND_IBKR` / `FUND_MANUAL` / `CURRENCY` (foreign cash as a position, from the old PLN-only bookings; accounts in several currencies hold cash per currency instead) / `CASH` |
 | `currency`, `venue` | `EUR`, `XAMS` (MIC of the listing prices come from: `XAMS` Euronext Amsterdam, `XETR` Xetra, `XWAR` GPW) |
 | `sourceIds` | `{ "yahoo": "VWRL.AS" }`, `{ "gpw": "<CODE>" }`, later `{ "ibkr_conid": "…" }` |
 | `nominal` | Corporate bonds (`BOND_CORPORATE`, no terms): nominal per bond (1000 or 100); prices are clean % of it; value = clean % × nominal, no accrued interest |
@@ -178,10 +178,10 @@ PK = ACCT#<account>         SK = TX#<YYYY-MM-DD>#<tx_id>
 GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
 ```
 
-`type`, `isin`, `quantity`, `price`, `amount`, `fee`, `currency`, `fxRate`, `ratio`, `note`, `source`.
+`type`, `isin`, `quantity`, `price`, `amount`, `fee`, `currency`, `fxRate`, `ratio`, `toAmount`, `toCurrency`, `note`, `source`.
 
 `type`: `BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`, `DIVIDEND`, `SPLIT`.
-Foreign-currency trades (ETFs at Bossa): `price` in the instrument's currency, `amount` and `fee` in PLN, `fxRate` = the broker's PLN per unit. `SPLIT`: `ratio` (units after per unit before), `amount` 0; the position's quantity × `ratio`, cost unchanged. `DIVIDEND` counts as income received, like coupons.
+**Currencies: all equal.** `amount` and `fee` are in `currency`, the currency actually paid or received (PLN, EUR, USD …); cash is kept per account and currency. Paid in PLN for an instrument in another currency (ETFs at Bossa): `price` in the instrument's currency, `amount` and `fee` in PLN, `fxRate` = the broker's PLN per unit. Paid in the instrument's currency (IBKR): `amount` and `fee` in it, no `fxRate`. `EXCHANGE`: `amount` (negative) and `fee` leave in `currency`, `toAmount` arrives in `toCurrency` (the broker's rate is their ratio). In PLN, every transaction counts at the NBP mid rate of the business day before it (D-1, as Polish tax): purchase costs (FIFO lots keep that PLN cost and the cost as paid), sales, income, deposits; the broker's spread shows in the account's profit (money in vs value), not in a position's gain. Accounts have an optional `baseCurrency` (IBKR: EUR): their summary is also given in it. `SPLIT`: `ratio` (units after per unit before), `amount` 0; the position's quantity × `ratio`, cost unchanged. `DIVIDEND` counts as income received, like coupons.
 `valueDate` (optional): retail bonds, when interest starts if not the transaction date. Retail positions are valued per lot (each buy; sales take the oldest lots first).
 
 **Same-day order:** buys before sales (then the rest), so a sale of what was bought the same day (currency at IBKR) isn't clipped.

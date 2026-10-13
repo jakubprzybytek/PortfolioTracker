@@ -34,7 +34,11 @@ export function checkManualTransaction(t: ManualTransaction, knownIsins: Set<str
   if (t.isin && !knownIsins.has(t.isin)) problems.push(`Unknown instrument ${t.isin}: add it first`);
   if ((t.type === "BUY" || t.type === "SELL") && !t.quantity) problems.push(`${t.type} needs a quantity`);
   if (t.type === "SPLIT" && !t.ratio) problems.push("SPLIT needs a ratio");
-  if ((t.type === "BUY" || t.type === "FEE" || t.type === "TAX" || t.type === "WITHDRAWAL") && t.amount > 0) problems.push(`${t.type}: the amount is money out, so negative`);
+  if (t.type === "EXCHANGE") {
+    if (!t.toAmount || !t.toCurrency) problems.push("EXCHANGE needs what came in: toAmount and toCurrency");
+    else if (t.toCurrency === t.currency) problems.push("EXCHANGE: the two currencies must differ");
+  }
+  if ((t.type === "BUY" || t.type === "FEE" || t.type === "TAX" || t.type === "WITHDRAWAL" || t.type === "EXCHANGE") && t.amount > 0) problems.push(`${t.type}: the amount is money out, so negative`);
   if ((t.type === "SELL" || t.type === "DEPOSIT" || t.type === "COUPON" || t.type === "INTEREST" || t.type === "DIVIDEND" || t.type === "REDEMPTION") && t.amount < 0)
     problems.push(`${t.type}: the amount is money in, so positive`);
   return problems;

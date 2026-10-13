@@ -5,6 +5,15 @@ const num = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2, ...always
 const pct = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2, signDisplay: "exceptZero" });
 
 export const fmtPln = (v: number | null | undefined): string => (v === null || v === undefined ? "–" : pln.format(v));
+const money = new Map<string, Intl.NumberFormat>();
+/** An amount in any currency: PLN as "1 234,56 zł", others as "1 234,56 EUR". */
+export const fmtMoney = (v: number | null | undefined, currency: string): string => {
+  if (v === null || v === undefined || Number.isNaN(v)) return "–";
+  if (currency === "PLN") return pln.format(v);
+  let f = money.get(currency);
+  if (!f) money.set(currency, (f = new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2, ...always })));
+  return `${f.format(v)} ${currency}`;
+};
 export const fmtNum = (v: number | null | undefined, digits = 2): string =>
   v === null || v === undefined ? "–" : new Intl.NumberFormat("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits, ...always }).format(v);
 export const fmtPct = (v: number | null | undefined): string => (v === null || v === undefined ? "–" : `${pct.format(v)} %`);
@@ -60,4 +69,5 @@ export const TX_TYPE_LABELS: Record<string, string> = {
   INTEREST: "Interest",
   DIVIDEND: "Dividend",
   SPLIT: "Split",
+  EXCHANGE: "Currency exchange",
 };

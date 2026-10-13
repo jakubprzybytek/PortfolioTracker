@@ -7,6 +7,7 @@ import { listingFromTicker } from "../instruments/listing.ts";
 import type { InstrumentInput } from "../instruments/schema.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
 import { privateAssetId, type ManualPriceInput } from "../prices/manual.ts";
+import { nativeLedger } from "./nativeLedger.ts";
 import { transactionId, type TransactionInput } from "./schema.ts";
 
 /** One row of "Transakcje" (columns A–N). */
@@ -70,8 +71,8 @@ export interface SheetConversion {
   /** Manually valued assets (sheet class "Inne"): instruments with a private id, and their purchase prices. */
   manualInstruments: InstrumentInput[];
   manualPrices: ManualPriceInput[];
-  /** Every account, with the kinds of assets not imported (empty = complete). */
-  accounts: { account: string; incomplete: string[] }[];
+  /** Every account, with the kinds of assets not imported (empty = complete) and its own currency if not PLN. */
+  accounts: { account: string; incomplete: string[]; baseCurrency?: string }[];
 }
 
 /** Short label of what isn't tracked, per sheet asset class (for the account's "incomplete" note). */
@@ -153,6 +154,8 @@ export function convertSheetRows(
   retailSeries: Map<string, RetailTerms> = new Map(),
   etfs: Map<string, { isin: string }> = new Map(),
   corporates: Map<string, { isin: string; nominal: number; name: string }> = new Map(),
+  /** Accounts kept in several currencies (IBKR → its base currency, EUR): rewritten with `nativeLedger`. */
+  nativeAccounts: Map<string, string> = new Map(),
 ): SheetConversion {
   const transactions: TransactionInput[] = [];
   const skipped: SkippedRow[] = [];
@@ -324,6 +327,15 @@ export function convertSheetRows(
     }
   }
 
+  // Multi-currency accounts: each trade in the currency it was paid in, conversions as EXCHANGE (no currency positions).
+  const currencyIsins = new Map([...currencies.values()].map((c) => [c.isin, c.currency]));
+  for (const account of nativeAccounts.keys()) {
+    const mine = transactions.filter((t) => t.account === account);
+    const rewritten = nativeLedger(mine, currencyIsins);
+    transactions.splice(0, transactions.length, ...transactions.filter((t) => t.account !== account), ...rewritten);
+  }
+  const stillHeldAsPositions = new Set(transactions.map((t) => t.isin));
+
   // Stable ids from the row contents (the sheet re-sorts its rows daily, so row numbers aren't stable).
   // Identical rows (e.g. two equal deposits on one day) get a counter suffix instead of collapsing into one.
   const seen = new Map<string, number>();
@@ -349,7 +361,10 @@ export function convertSheetRows(
     }));
   const incomplete = new Map<string, Set<string>>();
   for (const s of skipped) incomplete.set(s.account, (incomplete.get(s.account) ?? new Set()).add(s.what));
-  const accounts = [...new Set(rows.map((r) => r.account))].sort().map((account) => ({ account, incomplete: [...(incomplete.get(account) ?? [])].sort() }));
+  const accounts = [...new Set(rows.map((r) => r.account))].sort().map((account) => {
+    const baseCurrency = nativeAccounts.get(account);
+    return { account, incomplete: [...(incomplete.get(account) ?? [])].sort(), ...(baseCurrency ? { baseCurrency } : {}) };
+  });
   const etfInstruments = [...etfUsed.values()].sort((a, b) => a.code.localeCompare(b.code));
   // Bonds no longer held are mostly redeemed and gone from every quote page: their prices come from the trades.
   const corporateInstruments: InstrumentInput[] = [];
@@ -367,7 +382,7 @@ export function convertSheetRows(
       if (fb.quantity > 0 && fb.maturity) points.push({ date: fb.maturity, price: 100 });
       return { ...fb.input, active: fb.quantity > 0, pricePath: points.sort((a, b) => a.date.localeCompare(b.date)) };
     }),
-    ...currencies.values(),
+    ...[...currencies.values()].filter((c) => stillHeldAsPositions.has(c.isin)),
   ];
   return { transactions, skipped, retailInstruments, corporateInstruments, ibkrInstruments, etfInstruments, manualInstruments: [...manualUsed.values()], manualPrices, accounts };
 }

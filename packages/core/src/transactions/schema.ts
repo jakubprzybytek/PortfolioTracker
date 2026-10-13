@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { TransactionItem } from "../db/items.ts";
 
-export const transactionTypes = ["BUY", "SELL", "COUPON", "REDEMPTION", "DEPOSIT", "WITHDRAWAL", "FEE", "TAX", "INTEREST", "DIVIDEND", "SPLIT"] as const;
+export const transactionTypes = ["BUY", "SELL", "COUPON", "REDEMPTION", "DEPOSIT", "WITHDRAWAL", "FEE", "TAX", "INTEREST", "DIVIDEND", "SPLIT", "EXCHANGE"] as const;
 
 export const TransactionInput = z.object({
   id: z.string().min(1).optional(),
@@ -15,12 +15,16 @@ export const TransactionInput = z.object({
   quantity: z.number().positive().optional(),
   /** Bonds: clean price in % of nominal; ETFs: in the instrument's currency. */
   price: z.number().optional(),
-  /** Foreign-currency trades: the broker's PLN per unit of the instrument's currency (`amount` is in PLN). */
+  /** Paid in PLN for an instrument in another currency: the broker's PLN per unit of the instrument's currency. */
   fxRate: z.number().positive().optional(),
+  /** EXCHANGE: the amount received (positive) and its currency; `amount` (negative) is what was given in `currency`. */
+  toAmount: z.number().positive().optional(),
+  toCurrency: z.string().length(3).optional(),
   /** SPLIT: each unit held becomes `ratio` units (amount 0). */
   ratio: z.number().positive().optional(),
-  /** Signed cash effect: negative = money out (buys, fees), positive = money in (sells, coupons). */
+  /** Signed cash effect in `currency`: negative = money out (buys, fees), positive = money in (sells, coupons). */
   amount: z.number(),
+  /** In `currency`. */
   fee: z.number().nonnegative().optional(),
   /** Retail bonds: when interest starts (the purchase date), if not the transaction date. */
   valueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -36,7 +40,20 @@ export function transactionId(t: z.output<typeof TransactionInput>): string {
   if (t.id) return t.id;
   const h = createHash("sha256");
   // valueDate and ratio only when present, so ids of existing rows don't change.
-  h.update([t.date, t.account, t.type, t.isin ?? "", t.quantity ?? "", t.amount, t.currency, ...(t.valueDate ? [t.valueDate] : []), ...(t.ratio ? [`ratio=${t.ratio}`] : [])].join("|"));
+  h.update(
+    [
+      t.date,
+      t.account,
+      t.type,
+      t.isin ?? "",
+      t.quantity ?? "",
+      t.amount,
+      t.currency,
+      ...(t.valueDate ? [t.valueDate] : []),
+      ...(t.ratio ? [`ratio=${t.ratio}`] : []),
+      ...(t.toCurrency ? [`to=${t.toAmount}${t.toCurrency}`] : []),
+    ].join("|"),
+  );
   return h.digest("hex").slice(0, 16);
 }
 

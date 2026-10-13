@@ -24,5 +24,10 @@
   { "date": "2025-10-02", "account": "ibkr", "type": "SELL", "isin": "ZZWALUTYEUR0", "quantity": 1919.04, "price": 1, "fxRate": 4.3, "amount": 8251.87, "note": "EUR spent on the bond" },
   { "date": "2025-03-03", "account": "closed", "type": "DEPOSIT", "amount": 1000, "note": "account emptied and closed later (sample data)" },
   { "date": "2025-06-30", "account": "closed", "type": "INTEREST", "amount": 20 },
-  { "date": "2025-07-01", "account": "closed", "type": "WITHDRAWAL", "amount": -1020, "note": "everything out: the account is closed" }
+  { "date": "2025-07-01", "account": "closed", "type": "WITHDRAWAL", "amount": -1020, "note": "everything out: the account is closed" },
+  { "date": "2025-11-03", "account": "eur", "type": "DEPOSIT", "amount": 5000, "note": "account kept in EUR and USD, like IBKR (sample data)" },
+  { "date": "2025-11-03", "account": "eur", "type": "EXCHANGE", "amount": -4300, "currency": "PLN", "toAmount": 1000, "toCurrency": "EUR", "note": "PLN converted at the broker's rate" },
+  { "date": "2025-11-04", "account": "eur", "type": "BUY", "isin": "DE0001102523", "quantity": 1, "price": 96.2, "amount": -962, "fee": 1.25, "currency": "EUR", "note": "paid in EUR" },
+  { "date": "2025-11-05", "account": "eur", "type": "EXCHANGE", "amount": -20, "currency": "EUR", "toAmount": 23.2, "toCurrency": "USD" },
+  { "date": "2025-12-01", "account": "eur", "type": "DEPOSIT", "amount": 100, "currency": "EUR", "note": "sent in EUR" }
 ]

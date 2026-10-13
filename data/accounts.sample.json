@@ -4,5 +4,6 @@
   { "account": "ike" },
   { "account": "foreign" },
   { "account": "ibkr" },
-  { "account": "etf", "incomplete": ["ETFs"] }
+  { "account": "etf", "incomplete": ["ETFs"] },
+  { "account": "eur", "baseCurrency": "EUR" }
 ]

@@ -28,6 +28,7 @@ import {
   summarize,
   today,
   yearBefore,
+  type FxHistory,
   type IndicatorSummary,
   type PriceItem,
   type TransactionItem,
@@ -103,7 +104,12 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       case "GET /accounts": {
         // Per account (latest snapshot): net deposits, value, cash, profit, income, costs, XIRR; total of the complete ones.
         const [snap, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listTransactions()]);
-        return snap ? json(200, { date: snap.date, ...accountSummaries(snap, txs) }) : json(404, { error: "No valuation yet" });
+        if (!snap) return json(404, { error: "No valuation yet" });
+        // Money in other currencies counts at NBP rates (the day before each transaction; base currencies: today too).
+        const first = txs.map((t) => t.date).sort()[0] ?? snap.date;
+        const currencies = [...new Set([...txs.flatMap((t) => [t.currency, t.toCurrency ?? "PLN"]), ...Object.values(snap.accounts ?? {}).map((a) => a.baseCurrency ?? "PLN")])].filter((c) => c && c !== "PLN");
+        const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), snap.date)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
+        return json(200, { date: snap.date, ...accountSummaries(snap, txs, fx) });
       }
       case "GET /portfolio/history": {
         const snaps = await repo.querySnapshots(from, to);

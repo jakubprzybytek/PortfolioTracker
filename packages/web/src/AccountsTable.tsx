@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { fmtPct, fmtPln, signClass } from "./format.ts";
+import { Fragment, useState } from "react";
+import { fmtMoney, fmtPct, fmtPln, signClass } from "./format.ts";
 import { SkeletonRows } from "./Placeholders.tsx";
 import type { AccountSummary } from "./types.ts";
 import { useApi } from "./useApi.ts";
@@ -47,6 +47,25 @@ function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
   );
 }
 
+/** The account in its own currency (IBKR: EUR), under its PLN row. */
+function BaseRow({ a }: { a: AccountSummary }) {
+  const b = a.base!;
+  return (
+    <tr className={`base-row${a.closed ? " closed" : ""}`} data-testid="account-base-row" data-account={a.account} title={`${a.account} in ${b.currency}: deposits in ${b.currency} as made, others at the NBP rate of the day before; the total at today's rate`}>
+      <td className="left">
+        <span className="sub">└ in {b.currency}</span>
+      </td>
+      <td>{fmtMoney(b.netDeposits, b.currency)}</td>
+      <td></td>
+      <td></td>
+      <td>{fmtMoney(b.total, b.currency)}</td>
+      <td className={signClass(b.profit)}>{fmtMoney(b.profit, b.currency)}</td>
+      <td className={signClass(b.xirr)}>{pct(b.xirr)}</td>
+      <td colSpan={2}></td>
+    </tr>
+  );
+}
+
 /**
  * Per account: money put in, its value now, profit and the annual return (XIRR); total of the fully tracked accounts.
  * Closed accounts (emptied) come last, folded into one row ("▸ n closed accounts"); they stay in the total.
@@ -76,7 +95,10 @@ export function AccountsTable() {
         <tbody>
           {!data.data && <SkeletonRows rows={6} cols={9} />}
           {open.map((a) => (
-            <Row key={a.account} a={a} />
+            <Fragment key={a.account}>
+              <Row a={a} />
+              {a.base && <BaseRow a={a} />}
+            </Fragment>
           ))}
           {closed.length > 0 && (
             <tr className="closed" data-testid="closed-accounts">

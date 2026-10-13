@@ -18,8 +18,21 @@ describe("cashByAccount", () => {
       tx({ date: "2025-01-05", account: "b", type: "DEPOSIT", amount: 500 }),
       tx({ date: "2025-01-06", account: "b", type: "INTEREST", amount: 1.25 }),
     ];
-    expect(Object.fromEntries(cashByAccount(txs, "2025-12-31"))).toEqual({ a: 5249.01, b: 501.25 });
-    expect(Object.fromEntries(cashByAccount(txs, "2025-01-03"))).toEqual({ a: 1984 });
+    const plain = (m: Map<string, Map<string, number>>) => Object.fromEntries([...m].map(([a, c]) => [a, Object.fromEntries(c)]));
+    expect(plain(cashByAccount(txs, "2025-12-31"))).toEqual({ a: { PLN: 5249.01 }, b: { PLN: 501.25 } });
+    expect(plain(cashByAccount(txs, "2025-01-03"))).toEqual({ a: { PLN: 1984 } });
+  });
+
+  it("keeps each currency apart: trades and fees in the currency paid, an exchange moves money between two", () => {
+    const txs = [
+      tx({ date: "2026-01-02", type: "DEPOSIT", amount: 10000 }),
+      tx({ date: "2026-01-03", type: "EXCHANGE", amount: -8600, fee: 4, toAmount: 2000, toCurrency: "EUR" }),
+      tx({ date: "2026-01-04", type: "BUY", isin: "DE0001102523", quantity: 1, amount: -965, fee: 1.25, currency: "EUR" }),
+      tx({ date: "2026-01-05", type: "EXCHANGE", amount: -300, fee: 1, currency: "EUR", toAmount: 345.5, toCurrency: "USD" }),
+      tx({ date: "2026-01-06", type: "DEPOSIT", amount: 100, currency: "USD" }),
+    ];
+    const ibkr = cashByAccount(txs, "2026-12-31").get("a")!;
+    expect(Object.fromEntries(ibkr)).toEqual({ PLN: 1396, EUR: 732.75, USD: 445.5 });
   });
 });
 

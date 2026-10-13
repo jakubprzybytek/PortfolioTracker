@@ -51,8 +51,9 @@ async function revalue(event: ValuationEvent) {
       priceHistory.set(i.isin, items.sort((a, b) => a.date.localeCompare(b.date)));
     }
 
-    // Exchange rates of the currencies instruments are priced in, walked forward the same way.
-    const currencies = [...new Set(tracked.map((i) => i.currency).filter((c) => c !== "PLN"))];
+    // Exchange rates of the currencies instruments are priced in and money moved in, walked forward the same way;
+    // the whole history also goes to the valuation (transactions count at the rate of the day before).
+    const currencies = [...new Set([...tracked.map((i) => i.currency), ...transactions.flatMap((t) => [t.currency, t.toCurrency ?? "PLN"])].filter((c) => c && c !== "PLN"))];
     const fxHistory = new Map<string, FxRateItem[]>();
     for (const c of currencies) fxHistory.set(c, (await repo.queryFxRates(c, "0000-00-00", to)).sort((a, b) => a.date.localeCompare(b.date)));
 
@@ -79,7 +80,7 @@ async function revalue(event: ValuationEvent) {
         const r = at(date);
         if (r) fx.set(c, { mid: r.mid, date: r.date });
       }
-      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates, accounts, fx });
+      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates, accounts, fx, fxHistory });
       await repo.putSnapshot(snapshot, date === to);
       await repo.putPositionDays(snapshot); // per-position history for the Holdings row charts
       written++;

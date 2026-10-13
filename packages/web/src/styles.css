@@ -259,3 +259,8 @@ button.danger-link { font: inherit; background: none; border: 0; padding: 0; col
   /* Add / Cancel stay in reach while scrolling the form. */
   .modal-footer { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--border); }
 }
+/* An amount with its currency next to it. */
+.with-currency { display: flex; gap: 6px; }
+.with-currency input { flex: 1; }
+.modal .with-currency select { width: auto; flex: none; }
+tr.base-row td { color: var(--muted); font-size: 0.9em; border-top: 0; }

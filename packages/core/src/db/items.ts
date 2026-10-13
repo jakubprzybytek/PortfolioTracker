@@ -112,6 +112,8 @@ export interface AccountItem {
   GSI1SK: string; // account
   account: string;
   incomplete?: string[];
+  /** The account's own currency (IBKR: EUR): its summary is also shown in it. Absent: PLN. */
+  baseCurrency?: string;
   updatedAt: string;
 }
 
@@ -126,7 +128,9 @@ export type TransactionType =
   | "TAX"
   | "INTEREST"
   | "DIVIDEND"
-  | "SPLIT";
+  | "SPLIT"
+  /** Currency conversion in an account: `amount` (negative) in `currency` out, `toAmount` in `toCurrency` in. */
+  | "EXCHANGE";
 
 export interface TransactionItem {
   PK: `ACCT#${string}`;
@@ -140,14 +144,18 @@ export interface TransactionItem {
   isin?: string;
   quantity?: number;
   price?: number; // bonds: clean % of nominal; retail bonds: PLN per 100 PLN bond; ETFs: in the instrument's currency
-  /** Foreign-currency trades: PLN per unit of the instrument's currency used by the broker (amount is in PLN). */
+  /** Paid in PLN for an instrument in another currency (Bossa): PLN per unit of the instrument's currency. */
   fxRate?: number;
+  /** EXCHANGE: what came in, in `toCurrency`. */
+  toAmount?: number;
+  toCurrency?: string;
   /** SPLIT: each unit held becomes `ratio` units. */
   ratio?: number;
   /** Retail bonds: when interest starts (the purchase date), if not the transaction date. */
   valueDate?: IsoDate;
   amount: number; // signed cash effect in `currency`: negative = money out
-  fee?: number;
+  fee?: number; // in `currency`
+  /** Currency of `amount` and `fee`: what was actually paid or received (PLN, EUR, USD …). */
   currency: string;
   note?: string;
   source: string;
@@ -177,11 +185,17 @@ export interface HoldingSnapshot {
   rate?: { current: number; previous: number | null };
   /** Foreign-currency instruments: the NBP mid rate used (PLN per unit of `currency`) and its date. */
   fx?: { rate: number; date: IsoDate };
+  /** Bought in another currency than PLN: the cost in that currency (gain there = value at today's price − this). */
+  costNative?: { amount: number; currency: string };
 }
 
 /** An account's cash, and whether all of its assets are tracked (`incomplete` lists what isn't yet). */
 export interface AccountSnapshot {
+  /** All its cash in PLN (foreign currencies at the NBP mid rate). */
   cash: number;
+  /** Per currency, when it holds any other than PLN: the amount, its PLN value (null without a rate) and the rate. */
+  currencies?: Record<string, { amount: number; value: number | null; rate?: number }>;
+  baseCurrency?: string;
   incomplete?: string[];
 }
 

@@ -85,7 +85,7 @@ describe("ETF positions and valuation", () => {
   });
 
   it("cash: the split moves no money, the dividend adds to it", () => {
-    expect(cashByAccount(txs, "2026-12-31").get("a")).toBe(3190.48); // 10000 − 9316.86 − 20 + 2515 + 12.34
+    expect(cashByAccount(txs, "2026-12-31").get("a")?.get("PLN")).toBe(3190.48); // 10000 − 9316.86 − 20 + 2515 + 12.34
   });
 
   it("values an ETF in PLN at the NBP mid rate; cost stays as paid in PLN", () => {

@@ -4,6 +4,8 @@
 //
 // --etfs: the sheet's ETF tickers with their ISINs (the sheet has none): [{ "ticker": "AMS:VWRL", "isin": "IE00B3RBWM25" }].
 // Defaults to data/private/etfs.json when it exists.
+// --native: accounts kept in several currencies, with their own currency: "IBKR=EUR" (comma-separated for more).
+// Their trades are written in the currency paid, conversions as EXCHANGE, instead of the sheet's PLN bookings.
 // --catalyst: the sheet's Catalyst tickers: [{ "ticker": "CPS0130", "isin": "PLCFRPT00070", "nominal": 1000, "name": "…" }].
 // Defaults to data/private/catalyst.json when it exists.
 //
@@ -34,6 +36,12 @@ const flag = (name: string) => {
   return i >= 0 ? args.splice(i, 2)[1] : undefined;
 };
 const mfRetail = flag("--mf-retail");
+const nativeAccounts = new Map(
+  (flag("--native") ?? "")
+    .split(",")
+    .filter(Boolean)
+    .map((p) => p.split("=") as [string, string]),
+);
 const etfFile = flag("--etfs") ?? (existsSync("data/private/etfs.json") ? "data/private/etfs.json" : undefined);
 const catalystFile = flag("--catalyst") ?? (existsSync("data/private/catalyst.json") ? "data/private/catalyst.json" : undefined);
 const [input] = args;
@@ -66,6 +74,7 @@ const { transactions, skipped, retailInstruments, corporateInstruments, ibkrInst
   retail,
   etfs,
   corporates,
+  nativeAccounts,
 );
 const instrumentsOut = [...retailInstruments, ...corporateInstruments, ...ibkrInstruments, ...etfInstruments, ...manualInstruments];
 const pricesOut = [...manualPrices, ...readSheetManualPrices(workbook, today())];

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
-import { TX_TYPE_LABELS, fmtInt, fmtNum, fmtPln, signClass, typeLabel } from "./format.ts";
+import { TX_TYPE_LABELS, fmtInt, fmtMoney, fmtNum, signClass, typeLabel } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { TransactionForm } from "./TransactionForm.tsx";
@@ -116,8 +116,16 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
                 <td className="left">{typeLabel(assetType(t))}</td>
                 <td>{t.quantity === undefined ? "–" : fmtInt(t.quantity)}</td>
                 <td>{t.price === undefined ? "–" : fmtNum(t.price)}</td>
-                <td className={signClass(t.amount)}>{t.currency === "PLN" ? fmtPln(t.amount) : `${fmtNum(t.amount)} ${t.currency}`}</td>
-                <td>{t.fee ? fmtNum(t.fee) : "–"}</td>
+                <td className={t.type === "EXCHANGE" ? "" : signClass(t.amount)} data-testid="tx-amount-cell">
+                  {t.type === "EXCHANGE" ? (
+                    <>
+                      {fmtMoney(t.amount, t.currency)} <span className="faint">→</span> {fmtMoney(t.toAmount, t.toCurrency ?? t.currency)}
+                    </>
+                  ) : (
+                    fmtMoney(t.amount, t.currency)
+                  )}
+                </td>
+                <td>{t.fee ? fmtMoney(t.fee, t.currency) : "–"}</td>
                 <td className="left muted wrap">{t.note ?? ""}</td>
               </tr>
             ))}

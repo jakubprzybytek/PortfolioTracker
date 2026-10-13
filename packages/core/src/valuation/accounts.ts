@@ -4,6 +4,7 @@
 import type { IsoDate } from "../dates.ts";
 import type { SnapshotItem, TransactionItem } from "../db/items.ts";
 import { round2 } from "../bonds/izIndex.ts";
+import { rateD1, rateOn, type FxHistory } from "./fx.ts";
 
 export interface AccountSummary {
   account: string;
@@ -29,6 +30,11 @@ export interface AccountSummary {
   /** Money-weighted annual return of the deposits and withdrawals plus today's total; null when not computable. */
   xirr: number | null;
   firstDate: IsoDate;
+  /**
+   * The same in the account's own currency (IBKR: EUR), when it isn't PLN: money in that currency counts as is,
+   * the rest at the NBP rate of the day before; the total at today's rate.
+   */
+  base?: { currency: string; netDeposits: number; total: number; profit: number; xirr: number | null };
 }
 
 export interface CashFlow {
@@ -68,11 +74,36 @@ export function xirr(flows: CashFlow[]): number | null {
 const INCOME = new Set<TransactionItem["type"]>(["COUPON", "INTEREST", "DIVIDEND"]);
 
 /** One row per account of the snapshot (and any account with transactions), sorted by name, plus the total of the complete ones. */
-export function accountSummaries(snapshot: Pick<SnapshotItem, "date" | "holdings" | "accounts">, transactions: TransactionItem[]): { accounts: AccountSummary[]; total: AccountSummary } {
+/**
+ * Money in another currency than PLN counts at the NBP rate of the day before (`fx`), as Polish tax does; without a
+ * rate, at the broker's (`fxRate`) or not at all.
+ */
+export function accountSummaries(
+  snapshot: Pick<SnapshotItem, "date" | "holdings" | "accounts">,
+  transactions: TransactionItem[],
+  fx?: FxHistory,
+): { accounts: AccountSummary[]; total: AccountSummary } {
   const date = snapshot.date;
   const txs = transactions.filter((t) => t.date <= date);
   const names = new Set([...Object.keys(snapshot.accounts ?? {}), ...snapshot.holdings.map((h) => h.account), ...txs.map((t) => t.account)]);
-  const flowsOf = (ts: TransactionItem[]): CashFlow[] => ts.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => ({ date: t.date, amount: -t.amount }));
+  /** `amount` of a transaction in `currency`, as `target` (PLN or a base currency) at the NBP rates of the day before. */
+  const convert = (amount: number, currency: string, d: IsoDate, target = "PLN"): number => {
+    if (currency === target) return amount;
+    const pln = currency === "PLN" ? amount : amount * (rateD1(fx, currency, d) ?? NaN);
+    return target === "PLN" ? pln : pln / (rateD1(fx, target, d) ?? NaN);
+  };
+  const plnOf = (t: TransactionItem, v = t.amount) => convert(v, t.currency || "PLN", t.date);
+  const flowsOf = (ts: TransactionItem[], target = "PLN"): CashFlow[] =>
+    ts.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => ({ date: t.date, amount: -convert(t.amount, t.currency || "PLN", t.date, target) }));
+
+  // The account in its own currency: its deposits as made (others converted), its total at today's rate.
+  const baseSummary = (currency: string, own: TransactionItem[], totalPln: number): NonNullable<AccountSummary["base"]> => {
+    const flows = flowsOf(own, currency);
+    const rate = rateOn(fx, currency, date)?.mid;
+    const total = rate ? round2(totalPln / rate) : NaN;
+    const netDeposits = round2(-flows.reduce((s, f) => s + f.amount, 0));
+    return { currency, netDeposits, total, profit: round2(total - netDeposits), xirr: Number.isNaN(total) ? null : xirr([...flows, { date, amount: total }]) };
+  };
 
   const rows = [...names].sort((a, b) => a.localeCompare(b)).map((account): AccountSummary => {
     const own = txs.filter((t) => t.account === account);
@@ -93,11 +124,12 @@ export function accountSummaries(snapshot: Pick<SnapshotItem, "date" | "holdings
       cash,
       total,
       profit: round2(total - netDeposits),
-      income: round2(own.filter((t) => INCOME.has(t.type)).reduce((s, t) => s + t.amount, 0)),
-      costs: round2(own.reduce((s, t) => s + (t.fee ?? 0) + (t.type === "FEE" || t.type === "TAX" ? -t.amount : 0), 0)),
+      income: round2(own.filter((t) => INCOME.has(t.type)).reduce((s, t) => s + plnOf(t), 0)),
+      costs: round2(own.reduce((s, t) => s + plnOf(t, (t.fee ?? 0) + (t.type === "FEE" || t.type === "TAX" ? -t.amount : 0)), 0)),
       xirr: xirr([...flows, { date, amount: total }]),
       firstDate: own.map((t) => t.date).sort()[0] ?? date,
       lastDate: own.map((t) => t.date).sort().at(-1) ?? date,
+      ...(info?.baseCurrency ? { base: baseSummary(info.baseCurrency, own, total) } : {}),
     };
   });
 

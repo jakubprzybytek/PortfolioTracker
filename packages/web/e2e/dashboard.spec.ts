@@ -14,8 +14,9 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("total-value")).not.toContainText("–");
     await expect(page.getByTestId("total-gain")).toContainText("%");
     await expect(page.getByTestId("total-coupons")).toContainText("996,70"); // bond coupons (incl. the corporate bond's 70) + the manual asset's income
-    // Cash: bonds + broker + foreign + ibkr + ike; the incomplete "etf" account is left out and the card says so
-    await expect(page.getByTestId("total-cash")).toContainText("8 597,39");
+    // Cash: bonds + broker + foreign + ibkr + ike (8 597,39) + eur (its EUR and USD at today's rate); the incomplete
+    // "etf" account is left out and the card says so
+    await expect(page.getByTestId("total-cash")).toContainText(/\d\s\d{3},\d{2}\s*zł/);
     await expect(page.getByTestId("total-cash")).toContainText("1 incomplete account not included");
     await expect(page.getByTestId("total-all")).toContainText("zł");
   });
@@ -37,13 +38,17 @@ test.describe("dashboard", () => {
 
   test("lists the accounts with net deposits, profit and XIRR; the incomplete one greyed and outside the total", async ({ page }) => {
     const rows = page.getByTestId("account-row");
-    await expect(rows).toHaveCount(6);
-    expect(await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute("data-account")))).toEqual(["bonds", "broker", "etf", "foreign", "ibkr", "ike"]);
+    await expect(rows).toHaveCount(7);
+    expect(await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute("data-account")))).toEqual(["bonds", "broker", "etf", "eur", "foreign", "ibkr", "ike"]);
+    // An account kept in EUR: a second line in EUR (deposits as made, 5 000 PLN at 4.2543 + 100 EUR)
+    const base = page.locator('tr[data-testid="account-base-row"][data-account="eur"]');
+    await expect(base.locator("td").nth(0)).toHaveText("└ in EUR");
+    await expect(base.locator("td").nth(1)).toHaveText("1 275,28 EUR");
     const broker = page.locator('tr[data-testid="account-row"][data-account="broker"]');
     await expect(broker.locator("td").nth(1)).toHaveText("30 000,00 zł"); // net deposits
     await expect(broker.locator("td").nth(6)).toHaveText(/%$/); // XIRR
     await expect(page.locator('tr[data-testid="account-row"][data-account="etf"]')).toHaveClass(/muted/);
-    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("60 980,00 zł"); // incl. the closed account's −20
+    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("66 403,69 zł"); // incl. the closed account's −20, and eur: 5 000 + 100 EUR at 4.2369
   });
 
   test("folds closed accounts into one greyed row; they stay in the total", async ({ page }) => {

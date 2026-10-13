@@ -6,6 +6,8 @@ import { z } from "zod";
 export const AccountInput = z.object({
   account: z.string().min(1),
   incomplete: z.array(z.string()).default([]),
+  /** The account's own currency (e.g. EUR at IBKR); its summary is also shown in it. */
+  baseCurrency: z.string().length(3).optional(),
 });
 export type AccountInput = z.output<typeof AccountInput>;
 

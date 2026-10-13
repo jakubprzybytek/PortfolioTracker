@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, apiSend } from "./api.ts";
-import { TX_TYPE_LABELS, addDays, fmtNum, fmtPln, today, typeLabel } from "./format.ts";
-import type { Instrument, Transaction } from "./types.ts";
+import { TX_TYPE_LABELS, addDays, fmtMoney, fmtNum, today, typeLabel } from "./format.ts";
+import type { AccountSummary, Instrument, Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
 // The "Add transaction" form (Docs/ui.md): a dialog over the Transactions view, for a new transaction or one
 // being edited. The server checks it again (POST/PUT /transactions) and revalues from its date.
 
-const TYPES = ["BUY", "SELL", "COUPON", "DIVIDEND", "REDEMPTION", "DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "SPLIT"] as const;
+const TYPES = ["BUY", "SELL", "COUPON", "DIVIDEND", "REDEMPTION", "DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "EXCHANGE", "SPLIT"] as const;
 type TxType = (typeof TYPES)[number];
 /** Money out: stored as a negative amount (the form takes the size only). */
-const MONEY_OUT = new Set<string>(["BUY", "FEE", "TAX", "WITHDRAWAL"]);
+const MONEY_OUT = new Set<string>(["BUY", "FEE", "TAX", "WITHDRAWAL", "EXCHANGE"]);
+/** Currencies money can be in (plus an instrument's own). */
+const CURRENCIES = ["PLN", "EUR", "USD"];
 const NEEDS_INSTRUMENT = new Set<string>(["BUY", "SELL", "COUPON", "DIVIDEND", "REDEMPTION", "SPLIT"]);
 const HAS_QUANTITY = new Set<string>(["BUY", "SELL", "REDEMPTION"]);
 const NEW = "__new__";
@@ -34,11 +36,14 @@ const str = (n: number | undefined) => (n === undefined ? "" : String(n).replace
 const isBond = (i: Instrument) => i.type === "BOND_LISTED" || i.type === "BOND_CORPORATE" || i.type === "BOND_IBKR";
 const nominalOf = (i: Instrument) => i.terms?.nominal ?? i.nominal ?? 1000;
 
-/** PLN value of one unit at `price` (bonds: % of nominal; retail: PLN per 100 PLN bond; foreign: × the rate). */
-function unitValue(i: Instrument, price: number, fx: number | undefined): number {
-  const inPln = i.currency !== "PLN" ? (fx ?? NaN) : 1;
-  if (isBond(i)) return (price / 100) * nominalOf(i) * inPln;
-  return price * inPln;
+/**
+ * Value of one unit at `price` in the currency paid (bonds: % of nominal; retail: PLN per 100 PLN bond): as is when
+ * paid in the instrument's currency, × the broker's rate when paid in PLN for a foreign one.
+ */
+function unitValue(i: Instrument, price: number, paidIn: string, fx: number | undefined): number {
+  const rate = paidIn === i.currency ? 1 : paidIn === "PLN" ? (fx ?? NaN) : NaN;
+  if (isBond(i)) return (price / 100) * nominalOf(i) * rate;
+  return price * rate;
 }
 
 const priceLabel = (i: Instrument | undefined): string =>
@@ -56,6 +61,7 @@ function Field({ label, children, hint, wide }: { label: string; children: React
 
 export function TransactionForm({ editing, accounts, onClose, onSaved }: { editing?: Transaction; accounts: string[]; onClose: () => void; onSaved: (message: string) => void }) {
   const instruments = useApi<Instrument[]>("/instruments");
+  const summaries = useApi<{ accounts: AccountSummary[] }>("/accounts");
   const [date, setDate] = useState(editing?.date ?? today());
   const [account, setAccount] = useState(editing?.account ?? accounts[0] ?? "");
   const [newAccount, setNewAccount] = useState("");
@@ -68,6 +74,11 @@ export function TransactionForm({ editing, accounts, onClose, onSaved }: { editi
   const [amount, setAmount] = useState(editing ? str(Math.abs(editing.amount)) : "");
   const [amountTouched, setAmountTouched] = useState(!!editing);
   const [ratio, setRatio] = useState(str(editing?.ratio));
+  // The currency of the amount and the fee (an account's own currency by default); an exchange's other side.
+  const [currency, setCurrency] = useState(editing?.currency ?? "PLN");
+  const [currencyTouched, setCurrencyTouched] = useState(!!editing);
+  const [toAmount, setToAmount] = useState(str(editing?.toAmount));
+  const [toCurrency, setToCurrency] = useState(editing?.toCurrency ?? "");
   const [note, setNote] = useState(editing?.note ?? "");
   // A new instrument, added on save.
   const [kind, setKind] = useState<NewKind>("treasury");
@@ -91,7 +102,14 @@ export function TransactionForm({ editing, accounts, onClose, onSaved }: { editi
   const list = useMemo(() => [...(instruments.data ?? [])].sort((a, b) => Number(b.active) - Number(a.active) || a.code.localeCompare(b.code)), [instruments.data]);
   const inst = list.find((i) => i.isin === isin);
   const needsInstrument = NEEDS_INSTRUMENT.has(type);
-  const foreign = !!inst && inst.currency !== "PLN";
+  // Default currency: in an account kept in several currencies (IBKR), a trade in the instrument's currency and the
+  // rest in the account's own; elsewhere PLN.
+  const base = summaries.data?.accounts.find((a) => a.account === account)?.base?.currency ?? "PLN";
+  const cur = currencyTouched ? currency : base !== "PLN" ? (needsInstrument && inst ? inst.currency : base) : "PLN";
+  const otherCur = toCurrency || (cur === "PLN" ? (base !== "PLN" ? base : "EUR") : cur === base ? "PLN" : base);
+  const currencyOptions = [...new Set([...CURRENCIES, ...(inst ? [inst.currency] : []), cur])];
+  // Paid in PLN for an instrument in another currency (Bossa): the broker's rate is needed.
+  const foreign = !!inst && inst.currency !== "PLN" && cur === "PLN";
 
   // NBP rate for a foreign instrument, as a starting point for the broker's rate.
   useEffect(() => {
@@ -117,10 +135,10 @@ export function TransactionForm({ editing, accounts, onClose, onSaved }: { editi
   // Suggested size of the amount: the trade value (buy: without the fee, which comes on top; sell: net of it).
   const suggested = useMemo(() => {
     if (!inst || !HAS_QUANTITY.has(type) || q === undefined || p === undefined) return undefined;
-    const value = q * unitValue(inst, p, fx);
+    const value = q * unitValue(inst, p, cur, fx);
     if (!Number.isFinite(value)) return undefined;
     return Math.round((type === "SELL" ? value - f : value) * 100) / 100;
-  }, [inst, type, q, p, fx, f]);
+  }, [inst, type, q, p, fx, f, cur]);
   const amountShown = amountTouched ? amount : str(suggested);
   const size = parseNum(amountShown);
   const signed = type === "SPLIT" ? 0 : size === undefined ? undefined : MONEY_OUT.has(type) ? -Math.abs(size) : Math.abs(size);
@@ -147,6 +165,9 @@ export function TransactionForm({ editing, accounts, onClose, onSaved }: { editi
     for (const [label, v] of [["Quantity", q], ["Price", p], ["FX rate", fx], ["Fee", parseNum(fee)], ["Amount", size], ["Ratio", parseNum(ratio)]] as const)
       if (v !== undefined && !Number.isFinite(v)) return setError(`${label}: not a number`);
     if (type !== "SPLIT" && signed === undefined) return setError("Enter the amount");
+    const got = parseNum(toAmount);
+    if (type === "EXCHANGE" && (got === undefined || !Number.isFinite(got) || got <= 0)) return setError("Enter what you got");
+    if (type === "EXCHANGE" && otherCur === cur) return setError("Choose two different currencies");
     setBusy(true);
     try {
       let instrumentIsin = isin;
@@ -173,7 +194,8 @@ export function TransactionForm({ editing, accounts, onClose, onSaved }: { editi
         amount: signed ?? 0,
         ...(f ? { fee: f } : {}),
         ...(inst?.type === "BOND_RETAIL" && type === "BUY" ? { valueDate: date } : {}),
-        currency: "PLN",
+        ...(type === "EXCHANGE" ? { toAmount: got, toCurrency: otherCur } : {}),
+        currency: cur,
         ...(note.trim() ? { note: note.trim() } : {}),
       };
       if (editing) await apiSend("PUT", `/transactions/${editing.id}`, tx, { account: editing.account });
@@ -345,21 +367,48 @@ export function TransactionForm({ editing, accounts, onClose, onSaved }: { editi
           ) : (
             <>
               <Field
-                label={type === "BUY" ? "Amount paid, PLN (without the fee)" : type === "SELL" ? "Amount received, PLN (after the fee)" : "Amount, PLN"}
+                label={type === "BUY" ? "Amount paid (without the fee)" : type === "SELL" ? "Amount received (after the fee)" : type === "EXCHANGE" ? "You gave" : "Amount"}
                 hint={inst && isBond(inst) && type === "BUY" ? "Suggested: price × nominal. Add accrued interest, as on your broker's note." : undefined}
               >
-                <input
-                  inputMode="decimal"
-                  value={amountShown}
-                  onChange={(e) => {
-                    setAmountTouched(true);
-                    setAmount(e.target.value);
-                  }}
-                  data-testid="tx-amount"
-                />
+                <div className="with-currency">
+                  <input
+                    inputMode="decimal"
+                    value={amountShown}
+                    onChange={(e) => {
+                      setAmountTouched(true);
+                      setAmount(e.target.value);
+                    }}
+                    data-testid="tx-amount"
+                  />
+                  <select
+                    value={cur}
+                    onChange={(e) => {
+                      setCurrencyTouched(true);
+                      setCurrency(e.target.value);
+                    }}
+                    aria-label="Currency"
+                    data-testid="tx-currency"
+                  >
+                    {currencyOptions.map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
               </Field>
-              {HAS_QUANTITY.has(type) && (
-                <Field label="Fee, PLN">
+              {type === "EXCHANGE" && (
+                <Field label="You got">
+                  <div className="with-currency">
+                    <input inputMode="decimal" value={toAmount} onChange={(e) => setToAmount(e.target.value)} data-testid="tx-to-amount" />
+                    <select value={otherCur} onChange={(e) => setToCurrency(e.target.value)} aria-label="Currency received" data-testid="tx-to-currency">
+                      {[...new Set([...CURRENCIES, otherCur])].map((c) => (
+                        <option key={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                </Field>
+              )}
+              {(HAS_QUANTITY.has(type) || type === "EXCHANGE") && (
+                <Field label={`Fee, ${cur}`}>
                   <input inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} data-testid="tx-fee" />
                 </Field>
               )}
@@ -373,8 +422,15 @@ export function TransactionForm({ editing, accounts, onClose, onSaved }: { editi
         <p className="form-summary" data-testid="tx-summary">
           {cashEffect !== undefined && type !== "SPLIT" ? (
             <>
-              Cash in {account === NEW_ACCOUNT ? newAccount || "the new account" : account}: <strong className={cashEffect < 0 ? "neg" : "pos"}>{fmtPln(cashEffect)}</strong>
-              {type === "BUY" && f > 0 && <span className="faint"> (incl. fee {fmtNum(f)})</span>}
+              Cash in {account === NEW_ACCOUNT ? newAccount || "the new account" : account}:{" "}
+              <strong className={cashEffect < 0 ? "neg" : "pos"}>{fmtMoney(type === "EXCHANGE" ? cashEffect - f : cashEffect, cur)}</strong>
+              {type === "EXCHANGE" && parseNum(toAmount) !== undefined && (
+                <>
+                  , <strong className="pos">+{fmtMoney(parseNum(toAmount)!, otherCur)}</strong>
+                  {size ? <span className="faint"> (rate {fmtNum(size / parseNum(toAmount)!, 4)} {cur} per {otherCur})</span> : null}
+                </>
+              )}
+              {(type === "BUY" || type === "EXCHANGE") && f > 0 && <span className="faint"> (incl. fee {fmtNum(f)})</span>}
             </>
           ) : (
             <span className="faint">{type === "SPLIT" ? "A split changes the number of units only." : "Enter the amount."}</span>

@@ -5,6 +5,7 @@ import type { AccountSnapshot, CouponRateItem, HoldingSnapshot, InstrumentItem, 
 import { positionsAt } from "./positions.ts";
 import { retailLotsAt, valueRetailLots } from "./retailLots.ts";
 import { cashByAccount } from "./cash.ts";
+import { rateOn, type FxHistory } from "./fx.ts";
 import { round2 } from "../bonds/izIndex.ts";
 
 export interface ValuationContext {
@@ -17,10 +18,12 @@ export interface ValuationContext {
   couponRates: Map<string, CouponRateItem[]>;
   /** A price older than this many days is flagged stale (not for manual prices). */
   staleAfterDays?: number;
-  /** Account metadata: which accounts aren't fully tracked yet. */
-  accounts?: { account: string; incomplete?: string[] }[];
-  /** Latest NBP mid rate on or before `date` per currency (PLN per unit), for instruments priced in another currency. */
+  /** Account metadata: which accounts aren't fully tracked yet, their own currency. */
+  accounts?: { account: string; incomplete?: string[]; baseCurrency?: string }[];
+  /** Latest NBP mid rate on or before `date` per currency (PLN per unit); derived from `fxHistory` when absent. */
   fx?: Map<string, { mid: number; date: IsoDate }>;
+  /** All NBP mid rates per currency, oldest first: transactions in another currency count at the rate of the day before. */
+  fxHistory?: FxHistory;
 }
 
 const daysBetween = (a: IsoDate, b: IsoDate) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -29,7 +32,8 @@ const daysBetween = (a: IsoDate, b: IsoDate) => Math.round((Date.parse(b) - Date
 export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" | "SK"> {
   const { date, staleAfterDays = 10 } = ctx;
   const byIsin = new Map(ctx.instruments.map((i) => [i.isin, i]));
-  const positions = positionsAt(ctx.transactions, date);
+  const positions = positionsAt(ctx.transactions, date, ctx.fxHistory);
+  const fxOn = (currency: string) => ctx.fx?.get(currency) ?? rateOn(ctx.fxHistory, currency, date);
   const holdings: HoldingSnapshot[] = [];
 
   for (const p of positions.values()) {
@@ -46,8 +50,10 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       quantity: p.quantity,
       cost: p.cost,
       couponsReceived: round2(p.couponsReceived),
+      ...(p.costNative ? { costNative: p.costNative } : {}),
     };
     if (!inst) flags.push("unknown_instrument");
+    if (Number.isNaN(p.cost)) flags.push("no_fx");
 
     // Retail treasury bonds: no market price; value = Σ lots × nominal with interest (published rates).
     if (inst?.type === "BOND_RETAIL") {
@@ -106,7 +112,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     // Priced in another currency (ETFs): the value per unit in PLN at the NBP mid rate; cost is already in PLN.
     let fx: { rate: number; date: IsoDate } | undefined;
     if (base.currency !== "PLN") {
-      const rate = ctx.fx?.get(base.currency);
+      const rate = fxOn(base.currency);
       if (!rate) {
         flags.push("no_fx");
         valuePerUnit = null;
@@ -150,12 +156,28 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     t.value = round2(t.value);
     t.cost = round2(t.cost);
   }
-  const incomplete = new Map((ctx.accounts ?? []).map((a) => [a.account, a.incomplete ?? []]));
+  const meta = new Map((ctx.accounts ?? []).map((a) => [a.account, a]));
   const accounts: Record<string, AccountSnapshot> = {};
   let cashTotal = 0;
-  for (const [account, cash] of [...cashByAccount(ctx.transactions, date)].sort(([a], [b]) => a.localeCompare(b))) {
-    const missing = incomplete.get(account) ?? [];
-    accounts[account] = { cash, ...(missing.length ? { incomplete: missing } : {}) };
+  for (const [account, byCurrency] of [...cashByAccount(ctx.transactions, date)].sort(([a], [b]) => a.localeCompare(b))) {
+    const missing = meta.get(account)?.incomplete ?? [];
+    const baseCurrency = meta.get(account)?.baseCurrency;
+    // Each currency at the day's NBP rate; the account's cash is their sum in PLN.
+    let cash = 0;
+    const currencies: NonNullable<AccountSnapshot["currencies"]> = {};
+    for (const [currency, amount] of [...byCurrency].sort(([a], [b]) => (a === "PLN" ? -1 : b === "PLN" ? 1 : a.localeCompare(b)))) {
+      const rate = fxOn(currency);
+      const value = rate ? round2(amount * rate.mid) : null;
+      cash += value ?? 0;
+      currencies[currency] = { amount, value, ...(currency !== "PLN" && rate ? { rate: rate.mid } : {}) };
+    }
+    const foreign = [...byCurrency.keys()].some((c) => c !== "PLN");
+    accounts[account] = {
+      cash: round2(cash),
+      ...(foreign ? { currencies } : {}),
+      ...(baseCurrency && baseCurrency !== "PLN" ? { baseCurrency } : {}),
+      ...(missing.length ? { incomplete: missing } : {}),
+    };
     // An incomplete account's cash misses the untracked purchases (it would be far too high): not in the total.
     if (missing.length === 0) cashTotal += cash;
   }

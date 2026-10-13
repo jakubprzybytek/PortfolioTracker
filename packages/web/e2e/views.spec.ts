@@ -27,17 +27,17 @@ test.describe("transactions view", () => {
   test("lists all transactions, newest first", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(26);
+    await expect(rows).toHaveCount(31);
     const dates = await rows.locator("td:first-child").allTextContents();
     expect(dates).toEqual([...dates].sort().reverse());
     await expect(rows.first()).toContainText("2026-09-30");
-    await expect(page.getByTestId("filters-summary")).toHaveText("26 of 26 transactions");
+    await expect(page.getByTestId("filters-summary")).toHaveText("31 of 31 transactions");
   });
 
   test("filters by instrument, account and asset type, and keeps filters in the URL", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(26);
+    await expect(rows).toHaveCount(31);
 
     await page.getByTestId("filter-instrument").selectOption({ label: "DS0432" });
     await expect(rows).toHaveCount(4); // broker: buy + 2 coupons, ike: buy
@@ -50,10 +50,14 @@ test.describe("transactions view", () => {
     await expect(rows).toHaveCount(1);
 
     await page.getByTestId("filters-reset").click();
-    await expect(rows).toHaveCount(26);
+    await expect(rows).toHaveCount(31);
     await page.getByTestId("filter-type").selectOption({ label: "Cash" });
-    await expect(rows).toHaveCount(10); // the 8 deposits, the closed account's interest and withdrawal
+    await expect(rows).toHaveCount(14); // the 10 deposits, the closed account's interest and withdrawal, eur's 2 exchanges
     await expect(rows.first()).toContainText("Deposit");
+    // A currency exchange shows both sides
+    await page.getByTestId("filter-account").selectOption("eur");
+    const exchange = rows.filter({ hasText: "Currency exchange" }).filter({ hasText: "2025-11-03" });
+    await expect(exchange.getByTestId("tx-amount-cell")).toHaveText(/^-4\s?300,00\s*zł\s*→\s*1\s?000,00 EUR$/);
   });
 });
 
@@ -123,6 +127,35 @@ test.describe("adding transactions", () => {
   });
 });
 
+test.describe("adding transactions in other currencies", () => {
+  test("in an account kept in EUR the form starts in EUR, a trade in its instrument's currency; an exchange shows both sides", async ({ page }) => {
+    await page.goto("/#/transactions");
+    await expect(page.getByTestId("transaction-row").first()).toBeVisible();
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-account").selectOption("eur");
+    await page.getByTestId("tx-type").selectOption("BUY");
+    await page.getByTestId("tx-instrument").selectOption({ label: "DE0001102523 · DE Govt 0.0 Nov15'27 (sample holding)" });
+    await expect(page.getByTestId("tx-currency")).toHaveValue("EUR");
+    await expect(page.getByTestId("tx-fx")).toHaveCount(0); // paid in the bond's own currency: no rate
+    await page.getByTestId("tx-quantity").fill("2");
+    await page.getByTestId("tx-price").fill("96");
+    await expect(page.getByTestId("tx-amount")).toHaveValue("1920"); // 2 × 96 % × 1000 EUR
+    await expect(page.getByTestId("tx-summary")).toContainText("1 920,00 EUR");
+
+    await page.getByTestId("tx-type").selectOption("EXCHANGE");
+    await expect(page.getByTestId("tx-currency")).toHaveValue("EUR");
+    await page.getByTestId("tx-amount").fill("100");
+    await page.getByTestId("tx-to-currency").selectOption("USD");
+    await page.getByTestId("tx-to-amount").fill("116");
+    await expect(page.getByTestId("tx-summary")).toContainText("100,00 EUR");
+    await expect(page.getByTestId("tx-summary")).toContainText("+116,00 USD");
+    await page.getByTestId("tx-to-currency").selectOption("EUR");
+    await page.getByTestId("tx-save").click();
+    await expect(page.getByTestId("tx-error")).toHaveText("Choose two different currencies");
+    await page.keyboard.press("Escape");
+  });
+});
+
 test.describe("holdings view", () => {
   test("groups holdings by account, sorted alphabetically", async ({ page }) => {
     await page.goto("/#/holdings");
@@ -132,7 +165,7 @@ test.describe("holdings view", () => {
     await expect(page.getByTestId("holdings-total")).toBeVisible();
 
     const groupOrder = await table.locator("tr.group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
-    expect(groupOrder).toEqual(["account-bonds", "account-broker", "account-etf", "account-foreign", "account-ibkr", "account-ike"]);
+    expect(groupOrder).toEqual(["account-bonds", "account-broker", "account-etf", "account-eur", "account-foreign", "account-ibkr", "account-ike"]);
     // each account ends with its cash; the incomplete account shows only cash, greyed, with a note
     await expect(table.locator('tr[data-testid="cash-row"][data-account="broker"]')).toContainText("5 420,86");
     await expect(page.getByTestId("account-etf").getByTestId("incomplete")).toContainText("ETFs not tracked yet");
@@ -154,6 +187,17 @@ test.describe("holdings view", () => {
     await expect(eur.locator("td").nth(1)).toHaveText("Cash");
     await expect(eur.locator("td").nth(2)).toHaveText("80,96 EUR");
     await expect(eur.locator("td").nth(3)).toHaveText(/^\d,\d{4} PLN$/);
+    // eur, an account in several currencies: a cash row per currency, each amount in it and its PLN value
+    const eurCash = table.locator('tr[data-testid="cash-row"][data-account="eur"]');
+    expect(await eurCash.evaluateAll((rows) => rows.map((r) => r.getAttribute("data-currency")))).toEqual(["EUR", "PLN", "USD"]); // its own currency first
+    await expect(eurCash.nth(0).locator("td").nth(0)).toHaveText("Cash EUR");
+    await expect(eurCash.nth(0).locator("td").nth(2)).toHaveText("116,75 EUR");
+    await expect(eurCash.nth(2).locator("td").nth(2)).toHaveText("23,20 USD");
+    await expect(eurCash.nth(1).locator("td").nth(5)).toHaveText("700,00 zł");
+    // the bond bought in EUR: cost in PLN, as paid in EUR in its tooltip
+    const bund = table.locator('tr[data-testid="holding-row"][data-account="eur"]');
+    await expect(bund.locator("td").nth(6)).toHaveText("4 096,41 zł");
+    await expect(bund.locator("td").nth(6)).toHaveAttribute("title", /963,25 EUR/);
   });
 
   test("keeps every row on one line: long names are cut, the full name in the tooltip", async ({ page }) => {
@@ -167,11 +211,11 @@ test.describe("holdings view", () => {
   test("filters by account and asset type", async ({ page }) => {
     await page.goto("/#/holdings");
     const rows = page.getByTestId("holding-row");
-    await expect(rows).toHaveCount(9);
+    await expect(rows).toHaveCount(10);
     await page.getByTestId("filter-account").selectOption("ike");
     await expect(rows).toHaveCount(3);
     await expect(page.getByTestId("account-broker")).toHaveCount(0);
-    await expect(page.getByTestId("filters-summary")).toHaveText("3 of 9 holdings");
+    await expect(page.getByTestId("filters-summary")).toHaveText("3 of 10 holdings");
     await page.getByTestId("filters-reset").click();
     await page.getByTestId("filter-type").selectOption({ label: "Listed bond" });
     await expect(rows).toHaveCount(3);
@@ -186,7 +230,7 @@ test.describe("holdings view", () => {
     await page.getByTestId("filter-type").selectOption({ label: "Cash" });
     await expect(rows).toHaveCount(1);
     await expect(rows.first()).toHaveAttribute("data-isin", "ZZWALUTYEUR0");
-    await expect(page.getByTestId("cash-row")).toHaveCount(6);
+    await expect(page.getByTestId("cash-row")).toHaveCount(9); // 6 accounts in PLN, eur in PLN, EUR and USD
   });
 });
 
@@ -294,10 +338,10 @@ test.describe("holdings grouped by instrument", () => {
     await expect(dsRows).toHaveCount(0);
 
     // Cash: one row (complete accounts summed), expands to one row per account, the incomplete one greyed
-    await expect(page.getByTestId("instrument-cash").locator("td").nth(1)).toHaveText("▸ 6 accounts");
+    await expect(page.getByTestId("instrument-cash").locator("td").nth(1)).toHaveText("▸ 7 accounts");
     await expect(page.getByTestId("cash-row")).toHaveCount(0);
     await page.getByTestId("expand-cash").click();
-    await expect(page.getByTestId("cash-row")).toHaveCount(6);
+    await expect(page.getByTestId("cash-row")).toHaveCount(9); // eur: one per currency
     await expect(table.locator('tr[data-testid="cash-row"][data-account="etf"]')).toHaveClass(/muted/);
 
     await page.reload();

@@ -119,7 +119,7 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 
 ### Foreign bonds at IBKR – calculated prices (used, 2026-10-13)
 - Meant for zero-coupon government bonds (Bunds, OATs, US T-bills), short and held to maturity. The instrument's `pricePath` holds your trade prices (% of nominal 1000) and, while held, 100 % at maturity (parsed from IBKR's name, "DE Govt 0.0 Nov15'27"); the backfill stores one price per weekday in between at a constant yield (`core/prices/pricePath.ts`) as `PX#CALC#…`. Exact at every trade and at maturity; between them it ignores market moves (a fraction of a percent for bonds this short). A new trade (re-import) recomputes the path.
-- Foreign cash at IBKR is a position per currency (`CURRENCY`, "EUR cash"), bought and sold with PLN at the trade's rate like the reference sheet's `Waluty_EUR`, valued at the NBP mid rate; the account's PLN cash then equals the sheet's.
+- IBKR is kept in its currencies (2026-10-13): trades, fees and redemptions in the currency paid (EUR, USD), conversions as `EXCHANGE`, cash per currency, the account's own currency EUR. The sheet booked everything in PLN (currency positions `Waluty_EUR` bought and sold with PLN; a trade and the sale of the currency that paid for it as two rows of equal PLN value); `core/transactions/nativeLedger.ts` pairs those back (sheet conversion `--native IBKR=EUR`). Checked: the cash per currency equals the sheet's currency positions to the cent.
 
 ### IBKR Flex Web Service – IBKR bonds, positions, cash (later)
 - Token + query ID; plain HTTPS request; works from Lambda (no gateway).
@@ -129,7 +129,7 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 ### NBP API – exchange rates
 - `api.nbp.pl/api/exchangerates/rates/a/{code}/{from}/{to}/` – table A mid rates, free, no key, max 93 days per request; a range without a table answers 404. Table A as a series starts on 2002-01-02 (EUR 3.5496). Client: `jobs/lib/nbp.ts`.
 - Published around 11:45–12:15 on business days. Polish tax uses the rate from the business day before the transaction.
-- **Used for:** valuing instruments priced in another currency (ETFs in EUR): value = quantity × close × the mid rate of the latest table on or before the day. Cost stays what was paid in PLN (the broker's own rate, kept on the transaction as `fxRate`). Also the exchange-rate rows of the Indicators view.
+- **Used for:** valuing instruments and cash in another currency: value = quantity × close (or the cash) × the mid rate of the latest table on or before the day. Transactions in another currency count in PLN at the rate of the business day before (D-1, as Polish tax): purchase costs, sale proceeds, income, deposits (`core/valuation/fx.ts`). Paid in PLN at the broker's rate (Bossa), the cost is that PLN. Also the exchange-rate rows of the Indicators view.
 
 ### Optional / fallback
 - **OpenFIGI** – ISIN → ticker per exchange (free).
