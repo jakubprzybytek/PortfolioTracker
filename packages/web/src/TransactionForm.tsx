@@ -59,9 +59,10 @@ function Field({ label, children, hint, wide }: { label: string; children: React
   );
 }
 
-export function TransactionForm({ editing, accounts, onClose, onSaved }: { editing?: Transaction; accounts: string[]; onClose: () => void; onSaved: (message: string) => void }) {
+export function TransactionForm({ editing, onClose, onSaved }: { editing?: Transaction; onClose: () => void; onSaved: (message: string) => void }) {
   const instruments = useApi<Instrument[]>("/instruments");
   const summaries = useApi<{ accounts: AccountSummary[] }>("/accounts");
+  const accounts = useMemo(() => (summaries.data?.accounts ?? []).map((a) => a.account), [summaries.data]);
   const [date, setDate] = useState(editing?.date ?? today());
   const [account, setAccount] = useState(editing?.account ?? accounts[0] ?? "");
   const [newAccount, setNewAccount] = useState("");

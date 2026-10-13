@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Hub } from "aws-amplify/utils";
 import { APP_VERSION } from "./api.ts";
 import { currentSession, logout, type Session } from "./auth.ts";
@@ -9,7 +9,10 @@ import { IndicatorsView } from "./IndicatorsView.tsx";
 import { LoginForm } from "./LoginForm.tsx";
 import { PricesView } from "./PricesView.tsx";
 import { useRoute, VIEWS } from "./route.ts";
+import { TransactionForm } from "./TransactionForm.tsx";
 import { TransactionsView } from "./TransactionsView.tsx";
+import { TxFormContext } from "./txForm.ts";
+import type { Transaction } from "./types.ts";
 
 /** Shows the app to a logged-in user and the login form otherwise. The view (#/…) stays in the URL meanwhile. */
 export function App() {
@@ -38,6 +41,16 @@ export function App() {
 
 function Shell({ email }: { email: string }) {
   const [route, setParams] = useRoute();
+  // The transaction form, open from any view ("Add transaction", or a row of Transactions to edit it).
+  const [form, setForm] = useState<{ editing?: Transaction } | null>(null);
+  const [version, setVersion] = useState(0);
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(t);
+  }, [toast]);
+  const txForm = useMemo(() => ({ open: (editing?: Transaction) => setForm({ editing }), version }), [version]);
   // Phone: the menu opens over the page from the ☰ button; any navigation, a tap outside or Escape closes it.
   const [menuOpen, setMenuOpen] = useState(false);
   const hash = window.location.hash;
@@ -50,6 +63,7 @@ function Shell({ email }: { email: string }) {
   }, [menuOpen]);
 
   return (
+    <TxFormContext.Provider value={txForm}>
     <div className="layout">
       <nav className="sidebar" aria-label="Views">
         <div className="sidebar-inner">
@@ -60,6 +74,10 @@ function Shell({ email }: { email: string }) {
                 Portfolio <span className="light">Tracker</span>
               </a>
             </h1>
+            <button type="button" className="primary add-tx" onClick={() => setForm({})} aria-label="Add transaction" data-testid="tx-add">
+              <span aria-hidden>+</span>
+              <span className="label"> Add transaction</span>
+            </button>
             <button
               type="button"
               className="menu-toggle"
@@ -104,6 +122,23 @@ function Shell({ email }: { email: string }) {
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
       </main>
+      {toast && (
+        <p className="toast" role="status" data-testid="tx-toast">
+          {toast}
+        </p>
+      )}
+      {form && (
+        <TransactionForm
+          editing={form.editing}
+          onClose={() => setForm(null)}
+          onSaved={(message) => {
+            setForm(null);
+            setToast(`${message} The valuation updates in about a minute.`);
+            setVersion((v) => v + 1);
+          }}
+        />
+      )}
     </div>
+    </TxFormContext.Provider>
   );
 }

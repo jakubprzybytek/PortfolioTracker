@@ -123,6 +123,16 @@ test.describe("dashboard", () => {
     await expect(range.getByRole("button", { name: "1M" })).toBeEnabled();
   });
 
+  test("'Add transaction' is in the menu frame: it opens the form on any view", async ({ page }) => {
+    for (const view of ["/", "/#/holdings", "/#/prices", "/#/indicators"]) {
+      await page.goto(view);
+      await page.getByTestId("tx-add").click();
+      await expect(page.getByTestId("tx-form")).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByTestId("tx-form")).toBeHidden();
+    }
+  });
+
   test("lists job runs", async ({ page }) => {
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
     await expect(rows).toHaveCount(9);
@@ -150,6 +160,15 @@ test.describe("on a phone", () => {
     await page.getByTestId("menu-toggle").click();
     await page.getByTestId("nav-backdrop").click({ position: { x: 200, y: 800 } });
     await expect(page.getByTestId("nav-menu")).toBeHidden();
+  });
+
+  test("'Add transaction' is a + next to the menu button", async ({ page }) => {
+    await page.goto("/");
+    const add = page.getByTestId("tx-add");
+    await expect(add).toBeVisible();
+    await expect(add).toHaveText("+", { useInnerText: true }); // the label is hidden on a phone
+    await add.click();
+    await expect(page.getByTestId("tx-form")).toBeVisible();
   });
 
   test("a row chart opens at half the screen height", async ({ page }) => {

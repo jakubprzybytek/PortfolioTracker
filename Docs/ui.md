@@ -84,7 +84,7 @@ All transactions from `GET /transactions`.
 - **Sorted by date, newest first** (fixed).
 - **Columns:** date, account, type, instrument (code + name), asset type, quantity, price, amount (signed: red = money out), fee, note.
 - **Filters:** instrument (including "(no instrument)" for cash movements), account, asset type; "Reset"; "n of m transactions".
-- **Add transaction** (button) opens a form; a row opens it to edit or delete that transaction (deleting asks to confirm). Saving revalues from the transaction's date (about a minute); a message says so.
+- **Add transaction** is in the menu frame, on every view (under the logo; on a phone a "+" next to ☰): it opens the form over the current view, and after saving every view reloads its data. A row here opens the form to edit or delete that transaction (deleting asks to confirm). Saving revalues from the transaction's date (about a minute); a message says so.
 
 ### The form (`TransactionForm.tsx`)
 

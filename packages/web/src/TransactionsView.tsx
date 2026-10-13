@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
 import { TX_TYPE_LABELS, fmtInt, fmtMoney, fmtNum, signClass, typeLabel } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
-import { TransactionForm } from "./TransactionForm.tsx";
+import { useTxForm } from "./txForm.ts";
 import type { TransactionRow } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -16,15 +16,8 @@ const assetType = (t: TransactionRow) => t.instrument?.type ?? "CASH";
  * opens the form; a row opens it to edit (or delete) that transaction.
  */
 export function TransactionsView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
-  const [version, setVersion] = useState(0);
-  const txs = useApi<TransactionRow[]>("/transactions", {}, [version]);
-  const [form, setForm] = useState<{ editing?: TransactionRow } | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 6000);
-    return () => clearTimeout(t);
-  }, [toast]);
+  const txs = useApi<TransactionRow[]>("/transactions");
+  const form = useTxForm();
   const all = txs.data ?? [];
   const { instrument = "", account = "", type = "" } = params;
 
@@ -54,27 +47,7 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
     <>
       <header className="view-header">
         <h2 className="view-title">Transactions</h2>
-        <button type="button" className="primary" onClick={() => setForm({})} data-testid="tx-add">
-          + Add transaction
-        </button>
       </header>
-      {toast && (
-        <p className="toast" role="status" data-testid="tx-toast">
-          {toast}
-        </p>
-      )}
-      {form && (
-        <TransactionForm
-          editing={form.editing}
-          accounts={options.account.map((o) => o.value)}
-          onClose={() => setForm(null)}
-          onSaved={(message) => {
-            setForm(null);
-            setToast(`${message} The valuation updates in about a minute.`);
-            setVersion((v) => v + 1);
-          }}
-        />
-      )}
       {txs.error && <p className="error">{txs.error}</p>}
 
       <FilterBar active={!!(instrument || account || type)} onReset={() => setParams({})} summary={txs.loading ? "Loading…" : `${rows.length} of ${all.length} transactions`}>
@@ -102,7 +75,7 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
           <tbody>
             {!txs.data && txs.loading && <SkeletonRows rows={12} cols={10} />}
             {rows.map((t) => (
-              <tr key={`${t.account}/${t.id}`} data-testid="transaction-row" data-id={t.id} className="clickable" onClick={() => setForm({ editing: t })} title="Edit or delete">
+              <tr key={`${t.account}/${t.id}`} data-testid="transaction-row" data-id={t.id} className="clickable" onClick={() => form.open(t)} title="Edit or delete">
                 <td className="left">{t.date}</td>
                 <td className="left">{t.account}</td>
                 <td className="left">{TX_TYPE_LABELS[t.type] ?? t.type}</td>

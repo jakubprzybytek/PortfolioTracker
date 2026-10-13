@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useTxForm } from "./txForm.ts";
 import { api } from "./api.ts";
 
-/** Fetches `path` (skipped when null) and refetches when it or `deps` change. */
+/** Fetches `path` (skipped when null) and refetches when it or `deps` change, and after a transaction is saved. */
 export function useApi<T>(path: string | null, params: Record<string, string | undefined> = {}, deps: unknown[] = []) {
+  const { version } = useTxForm();
   const [state, setState] = useState<{ data?: T; error?: string; loading: boolean }>({ loading: path !== null });
   useEffect(() => {
     if (path === null) return;
@@ -15,6 +17,6 @@ export function useApi<T>(path: string | null, params: Record<string, string | u
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, ...deps]);
+  }, [path, version, ...deps]);
   return state;
 }
