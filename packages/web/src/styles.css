@@ -57,7 +57,9 @@ tr.group td { font-weight: 600; background: var(--row); }
 tr.total td { font-weight: 600; border-top: 2px solid var(--border); }
 td.indent { padding-left: 20px; }
 td.wrap { white-space: normal; min-width: 160px; }
-td.instrument { white-space: normal; min-width: 200px; }
+/* Instrument: one line; a long name is cut with "…" (the full name in its tooltip). */
+/* The column takes the width the others leave (max-width: 0 + width: 100%), so names are cut only as much as needed. */
+td.instrument { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; width: 100%; min-width: 16rem; }
 h2 { font-size: 1.1rem; margin: 24px 0 8px; }
 .muted { color: var(--muted); }
 .pos { color: var(--pos); }
@@ -112,10 +114,30 @@ tr.clickable { cursor: pointer; }
 }
 td .sub { color: var(--muted); padding-left: 0.75rem; }
 button.link.expand { font-size: 0.85rem; white-space: nowrap; }
-.allocations { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px 32px; }
+.allocations { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 12px 32px; }
 .allocation { min-width: 0; }
 .allocation h3 { font-size: 0.9rem; font-weight: 600; margin: 0 0 6px; color: var(--muted); }
 .alloc-row { display: grid; grid-template-columns: 9rem minmax(40px, 1fr) 3.5rem 9rem; align-items: center; gap: 8px; font-size: 0.9rem; padding: 3px 0; }
 .alloc-bar { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
 .alloc-bar span { display: block; height: 100%; background: var(--accent); }
 .alloc-pct, .alloc-value { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 8px; }
+/* Loading placeholders (Placeholders.tsx): the space of what's coming, gently pulsing. */
+.skeleton, .skeleton-bar { background: var(--border); animation: skeleton-pulse 1.4s ease-in-out infinite; }
+.skeleton { border-radius: 6px; width: 100%; }
+.skeleton-bar { display: inline-block; height: 0.8em; border-radius: 4px; vertical-align: middle; }
+tr.skeleton-row:hover { background: none; }
+@keyframes skeleton-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .skeleton, .skeleton-bar { animation: none; } }
+.chart-message { display: flex; align-items: center; justify-content: center; }
+.card .value .skeleton-bar { width: 7rem; height: 1em; }
+/* Closed accounts (nothing left in them): greyed, below the open ones, folded by default. */
+tr.closed td { color: var(--muted); }
+/* Foreign cash next to the account's PLN cash. */
+td .ccy { color: var(--muted); font-weight: 400; }
+@media (max-width: 720px) {
+  td.instrument { min-width: 12rem; }
+  /* Allocation: label, bar and share; the PLN amount is in each row's tooltip. */
+  .alloc-row { grid-template-columns: minmax(0, 8rem) minmax(30px, 1fr) 3.5rem; }
+  .alloc-value { display: none; }
+  .alloc-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

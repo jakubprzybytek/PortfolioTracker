@@ -27,17 +27,17 @@ test.describe("transactions view", () => {
   test("lists all transactions, newest first", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(23);
+    await expect(rows).toHaveCount(26);
     const dates = await rows.locator("td:first-child").allTextContents();
     expect(dates).toEqual([...dates].sort().reverse());
     await expect(rows.first()).toContainText("2026-09-30");
-    await expect(page.getByTestId("filters-summary")).toHaveText("23 of 23 transactions");
+    await expect(page.getByTestId("filters-summary")).toHaveText("26 of 26 transactions");
   });
 
   test("filters by instrument, account and asset type, and keeps filters in the URL", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(23);
+    await expect(rows).toHaveCount(26);
 
     await page.getByTestId("filter-instrument").selectOption({ label: "DS0432" });
     await expect(rows).toHaveCount(4); // broker: buy + 2 coupons, ike: buy
@@ -50,9 +50,9 @@ test.describe("transactions view", () => {
     await expect(rows).toHaveCount(1);
 
     await page.getByTestId("filters-reset").click();
-    await expect(rows).toHaveCount(23);
+    await expect(rows).toHaveCount(26);
     await page.getByTestId("filter-type").selectOption({ label: "Cash" });
-    await expect(rows).toHaveCount(7); // the deposits
+    await expect(rows).toHaveCount(10); // the 8 deposits, the closed account's interest and withdrawal
     await expect(rows.first()).toContainText("Deposit");
   });
 });
@@ -81,6 +81,21 @@ test.describe("holdings view", () => {
     expect(await ike.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "EDO0935", "SAMPLE-APARTMENT"]);
     await expect(ike.first().locator("td").nth(2)).toHaveText("5");
     await expect(ike.nth(1).locator("td").nth(1)).toHaveText("Retail bond");
+    // ibkr: the bond, then the PLN cash, then the foreign cash as cash (amount in EUR, the NBP rate as its price)
+    const ibkr = await table.locator('tr[data-account="ibkr"]').evaluateAll((rows) => rows.map((r) => r.querySelector("td")!.textContent!.trim()));
+    expect(ibkr).toEqual(["DE0001102523 DE Govt 0.0 Nov15'27 (sample holding)", "Cash", "Cash EUR"]);
+    const eur = table.locator('tr[data-testid="holding-row"][data-isin="ZZWALUTYEUR0"]');
+    await expect(eur.locator("td").nth(1)).toHaveText("Cash");
+    await expect(eur.locator("td").nth(2)).toHaveText("80,96 EUR");
+    await expect(eur.locator("td").nth(3)).toHaveText(/^\d,\d{4} PLN$/);
+  });
+
+  test("keeps every row on one line: long names are cut, the full name in the tooltip", async ({ page }) => {
+    await page.goto("/#/holdings");
+    const row = page.locator('tr[data-testid="holding-row"][data-account="broker"]').nth(1); // IZ0836, a long name
+    await expect(row.locator(".name")).toHaveAttribute("title", /indeksowane inflacją/);
+    const heights = await page.getByTestId("holding-row").evaluateAll((rows) => rows.map((r) => r.getBoundingClientRect().height));
+    expect(Math.max(...heights)).toBeLessThan(Math.min(...heights) + 2);
   });
 
   test("filters by account and asset type", async ({ page }) => {
@@ -100,10 +115,11 @@ test.describe("holdings view", () => {
     await expect(rows).toHaveCount(1);
     await page.getByTestId("filter-type").selectOption({ label: "Corporate bond" });
     await expect(rows).toHaveCount(1);
-    await page.getByTestId("filter-type").selectOption({ label: "Currency" });
-    await expect(rows).toHaveCount(1);
+    // Cash: the PLN cash rows and the foreign cash (EUR at ibkr); no separate "Currency" type
+    expect(await page.getByTestId("filter-type").locator("option").allTextContents()).not.toContain("Currency");
     await page.getByTestId("filter-type").selectOption({ label: "Cash" });
-    await expect(rows).toHaveCount(0);
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toHaveAttribute("data-isin", "ZZWALUTYEUR0");
     await expect(page.getByTestId("cash-row")).toHaveCount(6);
   });
 });
@@ -191,7 +207,7 @@ test.describe("holdings grouped by instrument", () => {
     const table = page.getByTestId("holdings-by-account");
     await expect(page.getByTestId("instrument-cash")).toBeVisible(); // data loaded
     const order = await table.locator('tr[data-testid^="instrument-"]').evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
-    expect(order).toEqual(["instrument-DE0001102523", "instrument-DS0432", "instrument-EDO0935", "instrument-EUR", "instrument-IZ0836", "instrument-KRU0827", "instrument-SAMPLE-APARTMENT", "instrument-SPXS", "instrument-cash"]);
+    expect(order).toEqual(["instrument-DE0001102523", "instrument-DS0432", "instrument-EDO0935", "instrument-IZ0836", "instrument-KRU0827", "instrument-SAMPLE-APARTMENT", "instrument-SPXS", "instrument-cash", "instrument-EUR"]); // foreign cash after the PLN cash
     await expect(page.getByTestId("holding-row")).toHaveCount(0); // nothing expanded: one row per instrument
 
     // Held in one account: the account in its own column, no sub-rows

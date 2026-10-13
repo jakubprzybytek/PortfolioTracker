@@ -43,7 +43,40 @@ test.describe("dashboard", () => {
     await expect(broker.locator("td").nth(1)).toHaveText("30 000,00 zł"); // net deposits
     await expect(broker.locator("td").nth(6)).toHaveText(/%$/); // XIRR
     await expect(page.locator('tr[data-testid="account-row"][data-account="etf"]')).toHaveClass(/muted/);
-    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("61 000,00 zł");
+    await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("60 980,00 zł"); // incl. the closed account's −20
+  });
+
+  test("folds closed accounts into one greyed row; they stay in the total", async ({ page }) => {
+    const toggle = page.getByTestId("toggle-closed");
+    await expect(toggle).toHaveText("▸ 1 closed account");
+    const closed = page.locator('tr[data-testid="account-row"][data-account="closed"]');
+    await expect(closed).toHaveCount(0);
+    await toggle.click();
+    await expect(closed).toHaveClass(/closed/);
+    await expect(closed).toContainText("closed 2025-07-01");
+    await expect(closed.locator("td").nth(1)).toHaveText(/^[-−]20,00\s*zł$/); // 1000 in, 1020 out
+    await expect(closed.locator("td").nth(4)).toHaveText("0,00 zł");
+    await expect(closed.locator("td").nth(5)).toHaveText("20,00 zł");
+    await toggle.click();
+    await expect(closed).toHaveCount(0);
+  });
+
+  test("holds the space of loading parts with placeholders", async ({ page }) => {
+    // Hold the API back: the placeholders show, then the real content replaces them.
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    await page.route("**/portfolio/history**", async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await page.goto("/");
+    await expect(page.getByTestId("chart-skeleton")).toBeVisible();
+    const box = await page.getByTestId("chart-skeleton").boundingBox();
+    expect(box!.height).toBe(260);
+    release();
+    await expect(page.getByTestId("portfolio-chart")).toBeVisible();
+    await expect(page.getByTestId("chart-skeleton")).toHaveCount(0);
+    expect((await page.getByTestId("portfolio-chart").boundingBox())!.height).toBe(260);
   });
 
   test("shows the allocation by asset type and by currency", async ({ page }) => {

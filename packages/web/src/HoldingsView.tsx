@@ -1,6 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, uniqueOptions, type Option } from "./Filters.tsx";
+import { InstrumentLabel } from "./InstrumentLabel.tsx";
+import { SkeletonRows } from "./Placeholders.tsx";
 import { fmtInt, fmtNum, fmtPct, fmtPln, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { RangePicker } from "./RangePicker.tsx";
 import { ValueChart, type ValuePoint } from "./ValueChart.tsx";
@@ -45,8 +47,30 @@ interface Group {
   sums: Sums;
 }
 
-/** Price in the instrument's currency (ETFs: EUR …; bonds: % of nominal). */
-const fmtPrice = (h: Holding) => (h.cleanPrice !== null && h.currency !== "PLN" ? `${fmtNum(h.cleanPrice)} ${h.currency}` : fmtNum(h.cleanPrice));
+/**
+ * Foreign cash (EUR, USD at IBKR) is cash like the PLN, shown next to it. It's held as a position because it was bought
+ * with PLN at a rate: its cost is what the PLN paid, its gain the exchange-rate gain.
+ */
+const isForeignCash = (h: Holding) => h.type === "CURRENCY";
+/** Asset type shown (and filtered by): foreign cash is "Cash". */
+const shownType = (h: Holding) => (isForeignCash(h) ? "CASH" : h.type);
+/** Instruments by code, foreign cash after them. */
+const byCode = (a: Holding, b: Holding) => Number(isForeignCash(a)) - Number(isForeignCash(b)) || a.code.localeCompare(b.code) || a.name.localeCompare(b.name);
+const labelOf = (h: Holding) =>
+  isForeignCash(h) ? (
+    <>
+      <strong>Cash</strong> <span className="ccy">{h.currency}</span>
+    </>
+  ) : (
+    <InstrumentLabel code={h.code} name={h.name} />
+  );
+const FOREIGN_CASH_TITLE = "Foreign cash, bought with PLN: cost is the PLN paid, gain the exchange-rate gain. Click for its value over time.";
+
+/** Price in the instrument's currency (ETFs: EUR …; bonds: % of nominal); foreign cash: the NBP rate. */
+const fmtPrice = (h: Holding) =>
+  isForeignCash(h) ? (h.fx ? `${fmtNum(h.fx.rate, 4)} PLN` : "–") : h.cleanPrice !== null && h.currency !== "PLN" ? `${fmtNum(h.cleanPrice)} ${h.currency}` : fmtNum(h.cleanPrice);
+/** Quantity; foreign cash: the amount in its currency. */
+const fmtQty = (h: Holding, quantity = h.quantity) => (isForeignCash(h) ? `${fmtNum(quantity)} ${h.currency}` : fmtInt(quantity));
 const priceTitle = (h: Holding) =>
   [h.priceDate, h.fx && `1 ${h.currency} = ${fmtNum(h.fx.rate, 4)} PLN (NBP, ${h.fx.date})`].filter(Boolean).join(" · ");
 
@@ -78,10 +102,17 @@ function HoldingRow({
   onSelect: () => void;
 }) {
   return (
-    <tr data-testid="holding-row" data-account={account} data-isin={h.isin} className={`clickable${selected ? " selected" : ""}`} onClick={onSelect} title="Show its value over time">
+    <tr
+      data-testid="holding-row"
+      data-account={account}
+      data-isin={h.isin}
+      className={`clickable${selected ? " selected" : ""}`}
+      onClick={onSelect}
+      title={isForeignCash(h) ? FOREIGN_CASH_TITLE : "Show its value over time"}
+    >
       <td className="left indent instrument">{label}</td>
-      <td className="left">{second ?? typeLabel(h.type)}</td>
-      <td>{fmtInt(h.quantity)}</td>
+      <td className="left">{second ?? typeLabel(shownType(h))}</td>
+      <td>{fmtQty(h)}</td>
       <td title={priceTitle(h)}>{detail ? fmtPrice(h) : ""}</td>
       <td>{detail ? fmtNum(h.accruedInterest) : ""}</td>
       <td>{fmtPln(h.value)}</td>
@@ -180,8 +211,11 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
 
   const options = useMemo(() => {
     const names = new Set([...all.map(accountOf), ...Object.entries(accounts).filter(([, a]) => a.cash !== 0 || a.incomplete).map(([n]) => n)]);
-    const hasCash = Object.values(accounts).some((a) => a.cash !== 0);
-    const types: Option[] = uniqueOptions(all, (h) => ({ value: h.type, label: typeLabel(h.type) }));
+    const hasCash = Object.values(accounts).some((a) => a.cash !== 0) || all.some(isForeignCash);
+    const types: Option[] = uniqueOptions(
+      all.filter((h) => !isForeignCash(h)),
+      (h) => ({ value: h.type, label: typeLabel(h.type) }),
+    );
     return {
       account: [...names].sort().map((n) => ({ value: n, label: n })),
       type: hasCash ? [...types, { value: "CASH", label: typeLabel("CASH") }].sort((a, b) => a.label.localeCompare(b.label)) : types,
@@ -195,7 +229,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
       .map((name): Group => {
         const info = accounts[name];
         const incomplete = info?.incomplete ?? [];
-        const holdings = type === "CASH" ? [] : all.filter((h) => accountOf(h) === name && (!type || h.type === type)).sort((a, b) => a.code.localeCompare(b.code) || a.name.localeCompare(b.name));
+        const holdings = all.filter((h) => accountOf(h) === name && (!type || shownType(h) === type)).sort(byCode);
         const showCash = (!type || type === "CASH") && info !== undefined && (info.cash !== 0 || incomplete.length > 0);
         const cash = showCash ? info.cash : null;
         return { name, holdings, cash, incomplete, sums: sums(holdings, cash !== null && incomplete.length === 0 ? cash : 0) };
@@ -209,11 +243,73 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
     for (const g of groups) for (const h of g.holdings) byIsin.set(h.isin, [...(byIsin.get(h.isin) ?? []), h]);
     return [...byIsin.entries()]
       .map(([isin, hs]) => ({ isin, first: hs[0]!, holdings: hs.sort((a, b) => accountOf(a).localeCompare(accountOf(b))), sums: sums(hs) }))
-      .sort((a, b) => a.first.code.localeCompare(b.first.code));
+      .sort((a, b) => byCode(a.first, b.first));
   }, [groups]);
+  // Foreign cash goes after the PLN cash.
+  const instrumentRows = instrumentGroups.filter((g) => !isForeignCash(g.first));
+  const foreignCashGroups = instrumentGroups.filter((g) => isForeignCash(g.first));
   const cashRows = groups.filter((g) => g.cash !== null);
   const cashSums = sums([], cashRows.reduce((s, g) => s + (g.incomplete.length ? 0 : g.cash!), 0));
   const groupCount = byInstrument ? instrumentGroups.length + (cashRows.length ? 1 : 0) : groups.length;
+
+  /** By instrument: one instrument (or foreign currency) with its accounts. */
+  const renderInstrument = (g: InstrumentGroup) => {
+    const multi = g.holdings.length > 1;
+    const open = multi && expanded.has(g.isin);
+    const only = g.holdings[0]!;
+    const label = labelOf(g.first);
+    // Held in one account: the instrument row is that position (its chart, its account).
+    if (!multi)
+      return (
+        <tr
+          key={g.isin}
+          className={`clickable${isSelected(g.isin, accountOf(only)) ? " selected" : ""}`}
+          data-testid={`instrument-${g.first.code}`}
+          data-account={accountOf(only)}
+          onClick={() => select(g.isin, accountOf(only))}
+          title={isForeignCash(only) ? FOREIGN_CASH_TITLE : "Show its value over time"}
+        >
+          <td className="left instrument">{label}</td>
+          <td className="left">{accountOf(only)}</td>
+          <td>{fmtQty(only)}</td>
+          <td title={priceTitle(only)}>{fmtPrice(only)}</td>
+          <td>{fmtNum(only.accruedInterest)}</td>
+          <SumCells s={g.sums} />
+        </tr>
+      );
+    return (
+      <Fragment key={g.isin}>
+        <tr
+          className={`clickable${isSelected(g.isin) ? " selected" : ""}`}
+          data-testid={`instrument-${g.first.code}`}
+          onClick={() => select(g.isin)}
+          title="Show its value over time (all accounts)"
+        >
+          <td className="left instrument">{label}</td>
+          <td className="left">
+            <ExpandToggle open={open} count={g.holdings.length} onToggle={() => toggle(g.isin)} testId={`expand-${g.first.code}`} />
+          </td>
+          <td>{fmtQty(g.first, g.holdings.reduce((n, h) => n + h.quantity, 0))}</td>
+          <td title={priceTitle(g.first)}>{fmtPrice(g.first)}</td>
+          <td>{fmtNum(g.first.accruedInterest)}</td>
+          <SumCells s={g.sums} />
+        </tr>
+        {open &&
+          g.holdings.map((h) => (
+            <HoldingRow
+              key={`${g.isin}/${accountOf(h)}`}
+              h={h}
+              account={accountOf(h)}
+              label=""
+              second={<span className="sub">└ {accountOf(h)}</span>}
+              detail={false}
+              selected={isSelected(g.isin, accountOf(h))}
+              onSelect={() => select(g.isin, accountOf(h))}
+            />
+          ))}
+      </Fragment>
+    );
+  };
 
   const shownCount = groups.reduce((n, g) => n + g.holdings.length, 0);
   const total = groups.reduce((s, g) => add(s, g.sums), sums([]));
@@ -268,68 +364,8 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
             </tr>
           </thead>
           <tbody>
-            {byInstrument &&
-              instrumentGroups.map((g) => {
-                const multi = g.holdings.length > 1;
-                const open = multi && expanded.has(g.isin);
-                const only = g.holdings[0]!;
-                const label = (
-                  <>
-                    <strong>{g.first.code}</strong> <span className="muted">{g.first.name !== g.first.code ? g.first.name : ""}</span>
-                  </>
-                );
-                // Held in one account: the instrument row is that position (its chart, its account).
-                if (!multi)
-                  return (
-                    <tr
-                      key={g.isin}
-                      className={`clickable${isSelected(g.isin, accountOf(only)) ? " selected" : ""}`}
-                      data-testid={`instrument-${g.first.code}`}
-                      data-account={accountOf(only)}
-                      onClick={() => select(g.isin, accountOf(only))}
-                      title="Show its value over time"
-                    >
-                      <td className="left instrument">{label}</td>
-                      <td className="left">{accountOf(only)}</td>
-                      <td>{fmtInt(only.quantity)}</td>
-                      <td title={priceTitle(only)}>{fmtPrice(only)}</td>
-                      <td>{fmtNum(only.accruedInterest)}</td>
-                      <SumCells s={g.sums} />
-                    </tr>
-                  );
-                return (
-                  <Fragment key={g.isin}>
-                    <tr
-                      className={`clickable${isSelected(g.isin) ? " selected" : ""}`}
-                      data-testid={`instrument-${g.first.code}`}
-                      onClick={() => select(g.isin)}
-                      title="Show its value over time (all accounts)"
-                    >
-                      <td className="left instrument">{label}</td>
-                      <td className="left">
-                        <ExpandToggle open={open} count={g.holdings.length} onToggle={() => toggle(g.isin)} testId={`expand-${g.first.code}`} />
-                      </td>
-                      <td>{fmtInt(g.holdings.reduce((n, h) => n + h.quantity, 0))}</td>
-                      <td title={priceTitle(g.first)}>{fmtPrice(g.first)}</td>
-                      <td>{fmtNum(g.first.accruedInterest)}</td>
-                      <SumCells s={g.sums} />
-                    </tr>
-                    {open &&
-                      g.holdings.map((h) => (
-                        <HoldingRow
-                          key={`${g.isin}/${accountOf(h)}`}
-                          h={h}
-                          account={accountOf(h)}
-                          label=""
-                          second={<span className="sub">└ {accountOf(h)}</span>}
-                          detail={false}
-                          selected={isSelected(g.isin, accountOf(h))}
-                          onSelect={() => select(g.isin, accountOf(h))}
-                        />
-                      ))}
-                  </Fragment>
-                );
-              })}
+            {!snap.data && snap.loading && <SkeletonRows rows={10} cols={10} />}
+            {byInstrument && instrumentRows.map(renderInstrument)}
             {byInstrument && cashRows.length === 1 && (
               <CashRow
                 account={cashRows[0]!.name}
@@ -373,6 +409,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                   ))}
               </Fragment>
             )}
+            {byInstrument && foreignCashGroups.map(renderInstrument)}
             {!byInstrument &&
               groups.map((g) => (
               <Fragment key={g.name}>
@@ -383,7 +420,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                   </td>
                   <SumCells s={g.sums} />
                 </tr>
-                {g.holdings.map((h) => (
+                {g.holdings.filter((h) => !isForeignCash(h)).map((h) => (
                   <HoldingRow
                     key={`${g.name}/${h.isin}`}
                     h={h}
@@ -391,14 +428,21 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                     detail
                     selected={isSelected(h.isin, g.name)}
                     onSelect={() => select(h.isin, g.name)}
-                    label={
-                      <>
-                        <strong>{h.code}</strong> <span className="muted">{h.name !== h.code ? h.name : ""}</span>
-                      </>
-                    }
+                    label={labelOf(h)}
                   />
                 ))}
                 {g.cash !== null && <CashRow account={g.name} cash={g.cash} incomplete={g.incomplete.length > 0} label={<strong>Cash</strong>} />}
+                {g.holdings.filter(isForeignCash).map((h) => (
+                  <HoldingRow
+                    key={`${g.name}/${h.isin}`}
+                    h={h}
+                    account={g.name}
+                    detail
+                    selected={isSelected(h.isin, g.name)}
+                    onSelect={() => select(h.isin, g.name)}
+                    label={labelOf(h)}
+                  />
+                ))}
               </Fragment>
             ))}
             {groupCount > 1 && (
@@ -436,7 +480,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
         >
           <RangePicker value={range} onChange={setRange} testId="holding-range" />
           <div style={{ flex: 1, minHeight: 0 }}>
-            {history.error ? <p className="error">{history.error}</p> : <ValueChart testId="holding-chart" data={history.data ?? []} />}
+            {history.error ? <p className="error">{history.error}</p> : <ValueChart testId="holding-chart" data={history.data ?? []} loading={history.loading} />}
           </div>
         </ChartPanel>
       )}

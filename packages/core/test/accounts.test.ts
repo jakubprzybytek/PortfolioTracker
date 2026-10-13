@@ -45,4 +45,16 @@ describe("accountSummaries", () => {
     expect(total).toMatchObject({ account: "Total", netDeposits: 9500, total: 10265, profit: 765 });
     expect(total.xirr).toBeCloseTo(accountSummaries(snap, txs).accounts[0]!.xirr!, 6);
   });
+
+  it("an account emptied (no positions, no cash) is closed as of its last transaction, and still in the total", () => {
+    const c = (t: Parameters<typeof tx>[0]) => tx({ account: "c", ...t });
+    const closedTxs = [...txs, c({ date: "2025-02-01", type: "DEPOSIT", amount: 1000 }), c({ date: "2025-06-30", type: "INTEREST", amount: 40 }), c({ date: "2025-07-01", type: "WITHDRAWAL", amount: -1040 })];
+    const { accounts, total } = accountSummaries({ ...snap, accounts: { ...snap.accounts, c: { cash: 0 } } }, closedTxs);
+    const closed = accounts.find((a) => a.account === "c")!;
+    expect(closed).toMatchObject({ closed: true, lastDate: "2025-07-01", netDeposits: -40, total: 0, profit: 40, income: 40 });
+    expect(closed.xirr!).toBeGreaterThan(0.08); // 4 % in five months
+    expect(accounts.find((a) => a.account === "a")!.closed).toBeUndefined();
+    expect(accounts.find((a) => a.account === "b")!.closed).toBeUndefined(); // incomplete, not closed
+    expect(total).toMatchObject({ netDeposits: 9460, profit: 805 });
+  });
 });

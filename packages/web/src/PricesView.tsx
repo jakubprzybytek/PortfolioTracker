@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
 import { fmtNum, fmtPct, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
+import { InstrumentLabel } from "./InstrumentLabel.tsx";
+import { SkeletonRows } from "./Placeholders.tsx";
 import { PriceChart } from "./PriceChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
 import type { Price, PriceRow, Transaction } from "./types.ts";
@@ -65,6 +67,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             </tr>
           </thead>
           <tbody>
+            {!rows.data && rows.loading && <SkeletonRows rows={8} cols={5} />}
             {shown.map((r) => (
               <tr
                 key={r.isin}
@@ -74,7 +77,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                 data-testid={`price-${r.code}`}
               >
                 <td className="left instrument">
-                  <strong>{r.code}</strong> <span className="muted">{r.name !== r.code ? r.name : ""}</span>
+                  <InstrumentLabel code={r.code} name={r.name} />
                 </td>
                 <td className="left">{typeLabel(r.type)}</td>
                 <td>{fmtPrice(r)}</td>
@@ -149,6 +152,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                 prices={prices.data ?? []}
                 transactions={txs.data ?? []}
                 calculated={sel?.type === "BOND_RETAIL"}
+                loading={prices.loading}
                 unit={sel?.type === "BOND_LISTED" || sel?.type === "BOND_CORPORATE" || sel?.type === "BOND_IBKR" ? "%" : (sel?.currency ?? "")}
               />
             )}

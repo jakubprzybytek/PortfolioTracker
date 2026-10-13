@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
 import { TX_TYPE_LABELS, fmtInt, fmtNum, fmtPln, signClass, typeLabel } from "./format.ts";
+import { InstrumentLabel } from "./InstrumentLabel.tsx";
+import { SkeletonRows } from "./Placeholders.tsx";
 import type { TransactionRow } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -66,6 +68,7 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
             </tr>
           </thead>
           <tbody>
+            {!txs.data && txs.loading && <SkeletonRows rows={12} cols={10} />}
             {rows.map((t) => (
               <tr key={`${t.account}/${t.id}`} data-testid="transaction-row">
                 <td className="left">{t.date}</td>
@@ -73,9 +76,7 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
                 <td className="left">{TX_TYPE_LABELS[t.type] ?? t.type}</td>
                 <td className="left instrument">
                   {t.instrument ? (
-                    <>
-                      <strong>{t.instrument.code}</strong> <span className="muted">{t.instrument.name !== t.instrument.code ? t.instrument.name : ""}</span>
-                    </>
+                    <InstrumentLabel code={t.instrument.code} name={t.instrument.name} />
                   ) : (
                     <span className="muted">{t.isin ?? "–"}</span>
                   )}

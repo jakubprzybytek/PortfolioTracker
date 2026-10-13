@@ -1,10 +1,12 @@
 import { CartesianGrid, ComposedChart, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmtNum } from "./format.ts";
+import { ChartPlaceholder } from "./Placeholders.tsx";
+import { chartMargin, useNarrow } from "./useNarrow.ts";
 import type { Price, Transaction } from "./types.ts";
 
 /**
  * Market close (bonds: % of nominal; others in `unit`, e.g. EUR), or for retail bonds (`calculated`) the value per bond in PLN
- * (nominal 100). Fills its parent's height unless `height` is given.
+ * (nominal 100). Fills its parent's height unless `height` is given; until the first data arrives (`loading`), a placeholder.
  */
 export function PriceChart({
   prices,
@@ -12,14 +14,17 @@ export function PriceChart({
   calculated = false,
   unit = "%",
   height,
+  loading = false,
 }: {
   prices: Price[];
   transactions: Transaction[];
   calculated?: boolean;
   unit?: string;
   height?: number;
+  loading?: boolean;
 }) {
-  if (prices.length === 0) return <p className="muted">No prices in this range.</p>;
+  const narrow = useNarrow();
+  if (prices.length === 0) return <ChartPlaceholder loading={loading} height={height ?? "100%"}>No prices in this range.</ChartPlaceholder>;
   const data = prices.map((p) => ({ date: p.date, close: p.close, traded: p.traded, volume: p.volume }));
   const byDate = new Map(data.map((d) => [d.date, d.close]));
   // Buys/sells shown on the price line at their date (or the next available session).
@@ -34,10 +39,10 @@ export function PriceChart({
   return (
     <div data-testid="price-chart" style={{ width: "100%", height: height ?? "100%" }}>
       <ResponsiveContainer>
-        <ComposedChart data={data} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+        <ComposedChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
-          <YAxis tick={{ fontSize: 11 }} width={60} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
+          <YAxis tick={{ fontSize: 11 }} width={narrow ? 44 : 60} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
           <Tooltip
             formatter={(v, _name, item) =>
               calculated

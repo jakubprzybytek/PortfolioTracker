@@ -15,7 +15,7 @@ function Bars({ title, slices, testId }: { title: string; slices: Slice[]; testI
       {slices.map((s) => {
         const share = total ? s.value / total : 0;
         return (
-          <div className="alloc-row" key={s.key} data-testid={`${testId}-${s.key}`}>
+          <div className="alloc-row" key={s.key} data-testid={`${testId}-${s.key}`} title={`${s.label}: ${fmtPln(s.value)}`}>
             <span className="alloc-label">{s.label}</span>
             <span className="alloc-bar" aria-hidden>
               <span style={{ width: `${(share * 100).toFixed(2)}%` }} />
@@ -33,7 +33,7 @@ const sorted = (m: Map<string, Slice>) => [...m.values()].filter((s) => s.value 
 
 /**
  * Where the money is (latest snapshot): by asset type and by currency. Positions of every account plus the cash of
- * fully tracked accounts (as in the totals).
+ * fully tracked accounts (as in the totals). Foreign cash (EUR, USD at IBKR) is cash, in its currency.
  */
 export function Allocation({ snapshot }: { snapshot: Snapshot }) {
   const byType = new Map<string, Slice>();
@@ -45,7 +45,8 @@ export function Allocation({ snapshot }: { snapshot: Snapshot }) {
   };
   for (const h of snapshot.holdings) {
     if (!h.value) continue;
-    add(byType, h.type, typeLabel(h.type), h.value);
+    const type = h.type === "CURRENCY" ? "CASH" : h.type;
+    add(byType, type, typeLabel(type), h.value);
     add(byCurrency, h.currency, h.currency, h.value);
   }
   const cash = snapshot.totals.cash ?? 0;

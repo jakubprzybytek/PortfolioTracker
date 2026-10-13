@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { fmtPct, fmtPln, signClass } from "./format.ts";
+import { SkeletonRows } from "./Placeholders.tsx";
 import type { AccountSummary } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -8,10 +10,16 @@ function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
   const incomplete = !!a.incomplete?.length;
   return (
     <tr
-      className={total ? "total" : incomplete ? "muted" : ""}
+      className={total ? "total" : incomplete ? "muted" : a.closed ? "closed" : ""}
       data-testid={total ? "accounts-total" : "account-row"}
       data-account={a.account}
-      title={incomplete ? `Incomplete: ${a.incomplete!.join(", ")} not tracked yet. Its figures are partial and not in the total.` : ""}
+      title={
+        incomplete
+          ? `Incomplete: ${a.incomplete!.join(", ")} not tracked yet. Its figures are partial and not in the total.`
+          : a.closed
+            ? `Closed: emptied on ${a.lastDate}. Its profit stays in the total.`
+            : ""
+      }
     >
       <td className="left">
         {total ? (
@@ -20,7 +28,8 @@ function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
           </>
         ) : (
           <>
-            {a.account} {incomplete && <span className="flag">incomplete</span>}
+            {a.closed ? <span className="sub">└ {a.account}</span> : a.account} {incomplete && <span className="flag">incomplete</span>}
+            {a.closed && <span className="flag">closed {a.lastDate}</span>}
           </>
         )}
       </td>
@@ -38,11 +47,16 @@ function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
   );
 }
 
-/** Per account: money put in, its value now, profit and the annual return (XIRR); total of the fully tracked accounts. */
+/**
+ * Per account: money put in, its value now, profit and the annual return (XIRR); total of the fully tracked accounts.
+ * Closed accounts (emptied) come last, folded into one row ("▸ n closed accounts"); they stay in the total.
+ */
 export function AccountsTable() {
   const data = useApi<{ date: string; accounts: AccountSummary[]; total: AccountSummary }>("/accounts");
+  const [showClosed, setShowClosed] = useState(false);
   if (data.error) return <p className="error">{data.error}</p>;
-  if (!data.data) return <p className="muted">{data.loading ? "Loading…" : ""}</p>;
+  const open = data.data?.accounts.filter((a) => !a.closed) ?? [];
+  const closed = data.data?.accounts.filter((a) => a.closed) ?? [];
   return (
     <div className="table-wrap">
       <table data-testid="accounts-table" className="static">
@@ -60,10 +74,21 @@ export function AccountsTable() {
           </tr>
         </thead>
         <tbody>
-          {data.data.accounts.map((a) => (
+          {!data.data && <SkeletonRows rows={6} cols={9} />}
+          {open.map((a) => (
             <Row key={a.account} a={a} />
           ))}
-          <Row a={data.data.total} total />
+          {closed.length > 0 && (
+            <tr className="closed" data-testid="closed-accounts">
+              <td className="left" colSpan={9}>
+                <button type="button" className="link expand" aria-expanded={showClosed} onClick={() => setShowClosed((s) => !s)} data-testid="toggle-closed">
+                  {showClosed ? "▾" : "▸"} {closed.length} closed account{closed.length > 1 ? "s" : ""}
+                </button>
+              </td>
+            </tr>
+          )}
+          {showClosed && closed.map((a) => <Row key={a.account} a={a} />)}
+          {data.data && <Row a={data.data.total} total />}
         </tbody>
       </table>
     </div>

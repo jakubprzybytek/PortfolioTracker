@@ -21,5 +21,8 @@
   { "date": "2025-10-01", "account": "ibkr", "type": "DEPOSIT", "amount": 10000, "note": "broker account with foreign cash and a foreign bond (sample data)" },
   { "date": "2025-10-02", "account": "ibkr", "type": "BUY", "isin": "ZZWALUTYEUR0", "quantity": 2000, "price": 1, "fxRate": 4.3, "amount": -8600, "note": "PLN → EUR" },
   { "date": "2025-10-02", "account": "ibkr", "type": "BUY", "isin": "DE0001102523", "quantity": 2, "price": 95.952, "fxRate": 4.3, "amount": -8251.87, "note": "2 × 959.52 EUR" },
-  { "date": "2025-10-02", "account": "ibkr", "type": "SELL", "isin": "ZZWALUTYEUR0", "quantity": 1919.04, "price": 1, "fxRate": 4.3, "amount": 8251.87, "note": "EUR spent on the bond" }
+  { "date": "2025-10-02", "account": "ibkr", "type": "SELL", "isin": "ZZWALUTYEUR0", "quantity": 1919.04, "price": 1, "fxRate": 4.3, "amount": 8251.87, "note": "EUR spent on the bond" },
+  { "date": "2025-03-03", "account": "closed", "type": "DEPOSIT", "amount": 1000, "note": "account emptied and closed later (sample data)" },
+  { "date": "2025-06-30", "account": "closed", "type": "INTEREST", "amount": 20 },
+  { "date": "2025-07-01", "account": "closed", "type": "WITHDRAWAL", "amount": -1020, "note": "everything out: the account is closed" }
 ]

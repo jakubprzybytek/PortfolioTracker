@@ -1,8 +1,10 @@
 import { Fragment } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { addDays, fmtNum, today } from "./format.ts";
+import { ChartPlaceholder, SkeletonRows } from "./Placeholders.tsx";
 import type { IndicatorPoint, IndicatorSummary } from "./types.ts";
 import { useApi } from "./useApi.ts";
+import { chartMargin, useNarrow } from "./useNarrow.ts";
 
 /** Ranges in years; monthly indicators are filtered by month on the server. */
 const RANGES = [
@@ -61,6 +63,7 @@ export function IndicatorsView({ params, setParams }: { params: Record<string, s
             </tr>
           </thead>
           <tbody>
+            {!rows.data && rows.loading && <SkeletonRows rows={6} cols={4} />}
             {groups.map((g) => (
               <Fragment key={g}>
                 <tr className="group" data-testid={`indicator-group-${g}`}>
@@ -124,7 +127,13 @@ export function IndicatorsView({ params, setParams }: { params: Record<string, s
 
 /** Percent changes as bars around zero (rises in the accent colour, falls grey); levels (index, rates) as a line. */
 function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSummary; points: IndicatorPoint[]; loading: boolean }) {
-  if (points.length === 0) return <p className="muted">{loading ? "Loading…" : "No data."}</p>;
+  const narrow = useNarrow();
+  if (points.length === 0)
+    return (
+      <ChartPlaceholder loading={loading} height={320}>
+        No data.
+      </ChartPlaceholder>
+    );
   const tooltip = {
     formatter: (v: unknown) => [fmtValue(indicator, Number(v)), indicator.name],
     contentStyle: { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 },
@@ -138,7 +147,7 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
       <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
       <YAxis
         tick={{ fontSize: 11 }}
-        width={56}
+        width={narrow ? 40 : 56}
         stroke="var(--muted)"
         domain={pctDomain ?? ["auto", "auto"]}
         ticks={pctDomain && Array.from({ length: pctDomain[1]! - pctDomain[0]! + 1 }, (_, k) => pctDomain[0]! + k)}
@@ -150,7 +159,7 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
     <div data-testid="indicator-chart" data-points={points.length} style={{ width: "100%", height: 320 }}>
       <ResponsiveContainer>
         {indicator.unit === "%" ? (
-          <BarChart data={points} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+          <BarChart data={points} margin={chartMargin(narrow)}>
             {axes}
             <ReferenceLine y={0} stroke="var(--muted)" />
             <Tooltip {...tooltip} cursor={{ fill: "var(--border)", opacity: 0.4 }} />
@@ -161,7 +170,7 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
             </Bar>
           </BarChart>
         ) : (
-          <LineChart data={points} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>
+          <LineChart data={points} margin={chartMargin(narrow)}>
             {axes}
             <Tooltip {...tooltip} />
             <Line type="monotone" dataKey="value" stroke="var(--accent)" dot={false} isAnimationActive={false} />

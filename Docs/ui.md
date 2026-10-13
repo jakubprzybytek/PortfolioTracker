@@ -2,6 +2,12 @@
 
 A small React app (Vite, `sst.aws.StaticSite`) that reads through the `api` Lambda. Four views, switched from a menu on the left (a top bar on narrow screens).
 
+## Loading
+
+Parts still loading hold their space with grey, gently pulsing placeholders (`Placeholders.tsx`): table rows, charts at their final height, the Dashboard cards and allocation. An empty chart shows its message at the chart's height. So the page doesn't jump when data arrives.
+
+On a phone (≤ 720 px) charts reach the screen edges, with short axis labels (57 k, 1,6 M).
+
 ## Navigation
 
 Hash routes, so the static site stays one page (no CloudFront rewrites) and every view, including its filters, can be bookmarked:
@@ -22,8 +28,8 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 
 - **Totals:** total (positions + cash), value of positions, cash (only accounts whose assets are all tracked; the card says how many it leaves out), cost, gain (PLN and %), coupons and income received.
 - **Portfolio value over time:** from `PORTFOLIO/SNAP#<date>`, with a range selector (1M, 6M, 1Y, all).
-- **Accounts** (`GET /accounts`): per account net deposits (deposits − withdrawals; transfers between your accounts count on both sides), positions, cash, total, profit (total − net deposits), **XIRR** (money-weighted annual return of the deposits and withdrawals plus today's total, `core/valuation/accounts.ts`), income (coupons, interest, dividends) and costs (commissions, fees, taxes). Incomplete accounts are greyed and left out of the total row.
-- **Allocation:** bars by asset type and by currency (positions of all accounts + cash of the complete ones, as in the totals), share and amount.
+- **Accounts** (`GET /accounts`): per account net deposits (deposits − withdrawals; transfers between your accounts count on both sides), positions, cash, total, profit (total − net deposits), **XIRR** (money-weighted annual return of the deposits and withdrawals plus today's total, `core/valuation/accounts.ts`), income (coupons, interest, dividends) and costs (commissions, fees, taxes). Incomplete accounts are greyed and left out of the total row. **Closed** accounts (no positions, no cash left) come last, folded into one greyed row "▸ n closed accounts" that expands them (with the date they were emptied); their profit stays in the total.
+- **Allocation:** bars by asset type and by currency (positions of all accounts + cash of the complete ones, as in the totals), share and amount (on a phone the amount is in the row tooltip). Foreign cash counts as Cash.
 - **Jobs:** last run of each job; failed jobs also appear as a banner.
 
 ## Holdings
@@ -31,9 +37,9 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **Group by** switches between two layouts (kept in the URL):
 
 - **Account** (default): described below.
-- **Instrument:** one row per instrument (by code), the second column showing the account it's held in. An instrument held in several accounts shows "▸ n accounts" with its total quantity and summed value/cost/gain/coupons; the arrow expands it into one row per account (the row itself opens the all-accounts chart). Cash is the last row: complete accounts summed, "▸ n accounts" expands it (incomplete ones greyed, not summed). The filters apply the same way.
+- **Instrument:** one row per instrument (by code), the second column showing the account it's held in. An instrument held in several accounts shows "▸ n accounts" with its total quantity and summed value/cost/gain/coupons; the arrow expands it into one row per account (the row itself opens the all-accounts chart). Cash comes after the instruments: complete accounts summed, "▸ n accounts" expands it (incomplete ones greyed, not summed); then the foreign cash (EUR, USD). The filters apply the same way.
 
-- **Grouped by account** (alphabetically); each group row shows the account's value (positions + cash), cost, gain, gain % and coupons. Each account ends with a **Cash** row; accounts holding only cash appear too. A total row appears when more than one account is shown.
+- **Grouped by account** (alphabetically); each group row shows the account's value (positions + cash), cost, gain, gain % and coupons. Each account ends with a **Cash** row, then its foreign cash ("Cash EUR": the amount in EUR, the NBP rate as its price, value in PLN; cost is the PLN paid for it, so its gain is the exchange-rate gain). The "Cash" asset-type filter shows both. Accounts holding only cash appear too. Rows keep one line: long instrument names are cut with "…" (full name in the tooltip). A total row appears when more than one account is shown.
 - **Incomplete accounts** (some of their assets aren't tracked yet, e.g. Catalyst bonds): the group row says what's missing, and the cash row is greyed and left out of the sums, because without the untracked purchases it's far too high.
 - **Instruments sorted by code** within each account.
 - **Columns:** instrument (code + name), asset type, quantity, price (bonds: clean, % of nominal; ETFs: in their currency, e.g. "167,70 EUR"; price date and the NBP rate used on hover), accrued interest per bond, value (PLN), cost (PLN, as paid), gain (PLN, %), coupons/dividends received.

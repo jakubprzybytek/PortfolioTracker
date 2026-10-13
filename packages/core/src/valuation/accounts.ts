@@ -9,6 +9,10 @@ export interface AccountSummary {
   account: string;
   /** What isn't tracked yet (the figures are then incomplete and not in the total). */
   incomplete?: string[];
+  /** Nothing left in it (no positions, no cash): `lastDate` is when it was emptied. */
+  closed?: true;
+  /** Date of its last transaction. */
+  lastDate: IsoDate;
   /** Deposits − withdrawals. Transfers between your own accounts count on both sides. */
   netDeposits: number;
   /** Value of the open positions. */
@@ -77,10 +81,13 @@ export function accountSummaries(snapshot: Pick<SnapshotItem, "date" | "holdings
     const cash = info?.cash ?? 0;
     const total = round2(positions + cash);
     const flows = flowsOf(own);
+    const held = snapshot.holdings.some((h) => h.account === account && h.quantity !== 0);
+    const closed = !info?.incomplete?.length && !held && cash === 0 && own.length > 0;
     const netDeposits = round2(-flows.reduce((s, f) => s + f.amount, 0));
     return {
       account,
       ...(info?.incomplete?.length ? { incomplete: info.incomplete } : {}),
+      ...(closed ? { closed: true as const } : {}),
       netDeposits,
       positions,
       cash,
@@ -90,6 +97,7 @@ export function accountSummaries(snapshot: Pick<SnapshotItem, "date" | "holdings
       costs: round2(own.reduce((s, t) => s + (t.fee ?? 0) + (t.type === "FEE" || t.type === "TAX" ? -t.amount : 0), 0)),
       xirr: xirr([...flows, { date, amount: total }]),
       firstDate: own.map((t) => t.date).sort()[0] ?? date,
+      lastDate: own.map((t) => t.date).sort().at(-1) ?? date,
     };
   });
 
@@ -107,6 +115,7 @@ export function accountSummaries(snapshot: Pick<SnapshotItem, "date" | "holdings
     costs: sum("costs"),
     xirr: xirr([...flowsOf(txs.filter((t) => completeNames.has(t.account))), { date, amount: sum("total") }]),
     firstDate: complete.map((r) => r.firstDate).sort()[0] ?? date,
+    lastDate: complete.map((r) => r.lastDate).sort().at(-1) ?? date,
   };
   return { accounts: rows, total };
 }
