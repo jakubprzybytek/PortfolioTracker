@@ -131,7 +131,7 @@ Later phases:
 
 ## Outstanding work (2026-10-14)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 7, 18, 8.
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 18, 7, 19, 8.
 
 ### Correctness and accuracy
 1. **Foreign bonds at IBKR are priced by calculation** (constant yield from the trades to 100 % at maturity), not quoted; the sheet's price for one of them differs by about 1 %. Mark prices from IBKR Flex (11) would settle it.
@@ -156,3 +156,11 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
 18. **Monthly export of `transactions` to S3** (data-storage.md plans it; point-in-time recovery covers only 35 days): the table is now the only copy of what's entered in the app.
+
+### Beyond the sheet
+19. **Hold or sell a bond:** is a bond worth selling now rather than holding it to maturity? Once owned, what was paid doesn't matter: compare the **yield if held** (what it still pays from today: coupons and 100 % at maturity, after tax, against what selling it would bring today) with an **alternative** for the same period, after the cost of switching.
+    - Per bond (Holdings, the row's panel): yield if held; net amount if sold today (price + accrued interest − commission − tax due now); the alternative's yield; the difference in PLN at the bond's maturity, "hold" or "sell". A column to sort bonds by it.
+    - "Sell" by kind: listed treasury and corporate bonds at the market price (corporates: often a thin bid); retail bonds by early redemption (nominal + interest − the Ministry's fee per bond); IBKR bonds at IBKR's price.
+    - Tax: in a taxable account a sale at a gain pays 19 % now instead of at maturity (counts against selling); none in IKE/IKZE (from the account).
+    - Assumptions (a small settings screen): a CPI path (IZ and retail bonds: EDO, COI, ROD), a WIBOR path (floating corporates, WZ), the alternative: by default the current retail offer nearest the remaining term (rates and margins already in the Ministry file), or a listed treasury bond of similar maturity, or a rate you set.
+    - Order: retail bonds and fixed-rate DS (all data in place) → IZ and corporate bonds (need the corporates' margins and coupon dates, item 3) → IBKR bonds (need real quotes: their prices are calculated from the purchase, so the yield would always equal the purchase yield; item 11 or Bundesbank).
