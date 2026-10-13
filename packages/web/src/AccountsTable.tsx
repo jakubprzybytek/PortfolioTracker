@@ -33,10 +33,8 @@ function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
         )}
       </td>
       <td>{fmtPln(a.netDeposits)}</td>
-      <td>{fmtPln(a.positions)}</td>
       <td>{fmtPln(a.cash)}</td>
-      <td>{fmtPln(a.total)}</td>
-      <td className={signClass(a.profit)}>{fmtPln(a.profit)}</td>
+      <td title={`positions ${fmtPln(a.positions)} + cash ${fmtPln(a.cash)}; profit ${fmtPln(a.profit)} (total − net deposits)`}>{fmtPln(a.total)}</td>
       <td className={signClass(a.unrealised)}>{fmtPln(a.unrealised)}</td>
       <td className={signClass(a.realised)}>{fmtPln(a.realised)}</td>
       <td className={signClass(a.xirr)} title={`Money-weighted annual return since ${a.firstDate}`}>
@@ -58,9 +56,7 @@ function BaseRow({ a }: { a: AccountSummary }) {
       </td>
       <td>{fmtMoney(b.netDeposits, b.currency)}</td>
       <td></td>
-      <td></td>
-      <td>{fmtMoney(b.total, b.currency)}</td>
-      <td className={signClass(b.profit)}>{fmtMoney(b.profit, b.currency)}</td>
+      <td title={`profit ${fmtMoney(b.profit, b.currency)}`}>{fmtMoney(b.total, b.currency)}</td>
       <td colSpan={2}></td>
       <td className={signClass(b.xirr)}>{pct(b.xirr)}</td>
       <td colSpan={2}></td>
@@ -98,10 +94,8 @@ export function AccountsTable({ data }: { data: AccountsData }) {
           <tr>
             <th className="left">Account</th>
             <th title="Deposits − withdrawals (transfers between your accounts count on both sides)">Net deposits</th>
-            <th>Positions</th>
             <th>Cash</th>
-            <th>Total</th>
-            <th title="Total − net deposits: everything gained, realised or not, after costs">Profit</th>
+            <th title="Positions + cash; the split and the profit (total − net deposits) in each cell's tooltip">Total</th>
             <th title="Open positions: value now − what they cost (FIFO)">Unrealised</th>
             <th title="Sales and redemptions: proceeds − what the units sold cost (FIFO), PLN at NBP D-1">Realised</th>
             <th title="Money-weighted annual return (XIRR) of deposits, withdrawals and today's total">XIRR</th>
@@ -110,7 +104,7 @@ export function AccountsTable({ data }: { data: AccountsData }) {
           </tr>
         </thead>
         <tbody>
-          {!data.data && <SkeletonRows rows={6} cols={11} />}
+          {!data.data && <SkeletonRows rows={6} cols={9} />}
           {open.map((a) => (
             <Fragment key={a.account}>
               <Row a={a} />
@@ -119,7 +113,7 @@ export function AccountsTable({ data }: { data: AccountsData }) {
           ))}
           {closed.length > 0 && (
             <tr className="closed" data-testid="closed-accounts">
-              <td className="left" colSpan={11}>
+              <td className="left" colSpan={9}>
                 <button type="button" className="link expand" aria-expanded={showClosed} onClick={() => setShowClosed((s) => !s)} data-testid="toggle-closed">
                   {showClosed ? "▾" : "▸"} {closed.length} closed account{closed.length > 1 ? "s" : ""}
                 </button>

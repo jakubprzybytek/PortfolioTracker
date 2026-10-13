@@ -52,9 +52,9 @@ test.describe("dashboard", () => {
     await expect(base.locator("td").nth(1)).toHaveText("1 275,28 EUR");
     const broker = page.locator('tr[data-testid="account-row"][data-account="broker"]');
     await expect(broker.locator("td").nth(1)).toHaveText("30 000,00 zł"); // net deposits
-    await expect(broker.locator("td").nth(6)).toHaveText(/zł$/); // unrealised
-    await expect(broker.locator("td").nth(7)).toHaveText(/^0,00\s*zł$/); // realised: nothing sold
-    await expect(broker.locator("td").nth(8)).toHaveText(/%$/); // XIRR
+    await expect(broker.locator("td").nth(4)).toHaveText(/zł$/); // unrealised
+    await expect(broker.locator("td").nth(5)).toHaveText(/^0,00\s*zł$/); // realised: nothing sold
+    await expect(broker.locator("td").nth(6)).toHaveText(/%$/); // XIRR
     await expect(page.locator('tr[data-testid="account-row"][data-account="etf"]')).toHaveClass(/muted/);
     await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("66 403,69 zł"); // incl. the closed account's −20, and eur: 5 000 + 100 EUR at 4.2369
   });
@@ -68,8 +68,8 @@ test.describe("dashboard", () => {
     await expect(closed).toHaveClass(/closed/);
     await expect(closed).toContainText("closed 2025-07-01");
     await expect(closed.locator("td").nth(1)).toHaveText(/^[-−]20,00\s*zł$/); // 1000 in, 1020 out
-    await expect(closed.locator("td").nth(4)).toHaveText("0,00 zł");
-    await expect(closed.locator("td").nth(5)).toHaveText("20,00 zł");
+    await expect(closed.locator("td").nth(3)).toHaveText("0,00 zł"); // total
+    await expect(closed.locator("td").nth(7)).toHaveText("20,00 zł"); // income: the interest (its whole profit)
     await toggle.click();
     await expect(closed).toHaveCount(0);
   });
