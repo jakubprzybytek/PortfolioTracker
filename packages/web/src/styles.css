@@ -273,3 +273,4 @@ tr.base-row td { color: var(--muted); font-size: 0.9em; border-top: 0; }
   .topbar .menu-toggle { margin-left: 0; }
   .toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
 }
+.chart-legend { font-size: 0.8rem; font-weight: 400; margin-left: 8px; }

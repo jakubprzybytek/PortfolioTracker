@@ -38,7 +38,7 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 
 - **Totals:** total (positions + cash), value of positions, cash (only accounts whose assets are all tracked; the card says how many it leaves out), cost, gain (PLN and %), coupons and income received.
 - **Asset mix:** one bar split into shares (ETFs), bonds (all bond types, and ETFs with "Bond" in their name, e.g. high-yield bond ETFs), cash (PLN and foreign) and other (manually valued), with each share and amount: positions plus the cash of complete accounts, as in the totals.
-- **Portfolio value over time:** from `PORTFOLIO/SNAP#<date>`, with a range selector (1M, 6M, 1Y, all).
+- **Portfolio value over time:** positions + cash (fully tracked accounts) as the area, net deposits (money put in − taken out so far, other currencies at NBP D-1) dashed; the gap is the profit. A sale or redemption kept as cash doesn't move the line (before, the chart showed positions only, so the T-bill redemption on 2026-10-01 looked like a drop). Range selector: 1M, 6M, 1Y, all.
 - **Accounts** (`GET /accounts`): per account net deposits (deposits − withdrawals; transfers between your accounts count on both sides), positions, cash, total, profit (total − net deposits), **XIRR** (money-weighted annual return of the deposits and withdrawals plus today's total, `core/valuation/accounts.ts`), income (coupons, interest, dividends) and costs (commissions, fees, taxes). Money in other currencies counts at the NBP rate of the day before each transaction. An account with its own currency (IBKR: EUR) has a second line in it ("└ in EUR"): net deposits (in EUR as made, the rest converted), total (today's rate), profit, XIRR. Incomplete accounts are greyed and left out of the total row. **Closed** accounts (no positions, no cash left) come last, folded into one greyed row "▸ n closed accounts" that expands them (with the date they were emptied); their profit stays in the total.
 - **Allocation:** bars by asset type and by currency (positions of all accounts + cash of the complete ones, as in the totals), share and amount (on a phone the amount is in the row tooltip). Foreign cash counts as Cash.
 - **Jobs:** last run of each job; failed jobs also appear as a banner.
@@ -108,7 +108,7 @@ All transactions from `GET /transactions`.
 |---|---|
 | `GET /holdings` | `SNAP#LATEST` (holdings per account and instrument) |
 | `GET /accounts` | `{ date, accounts: AccountSummary[], total }` (latest snapshot + all transactions) |
-| `GET /portfolio/history?from&to` | `SNAP#<from>…<to>` (totals only) |
+| `GET /portfolio/history?from&to` | `SNAP#<from>…<to>`: totals per day, plus `total` (positions + cash) and `netDeposits` (from the transactions) |
 | `GET /instruments` | instruments + backfill status |
 | `GET /instruments/{isin}/prices?from&to` | `PX#…` items; retail bonds: the daily calculated value per bond of your lots (`calculated: true`) |
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |

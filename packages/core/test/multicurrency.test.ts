@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
-import { accountSummaries } from "../src/valuation/accounts.ts";
+import { accountSummaries, netDepositsByDate } from "../src/valuation/accounts.ts";
 import { rateD1, rateOn, type FxHistory } from "../src/valuation/fx.ts";
 import { positionKey, positionsAt } from "../src/valuation/positions.ts";
 import { valuePortfolio } from "../src/valuation/valuePortfolio.ts";
@@ -105,5 +105,18 @@ describe("the account summary", () => {
     expect(ibkr.base).toMatchObject({ currency: "EUR", netDeposits: round2(10000 / 4.32 + 500), total: round2(12443.55 / 4.4) });
     expect(ibkr.base!.profit).toBeCloseTo(ibkr.base!.total - ibkr.base!.netDeposits, 2);
     expect(ibkr.base!.xirr).not.toBeNull();
+  });
+});
+
+describe("net deposits per day (the portfolio chart's dashed line)", () => {
+  it("adds deposits and withdrawals up to each day; another currency at NBP D-1; excluded accounts left out", () => {
+    const more = [...txs, tx({ date: "2026-02-01", type: "WITHDRAWAL", amount: -1000 }), tx({ date: "2026-01-03", account: "other", type: "DEPOSIT", amount: 5000 })];
+    const by = netDepositsByDate(more, ["2026-01-01", "2026-01-02", "2026-01-07", "2026-03-01"], fx, new Set(["other"]));
+    expect(Object.fromEntries(by)).toEqual({
+      "2026-01-01": 0,
+      "2026-01-02": 10000,
+      "2026-01-07": 12100, // + 500 EUR at 4.20 (D-1 of 2026-01-07)
+      "2026-03-01": 11100,
+    });
   });
 });

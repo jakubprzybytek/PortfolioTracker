@@ -151,3 +151,22 @@ export function accountSummaries(
   };
   return { accounts: rows, total };
 }
+
+/**
+ * Money put in minus taken out (deposits − withdrawals) up to and including each of `dates`, in PLN: other currencies
+ * at the NBP rate of the day before, as in the account summary. Accounts in `exclude` (not fully tracked) left out.
+ */
+export function netDepositsByDate(transactions: TransactionItem[], dates: IsoDate[], fx?: FxHistory, exclude: Set<string> = new Set()): Map<IsoDate, number> {
+  const flows = transactions
+    .filter((t) => (t.type === "DEPOSIT" || t.type === "WITHDRAWAL") && !exclude.has(t.account))
+    .map((t) => ({ date: t.date, pln: (t.currency || "PLN") === "PLN" ? t.amount : t.amount * (rateD1(fx, t.currency, t.date) ?? NaN) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const out = new Map<IsoDate, number>();
+  let i = 0;
+  let sum = 0;
+  for (const d of [...dates].sort()) {
+    while (i < flows.length && flows[i]!.date <= d) sum += flows[i++]!.pln;
+    out.set(d, round2(sum));
+  }
+  return out;
+}

@@ -13,6 +13,7 @@ import {
   etfInstrument,
   manualInstrument,
   accountSummaries,
+  netDepositsByDate,
   checkManualTransaction,
   listedTreasuryInstrument,
   newTransactionId,
@@ -112,10 +113,17 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, { date: snap.date, ...accountSummaries(snap, txs, fx) });
       }
       case "GET /portfolio/history": {
-        const snaps = await repo.querySnapshots(from, to);
+        // Each day: positions, cash, their sum (`total`) and the money put in so far (`netDeposits`, fully tracked
+        // accounts, other currencies at NBP D-1), so a sale kept as cash doesn't show as a drop.
+        const [snaps, txs, accounts] = await Promise.all([repo.querySnapshots(from, to), repo.listTransactions(), repo.listAccounts()]);
+        const currencies = [...new Set(txs.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => t.currency))].filter((c) => c && c !== "PLN");
+        const first = txs.map((t) => t.date).sort()[0] ?? from;
+        const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), to)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
+        const incomplete = new Set(accounts.filter((a) => a.incomplete?.length).map((a) => a.account));
+        const deposits = netDepositsByDate(txs, snaps.map((s) => s.date), fx, incomplete);
         return json(
           200,
-          snaps.map((s) => ({ date: s.date, totals: s.totals, byType: s.byType })),
+          snaps.map((s) => ({ date: s.date, totals: s.totals, byType: s.byType, total: Math.round((s.totals.value + (s.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(s.date) ?? 0 })),
         );
       }
       case "GET /instruments": {

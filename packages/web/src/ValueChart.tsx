@@ -13,7 +13,20 @@ export interface ValuePoint {
  * Value (area) and what was paid (dashed) over time, in PLN. Fills its parent's height unless `height` is given.
  * Until the first data arrives (`loading`), a placeholder of the same size; reloading (a new range), dimmed with a spinner.
  */
-export function ValueChart({ data, testId, height, loading = false }: { data: ValuePoint[]; testId: string; height?: number; loading?: boolean }) {
+export function ValueChart({
+  data,
+  testId,
+  height,
+  loading = false,
+  labels = { value: "Value", cost: "Cost" },
+}: {
+  data: ValuePoint[];
+  testId: string;
+  height?: number;
+  loading?: boolean;
+  /** Tooltip names of the two lines. */
+  labels?: { value: string; cost: string };
+}) {
   const narrow = useNarrow();
   if (data.length === 0) return <ChartPlaceholder loading={loading} height={height ?? "100%"}>No valuation history in this range.</ChartPlaceholder>;
   const gradient = `val-${testId}`;
@@ -31,7 +44,7 @@ export function ValueChart({ data, testId, height, loading = false }: { data: Va
           <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
           <YAxis {...(narrow ? narrowYAxis : { width: 80, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => (narrow ? fmtCompact(v) : Math.round(v).toLocaleString("pl-PL"))} />
           <Tooltip
-            formatter={(v, name) => [fmtPln(Number(v)), name === "value" ? "Value" : "Cost"]}
+            formatter={(v, name) => [fmtPln(Number(v)), name === "value" ? labels.value : labels.cost]}
             contentStyle={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 }}
           />
           <Area type="monotone" dataKey="cost" stroke="var(--muted)" strokeDasharray="4 3" fill="none" dot={false} isAnimationActive={false} />

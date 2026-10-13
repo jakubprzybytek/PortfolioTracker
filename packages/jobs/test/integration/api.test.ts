@@ -189,10 +189,14 @@ describe(`API ${API}`, () => {
   });
 
   it("GET /portfolio/history returns one snapshot per day since the first transaction", async () => {
-    const { status, body } = await get<{ date: string; totals: { value: number } }[]>("/portfolio/history?from=2025-02-01&to=2025-02-10");
+    const { status, body } = await get<{ date: string; totals: { value: number; cash?: number }; total: number; netDeposits: number }[]>("/portfolio/history?from=2025-02-01&to=2025-02-10");
     expect(status).toBe(200);
     expect(body.map((s) => s.date)).toEqual(["2025-02-03", "2025-02-04", "2025-02-05", "2025-02-06", "2025-02-07", "2025-02-08", "2025-02-09", "2025-02-10"]);
     expect(body[0]!.totals.value).toBe(0); // deposit only
+    // positions + cash, and the money put in so far: the chart's two lines
+    expect(body[0]).toMatchObject({ total: 30000, netDeposits: 30000 });
+    expect(body[2]!.netDeposits).toBe(30000);
+    expect(body[2]!.total).toBeCloseTo(body[2]!.totals.value + body[2]!.totals.cash!, 1);
     expect(body[2]!.totals.value).toBeGreaterThan(15000); // after the DS0432 buy
   });
 

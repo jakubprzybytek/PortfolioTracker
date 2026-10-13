@@ -63,7 +63,9 @@ export function DashboardView() {
 
       {snap ? <AssetMix snapshot={snap} /> : holdings.loading && <div className="asset-mix"><Skeleton height={14} testId="asset-mix-skeleton" /></div>}
 
-      <h2>Portfolio value</h2>
+      <h2>
+        Portfolio value <span className="muted chart-legend">positions + cash; dashed: net deposits</span>
+      </h2>
       <section className="panel">
         <RangePicker value={range} onChange={setRange} busy={history.loading} testId="portfolio-range" />
         {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} loading={history.loading} />}
