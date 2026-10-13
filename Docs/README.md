@@ -110,7 +110,7 @@ Phase 1:
 - [x] Retail bonds valued per lot from the rates in the MF retail file (no CPI needed).
 - [ ] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
 - [ ] Terms of each corporate bond held: fixed or floating, rate/margin, coupon dates, nominal.
-- [x] Catalyst corporate bonds: prices from BiznesRadar (history + daily), valued at clean price × nominal; terms (ISIN, nominal) from obligacje.pl into `data/private/catalyst.json`. Redeemed bonds (gone from every quote page) are priced from your own trades. Bossa Akcje i Obligacje and IKZE Bossa are complete; their cash matches the sheet to the grosz.
+- [x] Catalyst corporate bonds: prices from BiznesRadar (history + daily), valued at clean price × nominal; terms (ISIN, nominal) from obligacje.pl into `data/private/catalyst.json`. Redeemed bonds (gone from every quote page) are priced from your own trades. The accounts holding them are complete; their cash matches the sheet to the grosz.
 - [ ] Accrued interest of corporate bonds is not tracked (your choice: all are floating WIBOR + margin and WIBOR history isn't free). Values are clean, so they're below the sheet's (which adds the accrued interest from gpwcatalyst.pl) by up to a period's interest. Options later: rates from the coupons received, or hand-entered rates.
 - [x] Bossa: the public EOD files (`/pub/`) are gone (only CFD reports left); the quote JSON (`_cat_bonds`, with ISINs) is frozen at 2026-10-02 (NOL3 outage).
 - [x] SST: `CronV2` (EventBridge Scheduler) takes `timezone: "Europe/Warsaw"`.
@@ -124,8 +124,8 @@ Phase 1:
 
 Later phases:
 - [x] ETF source: Yahoo chart API works from Lambda for all 10 ETFs in the sheet, full daily history (data-sources.md). EODHD stays the fallback.
-- [x] ETFs: Yahoo prices (history converted back to traded prices with the recorded splits: Yahoo has no split event for SPXS.AS), NBP rates since 2002, valuation in PLN, the sheet's ETF transactions (buys, sells, dividends, the SPXS 100:1 split). Bossa Zagranica and IKE Bossa are complete.
-- [x] Cost basis FIFO (as the reference sheet and Polish tax): a sale takes the oldest lots first; each sale's matched cost and proceeds are kept for a closed-positions view. Checked against the sheet: all 12 comparable positions equal to the grosz (SPXS 102,153.29, EUNK, IJPA, EMIM).
+- [x] ETFs: Yahoo prices (history converted back to traded prices with the recorded splits: Yahoo has no split event for SPXS.AS), NBP rates since 2002, valuation in PLN, the sheet's ETF transactions (buys, sells, dividends, the SPXS 100:1 split). The ETF accounts are complete.
+- [x] Cost basis FIFO (as the reference sheet and Polish tax): a sale takes the oldest lots first; each sale's matched cost and proceeds are kept for a closed-positions view. Checked against the sheet: every comparable position equal to the grosz.
 - [ ] ISIN + venue for every ETF.
-- [x] IBKR from the sheet: currency positions (EUR, USD) and foreign zero-coupon bonds with calculated prices; IBKR is complete (PLN cash −0.06, EUR 0.95, USD 1,190.01, bonds: quantities and costs equal to the sheet). All 753 sheet rows convert; every account is complete.
+- [x] IBKR from the sheet: currency positions (EUR, USD) and foreign zero-coupon bonds with calculated prices; IBKR is complete (cash per currency, bond quantities and costs equal to the sheet). All 753 sheet rows convert; every account is complete.
 - [ ] IBKR Flex Web Service: new IBKR trades and mark prices without the sheet (needs a Flex Query + token from you); when the daily statement for day D becomes available.

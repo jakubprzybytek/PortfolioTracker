@@ -8,7 +8,7 @@ import { positionKey, positionsAt } from "../src/valuation/positions.ts";
 import { valuePortfolio } from "../src/valuation/valuePortfolio.ts";
 
 const EUR = "ZZWALUTYEUR0";
-const OAT = "FR0014003513";
+const OAT = "FR0013508470";
 
 const tx = (t: Partial<TransactionItem> & Pick<TransactionItem, "date" | "type" | "amount">): TransactionItem =>
   ({ PK: "ACCT#IBKR", SK: "TX#", GSI1PK: "TX", GSI1SK: "", id: "x", account: "IBKR", currency: "PLN", source: "t", ...t }) as TransactionItem;
@@ -40,7 +40,7 @@ describe("price path", () => {
   it("reads the maturity from IBKR's bond names", () => {
     expect(maturityFromName("DE Govt 0.0 Nov15'27")).toBe("2027-11-15");
     expect(maturityFromName("US-T Govt Bill Oct01'26")).toBe("2026-10-01");
-    expect(maturityFromName("US9128205B99")).toBeUndefined();
+    expect(maturityFromName("US912797XX00")).toBeUndefined();
   });
 });
 

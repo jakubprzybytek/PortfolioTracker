@@ -18,7 +18,7 @@ permissions:
 
 env:
   AWS_REGION: eu-west-1
-  AWS_ROLE: arn:aws:iam::198805281865:role/GitHub-PortfolioTracker
+  AWS_ROLE: ${{ secrets.AWS_ROLE_ARN }} # arn:aws:iam::<account>:role/GitHub-PortfolioTracker (repository secret)
   NODE_VERSION: "24"
 
 jobs:

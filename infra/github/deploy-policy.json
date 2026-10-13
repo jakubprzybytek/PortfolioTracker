@@ -18,7 +18,7 @@
         "ssm:PutParameter",
         "ssm:DeleteParameter"
       ],
-      "Resource": "arn:aws:ssm:*:198805281865:parameter/sst/*"
+      "Resource": "arn:aws:ssm:*:ACCOUNT_ID:parameter/sst/*"
     },
     {
       "Sid": "ApiGateway",
@@ -45,7 +45,7 @@
       "Action": [
         "sqs:*"
       ],
-      "Resource": "arn:aws:sqs:*:198805281865:portfolio-tracker-*"
+      "Resource": "arn:aws:sqs:*:ACCOUNT_ID:portfolio-tracker-*"
     },
     {
       "Sid": "Data",
@@ -104,7 +104,7 @@
         "cognito-idp:UpdateUserPoolClient",
         "cognito-idp:DeleteUserPoolClient"
       ],
-      "Resource": "arn:aws:cognito-idp:eu-west-1:198805281865:userpool/eu-west-1_IVai0KEAA"
+      "Resource": "arn:aws:cognito-idp:eu-west-1:ACCOUNT_ID:userpool/eu-west-1_IVai0KEAA"
     }
   ]
 }

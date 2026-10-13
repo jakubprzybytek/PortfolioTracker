@@ -24,7 +24,7 @@ describe("corporate bonds", () => {
 
   it("converts the sheet's Catalyst rows; a bond no longer held gets its trade prices as manual prices", () => {
     const row = (r: Partial<SheetRow>): SheetRow => ({
-      row: 2, account: "Bossa Akcje i Obligacje", date: "2026-03-03", ticker: "KRU0827", name: "KRU0827", currency: "PLN", assetClass: "Obligacje korporacyjne polskie",
+      row: 2, account: "Broker Bonds", date: "2026-03-03", ticker: "KRU0827", name: "KRU0827", currency: "PLN", assetClass: "Obligacje korporacyjne polskie",
       type: "Zakup", quantity: 40, price: 101.2, fee: 8.1, fxRate: 1, nominal: 100, totalPln: 4056.1, comment: "", ...r,
     });
     const corporates = new Map([

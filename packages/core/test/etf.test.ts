@@ -62,7 +62,7 @@ describe("splits", () => {
 describe("listingFromTicker", () => {
   it("maps the sheet's tickers to our venue and the Yahoo symbol", () => {
     expect(listingFromTicker("AMS:VWRL")).toEqual({ code: "VWRL", venue: "XAMS", yahoo: "VWRL.AS" });
-    expect(listingFromTicker("FRA:EUNK")).toEqual({ code: "EUNK", venue: "XETR", yahoo: "EUNK.DE" });
+    expect(listingFromTicker("FRA:EXS1")).toEqual({ code: "EXS1", venue: "XETR", yahoo: "EXS1.DE" });
     expect(listingFromTicker("LON:CSPX")).toEqual({ code: "CSPX", venue: "XLON", yahoo: "CSPX.L" });
     expect(listingFromTicker("XYZ:ABC")).toBeUndefined();
     expect(listingFromTicker("IZ0836")).toBeUndefined();
@@ -110,7 +110,7 @@ describe("ETF positions and valuation", () => {
 
 describe("convertSheetRows: ETFs", () => {
   const row = (r: Partial<SheetRow>): SheetRow => ({
-    row: 2, account: "Bossa Zagranica", date: "2025-08-11", ticker: "AMS:SPXS", name: "Invesco S&P 500 UCITS ETF", currency: "EUR",
+    row: 2, account: "Broker Foreign", date: "2025-08-11", ticker: "AMS:SPXS", name: "Invesco S&P 500 UCITS ETF", currency: "EUR",
     assetClass: "Akcje zagraniczne", type: "Zakup", quantity: 3, price: 1093.04, fee: 40.53, fxRate: 4.261857, nominal: 1, totalPln: 14015.67, comment: "", ...r,
   });
   const etfs = new Map([["AMS:SPXS", { isin: SPXS }]]);
@@ -138,7 +138,7 @@ describe("convertSheetRows: ETFs", () => {
       { isin: SPXS, code: "SPXS", name: "Invesco S&P 500 UCITS ETF", type: "ETF", currency: "EUR", venue: "XAMS", sourceIds: { yahoo: "SPXS.AS" }, active: true, live: false, splits: SPLIT },
     ]);
     expect(out.skipped.map((s) => s.ticker)).toEqual(["AMS:UNKNOWN"]);
-    expect(out.accounts).toEqual([{ account: "Bossa Zagranica", incomplete: ["ETFs"] }]);
+    expect(out.accounts).toEqual([{ account: "Broker Foreign", incomplete: ["ETFs"] }]);
     expect(() => parseTransactionFile(JSON.stringify(out.transactions), "check")).not.toThrow();
   });
 });

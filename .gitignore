@@ -7,6 +7,8 @@ temp/
 # Local env / secrets
 .env
 .env.*
+# IAM documents with the AWS account number (the role's trust policy, the rendered deploy policy)
+infra/github/private/
 
 # OS / editor
 .DS_Store
