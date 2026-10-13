@@ -266,8 +266,10 @@ button.danger-link { font: inherit; background: none; border: 0; padding: 0; col
 .modal-footer .spacer { flex: 1; }
 .modal-footer .confirm { display: inline-flex; align-items: center; gap: 6px; color: var(--neg); }
 @media (max-width: 720px) {
-  .modal-backdrop { padding: 0; place-items: stretch; }
-  .modal { border-radius: 0; min-height: 100%; border: 0; padding: 14px; }
+  /* Full screen: the panel grows with the form (a grid row would hold it to the screen's height, the rest spilling
+     over the dark backdrop). */
+  .modal-backdrop { padding: 0; display: block; background: var(--panel); overscroll-behavior: contain; }
+  .modal { border-radius: 0; min-height: 100%; border: 0; box-shadow: none; padding: 14px; }
   .form-grid { grid-template-columns: minmax(0, 1fr); }
   /* Add / Cancel stay in reach while scrolling the form. */
   .modal-footer { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--border); }
