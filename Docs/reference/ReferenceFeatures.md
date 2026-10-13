@@ -1,6 +1,6 @@
 # Reference spreadsheet – feature inventory
 
-The app reproduces the Google Sheets tracker [Portfolio Tracker 2.0.1](https://docs.google.com/spreadsheets/d/1I0QQ6bFOhxdkP8hMazM9DZqmvcZzPvoz7N1ZZnA_VQw) (inwestomat.eu template by Piotrek, version of 2026-07-01) as a cloud app. This document lists what the sheet does, from an analysis of its XLSX export and of its Apps Script code (the `.gs` / `.html` files in this folder), 2026-10-11.
+The app reproduces the Google Sheets tracker Portfolio Tracker 2.0.1 (your own copy, private) (inwestomat.eu template by Piotrek, version of 2026-07-01) as a cloud app. This document lists what the sheet does, from an analysis of its XLSX export and of its Apps Script code (the `.gs` / `.html` files in this folder), 2026-10-11.
 
 The sheet is formulas plus a bound Apps Script. The script does the heavy lifting: it rebuilds holdings from transactions (FIFO), refreshes prices, appends the daily history row, fetches CPI and retail-bond rates, builds the closed-position report and benchmarks, and provides the data-entry forms.
 
