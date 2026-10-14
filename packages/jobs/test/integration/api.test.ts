@@ -11,6 +11,9 @@ const KRU = "PLKRK0000713"; // sample Catalyst corporate bond KRU0827 (BiznesRad
 const BUND = "DE0001102523"; // sample foreign bond at IBKR: calculated prices
 const EUR_CASH = "ZZWALUTYEUR0";
 
+/** `date` moved by `days` (ISO dates). */
+const addDaysIso = (date: string, days: number): string => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
 interface InstrumentOut {
   isin: string;
   code: string;
@@ -348,6 +351,21 @@ describe(`API ${API}`, () => {
     expect((await send("DELETE", `/transactions/${id}?account=api-test`)).status).toBe(404);
     expect((await send("PUT", "/transactions/0000000000000000?account=api-test", { date: "2099-01-03", account: "api-test", type: "DEPOSIT", amount: 1 })).status).toBe(404);
   });
+
+  it("a position that's gone after a deletion loses its daily history (row chart) too", async () => {
+    // A recent buy in an account of its own: the revaluation from that day is short.
+    const day = (await get<SnapshotItem>("/holdings")).body.date;
+    const date = addDaysIso(day, -3);
+    const history = async () => (await get<{ date: string }[]>(`/holdings/history?isin=${DS}&account=api-test-pos&from=${date}&to=${day}`)).body;
+    const created = await send<{ id: string }>("POST", "/transactions", { date, account: "api-test-pos", type: "BUY", isin: DS, quantity: 1, price: 100, amount: -1000, note: "integration test" });
+    expect(created.status).toBe(201);
+    try {
+      expect((await waitFor(async () => ((await history()).length > 0 ? await history() : undefined), 180_000))[0]!.date).toBe(date);
+    } finally {
+      expect((await send("DELETE", `/transactions/${created.body.id}?account=api-test-pos`)).status).toBe(200);
+    }
+    await waitFor(async () => ((await history()).length === 0 ? true : undefined), 180_000);
+  }, 400_000);
 
   it("POST/DELETE /instruments/{isin}/prices record and remove a value of a hand-valued asset, checking it first", async () => {
     // Dated before the sample's latest value (950 on 2026-09-30), so today's valuation doesn't change meanwhile.

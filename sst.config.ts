@@ -71,7 +71,10 @@ export default $config({
     // Lambda then runs them one at a time, in order. Overlapping runs could end with the older data written last
     // (SNAP#LATEST without the newest transactions). Reserved concurrency would do it too, but the account's limit
     // (50) doesn't allow reserving any.
-    const valuationQueue = new sst.aws.Queue("ValuationQueue", { fifo: true, visibilityTimeout: "16 minutes" });
+    // A message that fails 3 times goes to the dead-letter queue (kept 14 days), so it can't hold up the ones behind it
+    // for good; the failure shows on the Dashboard (job runs).
+    const valuationDeadLetter = new sst.aws.Queue("ValuationDeadLetter", { fifo: true, transform: { queue: { messageRetentionSeconds: 14 * 24 * 3600 } } });
+    const valuationQueue = new sst.aws.Queue("ValuationQueue", { fifo: true, visibilityTimeout: "16 minutes", dlq: { queue: valuationDeadLetter.arn, retry: 3 } });
 
     const valuation = new sst.aws.Function("Valuation", {
       ...defaults,

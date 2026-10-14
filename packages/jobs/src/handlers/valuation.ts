@@ -40,6 +40,8 @@ async function revalue(event: ValuationEvent) {
     const to = event.to ?? today();
     const from = event.from ?? (event.reason && event.reason !== "schedule" ? (firstTransactionDate(transactions) ?? to) : to);
     if (transactions.length === 0) return { itemsWritten: 0, note: "no transactions" };
+    // A change dated after today (e.g. a future transaction) touches no valued day yet.
+    if (from > to) return { itemsWritten: 0, note: `${from} is after ${to}: nothing to value (${event.reason ?? "schedule"})` };
 
     const couponRates = new Map<string, CouponRateItem[]>();
     for (const i of tracked) couponRates.set(i.isin, await repo.listCouponRates(i.isin));
@@ -68,7 +70,11 @@ async function revalue(event: ValuationEvent) {
     const priceAt = [...priceHistory].map(([isin, items]) => [isin, cursor(items)] as const);
     const fxAt = [...fxHistory].map(([c, items]) => [c, cursor(items)] as const);
 
+    // The positions each day had before: one that's gone now (a transaction edited or deleted) loses its days too,
+    // so its row chart doesn't keep stale days.
+    const before = new Map((await repo.querySnapshots(from, to)).map((s) => [s.date, s.holdings.map((h) => ({ account: h.account, isin: h.isin }))]));
     let written = 0;
+    let removed = 0;
     for (let date = from; date <= to; date = addDays(date, 1)) {
       const prices = new Map<string, PriceItem>();
       for (const [isin, at] of priceAt) {
@@ -83,8 +89,11 @@ async function revalue(event: ValuationEvent) {
       const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates, accounts, fx, fxHistory });
       await repo.putSnapshot(snapshot, date === to);
       await repo.putPositionDays(snapshot); // per-position history for the Holdings row charts
+      const now = new Set(snapshot.holdings.map((h) => `${h.account}#${h.isin}`));
+      const gone = (before.get(date) ?? []).filter((h) => !now.has(`${h.account}#${h.isin}`));
+      if (gone.length) removed += await repo.deletePositionDays(gone.map((h) => ({ ...h, date })));
       written++;
     }
-    return { itemsWritten: written, note: `${from} → ${to} (${event.reason ?? "schedule"})` };
+    return { itemsWritten: written, note: `${from} → ${to} (${event.reason ?? "schedule"})${removed ? `; ${removed} days of positions gone removed` : ""}` };
   });
 }

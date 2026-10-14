@@ -137,7 +137,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 1. **Foreign bonds at IBKR are priced by calculation** (constant yield from the trades to 100 % at maturity), not quoted; the sheet's price for one of them differs by about 1 %. Mark prices from IBKR Flex (11) would settle it.
 2. **Accrued interest of listed treasury bonds:** a few grosz per bond below the sheet's for IZ0836 (the sheet likely counts to settlement, T+2). Check which convention to follow.
 3. **Corporate bonds are valued clean,** without accrued interest (a choice: all are floating WIBOR + margin and WIBOR history isn't free); about 0.1 % of the portfolio below the sheet. Options: rates from the coupons received, or hand-entered rates. gpwcatalyst.pl (the sheet's source) stopped answering from here on 2026-10-12; recheck before relying on it.
-4. **Holdings row charts after an edit or a delete:** days of a position that no longer exists aren't removed (`POS#` items), so its chart can show stale days.
+4. ~~Holdings row charts after an edit or a delete~~ Done (2026-10-14): a revaluation removes the days of positions that are gone; the days left by earlier edits were cleaned up on `prod` (1,856, all from the IBKR rebuild).
 5. ~~Dashboard cards vs the chart~~ Done (2026-10-13): Total, Cash, Net deposits, Profit cards; the profit split into unrealised, realised, income, fees, currency and other; unrealised and realised per account.
 6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed.
 
@@ -152,7 +152,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 
 ### Operations and housekeeping
 14. **`prod`: drop the old `Table`** (declared in `sst.config.ts` for `prod` only, linked to nothing; removing the block leaves it in AWS because of `removal: retain`, so delete it in the console afterwards).
-15. **`prod`: the "EUR cash" / "USD cash" instruments** (`CURRENCY`) are unused since IBKR is kept per currency: mark them inactive.
+15. ~~`prod`: the "EUR cash" / "USD cash" instruments~~ Done (2026-10-14): marked inactive (no transaction uses them).
 16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
 18. ~~Monthly export of `transactions` to S3~~ Done (2026-10-14): the `Export` job backs up accounts, instruments, prices entered by hand and transactions to `exports/<date>/` on the 1st, in the import formats (data-storage.md, restore: data/README.md).

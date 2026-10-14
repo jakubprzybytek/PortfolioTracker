@@ -59,6 +59,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Function"
     }
+    "ValuationDeadLetter": {
+      "type": "sst.aws.Queue"
+      "url": string
+    }
     "ValuationQueue": {
       "type": "sst.aws.Queue"
       "url": string

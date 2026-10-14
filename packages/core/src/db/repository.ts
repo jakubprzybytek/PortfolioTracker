@@ -6,7 +6,9 @@ import {
   GetCommand,
   PutCommand,
   QueryCommand,
+  ScanCommand,
   type QueryCommandInput,
+  type ScanCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import type { IsoDate } from "../dates.ts";
 import type { ReferenceIndexMonth } from "../bonds/izIndex.ts";
@@ -62,10 +64,19 @@ export class Repository {
   }
 
   /** Writes in batches of 25, retrying unprocessed items. Returns the number of items written. */
-  private async batchPut(table: Table, items: object[]): Promise<number> {
+  private batchPut(table: Table, items: object[]): Promise<number> {
+    return this.batchWrite(table, items.map((Item) => ({ PutRequest: { Item } })));
+  }
+
+  private batchDelete(table: Table, keys: { PK: string; SK: string }[]): Promise<number> {
+    return this.batchWrite(table, keys.map((Key) => ({ DeleteRequest: { Key } })));
+  }
+
+  private async batchWrite(table: Table, all: ({ PutRequest: { Item: object } } | { DeleteRequest: { Key: object } })[]): Promise<number> {
     const tableName = this.tables[table];
+    const items = all;
     for (let i = 0; i < items.length; i += 25) {
-      let requests = items.slice(i, i + 25).map((Item) => ({ PutRequest: { Item } }));
+      let requests = items.slice(i, i + 25);
       for (let attempt = 0; requests.length > 0; attempt++) {
         if (attempt > 8) throw new Error(`BatchWrite: ${requests.length} items still unprocessed after ${attempt} attempts`);
         if (attempt > 0) await new Promise((r) => setTimeout(r, 100 * 2 ** attempt));
@@ -74,6 +85,17 @@ export class Repository {
       }
     }
     return items.length;
+  }
+
+  private async scanAll<T>(table: Table, input: Omit<ScanCommandInput, "TableName">): Promise<T[]> {
+    const out: T[] = [];
+    let ExclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const res = await this.doc.send(new ScanCommand({ TableName: this.tables[table], ...input, ExclusiveStartKey }));
+      out.push(...((res.Items ?? []) as T[]));
+      ExclusiveStartKey = res.LastEvaluatedKey;
+    } while (ExclusiveStartKey);
+    return out;
   }
 
   private async queryAll<T>(table: Table, input: Omit<QueryCommandInput, "TableName">): Promise<T[]> {
@@ -309,6 +331,21 @@ export class Repository {
         cost: h.cost,
       })),
     );
+  }
+
+  /** Removes days of positions (e.g. one that no longer exists after a transaction was edited or deleted). */
+  deletePositionDays(days: { account: string; isin: string; date: IsoDate }[]): Promise<number> {
+    return this.batchDelete("holdings", days.map((d) => keys.positionDay(d.account, d.isin, d.date)));
+  }
+
+  /** Every position day in the table (a full scan: for the one-off cleanup of days left by older versions). */
+  scanPositionDays(): Promise<Pick<PositionDayItem, "account" | "isin" | "date">[]> {
+    return this.scanAll<Pick<PositionDayItem, "account" | "isin" | "date">>("holdings", {
+      FilterExpression: "begins_with(PK, :pos)",
+      ExpressionAttributeValues: { ":pos": "POS#" },
+      ProjectionExpression: "account, isin, #d",
+      ExpressionAttributeNames: { "#d": "date" },
+    });
   }
 
   queryPositionDays(account: string, isin: string, from: IsoDate, to: IsoDate): Promise<PositionDayItem[]> {
