@@ -20,7 +20,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 | Phase | Contents |
 |---|---|
 | **1 – Polish bonds** (now) | Treasury bonds on GPW (fixed and inflation-linked IZ), Catalyst corporate bonds, retail bonds (EDO, COI, ROD); transactions import; daily valuation incl. accrued interest; table + charts |
-| 2 – ETFs | Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; later "live" (15-min delayed) quotes |
+| 2 – ETFs | Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; today's prices on demand ("Refresh prices": ETFs, IBKR and Catalyst bonds) |
 | 3 – IBKR, FX | Done: foreign bonds (Börse Stuttgart closes via onvista; calculated for US T-bills), cash per currency, NBP rates; IBKR's history from its activity statements. Later: IBKR Flex for new trades |
 
 ## Architecture

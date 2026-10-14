@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Hub } from "aws-amplify/utils";
-import { APP_VERSION, api } from "./api.ts";
+import { APP_VERSION, api, apiSend } from "./api.ts";
 import { currentSession, logout, type Session } from "./auth.ts";
 import { DashboardView } from "./DashboardView.tsx";
 import { HoldingsView } from "./HoldingsView.tsx";
@@ -51,25 +51,43 @@ function Shell({ email }: { email: string }) {
     return () => clearTimeout(t);
   }, [toast]);
   // After a save the valuation reruns in the background (about a minute): "Recalculating…" stays up until a valuation
-  // run finishes after the save (server clock, from /status), then every view reloads.
-  const [recalc, setRecalc] = useState<{ since: string; startedAt: number } | null>(null);
+  // run finishes after the save (server clock, from /status), then every view reloads. "Refresh prices" first waits for
+  // the Live job (phase "prices"), then for the valuation it queues.
+  const [recalc, setRecalc] = useState<{ since: string; startedAt: number; phase: "prices" | "valuation"; done?: string } | null>(null);
   const saved = useCallback((message: string) => {
     setToast(message);
     setVersion((v) => v + 1);
     void api<Status>("/status")
-      .then((s) => setRecalc({ since: s.now, startedAt: Date.now() }))
+      .then((s) => setRecalc({ since: s.now, startedAt: Date.now(), phase: "valuation" }))
       .catch(() => setRecalc(null));
+  }, []);
+  const refreshPrices = useCallback(async () => {
+    try {
+      const { now } = await apiSend<{ now: string }>("POST", "/prices/refresh");
+      setRecalc({ since: now, startedAt: Date.now(), phase: "prices" });
+    } catch (e) {
+      setToast((e as Error).message);
+    }
   }, []);
   useEffect(() => {
     if (!recalc) return;
     const t = setInterval(() => {
       void api<Status>("/status")
         .then((s) => {
+          if (recalc.phase === "prices") {
+            const live = s.jobs["live"];
+            if (!live?.finishedAt || live.finishedAt <= recalc.since) return;
+            if (live.status === "failed" || !live.itemsWritten) {
+              setRecalc(null);
+              setToast(live.status === "failed" ? `Prices couldn't be refreshed: ${live.note ?? "see the Dashboard"}` : `No new prices (${live.note ?? "nothing traded today yet"}).`);
+            } else setRecalc({ ...recalc, phase: "valuation", done: `Prices refreshed: ${live.note}.` });
+            return;
+          }
           const run = s.jobs["valuation"];
           if (run?.finishedAt && run.finishedAt > recalc.since) {
             setRecalc(null);
             setVersion((v) => v + 1);
-            setToast(run.status === "ok" ? "Valuation updated." : `The valuation failed: ${run.note ?? "see the Dashboard"}`);
+            setToast(run.status === "ok" ? (recalc.done ?? "Valuation updated.") : `The valuation failed: ${run.note ?? "see the Dashboard"}`);
           } else if (Date.now() - recalc.startedAt > 5 * 60_000) {
             setRecalc(null);
             setToast("The valuation is taking longer than usual; refresh the page later.");
@@ -106,6 +124,18 @@ function Shell({ email }: { email: string }) {
             <button type="button" className="primary add-tx" onClick={() => setForm({})} aria-label="Add transaction" data-testid="tx-add">
               <span aria-hidden>+</span>
               <span className="label"> Add transaction</span>
+            </button>
+            <button
+              type="button"
+              className="icon-only refresh"
+              onClick={() => void refreshPrices()}
+              disabled={!!recalc}
+              title="Refresh prices: today's quotes of ETFs and bonds with a live source, then the valuation"
+              aria-label="Refresh prices"
+              data-testid="refresh-prices"
+            >
+              <Icon name="refresh" size={18} className={recalc?.phase === "prices" ? "spin" : undefined} />
+              <span className="label">Refresh prices</span>
             </button>
             <button
               type="button"
@@ -157,7 +187,7 @@ function Shell({ email }: { email: string }) {
           {recalc && (
             <p className="recalc" data-testid="recalc">
               <span className="spinner" aria-hidden />
-              Recalculating the valuation…
+              {recalc.phase === "prices" ? "Fetching today's prices…" : "Recalculating the valuation…"}
             </p>
           )}
         </div>

@@ -85,6 +85,7 @@ All transactions from `GET /transactions`.
 - **Sorted by date, newest first** (fixed).
 - **Columns:** date, account, type, instrument (code + name), asset type, quantity, price, amount (signed: red = money out), fee, note.
 - **Filters:** instrument (including "(no instrument)" for cash movements), account, asset type; "Reset"; "n of m transactions".
+- **Refresh prices** is under "Add transaction" (on a phone ↻ next to "+"): it fetches today's quotes of ETFs, IBKR bonds and Catalyst bonds (ingestion.md, "Live prices") and revalues today. The corner says "Fetching today's prices…", then "Recalculating the valuation…"; when the run is done every view reloads and a message says how many prices changed (or "No new prices" when nothing has traded yet). The button is disabled while it runs; a second refresh within 5 minutes is refused with a message. Polish treasury bonds keep the previous close until the evening.
 - **Add transaction** is in the menu frame, on every view (under the logo; on a phone a "+" next to ☰): it opens the form over the current view, and after saving every view reloads its data. A row here opens the form to edit or delete that transaction (deleting asks to confirm). Saving revalues from the transaction's date (about a minute); a message says so.
 
 ### The form (`TransactionForm.tsx`)

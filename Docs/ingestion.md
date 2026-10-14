@@ -22,7 +22,7 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 
 | Job | When | Source | Writes |
 |---|---|---|---|
-| `live-quotes` | every 15 min, 09:00–17:45 | EODHD delayed live (ETFs with `live = true`), optional EUR/PLN | `INST#…/LIVE`, `FX#EUR/LIVE` |
+| `live` | on demand ("Refresh prices" in the app, `POST /prices/refresh`, at most every 5 min) | today's quote of every instrument with an intraday source: onvista (IBKR bonds), Yahoo (ETFs), BiznesRadar quote page (Catalyst); then revalues today | `PX#<venue>#<today>` provisional |
 | `fx` | 12:30, 16:30; also after importing a foreign-currency instrument | NBP table A: EUR, USD and every instrument currency, from the day after the last stored rate (first run: from 2002); revalues the affected days when older rates arrive for a held currency | `FX#<ccy>/<date>` |
 | `eod-gpw` | 20:30 and 22:00 (GPW publishes the day's file after 18:30; today's file missing = "not published yet") | GPW archive daily XLS, all treasury bonds in one file (+ one file per missing day in the look-back; full history per bond weekly as a check) | `PX#XWAR#…` provisional |
 | `eod-catalyst` | 19:30, and 08:00 Tue–Sat | BiznesRadar per bond (`sourceIds.biznesradar`): the first history page (last ~50 sessions, final; it lags a day) + today's quote (provisional), 2 s between requests. Full history per bond on import (backfill, ~16 pages) | `PX#CATALYST#…` |
@@ -36,13 +36,13 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 
 The jobs group into a few short windows a day. With DynamoDB this doesn't matter for cost; it keeps the schedule easy to follow.
 
-## Live quotes
+## Live prices (on demand, 2026-10-14)
 
-- **Scope:** only instruments with `live = true` (the ETFs). One EODHD request with all tickers per poll; each ticker counts as a call, e.g. 10 ETFs × ~36 polls ≈ 360 calls/day.
-- **Guard:** the job exits immediately if today is in `CAL#<venue>` as a holiday, or if the venue is outside trading hours.
-- **Writes:** overwrite `LIVE`; skip the write if `quote_time` didn't change.
-- **Read path:** the `api` Lambda returns the latest snapshot with live prices swapped in where `LIVE.quote_time` is newer than the snapshot's price date. Bonds and retail bonds keep their last end-of-day value.
-- **Optional later:** poll only while the app is open (stale-while-revalidate in the `api` Lambda) instead of on a schedule, if API calls become a constraint.
+- **Trigger:** "Refresh prices" in the app → `POST /prices/refresh` → the `Live` function (async). At most one run every 5 minutes (the API answers 429 with `retryAt`), so the sources aren't asked over and over.
+- **What it does** (`jobs/handlers/live.ts`): for every active instrument with an intraday source, today's quote so far, stored as today's **provisional** price in the usual `PX#<venue>#<date>` item: IBKR bonds from onvista (Börse Stuttgart, near real time), ETFs from Yahoo (today's bar, about 15 minutes delayed), Catalyst bonds from the BiznesRadar quote page (2 s apart). An instrument not traded or quoted today is skipped; a price already final for today is left alone. Then it queues a revaluation of today, and the evening jobs replace the provisional prices with the closes.
+- **Not covered:** GPW treasury bonds (their source is the end-of-day file), retail bonds and hand-valued assets (no market), exchange rates (NBP, once a day).
+- **Failures:** an instrument whose source fails is listed in the run's note; the run fails only when nothing could be fetched.
+- **Later, if wanted:** the same function on a schedule (e.g. hourly in trading hours); BiznesRadar quotes for GPW treasury bonds.
 
 ## Valuation job
 

@@ -34,6 +34,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Function"
     }
+    "Live": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "Market": {
       "name": string
       "type": "sst.aws.Dynamo"

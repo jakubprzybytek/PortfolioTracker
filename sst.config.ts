@@ -95,6 +95,13 @@ export default $config({
       // Starts the backfill of new instruments directly (a stream on a new table misses early inserts).
       link: [...link, market, transactions, valuationQueue, backfill, fx],
     });
+    // Live prices on demand ("Refresh prices" in the app): today's quotes, then a revaluation of today.
+    const live = new sst.aws.Function("Live", {
+      ...defaults,
+      handler: "packages/jobs/src/handlers/live.handler",
+      timeout: "3 minutes",
+      link: [...link, market, valuationQueue],
+    });
     files.notify({
       notifications: [{ name: "Imports", function: importer.arn, events: ["s3:ObjectCreated:*"], filterPrefix: "imports/" }],
     });
@@ -229,7 +236,7 @@ export default $config({
       handler: "packages/jobs/src/handlers/api.handler",
       timeout: "30 seconds" as const,
       // Writes (the "Add transaction" form) queue a revaluation; a new instrument starts its history backfill and FX rates.
-      link: [...link, market, transactions, holdings, valuationQueue, backfill, fx],
+      link: [...link, market, transactions, holdings, valuationQueue, backfill, fx, live],
       environment: { ACCESS_GROUPS: accessGroups($app.stage).join(",") },
     };
     api.route("GET /holdings", apiHandler, auth);
@@ -246,6 +253,7 @@ export default $config({
     api.route("GET /instruments/lookup", apiHandler, auth);
     api.route("POST /instruments", apiHandler, auth);
     api.route("GET /prices", apiHandler, auth);
+    api.route("POST /prices/refresh", apiHandler, auth);
     api.route("GET /accounts", apiHandler, auth);
     api.route("GET /indicators", apiHandler, auth);
     api.route("GET /indicators/{id}", apiHandler, auth);

@@ -3,6 +3,7 @@
 // access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
+import { Resource } from "sst";
 import {
   APP_SOURCE,
   CPI_INDICATORS,
@@ -37,7 +38,7 @@ import {
 } from "@portfolio/core";
 import { FX_CURRENCIES } from "./fx.ts";
 import { hasAnyGroup } from "../lib/access.ts";
-import { queueValuation, repo } from "../lib/context.ts";
+import { invokeAsync, queueValuation, repo } from "../lib/context.ts";
 import { importInstruments, mfTermsByCode } from "./import.ts";
 
 const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({
@@ -47,6 +48,8 @@ const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({
 });
 
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
+/** "Refresh prices" at most this often. */
+const REFRESH_EVERY_MS = 5 * 60_000;
 
 /** Comma-separated, set per stage in sst.config.ts (accessGroups). */
 const ACCESS_GROUPS = (process.env["ACCESS_GROUPS"] ?? "portfolio-tracker").split(",");
@@ -201,6 +204,15 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const series = cpiIndicators(await repo.listReferenceIndex()).find((i) => i.id === id)!;
         return json(200, series.points.filter((p) => p.date >= from.slice(0, 7) && p.date <= to.slice(0, 7)));
       }
+      case "POST /prices/refresh": {
+        // "Refresh prices": starts the Live job (today's quotes, then a revaluation of today). At most one every few
+        // minutes, so the sources aren't asked over and over.
+        const last = (await repo.listJobRuns("live"))[0];
+        const retryAt = last ? Date.parse(last.startedAt) + REFRESH_EVERY_MS : 0;
+        if (retryAt > Date.now()) return json(429, { error: `Prices were refreshed less than ${REFRESH_EVERY_MS / 60_000} minutes ago.`, retryAt: new Date(retryAt).toISOString() });
+        await invokeAsync(Resource.Live.name, {});
+        return json(202, { now: new Date().toISOString() });
+      }
       case "GET /prices": {
         // Held instruments (latest snapshot): latest price, its date, and the price a year earlier.
         const [snap, instruments] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments()]);
@@ -297,7 +309,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, txs.map(withoutKeys));
       }
       case "GET /status": {
-        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "fx", "valuation", "backfill", "import", "monthly", "export"];
+        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "live", "fx", "valuation", "backfill", "import", "monthly", "export"];
         const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.listJobRuns(j))[0] ?? null])));
         return json(200, { now: new Date().toISOString(), jobs: runs });
       }

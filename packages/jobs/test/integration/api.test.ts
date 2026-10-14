@@ -67,7 +67,7 @@ describe(`API ${API}`, () => {
   it("GET /status lists the last run of every job", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown> }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "export", "fx", "import", "monthly", "valuation"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "export", "fx", "import", "live", "monthly", "valuation"]);
     expect(body.jobs["fx"]).toMatchObject({ status: "ok" });
     expect(body.jobs["import"]).toMatchObject({ status: "ok" });
   });
@@ -429,5 +429,23 @@ describe(`API ${API}`, () => {
   it("rejects bad input", async () => {
     expect((await get("/instruments/not-an-isin/prices")).status).toBe(400);
     expect((await get("/nope")).status).toBe(404);
+  });
+
+  // Last: it revalues today with live quotes.
+  it("POST /prices/refresh starts the Live job (today's quotes, then the valuation), at most once every 5 minutes", async () => {
+    type Live = { status: string; startedAt: string; finishedAt?: string; note?: string };
+    const first = await send<{ now?: string; retryAt?: string }>("POST", "/prices/refresh");
+    expect([202, 429]).toContain(first.status);
+    if (first.status === 202) {
+      const run = await waitFor(async () => {
+        const r = (await get<{ jobs: Record<string, Live | null> }>("/status")).body.jobs["live"];
+        return r?.finishedAt && r.finishedAt > first.body.now! ? r : undefined;
+      }, 180_000);
+      expect(run).toMatchObject({ status: "ok" });
+      expect(run.note).toMatch(/of 2 prices updated/); // the sample's ETF and Catalyst bond; the Bund is calculated
+    }
+    const again = await send<{ error: string; retryAt: string }>("POST", "/prices/refresh");
+    expect(again.status).toBe(429);
+    expect(again.body.retryAt > new Date().toISOString()).toBe(true);
   });
 });

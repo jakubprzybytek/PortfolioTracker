@@ -97,13 +97,7 @@ Retail bonds and manual entries use the same item with `venue = CALC` or `MANUAL
 
 ### Live quote
 
-```
-PK = INST#<ISIN>            SK = LIVE
-GSI1PK = LIVE               GSI1SK = <ISIN>
-```
-
-`price`, `change`, `change_pct`, `prev_close`, `currency`, `quote_time` (exchange time of the quote), `fetched_at`, `source`.
-The item is overwritten every poll, so history never grows from it.
+Not a separate item: "Refresh prices" writes today's quote as today's price item (`PX#<venue>#<today>`, `status = provisional`), which the evening close overwrites (ingestion.md, "Live prices"). The valuation then values today as usual, so every view reads one shape and history keeps one price per day. (Planned before: a `LIVE` item per instrument swapped in by the api Lambda.)
 
 ### Corporate / bond events
 
@@ -143,7 +137,6 @@ Every series of the Ministry retail-bond file (~990 items): `isin`, `kind`, `ter
 PK = CPI                    SK = <YYYY-MM>          value, source, published_at
 PK = CPI_REF                SK = <YYYY-MM>          wr (CPI m/m, e.g. 0.003), w (reference index, 5 dp)   (IZ indexation, see data-sources.md)
 PK = FX#<CCY>               SK = <YYYY-MM-DD>       mid, table_no, source        (NBP table A, PLN per unit)
-PK = FX#<CCY>               SK = LIVE               mid, fetched_at              (optional intraday rate)
 ```
 
 ### Exchange calendar
@@ -238,7 +231,7 @@ Each function links only the tables it needs.
 
 | Need | Table | Operation |
 |---|---|---|
-| Dashboard | `holdings` + `market` | `Get PORTFOLIO/SNAP#LATEST` + `Query GSI1 GSI1PK=LIVE`; the api Lambda swaps in live prices where newer |
+| Dashboard | `holdings` | `Get PORTFOLIO/SNAP#LATEST` (after "Refresh prices", valued with today's quotes) |
 | Portfolio value over time | `holdings` | `Query PK=PORTFOLIO, SK between SNAP#<from> and SNAP#<to>` |
 | Price chart for one instrument | `market` | `Query PK=INST#<isin>, SK between PX#<venue>#<from> and PX#<venue>#<to>` |
 | All instruments (jobs, UI) | `market` | `Query GSI1 GSI1PK=INSTRUMENT` |

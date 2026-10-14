@@ -142,6 +142,21 @@ test.describe("dashboard", () => {
     }
   });
 
+  test("'Refresh prices' starts the live prices and shows the progress, or why not now", async ({ page }) => {
+    // Mocked: a real refresh revalues today, and the API allows one every 5 minutes.
+    let answer = { status: 202, body: { now: new Date().toISOString() } as object };
+    await page.route("**/prices/refresh", (route) => route.fulfill({ status: answer.status, contentType: "application/json", body: JSON.stringify(answer.body) }));
+    await page.goto("/");
+    const button = page.getByTestId("refresh-prices");
+    await button.click();
+    await expect(page.getByTestId("recalc")).toHaveText("Fetching today's prices…");
+    await expect(button).toBeDisabled();
+    await page.reload();
+    answer = { status: 429, body: { error: "Prices were refreshed less than 5 minutes ago." } };
+    await page.getByTestId("refresh-prices").click();
+    await expect(page.getByTestId("tx-toast")).toHaveText("Prices were refreshed less than 5 minutes ago.");
+  });
+
   test("lists job runs", async ({ page }) => {
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
     await expect(rows).toHaveCount(9);
