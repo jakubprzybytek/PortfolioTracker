@@ -48,17 +48,6 @@ export default $config({
     const transactions = new sst.aws.Dynamo("Transactions", { ...byType, transform: withPitr });
     const holdings = new sst.aws.Dynamo("Holdings", { fields: keys, primaryIndex });
 
-    // The former single table, kept in prod (linked to nothing) until its data is checked and it is
-    // dropped on purpose (README open items). Removing this block leaves the table in AWS (removal: retain).
-    if ($app.stage === "prod") {
-      new sst.aws.Dynamo("Table", {
-        ...byType,
-        stream: "new-and-old-images",
-        ttl: "ttl",
-        transform: withPitr,
-      });
-    }
-
     // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload.
     const files = new sst.aws.Bucket("Files");
 

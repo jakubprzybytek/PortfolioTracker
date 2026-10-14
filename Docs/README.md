@@ -151,7 +151,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 13. **Asset class per instrument:** bond ETFs are recognised by "Bond" in the name; an explicit setting would be safer (gold, mixed funds).
 
 ### Operations and housekeeping
-14. **`prod`: drop the old `Table`** (declared in `sst.config.ts` for `prod` only, linked to nothing; removing the block leaves it in AWS because of `removal: retain`, so delete it in the console afterwards).
+14. ~~`prod`: drop the old `Table`~~ Done (2026-10-14): it was empty; removed from `sst.config.ts` and deleted in AWS.
 15. ~~`prod`: the "EUR cash" / "USD cash" instruments~~ Done (2026-10-14): marked inactive (no transaction uses them).
 16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
