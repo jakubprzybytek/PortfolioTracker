@@ -13,7 +13,8 @@ export async function handler() {
     // Hand-entered prices: those of instruments valued by hand (venue MANUAL), every date.
     const manual = instruments.filter((i) => i.venue === "MANUAL");
     const manualPrices: PriceItem[] = (await Promise.all(manual.map((i) => repo.queryPrices(i.isin, "MANUAL", "1900-01-01", "2999-12-31")))).flat();
-    const files = exportFiles({ accounts, instruments, manualPrices, transactions });
+    const couponPeriods = (await Promise.all(instruments.filter((i) => i.type === "BOND_CORPORATE").map((i) => repo.listCouponPeriods(i.isin)))).flat();
+    const files = exportFiles({ accounts, instruments, manualPrices, couponPeriods, transactions });
     const date = today();
     for (const kind of EXPORT_KINDS)
       await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: `exports/${date}/${kind}.json`, Body: JSON.stringify(files[kind], null, 1), ContentType: "application/json" }));

@@ -93,10 +93,11 @@ WEB_URL=https://dev.portfoliotracker.albedoonline.com npx sst shell --stage dev 
 | `eod-gpw` | 20:30 and 22:00 Mon–Fri | GPW all-bonds XLS for today + any day missing in the last 14 days |
 | `eod-gpw` (recheck) | 07:15 Tue–Sat | re-fetches yesterday, marks prices final |
 | `eod-bonds` | 22:10 Mon–Fri, 07:10 Tue–Sat | IBKR bonds from onvista (Börse Stuttgart), last 14 days |
+| `coupons` | 09:00 Mon–Fri | coupon periods of corporate bonds from obligacje.pl (new periods, the current rate where none is stored) |
 | `fx` | 12:30, 16:30 Mon–Fri | NBP exchange rates |
 | `valuation` | 22:30, 07:30, and after any change (queued, one at a time) | daily snapshot (positions × prices + accrued interest) |
 | `monthly` | 16th 10:00 | CPI → IZ reference index; cross-check against the Ministry of Finance page; retail-bond rates from the Ministry file (revalues when a rate changes) |
-| `export` | 1st 04:00 | backup of accounts, instruments, hand-entered prices and transactions to `exports/<date>/` |
+| `export` | 1st 04:00 | backup of accounts, instruments, hand-entered prices, coupon periods and transactions to `exports/<date>/` |
 | `live` | "Refresh" in the app | today's quotes (ETFs, IBKR, Catalyst and treasury bonds), then revalues today |
 | `import` | on S3 upload to `imports/` | instruments, transactions, MF calculator, retail-bond file |
 | `backfill` | on a new instrument (or a new price source), or manual invoke `{ "isin": "…" }` | full price history from the instrument's source |

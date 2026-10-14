@@ -1,7 +1,8 @@
 import type { IsoDate } from "../dates.ts";
 import { dirtyValue, valueBond } from "../bonds/accrued.ts";
 import type { ReferenceIndex } from "../bonds/izIndex.ts";
-import type { AccountSnapshot, CouponRateItem, HoldingSnapshot, InstrumentItem, PriceItem, SnapshotItem, TransactionItem } from "../db/items.ts";
+import { corporateAccrued, quantityHeld, type InterestPeriod } from "../bonds/couponPeriods.ts";
+import type { AccountSnapshot, HoldingSnapshot, InstrumentItem, PriceItem, SnapshotItem, TransactionItem } from "../db/items.ts";
 import { positionsAt } from "./positions.ts";
 import { retailLotsAt, valueRetailLots } from "./retailLots.ts";
 import { cashByAccount } from "./cash.ts";
@@ -15,7 +16,8 @@ export interface ValuationContext {
   /** Latest price on or before `date`, per ISIN. */
   prices: Map<string, PriceItem>;
   referenceIndex: ReferenceIndex;
-  couponRates: Map<string, CouponRateItem[]>;
+  /** Corporate bonds' interest periods (and floating treasury rates), per ISIN. */
+  couponPeriods: Map<string, InterestPeriod[]>;
   /** A price older than this many days is flagged stale (not for manual prices). */
   staleAfterDays?: number;
   /** Account metadata: which accounts aren't fully tracked yet, their own currency. */
@@ -88,9 +90,11 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     let nominal: number | null = null;
     let accruedInterest: number | null = null;
     let valuePerUnit: number | null = null;
+    let corporate: ReturnType<typeof corporateAccrued> | undefined;
+    let positionValue: number | undefined;
 
     if (inst?.terms) {
-      const periodRate = ctx.couponRates.get(p.isin)?.find((c) => c.periodStart <= date && date < c.periodEnd)?.rate;
+      const periodRate = ctx.couponPeriods.get(p.isin)?.find((c) => c.start <= date && date < c.end)?.rate;
       const v = valueBond(inst.terms, date, {
         referenceIndex: ctx.referenceIndex,
         ...(periodRate !== undefined ? { periodRate } : {}),
@@ -100,9 +104,21 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       accruedInterest = v.accruedInterest;
       if (price) valuePerUnit = dirtyValue(price.close, v);
     } else if (inst?.nominal) {
-      // Corporate bonds: clean price (% of nominal) × nominal; accrued interest isn't tracked (floating coupons).
+      // Corporate bonds: clean price (% of nominal) × nominal, plus accrued interest from the coupon periods; without
+      // a rate for the period (or without periods), the clean price alone.
       nominal = inst.nominal;
-      if (price) valuePerUnit = Number(((price.close / 100) * inst.nominal).toFixed(6));
+      // (IBKR bonds come here too: zero-coupon, so the clean price is the whole value.)
+      if (inst.type === "BOND_CORPORATE") {
+        corporate = corporateAccrued(ctx.couponPeriods.get(p.isin) ?? [], inst.nominal, date, p.quantity, (day) => quantityHeld(ctx.transactions, p.account, p.isin, day));
+        if (corporate.total !== null) accruedInterest = round2(corporate.total / p.quantity);
+        else flags.push("no_coupon_rate");
+      }
+      if (price) {
+        const clean = Number(((price.close / 100) * inst.nominal).toFixed(6));
+        valuePerUnit = round2(clean + (accruedInterest ?? 0));
+        // The position's accrued interest is exact (bonds bought after a record day earn nothing that period).
+        if (corporate && base.currency === "PLN") positionValue = round2(clean * p.quantity + (corporate.total ?? 0));
+      }
     } else if (isCurrency) {
       valuePerUnit = 1;
     } else if (price) {
@@ -122,7 +138,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       }
     }
 
-    const value = valuePerUnit === null ? null : round2(valuePerUnit * p.quantity);
+    const value = valuePerUnit === null ? null : (positionValue ?? round2(valuePerUnit * p.quantity));
     const gain = value === null ? null : round2(value - p.cost);
     holdings.push({
       ...base,
@@ -137,6 +153,8 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       gainPct: gain === null || p.cost === 0 ? null : round2((gain / p.cost) * 100),
       flags,
       ...(fx ? { fx } : {}),
+      ...(corporate?.rate ? { rate: corporate.rate } : {}),
+      ...(corporate && corporate.total === null ? { noCouponRate: { from: corporate.missingFrom ?? null } } : {}),
     });
   }
 

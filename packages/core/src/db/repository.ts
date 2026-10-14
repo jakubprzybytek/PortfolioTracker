@@ -16,7 +16,7 @@ import {
   keys,
   type AccountItem,
   type BackfillItem,
-  type CouponRateItem,
+  type CouponPeriodItem,
   type FxRateItem,
   type InstrumentItem,
   type JobRunItem,
@@ -227,17 +227,23 @@ export class Repository {
     return this.get<RetailSeriesItem>("market", keys.retailSeries(series));
   }
 
-  // --- floating coupon rates -------------------------------------------------------------------
+  // --- coupon periods of corporate bonds ---------------------------------------------------------
 
-  putCouponRates(items: Omit<CouponRateItem, "PK" | "SK">[]): Promise<number> {
-    return this.batchPut("market", items.map((i) => ({ ...keys.couponRate(i.isin, i.periodStart), ...i })));
+  putCouponPeriods(items: Omit<CouponPeriodItem, "PK" | "SK" | "updatedAt">[]): Promise<number> {
+    const updatedAt = new Date().toISOString();
+    return this.batchPut("market", items.map((i) => ({ ...keys.couponPeriod(i.isin, i.start), ...i, updatedAt })));
   }
 
-  listCouponRates(isin: string): Promise<CouponRateItem[]> {
-    return this.queryAll<CouponRateItem>("market", {
+  /** A bond's periods, oldest first. */
+  listCouponPeriods(isin: string): Promise<CouponPeriodItem[]> {
+    return this.queryAll<CouponPeriodItem>("market", {
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ExpressionAttributeValues: { ":pk": `INST#${isin}`, ":sk": "COUPON#" },
     });
+  }
+
+  async deleteCouponPeriod(isin: string, start: IsoDate): Promise<void> {
+    await this.doc.send(new DeleteCommand({ TableName: this.tables.market, Key: keys.couponPeriod(isin, start) }));
   }
 
   // --- transactions ----------------------------------------------------------------------------

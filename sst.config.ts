@@ -149,6 +149,13 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
+    // Coupon periods of corporate bonds (obligacje.pl): new periods and the current rate where none is stored.
+    new sst.aws.CronV2("Coupons", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/coupons.handler", link: [...link, market, valuationQueue] },
+      schedule: "cron(0 9 ? * MON-FRI *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
     // Foreign government bonds at IBKR (onvista, Börse Stuttgart, open until 22:00): before the 22:30 valuation,
     // and a morning pass that turns today's quote into the final close.
     new sst.aws.CronV2("EodBonds", {
@@ -246,6 +253,10 @@ export default $config({
     api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
     api.route("POST /instruments/{isin}/prices", apiHandler, auth);
     api.route("DELETE /instruments/{isin}/prices/{date}", apiHandler, auth);
+    api.route("GET /instruments/{isin}/coupons", apiHandler, auth);
+    api.route("POST /instruments/{isin}/coupons", apiHandler, auth);
+    api.route("PUT /instruments/{isin}/coupons/{start}", apiHandler, auth);
+    api.route("DELETE /instruments/{isin}/coupons/{start}", apiHandler, auth);
     api.route("GET /transactions", apiHandler, auth);
     api.route("POST /transactions", apiHandler, auth);
     api.route("PUT /transactions/{id}", apiHandler, auth);

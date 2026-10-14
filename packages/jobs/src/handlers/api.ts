@@ -1,11 +1,13 @@
 // HTTP API for the UI (see Docs/ui.md). Reads, plus adding/editing/deleting transactions and adding instruments
-// (the "Add transaction" form), and new values of hand-valued assets. Every route needs a Cognito login (checked by API Gateway) in one of the stage's
+// (the "Add transaction" form), new values of hand-valued assets, and corporate bonds' coupon periods. Every route needs a Cognito login (checked by API Gateway) in one of the stage's
 // access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import { Resource } from "sst";
 import {
   APP_SOURCE,
+  CouponPeriodInput,
+  couponChecks,
   CPI_INDICATORS,
   InstrumentInput,
   ManualTransaction,
@@ -33,6 +35,8 @@ import {
   yearBefore,
   type FxHistory,
   type IndicatorSummary,
+  type InstrumentItem,
+  type InterestPeriod,
   type PriceItem,
   type TransactionItem,
 } from "@portfolio/core";
@@ -90,6 +94,56 @@ async function treasurySeries(code: string): Promise<InstrumentInput | undefined
   if (retail) return retailInstrument(retail);
   const listed = (await mfTermsByCode()).get(code);
   return listed ? listedTreasuryInstrument(listed) : undefined;
+}
+
+/** A corporate bond by ISIN, or the error response. */
+async function corporateBond(isin: string | undefined): Promise<{ inst: InstrumentItem } | { error: APIGatewayProxyResultV2 }> {
+  if (!isin || !ISIN.test(isin)) return { error: json(400, { error: "Invalid ISIN" }) };
+  const inst = await repo.getInstrument(isin);
+  if (!inst) return { error: json(404, { error: "Unknown instrument" }) };
+  if (inst.type !== "BOND_CORPORATE" || !inst.nominal) return { error: json(400, { error: `${inst.code} isn't a corporate bond: no coupon periods` }) };
+  return { inst };
+}
+
+const periodOf = ({ PK: _p, SK: _s, updatedAt: _u, ...p }: InterestPeriod & { PK?: unknown; SK?: unknown; updatedAt?: unknown }): InterestPeriod => p;
+
+/**
+ * Adds a period (POST, no `existing`) or changes one (PUT): the dates and the rate from the form. Dates or a rate that
+ * differ from what's stored become "manual" (`rateSource` may say "coupons" or "obligacje.pl" when you accept the rate
+ * those gave); a rate set by you settles `otherRate`. Then revalues from the period's start.
+ */
+async function savePeriod(inst: InstrumentItem, body: unknown, existing?: InterestPeriod): Promise<APIGatewayProxyResultV2> {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const stored = await repo.listCouponPeriods(inst.isin);
+  // A field left out keeps its value; null clears the record day or the rate.
+  const pick = <K extends "end" | "recordDate" | "paymentDate" | "rate">(k: K) => (b[k] === null ? undefined : b[k] !== undefined ? b[k] : existing?.[k]);
+  const end = pick("end");
+  const recordDate = pick("recordDate");
+  const paymentDate = pick("paymentDate");
+  const rate = pick("rate");
+  const datesChanged = !existing || end !== existing.end || recordDate !== existing.recordDate || paymentDate !== existing.paymentDate;
+  const rateChanged = rate !== existing?.rate;
+  const rateSource = rate === undefined ? undefined : typeof b["rateSource"] === "string" ? b["rateSource"] : rateChanged ? "manual" : existing?.rateSource;
+  const candidate = {
+    isin: inst.isin,
+    start: existing?.start ?? b["start"],
+    end,
+    ...(recordDate !== undefined ? { recordDate } : {}),
+    paymentDate,
+    datesSource: datesChanged ? "manual" : existing.datesSource,
+    ...(rate !== undefined ? { rate, rateSource } : {}),
+    // Kept until a rate is set (yours, or one you accept).
+    ...(existing?.otherRate && !rateChanged && !b["rateSource"] ? { otherRate: existing.otherRate } : {}),
+  };
+  const parsed = CouponPeriodInput.safeParse(candidate);
+  if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+  const p = parsed.data;
+  const clash = stored.find((o) => o.start !== p.start && o.start < p.end && p.start < o.end);
+  if (clash) return json(400, { error: `Overlaps the period ${clash.start} – ${clash.end}` });
+  if (!existing && stored.some((o) => o.start === p.start)) return json(409, { error: `A period starting ${p.start} exists` });
+  await repo.putCouponPeriods([p]);
+  await queueValuation({ reason: existing ? "coupon period edited" : "coupon period added", from: p.start });
+  return json(existing ? 200 : 201, p);
 }
 
 export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
@@ -178,6 +232,36 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         await repo.deletePrice(isin, "MANUAL", date);
         await queueValuation({ reason: "value deleted", from: date });
         return json(200, { isin, date });
+      }
+      case "GET /instruments/{isin}/coupons": {
+        // The bond's periods (oldest first), with the coupons you received matched to them: the rate each implies and
+        // whether it fits the stored rate.
+        const found = await corporateBond(isin);
+        if ("error" in found) return found.error;
+        const { inst } = found;
+        const [periods, txs] = await Promise.all([repo.listCouponPeriods(inst.isin), repo.listTransactions()]);
+        const own = txs.filter((t) => t.isin === inst.isin);
+        const checks = couponChecks(periods, inst.nominal!, own, inst.isin);
+        return json(200, { isin: inst.isin, code: inst.code, nominal: inst.nominal, periods: periods.map(periodOf), coupons: checks.periods, unmatched: checks.unmatched.map(withoutKeys) });
+      }
+      case "POST /instruments/{isin}/coupons": {
+        const found = await corporateBond(isin);
+        if ("error" in found) return found.error;
+        const { inst } = found;
+        return await savePeriod(inst, bodyOf(event));
+      }
+      case "PUT /instruments/{isin}/coupons/{start}":
+      case "DELETE /instruments/{isin}/coupons/{start}": {
+        const found = await corporateBond(isin);
+        if ("error" in found) return found.error;
+        const { inst } = found;
+        const start = event.pathParameters?.["start"] ?? "";
+        const existing = (await repo.listCouponPeriods(inst.isin)).find((p) => p.start === start);
+        if (!existing) return json(404, { error: `No period starting ${start}` });
+        if (route.startsWith("PUT")) return await savePeriod(inst, bodyOf(event), periodOf(existing));
+        await repo.deleteCouponPeriod(inst.isin, start);
+        await queueValuation({ reason: "coupon period deleted", from: start });
+        return json(200, periodOf(existing));
       }
       case "GET /indicators": {
         // One row per indicator: latest value and the one a year earlier (series via /indicators/{id}).
@@ -309,7 +393,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, txs.map(withoutKeys));
       }
       case "GET /status": {
-        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "live", "fx", "valuation", "backfill", "import", "monthly", "export"];
+        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];
         const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.listJobRuns(j))[0] ?? null])));
         return json(200, { now: new Date().toISOString(), jobs: runs });
       }

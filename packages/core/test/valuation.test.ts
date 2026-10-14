@@ -85,7 +85,7 @@ describe("valuePortfolio", () => {
       tx({ id: "1", date: "2026-01-15", type: "BUY", isin: "PL0000117024", quantity: 10, price: 90, amount: -9500, fee: 5 }),
       tx({ id: "2", date: "2026-01-15", type: "BUY", isin: "PL0000113783", quantity: 20, price: 80, amount: -16000, fee: 5 }),
     ];
-    const snap = valuePortfolio({ date: "2026-10-09", instruments, transactions, prices, referenceIndex: index, couponRates: new Map() });
+    const snap = valuePortfolio({ date: "2026-10-09", instruments, transactions, prices, referenceIndex: index, couponPeriods: new Map() });
     expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["a/DS0432", "a/IZ0836"]);
 
     const izH = snap.holdings.find((h) => h.code === "IZ0836")!;
@@ -107,7 +107,7 @@ describe("valuePortfolio", () => {
       tx({ id: "1", date: "2026-01-15", type: "BUY", isin: "PL0000113783", quantity: 1, amount: -800 }),
       tx({ id: "2", date: "2026-01-15", type: "BUY", isin: "PL0000117024", quantity: 1, amount: -900 }),
     ];
-    const snap = valuePortfolio({ date: "2026-10-09", instruments: [], transactions, prices: new Map([["PL0000113783", stale]]), referenceIndex: index, couponRates: new Map() });
+    const snap = valuePortfolio({ date: "2026-10-09", instruments: [], transactions, prices: new Map([["PL0000113783", stale]]), referenceIndex: index, couponPeriods: new Map() });
     expect(snap.holdings.find((h) => h.isin === "PL0000113783")!.flags).toEqual(["unknown_instrument", "stale_price"]);
     expect(snap.holdings.find((h) => h.isin === "PL0000117024")!.flags).toEqual(["unknown_instrument", "no_price"]);
   });

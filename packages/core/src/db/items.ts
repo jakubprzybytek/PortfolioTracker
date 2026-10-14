@@ -96,14 +96,31 @@ export interface FxRateItem {
   source: string;
 }
 
-export interface CouponRateItem {
+/** Who set a coupon period's rate or dates: you (the app), obligacje.pl (the `coupons` job), or your coupons received. */
+export type CouponSource = "manual" | "obligacje.pl" | "coupons";
+
+/**
+ * One interest period of a corporate bond (floating or fixed coupon): its dates (as on obligacje.pl, or entered by
+ * hand) and its annual rate. A period without a rate gives no accrued interest (the bond is valued at the clean price).
+ */
+export interface CouponPeriodItem {
   PK: `INST#${string}`;
   SK: `COUPON#${IsoDate}`;
   isin: string;
-  periodStart: IsoDate;
-  periodEnd: IsoDate;
-  rate: number;
-  source: string;
+  /** First day of the period. */
+  start: IsoDate;
+  /** Exclusive: the next period's first day. */
+  end: IsoDate;
+  /** Who holds the bond at the end of this day gets the coupon. */
+  recordDate?: IsoDate;
+  paymentDate: IsoDate;
+  datesSource: CouponSource;
+  /** Annual rate, e.g. 0.0713. */
+  rate?: number;
+  rateSource?: CouponSource;
+  /** obligacje.pl showed another rate for this period than the one stored: kept for you to decide, not used. */
+  otherRate?: { rate: number; source: CouponSource; seenAt: string };
+  updatedAt: string;
 }
 
 /** Account metadata: which kinds of assets of this account aren't tracked yet (from the sheet import). */
@@ -185,8 +202,10 @@ export interface HoldingSnapshot {
   gain: number | null;
   gainPct: number | null;
   flags: string[];
-  /** Retail bonds: annual rate of the current period and of the one before (null in the first). */
+  /** Retail and corporate bonds: annual rate of the current period and of the one before (null in the first). */
   rate?: { current: number; previous: number | null };
+  /** Corporate bonds valued at the clean price only: the first day of the period without a rate (null: no periods). */
+  noCouponRate?: { from: IsoDate | null };
   /** Foreign-currency instruments: the NBP mid rate used (PLN per unit of `currency`) and its date. */
   fx?: { rate: number; date: IsoDate };
   /** Bought in another currency than PLN: the cost in that currency (gain there = value at today's price − this). */
@@ -260,7 +279,7 @@ export const keys = {
   pricePrefix: (isin: string, venue: string) => ({ PK: `INST#${isin}` as const, SK: `PX#${venue}#` as const }),
   referenceIndex: (month: string) => ({ PK: "CPI_REF" as const, SK: month }),
   fxRate: (currency: string, date: IsoDate) => ({ PK: `FX#${currency}` as const, SK: date }),
-  couponRate: (isin: string, periodStart: IsoDate) => ({ PK: `INST#${isin}` as const, SK: `COUPON#${periodStart}` as const }),
+  couponPeriod: (isin: string, start: IsoDate) => ({ PK: `INST#${isin}` as const, SK: `COUPON#${start}` as const }),
   transaction: (account: string, date: IsoDate, id: string) => ({ PK: `ACCT#${account}` as const, SK: `TX#${date}#${id}` as const }),
   snapshot: (date: IsoDate | "LATEST") => ({ PK: "PORTFOLIO" as const, SK: `SNAP#${date}` as const }),
   backfill: (isin: string) => ({ PK: `INST#${isin}` as const, SK: "BACKFILL" as const }),

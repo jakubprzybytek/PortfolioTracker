@@ -17,9 +17,17 @@ describe("corporate bonds", () => {
   };
   const buy = { PK: "ACCT#a", SK: "TX#2026-03-03#1", GSI1PK: "TX", GSI1SK: "2026-03-03#1", id: "1", account: "a", date: "2026-03-03", type: "BUY", isin: KRU, quantity: 40, price: 101.2, amount: -4048, fee: 8.1, currency: "PLN", source: "t" } as TransactionItem;
 
-  it("values at clean price (% of nominal) × nominal, without accrued interest", () => {
-    const snap = valuePortfolio({ date: "2026-10-12", instruments: [inst], transactions: [buy], prices: new Map([[KRU, price]]), referenceIndex: new Map(), couponRates: new Map() });
-    expect(snap.holdings[0]).toMatchObject({ type: "BOND_CORPORATE", quantity: 40, cleanPrice: 100.45, nominal: 100, accruedInterest: null, valuePerUnit: 100.45, value: 4018, cost: 4056.1, flags: [] });
+  it("without coupon periods: the clean price (% of nominal) × nominal, flagged", () => {
+    const snap = valuePortfolio({ date: "2026-10-12", instruments: [inst], transactions: [buy], prices: new Map([[KRU, price]]), referenceIndex: new Map(), couponPeriods: new Map() });
+    expect(snap.holdings[0]).toMatchObject({ type: "BOND_CORPORATE", quantity: 40, cleanPrice: 100.45, nominal: 100, accruedInterest: null, valuePerUnit: 100.45, value: 4018, cost: 4056.1, flags: ["no_coupon_rate"], noCouponRate: { from: null } });
+  });
+
+  it("with the period's rate: clean value plus accrued interest", () => {
+    const period = { isin: KRU, start: "2026-08-12", end: "2026-11-12", recordDate: "2026-11-03", paymentDate: "2026-11-12", datesSource: "obligacje.pl" as const, rate: 0.0713 };
+    const snap = valuePortfolio({ date: "2026-10-12", instruments: [inst], transactions: [buy], prices: new Map([[KRU, price]]), referenceIndex: new Map(), couponPeriods: new Map([[KRU, [period]]]) });
+    // 61 days of 7.13 % on 100: 1.19 per bond.
+    expect(snap.holdings[0]).toMatchObject({ accruedInterest: 1.19, valuePerUnit: 101.64, value: 4065.6, flags: [], rate: { current: 0.0713, previous: null } });
+    expect(snap.holdings[0]!.noCouponRate).toBeUndefined();
   });
 
   it("converts the sheet's Catalyst rows; a bond no longer held gets its trade prices as manual prices", () => {

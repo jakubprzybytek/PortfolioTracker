@@ -68,7 +68,7 @@ describe("a bond bought in EUR", () => {
       transactions: txs,
       prices: new Map([[BUND, px]]),
       referenceIndex: new Map(),
-      couponRates: new Map(),
+      couponPeriods: new Map(),
       accounts: [{ account: "IBKR", baseCurrency: "EUR" }],
       fxHistory: fx,
     });

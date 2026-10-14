@@ -91,13 +91,13 @@ describe("ETF positions and valuation", () => {
   it("values an ETF in PLN at the NBP mid rate; cost stays as paid in PLN", () => {
     const snap = valuePortfolio({
       date: "2026-02-02", instruments: [etf], transactions: txs, prices: new Map([[SPXS, price("2026-01-30", 12.5)]]),
-      referenceIndex: new Map(), couponRates: new Map(), fx: new Map([["EUR", { mid: 4.2, date: "2026-01-30" }]]),
+      referenceIndex: new Map(), couponPeriods: new Map(), fx: new Map([["EUR", { mid: 4.2, date: "2026-01-30" }]]),
     });
     expect(snap.holdings[0]).toMatchObject({ code: "SPXS", currency: "EUR", quantity: 150, cleanPrice: 12.5, valuePerUnit: 52.5, value: 7875, cost: 7002.65, gain: 872.35, fx: { rate: 4.2, date: "2026-01-30" }, flags: [] });
   });
 
   it("flags a missing exchange rate instead of valuing in the wrong currency", () => {
-    const snap = valuePortfolio({ date: "2026-02-02", instruments: [etf], transactions: txs, prices: new Map([[SPXS, price("2026-01-30", 12.5)]]), referenceIndex: new Map(), couponRates: new Map() });
+    const snap = valuePortfolio({ date: "2026-02-02", instruments: [etf], transactions: txs, prices: new Map([[SPXS, price("2026-01-30", 12.5)]]), referenceIndex: new Map(), couponPeriods: new Map() });
     expect(snap.holdings[0]).toMatchObject({ value: null, flags: ["no_fx"] });
   });
 

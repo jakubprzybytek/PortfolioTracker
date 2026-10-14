@@ -55,7 +55,7 @@ describe("cash in the snapshot", () => {
       tx({ date: "2025-01-02", type: "DEPOSIT", amount: 1000 }),
       tx({ date: "2025-01-02", account: "etf", type: "DEPOSIT", amount: 50000 }), // its ETF buys aren't imported
     ];
-    const snap = valuePortfolio({ date: "2025-02-01", instruments: [], transactions: txs, prices: new Map(), referenceIndex: toReferenceIndex([]), couponRates: new Map(), accounts: [{ account: "etf", incomplete: ["ETFs"] }] });
+    const snap = valuePortfolio({ date: "2025-02-01", instruments: [], transactions: txs, prices: new Map(), referenceIndex: toReferenceIndex([]), couponPeriods: new Map(), accounts: [{ account: "etf", incomplete: ["ETFs"] }] });
     expect(snap.accounts).toEqual({ a: { cash: 1000 }, etf: { cash: 50000, incomplete: ["ETFs"] } });
     expect(snap.totals.cash).toBe(1000);
   });

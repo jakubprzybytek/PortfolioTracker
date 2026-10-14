@@ -31,6 +31,7 @@ CronV2 (Warsaw) ────┼─► eod-etf       19:00 (+07:00)    ETFs (Yaho
                     ├─► eod-catalyst  19:30 (+08:00)    corporate bonds (BiznesRadar)        │
                     ├─► eod-gpw       20:30, 22:00 (+07:15 final)  treasury bonds (GPW XLS)  ├─► DynamoDB: market,
                     ├─► eod-bonds     22:10 (+07:10)    IBKR bonds (onvista, Stuttgart)      │   transactions, holdings
+                    ├─► coupons       09:00             coupon periods (obligacje.pl)        │
                     ├─► fx            12:30, 16:30      NBP table A                          │
                     ├─► monthly       16th 10:00        CPI, IZ index, retail rates          │
                     ├─► export        1st 04:00         backup → S3 exports/<date>/          │
@@ -88,7 +89,7 @@ Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Rout
 1. **DynamoDB on-demand is the only database.** No idle cost, no cold start; Aurora Serverless was rejected because polling keeps it awake. Volume is tiny.
    Three tables by lifecycle: `market` (instruments, prices, reference data; rebuildable), `transactions` (your input; the only irreplaceable data) and `holdings` (snapshots computed by valuation). See [data-storage.md](data-storage.md).
 2. **Transactions are entered by you.** The history came from file imports (the spreadsheet, converted; IBKR from its activity statements); new ones are added in the app ("Add transaction" form on Transactions, Docs/ui.md), which is now the record. Sources: data-sources.md, "Where transactions come from". Coupon payments you enter are also used to check the calculated accrued interest.
-3. **Accrued interest is computed, not fetched.** It comes from each bond's terms. The only external input is the coupon rate per period of floating-rate corporate bonds (see data-sources.md).
+3. **Accrued interest is computed, not fetched.** It comes from each bond's terms. Corporate bonds keep their interest periods with a rate each: the dates and the current rate come from obligacje.pl, past rates from your coupons or typed in; a period without a rate gives no accrued interest (see data-sources.md).
 4. **ISIN is the internal key.** Each source's code/ticker is a mapping on the instrument.
 5. **Store raw, unadjusted prices**; events (coupons, redemptions, splits, dividends) are stored separately.
 6. **One code path for daily and backfill.** Every source adapter is `fetch → archive → parse → validate → upsert`; only the trigger and date range differ.
@@ -112,7 +113,7 @@ Phase 1:
 - [x] Load `prod`: MF calculator, `data/instruments.json`, and your real transactions (export of the sheet), plus retail bond series with purchase dates. `int` and `dev` hold `data/transactions.sample.json` (made-up).
 - [x] Retail bonds valued per lot from the rates in the MF retail file (no CPI needed).
 - [x] `sst dev` runs Lambdas locally, so scheduled jobs only run while it's up; use `npm run deploy -- --stage dev` for unattended collection.
-- [x] Terms of each corporate bond held: ISIN and nominal (`data/private/catalyst.json`); rates and coupon dates aren't needed while values are clean (see Outstanding work).
+- [x] Terms of each corporate bond held: ISIN and nominal (`data/private/catalyst.json`); coupon periods and rates in the app (2026-10-14).
 - [x] Catalyst corporate bonds: prices from BiznesRadar (history + daily), valued at clean price × nominal; terms (ISIN, nominal) from obligacje.pl into `data/private/catalyst.json`. Redeemed bonds (gone from every quote page) are priced from your own trades. The accounts holding them are complete; their cash matches the sheet to the grosz.
 - [x] Bossa: the public EOD files (`/pub/`) are gone (only CFD reports left); the quote JSON (`_cat_bonds`, with ISINs) is frozen at 2026-10-02 (NOL3 outage).
 - [x] SST: `CronV2` (EventBridge Scheduler) takes `timezone: "Europe/Warsaw"`.
@@ -135,6 +136,7 @@ Later phases:
 - [x] Monthly backup (`Export` job), values of hand-valued assets entered in the app, "Recalculating the valuation…" after every change (2026-10-14).
 - [x] IBKR bonds priced from Börse Stuttgart closes via onvista (2026-10-14), within 0.015 of IBKR's marks; US T-bills stay calculated.
 - [x] Today's prices on demand (2026-10-14): "Refresh" next to the valuation date fetches the current quotes of ETFs, IBKR bonds, Catalyst and treasury bonds and revalues today; Holdings and Prices show each price's time, or the date of an older one.
+- [x] Accrued interest of corporate bonds (2026-10-14): interest periods per bond (first day, record day, payment day, rate) from obligacje.pl each morning (`coupons` job: new periods and the current rate, never replacing a stored one), past rates from the coupons you received (accepted with a click) or typed in, in the bond's chart panel ("Coupon periods"); coupons checked against the rate.
 - [x] Valuation queue hardening (2026-10-14): a dead-letter queue after 3 failures; a revaluation drops the days of positions that are gone; the old single `Table` deleted from `prod`.
 
 ## Outstanding work (2026-10-14)
@@ -144,7 +146,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 ### Correctness and accuracy
 1. ~~Foreign bonds at IBKR are priced by calculation~~ Done (2026-10-14): the EUR bonds are priced from Börse Stuttgart's closes (onvista, `eod-bonds`), within 0.015 of IBKR's marks; the calculated prices had been up to 1 % off. US T-bills (none held now) stay calculated.
 2. **Accrued interest of listed treasury bonds:** a few grosz per bond below the sheet's for IZ0836 (the sheet likely counts to settlement, T+2). Check which convention to follow.
-3. **Corporate bonds are valued clean,** without accrued interest (a choice: all are floating WIBOR + margin and WIBOR history isn't free); about 0.1 % of the portfolio below the sheet. Options: rates from the coupons received, or hand-entered rates. gpwcatalyst.pl (the sheet's source) stopped answering from here on 2026-10-12; recheck before relying on it.
+3. ~~Corporate bonds are valued clean~~ Done (2026-10-14): coupon periods with a rate each (obligacje.pl, your coupons, or typed in); a period without a rate is flagged "no rate" and valued clean.
 4. ~~Holdings row charts after an edit or a delete~~ Done (2026-10-14): a revaluation removes the days of positions that are gone; the days left by earlier edits were cleaned up on `prod` (1,856, all from the IBKR rebuild).
 5. ~~Dashboard cards vs the chart~~ Done (2026-10-13): Total, Cash, Net deposits, Profit cards; the profit split into unrealised, realised, income, fees, currency and other; unrealised and realised per account.
 6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed.
@@ -171,4 +173,4 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
     - "Sell" by kind: listed treasury and corporate bonds at the market price (corporates: often a thin bid); retail bonds by early redemption (nominal + interest − the Ministry's fee per bond); IBKR bonds at IBKR's price.
     - Tax: in a taxable account a sale at a gain pays 19 % now instead of at maturity (counts against selling); none in IKE/IKZE (from the account).
     - Assumptions (a small settings screen): a CPI path (IZ and retail bonds: EDO, COI, ROD), a WIBOR path (floating corporates, WZ), the alternative: by default the current retail offer nearest the remaining term (rates and margins already in the Ministry file), or a listed treasury bond of similar maturity, or a rate you set.
-    - Order: retail bonds and fixed-rate DS (all data in place) → IZ and corporate bonds (need the corporates' margins and coupon dates, item 3) → IBKR bonds (quoted since 2026-10-14; US T-bills are still calculated, so their yield would equal the purchase yield).
+    - Order: retail bonds and fixed-rate DS (all data in place) → IZ and corporate bonds (their coupon dates and current rates are in place since item 3; the margin is in the name) → IBKR bonds (quoted since 2026-10-14; US T-bills are still calculated, so their yield would equal the purchase yield).

@@ -28,6 +28,7 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 | `eod-catalyst` | 19:30, and 08:00 Tue–Sat | BiznesRadar per bond (`sourceIds.biznesradar`): the first history page (last ~50 sessions, final; it lags a day) + today's quote (provisional), 2 s between requests. Full history per bond on import (backfill, ~16 pages) | `PX#CATALYST#…` |
 | `eod-etf` | 19:00, and 07:00 Tue–Sat | Yahoo chart API, last 14 days of every ETF (`sourceIds.yahoo`). A stored close that would move by more than 20 % isn't overwritten (looks like an unrecorded split; reported in the job note). Full history per ETF on import (backfill), split-adjusted history converted back with the instrument's `splits` | `PX#<venue>#…` final |
 | `eod-bonds` | 22:10, and 07:10 Tue–Sat | onvista per foreign bond at IBKR (`sourceIds.onvista`, Börse Stuttgart): last 14 days of closes (final) + today's quote (provisional; the morning run replaces it with the close). Full history per bond on import (backfill) | `PX#XSTU#…` |
+| `coupons` | 09:00 | obligacje.pl page of every corporate bond held: new interest periods and the current period's rate where none is stored (never replacing one; a different rate is kept aside). Revalues from the first period whose rate is new. By hand `{ "all": true }` also covers bonds no longer held | `INST#…/COUPON#<start>` |
 | `valuation` | 22:30 | DynamoDB only | retail bond `PX#CALC#…`, `PORTFOLIO/SNAP#<date>`, `SNAP#LATEST` |
 | `eod-ibkr` (later, not built) | 07:00 (next day) | IBKR Flex statement for the previous day | transactions, cash |
 | `eod-gpw-recheck` | 07:15 (next day) | re-runs `eod-gpw` for D-1 | overwrites, sets `status = final` |
@@ -53,7 +54,7 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
    - Compute the value per bond for each series: 100 PLN + accrued interest according to the rate periods and the compounding rule (EDO compounds yearly, COI/ROD per their terms).
    - Optionally also store the value net of the early-redemption fee and the Belka tax.
    - Write as `PX#CALC#<date>`.
-3. **Exchange-traded bonds:** accrued interest per bond from the bond terms (fixed: coupon rate; floating: `COUPON#…` rate of the current period; IZ: `nominal = 1000 × ratio(date)` from `CPI_REF` and `base_ref`). Write into the bond's `PX` item as `nominal`, `accrued_interest`, `value_per_unit` (= clean % × nominal + accrued). A floating bond without the current period's rate gets flagged `missing_coupon_rate` and is valued at clean price only.
+3. **Exchange-traded bonds:** accrued interest per bond from the bond terms (fixed: coupon rate; floating: `COUPON#…` rate of the current period; IZ: `nominal = 1000 × ratio(date)` from `CPI_REF` and `base_ref`). Write into the bond's `PX` item as `nominal`, `accrued_interest`, `value_per_unit` (= clean % × nominal + accrued). Corporate bonds: clean % × nominal plus the accrued interest of their coupon periods (data-sources.md, "Corporate bonds: coupon periods"); a period without a rate flags the holding `no_coupon_rate` and leaves it at the clean price.
 4. Positions = sum of transactions per ISIN and account up to the date.
 5. Value per position in instrument currency and in PLN (NBP rate of the date, falling back to the latest available).
 6. Write `SNAP#<date>` and `SNAP#LATEST`.

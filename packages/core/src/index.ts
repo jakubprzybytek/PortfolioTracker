@@ -5,6 +5,7 @@ export * from "./gpw/toPriceItems.ts";
 export * from "./bonds/terms.ts";
 export * from "./bonds/izIndex.ts";
 export * from "./bonds/accrued.ts";
+export * from "./bonds/couponPeriods.ts";
 export * from "./mf/calculator.ts";
 export * from "./mf/retailRates.ts";
 export * from "./db/items.ts";

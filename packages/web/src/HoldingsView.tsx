@@ -1,6 +1,7 @@
 import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
+import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
 import { FilterBar, FilterSelect, uniqueOptions, type Option } from "./Filters.tsx";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
@@ -137,13 +138,24 @@ function HoldingRow({
       <td className="left">{second ?? typeLabel(shownType(h))}</td>
       <td>{fmtQty(h)}</td>
       <PriceCell h={h} show={detail} />
-      <td>{detail ? fmtNum(h.accruedInterest) : ""}</td>
+      <td>{detail ? <AccruedCell h={h} /> : ""}</td>
       <td>{fmtPln(h.value)}</td>
       <td title={h.costNative ? `Paid ${fmtMoney(h.costNative.amount, h.costNative.currency)}; in PLN at the NBP rate of the day before each purchase` : ""}>{fmtPln(h.cost)}</td>
       <td className={signClass(h.gain)}>{fmtPln(h.gain)}</td>
       <td className={signClass(h.gainPct)}>{fmtPct(h.gainPct)}</td>
       <td>{fmtPln(h.couponsReceived)}</td>
     </tr>
+  );
+}
+
+/** Accrued interest per unit; a corporate bond without a rate for its period says so (valued at the clean price). */
+function AccruedCell({ h }: { h: Holding }) {
+  if (!h.noCouponRate) return <>{fmtNum(h.accruedInterest)}</>;
+  const why = h.noCouponRate.from ? `no rate for the period from ${h.noCouponRate.from}` : "no coupon periods";
+  return (
+    <span className="flag warn" title={`Clean price only: ${why}. Open the bond's chart → "Coupon periods" to add it.`} data-testid="no-coupon-rate">
+      no rate
+    </span>
   );
 }
 
@@ -242,6 +254,8 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const chartAccount = params["chartAccount"];
   const [range, setRange] = useState<RangeKey>("1Y");
   const [panelHeight, setPanelHeight] = useState(0);
+  /** The bond whose coupon periods replace its chart in the panel. */
+  const [couponsFor, setCouponsFor] = useState<string | null>(null);
   const history = useApi<ValuePoint[]>(chartIsin ? "/holdings/history" : null, { isin: chartIsin, account: chartAccount, from: rangeFrom(range), to: today() }, [chartIsin, chartAccount, range]);
   const select = (isin: string, acct?: string) =>
     setParams(chartIsin === isin && chartAccount === acct ? { ...params, chart: undefined, chartAccount: undefined } : { ...params, chart: isin, chartAccount: acct });
@@ -327,7 +341,9 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           <td className="left">{accountOf(only)}</td>
           <td>{fmtQty(only)}</td>
           <PriceCell h={only} />
-          <td>{fmtNum(only.accruedInterest)}</td>
+          <td>
+            <AccruedCell h={only} />
+          </td>
           <SumCells s={g.sums} />
         </tr>
       );
@@ -345,7 +361,9 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           </td>
           <td>{fmtQty(g.first, g.holdings.reduce((n, h) => n + h.quantity, 0))}</td>
           <PriceCell h={g.first} />
-          <td>{fmtNum(g.first.accruedInterest)}</td>
+          <td>
+            <AccruedCell h={g.first} />
+          </td>
           <SumCells s={g.sums} />
         </tr>
         {open &&
@@ -545,11 +563,18 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           }
         >
           <div className="chart-tools">
-            <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />
+            {couponsFor === chartIsin ? <span /> : <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />}
             {chartHolding?.type === "FUND_MANUAL" && <ManualValues key={chartHolding.isin} isin={chartHolding.isin} code={chartHolding.code} currency={chartHolding.currency} />}
+            {chartHolding?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === chartIsin} onToggle={() => setCouponsFor(couponsFor === chartIsin ? null : chartIsin)} />}
           </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            {history.error ? <p className="error">{history.error}</p> : <ValueChart testId="holding-chart" data={history.data ?? []} loading={history.loading} />}
+          <div style={{ flex: 1, minHeight: 0, overflow: couponsFor === chartIsin ? "auto" : undefined }}>
+            {chartHolding?.type === "BOND_CORPORATE" && couponsFor === chartIsin ? (
+              <CouponPeriods key={chartIsin} isin={chartIsin} code={chartHolding.code} />
+            ) : history.error ? (
+              <p className="error">{history.error}</p>
+            ) : (
+              <ValueChart testId="holding-chart" data={history.data ?? []} loading={history.loading} />
+            )}
           </div>
         </ChartPanel>
       )}

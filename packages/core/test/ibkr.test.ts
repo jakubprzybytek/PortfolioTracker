@@ -71,7 +71,7 @@ describe("IBKR positions and valuation", () => {
       transactions: txs,
       prices: new Map([[OAT, px]]),
       referenceIndex: new Map(),
-      couponRates: new Map(),
+      couponPeriods: new Map(),
       fx: new Map([["EUR", { mid: 4.3, date: "2026-10-12" }]]),
     });
     const by = Object.fromEntries(snap.holdings.map((h) => [h.isin, h]));

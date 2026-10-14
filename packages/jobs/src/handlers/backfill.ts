@@ -5,6 +5,7 @@ import { Resource } from "sst";
 import { queueValuation, repo, runJob } from "../lib/context.ts";
 import { interpolatePricePath, today, type PriceItem } from "@portfolio/core";
 import { BIZNESRADAR_SOURCE_ID, backfillBiznesradarHistory } from "../lib/catalystJobs.ts";
+import { syncCouponTerms } from "../lib/couponJobs.ts";
 import { YAHOO_SOURCE_ID, backfillYahooHistory } from "../lib/etfJobs.ts";
 import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
 import { ONVISTA_SOURCE_ID, backfillOnvistaHistory } from "../lib/onvistaJobs.ts";
@@ -48,6 +49,9 @@ export async function backfillInstrument(isin: string): Promise<{ status: string
     try {
       const result = await backfillBiznesradarHistory(inst, today());
       await repo.putBackfillStatus({ isin, status: "done", source: BIZNESRADAR_SOURCE_ID, ...result });
+      // Its coupon periods too (the valuation that follows uses them); the daily job retries if this fails.
+      if (inst.type === "BOND_CORPORATE")
+        await syncCouponTerms(inst, today()).catch((err) => console.error(`coupon periods of ${inst.code}:`, err));
       return { status: "done", ...result };
     } catch (err) {
       await repo.putBackfillStatus({ isin, status: "failed", source: BIZNESRADAR_SOURCE_ID, note: String((err as Error).message) });

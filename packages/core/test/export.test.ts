@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { exportFiles } from "../src/backup/export.ts";
+import { parseCouponPeriods } from "../src/bonds/couponPeriods.ts";
 import type { AccountItem, InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
 import { parseInstrumentFile } from "../src/instruments/schema.ts";
 import { parseManualPrices } from "../src/prices/manual.ts";
@@ -20,6 +21,9 @@ describe("exportFiles", () => {
       inst({ isin: "MF-TERMS", type: "FUND_MANUAL" }),
     ],
     manualPrices: [{ isin: "ZZRZESZOW000", venue: "MANUAL", date: "2026-10-01", close: 1050, currency: "PLN" } as PriceItem],
+    couponPeriods: [
+      { PK: "INST#PLKRK0000713", SK: "COUPON#2026-08-12", isin: "PLKRK0000713", start: "2026-08-12", end: "2026-11-12", recordDate: "2026-11-03", paymentDate: "2026-11-12", datesSource: "obligacje.pl", rate: 0.0713, rateSource: "manual", updatedAt: "x" },
+    ],
     transactions: [
       tx({ id: "b", date: "2026-10-02", type: "DEPOSIT", amount: 100, source: "app" }),
       tx({ id: "a", date: "2026-10-01", type: "BUY", isin: "ZZRZESZOW000", quantity: 1, price: 1000, amount: -1000, source: "imports/transactions/x.json" }),
@@ -35,6 +39,9 @@ describe("exportFiles", () => {
       ["ZZRZESZOW000", null],
     ]);
     expect(parseManualPrices(JSON.stringify(files.prices), "restore").map((p) => [p.SK, p.close])).toEqual([["PX#MANUAL#2026-10-01", 1050]]);
+    expect(parseCouponPeriods(JSON.stringify(files.coupons))).toEqual([
+      { isin: "PLKRK0000713", start: "2026-08-12", end: "2026-11-12", recordDate: "2026-11-03", paymentDate: "2026-11-12", datesSource: "obligacje.pl", rate: 0.0713, rateSource: "manual" },
+    ]);
   });
 
   it("keeps transaction ids and sources, oldest first", () => {

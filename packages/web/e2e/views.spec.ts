@@ -345,6 +345,40 @@ test.describe("prices view", () => {
     await expect(page.getByTestId("price-title")).toContainText("DS0432");
     await expect(page.getByTestId("manual-value-open")).toHaveCount(0);
   });
+
+  test("a corporate bond's coupon periods replace its chart; a period is added, given a rate and deleted", async ({ page }) => {
+    await page.goto("/#/prices?chart=PLKRK0000713");
+    await expect(page.getByTestId("price-title")).toContainText("KRU0827");
+    await page.getByTestId("coupon-periods-open").click();
+    const table = page.getByTestId("coupon-periods");
+    // The sample's periods (data/coupons.sample.json), newest first; the sample coupon fits its period's rate.
+    const feb = table.locator('[data-testid="coupon-period"][data-start="2026-02-12"]');
+    await expect(feb).toContainText("8,86 %");
+    await expect(feb).toContainText("86,42 zł");
+    await expect(feb.getByTestId("coupon-use-suggested")).toHaveCount(0);
+    // A period far ahead (today's value stays as it is), then its rate, then gone.
+    await page.getByTestId("coupon-add").click();
+    await page.getByTestId("coupon-edit-start").fill("2032-01-01");
+    await page.getByTestId("coupon-edit-end").fill("2032-04-01");
+    await page.getByTestId("coupon-edit-paymentDate").fill("2032-04-01");
+    await page.getByTestId("coupon-edit-save").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("KRU0827: period from 2032-01-01 saved");
+    await page.getByTestId("coupon-future").click();
+    const added = table.locator('[data-testid="coupon-period"][data-start="2032-01-01"]');
+    await expect(added.getByTestId("coupon-rate")).toContainText("no rate");
+    await added.getByTestId("coupon-edit").click();
+    await page.getByTestId("coupon-edit-rate").fill("7,5");
+    await page.getByTestId("coupon-edit-save").click();
+    await expect(added.getByTestId("coupon-rate")).toContainText("7,50 %");
+    await expect(added.getByTestId("coupon-rate")).toContainText("yours");
+    await added.getByTestId("coupon-delete").click();
+    await added.getByTestId("coupon-delete").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("period from 2032-01-01 deleted");
+    await expect(added).toHaveCount(0);
+    // Back to the chart.
+    await page.getByTestId("coupon-periods-open").click();
+    await expect(table).toHaveCount(0);
+  });
 });
 
 test.describe("holdings grouped by instrument", () => {

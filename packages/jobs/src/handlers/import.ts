@@ -4,6 +4,7 @@
 //   imports/instruments/*.json     instruments to track (terms "mf"/"mf-retail" resolved from the imported files)
 //   imports/prices/*.json          manual prices [{ isin, date, price, currency? }] (assets without a price source)
 //   imports/accounts/*.json        account metadata [{ account, incomplete: ["ETFs", …] }]
+//   imports/coupons/*.json         coupon periods of corporate bonds [{ isin, start, end, recordDate, paymentDate, rate … }]
 //   imports/transactions/*.json    your transactions
 
 import type { S3Event } from "aws-lambda";
@@ -11,6 +12,7 @@ import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Resource } from "sst";
 import {
   parseAccountsFile,
+  parseCouponPeriods,
   parseInstrumentFile,
   parseManualPrices,
   parseMfCalculator,
@@ -145,6 +147,10 @@ export async function importKey(bucket: string, key: string): Promise<{ itemsWri
     case "prices": {
       const n = await repo.putPrices(parseManualPrices(content.toString("utf8"), key));
       return { itemsWritten: n, note: `${key}: ${n} prices` };
+    }
+    case "coupons": {
+      const n = await repo.putCouponPeriods(parseCouponPeriods(content.toString("utf8")));
+      return { itemsWritten: n, note: `${key}: ${n} coupon periods` };
     }
     case "accounts": {
       const n = await repo.putAccounts(parseAccountsFile(content.toString("utf8")));

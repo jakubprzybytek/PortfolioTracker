@@ -11,6 +11,9 @@ const KRU = "PLKRK0000713"; // sample Catalyst corporate bond KRU0827 (BiznesRad
 const BUND = "DE0001102523"; // sample foreign bond at IBKR: calculated prices
 const EUR_CASH = "ZZWALUTYEUR0";
 
+/** The sample's coupon periods of KRU (data/coupons.sample.json). */
+const samplePeriods = JSON.parse(readFileSync(path.join(repoRoot, "data/coupons.sample.json"), "utf8")) as { start: string; end: string; recordDate: string; rate: number }[];
+
 /** `date` moved by `days` (ISO dates). */
 const addDaysIso = (date: string, days: number): string => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
@@ -48,6 +51,8 @@ describe(`API ${API}`, () => {
       const ok = inst.status === 200 && [IZ, DS, SPXS, KRU, BUND].every((i) => inst.body.find((x) => x.isin === i)?.backfill?.status === "done");
       return ok ? true : undefined;
     }, 240_000);
+    // 2b. The corporate bond's coupon periods (public dates of KRU0827, rates made up).
+    await uploadImport("coupons", "sample.json", readFileSync(path.join(repoRoot, "data/coupons.sample.json")));
     // 3. Transactions: triggers the valuation. Wait for a snapshot that knows both instruments.
     await uploadImport("transactions", "sample.json", readFileSync(path.join(repoRoot, "data/transactions.sample.json")));
     await waitFor(async () => {
@@ -58,7 +63,10 @@ describe(`API ${API}`, () => {
       const clean = r.body.holdings.every((h) => !h.flags.includes("unknown_instrument") && !h.flags.includes("no_price") && !h.flags.includes("no_fx"));
       const ike = r.body.accounts?.["ike"]?.cash;
       const etf = r.body.holdings.find((h) => h.code === "SPXS")?.quantity === 200 && r.body.holdings.some((h) => h.code === "KRU0827") && r.body.holdings.some((h) => h.isin === BUND);
-      return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && codes.has("SAMPLE-APARTMENT") && etf && ike === 99.49 && r.body.accounts?.["closed"] && r.body.accounts?.["eur"] && clean ? true : undefined; // "closed", "eur": the latest sample rows
+      // The corporate bond valued with its sample coupon periods (imported just before).
+      const kru = r.body.holdings.find((h) => h.code === "KRU0827");
+      const periods = samplePeriods.some((p) => p.start <= r.body.date && r.body.date < p.end) ? kru?.accruedInterest != null : true;
+      return codes.has("DS0432") && codes.has("IZ0836") && codes.has("EDO0935") && codes.has("SAMPLE-APARTMENT") && etf && periods && ike === 99.49 && r.body.accounts?.["closed"] && r.body.accounts?.["eur"] && clean ? true : undefined; // "closed", "eur": the latest sample rows
     }, 420_000); // revaluations run one at a time (queued), each up to a minute
     // The NBP import (EUR and USD back to 2002) writes rates as it goes; wait for the run to finish.
     await waitFor(async () => ((await get<{ jobs: Record<string, { status: string } | null> }>("/status")).body.jobs["fx"]?.status === "ok" ? true : undefined), 300_000);
@@ -67,7 +75,7 @@ describe(`API ${API}`, () => {
   it("GET /status lists the last run of every job", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown> }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "export", "fx", "import", "live", "monthly", "valuation"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "export", "fx", "import", "live", "monthly", "valuation"]);
     expect(body.jobs["fx"]).toMatchObject({ status: "ok" });
     expect(body.jobs["import"]).toMatchObject({ status: "ok" });
   });
@@ -138,11 +146,18 @@ describe(`API ${API}`, () => {
     expect(bund.cleanPrice!).toBeGreaterThan(95.952); // accreting towards 100 at maturity
     expect(bund.cleanPrice!).toBeLessThan(100);
     expect(bund.value!).toBeCloseTo(2 * 10 * bund.cleanPrice! * bund.fx!.rate, 0);
-    // Catalyst corporate bond: clean price (% of nominal) x nominal 100, no accrued interest; the coupon counts as received.
+    // Catalyst corporate bond: clean price (% of nominal) x nominal 100, plus accrued interest from the sample periods
+    // (ACT/365; from the record day the whole coupon); the coupon counts as received.
     const kru = by["bonds/KRU0827"]!;
-    expect(kru).toMatchObject({ type: "BOND_CORPORATE", quantity: 40, nominal: 100, accruedInterest: null, cost: 4056.1, couponsReceived: 70, flags: [] });
+    expect(kru).toMatchObject({ type: "BOND_CORPORATE", quantity: 40, nominal: 100, cost: 4056.1, couponsReceived: 70 });
     expect(kru.cleanPrice!).toBeGreaterThan(90);
-    expect(kru.value!).toBeCloseTo(40 * kru.cleanPrice!, 1);
+    const period = samplePeriods.find((p) => p.start <= snap.date && snap.date < p.end);
+    if (period) {
+      const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+      const accrued = Math.round(100 * period.rate * (snap.date >= period.recordDate ? days(period.start, period.end) : days(period.start, snap.date)) / 365 * 100) / 100;
+      expect(kru).toMatchObject({ accruedInterest: accrued, flags: [], rate: { current: period.rate } });
+      expect(kru.value!).toBeCloseTo(40 * (kru.cleanPrice! + accrued), 1);
+    } else expect(kru).toMatchObject({ accruedInterest: null, flags: ["no_coupon_rate"] }); // after the sample's last period
     // ETF in EUR: 2 bought, x100 by the split; valued at the EUR close x NBP mid; cost as paid in PLN.
     const spxs = by["foreign/SPXS"]!;
     expect(spxs).toMatchObject({ type: "ETF", currency: "EUR", quantity: 200, cost: 9336.86, flags: [] });
@@ -389,6 +404,32 @@ describe(`API ${API}`, () => {
     expect((await values()).map((p) => p.date)).toEqual(["2026-06-01", "2026-09-30"]);
     expect((await send("DELETE", `/instruments/${APT}/prices/2026-07-15`)).status).toBe(404);
     expect((await send("DELETE", `/instruments/${DS}/prices/2026-07-15`)).status).toBe(400);
+  });
+
+  it("GET/POST/PUT/DELETE /instruments/{isin}/coupons list a corporate bond's periods with the coupons received, and change them", async () => {
+    const list = async () => (await get<{ nominal: number; periods: { start: string; end: string; rate?: number; rateSource?: string; datesSource: string }[]; coupons: { start: string; checks: { gross: number; quantity: number; mismatch?: boolean; taxAssumed: boolean }[]; suggestedRate?: number }[] }>(`/instruments/${KRU}/coupons`)).body;
+    const before = await list();
+    expect(before.nominal).toBe(100);
+    expect(before.periods.find((p) => p.start === "2026-02-12")).toMatchObject({ end: "2026-05-12", rate: 0.0886, rateSource: "manual" });
+    // The sample's coupon (70 after an assumed 19 % tax = 86.42 for 40 bonds) fits the period's 8.86 %.
+    expect(before.coupons.find((c) => c.start === "2026-02-12")).toMatchObject({ checks: [{ gross: 86.42, quantity: 40, mismatch: false, taxAssumed: true }], suggestedRate: 0.0886 });
+
+    // Far in the future, so today's value doesn't change meanwhile.
+    expect((await send("POST", `/instruments/${DS}/coupons`, { start: "2031-01-01", end: "2031-04-01", paymentDate: "2031-04-01" })).status).toBe(400); // not a corporate bond
+    expect((await send("POST", `/instruments/${KRU}/coupons`, { start: "2031-04-01", end: "2031-01-01", paymentDate: "2031-04-01" })).status).toBe(400);
+    expect((await send("POST", `/instruments/${KRU}/coupons`, { start: "2031-01-01", end: "2031-04-01", paymentDate: "2031-04-01", recordDate: "2030-12-01" })).status).toBe(400);
+    const created = await send<{ start: string; datesSource: string; rate?: number }>("POST", `/instruments/${KRU}/coupons`, { start: "2031-01-01", end: "2031-04-01", recordDate: "2031-03-24", paymentDate: "2031-04-01" });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ start: "2031-01-01", datesSource: "manual" });
+    expect(created.body.rate).toBeUndefined();
+    expect((await send("POST", `/instruments/${KRU}/coupons`, { start: "2031-02-01", end: "2031-05-01", paymentDate: "2031-05-01" })).status).toBe(400); // overlaps
+    const edited = await send<{ rate: number; rateSource: string; datesSource: string }>("PUT", `/instruments/${KRU}/coupons/2031-01-01`, { rate: 0.0735 });
+    expect(edited.body).toMatchObject({ rate: 0.0735, rateSource: "manual", datesSource: "manual" });
+    expect((await list()).periods.find((p) => p.start === "2031-01-01")).toMatchObject({ rate: 0.0735 });
+    expect((await send("PUT", `/instruments/${KRU}/coupons/2031-01-01`, { rate: 5 })).status).toBe(400); // a fraction, not %
+    expect((await send("DELETE", `/instruments/${KRU}/coupons/2031-01-01`)).status).toBe(200);
+    expect((await list()).periods.some((p) => p.start === "2031-01-01")).toBe(false);
+    expect((await send("DELETE", `/instruments/${KRU}/coupons/2031-01-01`)).status).toBe(404);
   });
 
   it("GET /instruments/lookup finds a tracked instrument or proposes a treasury series; POST /instruments checks its input", async () => {

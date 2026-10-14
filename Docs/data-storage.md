@@ -4,7 +4,7 @@ Three DynamoDB tables, all on-demand capacity, plus an S3 bucket used only as a 
 
 | Table | Contents | Written by | Can be rebuilt? |
 |---|---|---|---|
-| `market` | Instruments, daily prices (incl. today's refreshed quotes), events, coupon rates, retail-bond rates, CPI, FX, calendar, backfill status, job runs | Scheduled jobs, backfill, import (instruments) | Yes: re-fetch, or reprocess the S3 archive (the only source for past Catalyst snapshots) |
+| `market` | Instruments, daily prices (incl. today's refreshed quotes), events, coupon periods of corporate bonds, retail-bond rates, CPI, FX, calendar, backfill status, job runs | Scheduled jobs, backfill, import (instruments) | Yes: re-fetch, or reprocess the S3 archive (the only source for past Catalyst snapshots) |
 | `transactions` | Accounts, transactions; later also allocation targets and multi-asset splits | You: the app's form, file imports (the sheet once, IBKR statements) | **No.** This is the only data that exists nowhere else (IBKR's can be rebuilt from its statements) |
 | `holdings` | Daily portfolio snapshots | Valuation job only | Yes: recompute from `transactions` + `market` |
 
@@ -64,7 +64,7 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 | `isin`, `name`, `type` | `IE00B3RBWM25`, "Vanguard FTSE All-World", `ETF` / `BOND_LISTED` / `BOND_CORPORATE` / `BOND_RETAIL` / `BOND_IBKR` / `FUND_MANUAL` / `CURRENCY` (foreign cash as a position, from the old PLN-only bookings; accounts in several currencies hold cash per currency instead) / `CASH` |
 | `currency`, `venue` | `EUR`, `XAMS` (MIC of the listing prices come from: `XAMS` Euronext Amsterdam, `XETR` Xetra, `XWAR` GPW) |
 | `sourceIds` | `{ "yahoo": "VWRL.AS" }`, `{ "gpw": "<CODE>" }`, later `{ "ibkr_conid": "…" }` |
-| `nominal` | Corporate bonds (`BOND_CORPORATE`, no terms): nominal per bond (1000 or 100); prices are clean % of it; value = clean % × nominal, no accrued interest |
+| `nominal` | Corporate bonds (`BOND_CORPORATE`, no terms): nominal per bond (1000 or 100); prices are clean % of it; value = clean % × nominal + accrued interest from its coupon periods |
 | `pricePath` | Foreign bonds at IBKR (`BOND_IBKR`, `nominal` 1000) without a quote (`venue = CALC`: US T-bills, matured bonds): known prices `[{ date, price }]` (% of nominal: your trades, redemption at maturity); the backfill writes a price per weekday in between at a constant yield. Quoted ones have `venue = XSTU`, `sourceIds.onvista = "STU"` |
 | `splits` | ETFs: `[{ "date": "2025-12-15", "ratio": 100 }]`: from `date` on one unit became `ratio` units. Prices are stored as traded; charts and the 1-year change divide earlier prices by later splits (`core/prices/splits.ts`) |
 | `live` | Not used: which instruments "Refresh" covers follows from their price source (ingestion.md, "Live prices") |
@@ -107,13 +107,13 @@ PK = INST#<ISIN>            SK = EV#<YYYY-MM-DD>#<DIV|SPLIT|COUPON|REDEMPTION>
 
 `ex_date`, `pay_date`, `amount`, `currency`, `ratio` (splits), `source`.
 
-### Floating coupon rates (corporate bonds)
+### Coupon periods (corporate bonds)
 
 ```
-PK = INST#<ISIN>            SK = COUPON#<period_start>
+PK = INST#<ISIN>            SK = COUPON#<start>
 ```
 
-`period_start`, `period_end`, `rate` (annual, e.g. 0.0812), `source` (`manual` / `catalyst`). One item per coupon period; needed for accrued interest of floating-rate bonds.
+`start`, `end` (exclusive: the next period's start), `recordDate`, `paymentDate`, `datesSource`, `rate` (annual, e.g. 0.0713; absent: no accrued interest that period), `rateSource` (`manual` / `obligacje.pl` / `coupons`), `otherRate` (`{ rate, source, seenAt }`: obligacje.pl showed another rate, not used until you accept it). One item per period. Rates you set or accepted exist nowhere else: the monthly `Export` includes them (`coupons.json`).
 
 ### Backfill status
 
@@ -221,7 +221,7 @@ Each function links only the tables it needs.
 
 | Function | `market` | `transactions` | `holdings` |
 |---|---|---|---|
-| `EodGpw`, `RecheckGpw`, `EodEtf`, `EodCatalyst`, `EodBonds` (and their rechecks), `Live`, `Monthly` | read/write | — | — |
+| `EodGpw`, `RecheckGpw`, `EodEtf`, `EodCatalyst`, `EodBonds` (and their rechecks), `Live`, `Coupons`, `Monthly` | read/write | — | — |
 | `Fx` | read/write | read | — |
 | `Export` | read | read | — |
 | `Backfill` | read/write | — | — |

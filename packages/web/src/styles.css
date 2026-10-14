@@ -345,3 +345,23 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
 /* How fresh a price is: before the price in Holdings (the time of a refreshed price, or the date of an older one), next to the date in Prices. */
 .price-age { margin-right: 6px; font-size: 0.75rem; color: var(--faint); font-weight: 400; white-space: nowrap; }
 .price-time { margin-left: 6px; color: var(--faint); }
+/* Coupon periods of a corporate bond (in the chart panel). */
+.flag.warn { color: var(--neg); border-color: currentColor; background: transparent; margin-left: 0; }
+.coupon-periods { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; }
+.coupon-periods table td, .coupon-periods table th { padding: 3px 8px; vertical-align: top; }
+.coupon-periods tr.current td { background: var(--accent-soft); }
+.coupon-periods tr.pending { opacity: 0.6; }
+.coupon-periods .small { font-size: 0.75rem; }
+.coupon-periods input { font: inherit; font-size: 0.85rem; padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg); width: 9rem; }
+.coupon-periods input[inputmode="decimal"] { width: 5.5rem; text-align: right; }
+.coupon-periods button { font: inherit; font-size: 0.8rem; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg); cursor: pointer; }
+.coupon-periods button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.coupon-periods button.link { border: 0; background: none; color: var(--accent); padding: 0 4px; }
+.coupon-periods button.danger { padding: 1px 8px; }
+.coupon-actions { display: flex; flex-wrap: wrap; gap: 2px 6px; }
+.coupon-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.coupon-periods .error { margin: 0; }
+.coupon-periods td[data-testid="coupon-rate"] { white-space: nowrap; }
+@media (max-width: 720px) {
+  .coupon-periods .ends { display: none; } /* the next period's start: redundant on a phone */
+}

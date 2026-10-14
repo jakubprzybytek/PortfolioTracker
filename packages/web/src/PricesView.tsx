@@ -4,6 +4,7 @@ import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
 import { fmtNum, fmtPct, fmtTime, priceAgeTitle, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
+import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { PriceChart } from "./PriceChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
@@ -25,6 +26,8 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const selected = params["chart"] ?? null;
   const [range, setRange] = useState<RangeKey>("1Y");
   const [panelHeight, setPanelHeight] = useState(0);
+  /** The bond whose coupon periods replace its chart in the panel. */
+  const [couponsFor, setCouponsFor] = useState<string | null>(null);
   const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, { from: rangeFrom(range), to: today() }, [selected, range]);
   const txs = useApi<Transaction[]>(selected ? `/instruments/${selected}/transactions` : null, {}, [selected]);
   const all = rows.data ?? [];
@@ -156,11 +159,14 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
           }
         >
           <div className="chart-tools">
-            <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />
+            {couponsFor === selected ? <span /> : <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />}
             {sel?.manual && <ManualValues key={sel.isin} isin={sel.isin} code={sel.code} currency={sel.currency} />}
+            {sel?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === selected} onToggle={() => setCouponsFor(couponsFor === selected ? null : selected)} />}
           </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            {prices.error ? (
+          <div style={{ flex: 1, minHeight: 0, overflow: couponsFor === selected ? "auto" : undefined }}>
+            {sel?.type === "BOND_CORPORATE" && couponsFor === selected ? (
+              <CouponPeriods key={selected} isin={selected} code={sel.code} />
+            ) : prices.error ? (
               <p className="error">{prices.error}</p>
             ) : (
               <PriceChart

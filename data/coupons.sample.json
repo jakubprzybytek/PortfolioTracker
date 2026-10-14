@@ -1,0 +1,8 @@
+[
+  { "isin": "PLKRK0000713", "start": "2026-02-12", "end": "2026-05-12", "recordDate": "2026-05-04", "paymentDate": "2026-05-12", "datesSource": "obligacje.pl", "rate": 0.0886, "rateSource": "manual" },
+  { "isin": "PLKRK0000713", "start": "2026-05-12", "end": "2026-08-12", "recordDate": "2026-08-04", "paymentDate": "2026-08-12", "datesSource": "obligacje.pl", "rate": 0.072, "rateSource": "manual" },
+  { "isin": "PLKRK0000713", "start": "2026-08-12", "end": "2026-11-12", "recordDate": "2026-11-03", "paymentDate": "2026-11-12", "datesSource": "obligacje.pl", "rate": 0.0713, "rateSource": "manual" },
+  { "isin": "PLKRK0000713", "start": "2026-11-12", "end": "2027-02-12", "recordDate": "2027-02-04", "paymentDate": "2027-02-12", "datesSource": "obligacje.pl", "rate": 0.07, "rateSource": "manual" },
+  { "isin": "PLKRK0000713", "start": "2027-02-12", "end": "2027-05-12", "recordDate": "2027-05-04", "paymentDate": "2027-05-12", "datesSource": "obligacje.pl", "rate": 0.07, "rateSource": "manual" },
+  { "isin": "PLKRK0000713", "start": "2027-05-12", "end": "2027-08-12", "recordDate": "2027-08-04", "paymentDate": "2027-08-12", "datesSource": "obligacje.pl", "rate": 0.07, "rateSource": "manual" }
+]

@@ -47,7 +47,7 @@ describe("valuePortfolio with retail bonds", () => {
       tx({ id: "1", date: "2022-03-01", valueDate: "2022-03-11", type: "BUY", quantity: 10, price: 100, amount: -1000 }),
       tx({ id: "2", date: "2022-03-15", valueDate: "2022-03-16", type: "BUY", quantity: 10, price: 99.9, amount: -999 }),
     ];
-    const snap = valuePortfolio({ date: "2026-10-11", instruments: [inst], transactions, prices: new Map(), referenceIndex: toReferenceIndex([]), couponRates: new Map() });
+    const snap = valuePortfolio({ date: "2026-10-11", instruments: [inst], transactions, prices: new Map(), referenceIndex: toReferenceIndex([]), couponPeriods: new Map() });
     const h = snap.holdings[0]!;
     expect(h).toMatchObject({ code: "EDO0332", quantity: 20, cost: 1999, cleanPrice: null, flags: [], rate: { current: 0.0345, previous: 0.0655 } });
     expect(h.value).toBeGreaterThan(2760); // ≈ 20 × 138.3

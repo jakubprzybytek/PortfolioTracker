@@ -8,7 +8,7 @@ import {
   toReferenceIndex,
   today,
   valuePortfolio,
-  type CouponRateItem,
+  type CouponPeriodItem,
   type FxRateItem,
   type IsoDate,
   type PriceItem,
@@ -43,8 +43,9 @@ async function revalue(event: ValuationEvent) {
     // A change dated after today (e.g. a future transaction) touches no valued day yet.
     if (from > to) return { itemsWritten: 0, note: `${from} is after ${to}: nothing to value (${event.reason ?? "schedule"})` };
 
-    const couponRates = new Map<string, CouponRateItem[]>();
-    for (const i of tracked) couponRates.set(i.isin, await repo.listCouponRates(i.isin));
+    // Interest periods of corporate bonds (accrued interest).
+    const couponPeriods = new Map<string, CouponPeriodItem[]>();
+    for (const i of tracked.filter((i) => i.type === "BOND_CORPORATE")) couponPeriods.set(i.isin, await repo.listCouponPeriods(i.isin));
 
     // Load every price once per instrument for the whole range and walk forward.
     const priceHistory = new Map<string, PriceItem[]>();
@@ -86,7 +87,7 @@ async function revalue(event: ValuationEvent) {
         const r = at(date);
         if (r) fx.set(c, { mid: r.mid, date: r.date });
       }
-      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponRates, accounts, fx, fxHistory });
+      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponPeriods, accounts, fx, fxHistory });
       await repo.putSnapshot(snapshot, date === to);
       await repo.putPositionDays(snapshot); // per-position history for the Holdings row charts
       const now = new Set(snapshot.holdings.map((h) => `${h.account}#${h.isin}`));
