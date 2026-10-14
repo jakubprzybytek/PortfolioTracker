@@ -30,7 +30,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 
-Changing a filter replaces the history entry, so "back" goes to the previous view, not the previous filter. Filter dropdowns have a fixed width (no jump when their options load); on a phone they share one row with the reset button (↺; Transactions: the instrument on a row of its own), the label shown inside the dropdown while nothing is picked, the count below. No router library: `packages/web/src/route.ts`.
+Changing a filter replaces the history entry, so "back" goes to the previous view, not the previous filter. Filter dropdowns have a fixed width (no jump when their options load); on a phone they share one row with the "clear filters" button (a funnel with ✕, so it isn't taken for a refresh; Transactions: the instrument on a row of its own), the label shown inside the dropdown while nothing is picked, the count below. No router library: `packages/web/src/route.ts`.
 
 "Asset type" is the instrument type (`BOND_LISTED` → "Listed bond", `BOND_RETAIL`, `ETF`, `BOND_IBKR`, `FUND_MANUAL`, `CASH`); transactions without an instrument (deposits, fees) count as "Cash". The reference sheet's 12 asset classes aren't modelled yet.
 
@@ -55,7 +55,7 @@ From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **
 - **Incomplete accounts** (some of their assets aren't tracked yet, e.g. Catalyst bonds): the group row says what's missing, and the cash row is greyed and left out of the sums, because without the untracked purchases it's far too high.
 - **Instruments sorted by code** within each account.
 - **Columns:** instrument (code + name), asset type, quantity, price (bonds: clean, % of nominal; ETFs: in their currency, e.g. "167,70 EUR"; price date and the NBP rate used on hover), accrued interest per bond, value (PLN), cost (PLN, as paid), gain (PLN, %), coupons/dividends received.
-- **Filters:** account, asset type ("Cash" shows only the cash rows); "Reset" clears them; "n of m holdings".
+- **Filters:** account, asset type ("Cash" shows only the cash rows); "clear filters" (funnel ✕) clears them; "n of m holdings".
 - **Row chart:** clicking a holding row shows that position's value and cost over time (range 1M/6M/1Y/ALL); grouped by instrument, the group row shows the instrument across all accounts. The chart is a panel docked to the bottom of the window (1/3 of its height by default) while the list stays visible and scrolls above it; its top edge is a drag handle (size remembered in the browser); ✕ or Escape closes it. Cash rows have no chart.
 - **Corporate bonds** (Catalyst): clean price, % of nominal; the accrued-interest column shows "–" (not tracked: floating coupons), so their value is below the market value with interest.
 - **Manually valued** assets (e.g. a property fund share) show their latest value entered by hand; in the Prices view it's tagged "manual" and never marked stale. **"Edit values"** in the asset's chart panel (Prices and Holdings) opens a form to add a value per unit on a date (today by default, not in the future); below the form, the values so far, newest first, each with ✕ to delete (a second click confirms). The valuation reruns from that date; meanwhile "Recalculating the valuation…" shows in the corner (after any save: transactions too) until the run finishes, then every view reloads ("Valuation updated.").
@@ -64,7 +64,7 @@ From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **
 
 Kept deliberately short (a passive portfolio needs no daily statistics): what each held instrument is worth per unit, and whether that price is current.
 
-- **One row per held instrument** (latest snapshot), sorted by code. **Filter:** asset type ("Reset", "n of m instruments"), kept in the URL.
+- **One row per held instrument** (latest snapshot), sorted by code. **Filter:** asset type ("clear filters", "n of m instruments"), kept in the URL.
 - **Columns:** instrument (code + name), type, price (bonds: clean, % of nominal; others: in their currency), price date (grey with a "stale" tag when older than a week), **1 year**: change since the price on or before the same day a year earlier (hover shows that price and date; "–" without a year of history).
 - **Foreign bonds at IBKR:** Börse Stuttgart closes (% of nominal); US T-bills calculated (the chart title says which), see data-sources.md. Currencies held (EUR/USD cash) aren't listed: their rates are in Indicators.
 - **Retail bonds** aren't traded: price = this year's interest rate ("5,00 % p.a."), date = "calculated", 1 year = the previous year's rate. Their chart shows the calculated value per bond of your lots (PLN, nominal 100, so it reads like % of nominal), from the first purchase; each new interest year changes the slope.
@@ -84,8 +84,8 @@ All transactions from `GET /transactions`.
 
 - **Sorted by date, newest first** (fixed).
 - **Columns:** date, account, type, instrument (code + name), asset type, quantity, price, amount (signed: red = money out), fee, note.
-- **Filters:** instrument (including "(no instrument)" for cash movements), account, asset type; "Reset"; "n of m transactions".
-- **Refresh prices** is under "Add transaction" (on a phone ↻ next to "+"): it fetches today's quotes of ETFs, IBKR bonds and Catalyst bonds (ingestion.md, "Live prices") and revalues today. The corner says "Fetching today's prices…", then "Recalculating the valuation…"; when the run is done every view reloads and a message says how many prices changed (or "No new prices" when nothing has traded yet). The button is disabled while it runs; a second refresh within 5 minutes is refused with a message. Polish treasury bonds keep the previous close until the evening.
+- **Filters:** instrument (including "(no instrument)" for cash movements), account, asset type; "clear filters"; "n of m transactions".
+- **Refresh** (↻) is next to the valuation date in the headers of Dashboard, Holdings and Prices: it fetches today's quotes of ETFs, IBKR bonds and Catalyst bonds (ingestion.md, "Live prices") and revalues today. The corner says "Fetching today's prices…", then "Recalculating the valuation…"; when the run is done every view reloads and a message says how many prices changed (or "No new prices" when nothing has traded yet). The button is disabled while it runs; a second refresh within 5 minutes is refused with a message. Polish treasury bonds keep the previous close until the evening.
 - **Add transaction** is in the menu frame, on every view (under the logo; on a phone a "+" next to ☰): it opens the form over the current view, and after saving every view reloads its data. A row here opens the form to edit or delete that transaction (deleting asks to confirm). Saving revalues from the transaction's date (about a minute); a message says so.
 
 ### The form (`TransactionForm.tsx`)

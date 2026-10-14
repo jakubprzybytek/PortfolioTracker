@@ -191,6 +191,10 @@ test.describe("on a phone", () => {
     const add = page.getByTestId("tx-add");
     await expect(add).toBeVisible();
     await expect(add).toHaveText("+", { useInnerText: true }); // the label is hidden on a phone
+    // One row: logo, + and ☰ (nothing else in the bar pushes ☰ onto a second row).
+    const [brand, plus, menu] = await Promise.all([page.locator("h1.brand").boundingBox(), add.boundingBox(), page.getByTestId("menu-toggle").boundingBox()]);
+    expect(Math.abs(plus!.y - menu!.y)).toBeLessThan(2);
+    expect(menu!.y).toBeLessThan(brand!.y + brand!.height);
     await add.click();
     await expect(page.getByTestId("tx-form")).toBeVisible();
   });

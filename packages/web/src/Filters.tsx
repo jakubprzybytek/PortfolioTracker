@@ -33,8 +33,8 @@ export function FilterBar({ children, active, onReset, summary }: { children: Re
   return (
     <div className="filters" data-testid="filters">
       {children}
-      <button type="button" className="reset" onClick={onReset} disabled={!active} title="Reset filters" aria-label="Reset filters" data-testid="filters-reset">
-        <Icon name="reset" size={16} />
+      <button type="button" className="reset" onClick={onReset} disabled={!active} title="Clear filters" aria-label="Clear filters" data-testid="filters-reset">
+        <Icon name="clear-filters" size={16} />
       </button>
       <span className="muted filters-summary" data-testid="filters-summary">
         {summary}

@@ -7,6 +7,7 @@ import { PortfolioChart } from "./PortfolioChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
 import type { AccountSummary, HistoryPoint, Snapshot, Status } from "./types.ts";
 import { useApi } from "./useApi.ts";
+import { RefreshPrices } from "./RefreshPrices.tsx";
 
 function Card({ label, value, className, testId, note, loading }: { label: string; value: string; className?: string; testId: string; note?: string; loading: boolean }) {
   return (
@@ -63,8 +64,11 @@ export function DashboardView() {
     <>
       <header className="view-header">
         <h2 className="view-title">Dashboard</h2>
-        <span className="muted" data-testid="snapshot-date">
-          {snap ? `Valuation as of ${snap.date}` : holdings.loading ? "Loading…" : holdings.error ?? ""}
+        <span className="view-meta">
+          <span className="muted" data-testid="snapshot-date">
+            {snap ? `Valuation as of ${snap.date}` : holdings.loading ? "Loading…" : holdings.error ?? ""}
+          </span>
+          <RefreshPrices />
         </span>
       </header>
 

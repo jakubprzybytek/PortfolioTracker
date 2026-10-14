@@ -97,7 +97,11 @@ function Shell({ email }: { email: string }) {
     }, 5000);
     return () => clearInterval(t);
   }, [recalc]);
-  const txForm = useMemo(() => ({ open: (editing?: Transaction) => setForm({ editing }), saved, version }), [saved, version]);
+  const busy = recalc?.phase ?? null;
+  const txForm = useMemo(
+    () => ({ open: (editing?: Transaction) => setForm({ editing }), saved, version, refreshPrices: () => void refreshPrices(), busy }),
+    [saved, version, refreshPrices, busy],
+  );
   // Phone: the menu opens over the page from the ☰ button; any navigation, a tap outside or Escape closes it.
   const [menuOpen, setMenuOpen] = useState(false);
   const hash = window.location.hash;
@@ -124,18 +128,6 @@ function Shell({ email }: { email: string }) {
             <button type="button" className="primary add-tx" onClick={() => setForm({})} aria-label="Add transaction" data-testid="tx-add">
               <span aria-hidden>+</span>
               <span className="label"> Add transaction</span>
-            </button>
-            <button
-              type="button"
-              className="icon-only refresh"
-              onClick={() => void refreshPrices()}
-              disabled={!!recalc}
-              title="Refresh prices: today's quotes of ETFs and bonds with a live source, then the valuation"
-              aria-label="Refresh prices"
-              data-testid="refresh-prices"
-            >
-              <Icon name="refresh" size={18} className={recalc?.phase === "prices" ? "spin" : undefined} />
-              <span className="label">Refresh prices</span>
             </button>
             <button
               type="button"

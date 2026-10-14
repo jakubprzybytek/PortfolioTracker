@@ -9,6 +9,7 @@ import { PriceChart } from "./PriceChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
 import type { Price, PriceRow, Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
+import { RefreshPrices } from "./RefreshPrices.tsx";
 
 /** Bonds are priced in % of nominal; other instruments in their currency; retail bonds show their interest rate. */
 const fmtPrice = (r: PriceRow) =>
@@ -46,8 +47,11 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
     <>
       <header className="view-header">
         <h2 className="view-title">Prices</h2>
-        <span className="muted" data-testid="prices-date">
-          {newest ? `as of ${newest}` : rows.loading ? "Loading…" : ""}
+        <span className="view-meta">
+          <span className="muted" data-testid="prices-date">
+            {newest ? `as of ${newest}` : rows.loading ? "Loading…" : ""}
+          </span>
+          <RefreshPrices />
         </span>
       </header>
       {rows.error && <p className="error">{rows.error}</p>}

@@ -307,22 +307,20 @@ button.danger-link { font: inherit; background: none; border: 0; padding: 0; col
 .with-currency input { flex: 1; }
 .modal .with-currency select { width: auto; flex: none; }
 tr.base-row td { color: var(--muted); font-size: 0.9em; border-top: 0; }
-/* "Add transaction" and "Refresh prices" in the menu frame: under the logo on a computer, next to ☰ on a phone. */
+/* "Add transaction" in the menu frame: under the logo on a computer, a "+" next to ☰ on a phone. */
 .topbar { flex-wrap: wrap; }
-.topbar h1.brand { flex-basis: 100%; }
 .add-tx { flex-basis: 100%; margin-top: 4px; }
-button.refresh { flex-basis: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--fg); font: inherit; cursor: pointer; }
+/* "Refresh" next to the valuation date in the view headers. */
+.view-meta { display: inline-flex; align-items: center; gap: 8px; }
+.view-meta > .muted { font-size: 0.9rem; }
+button.refresh { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--fg); font: inherit; font-size: 0.85rem; cursor: pointer; }
 button.refresh:hover:not(:disabled) { background: var(--row); }
 button.refresh:disabled { cursor: default; color: var(--faint); }
 .icon.spin { animation: spin 0.9s linear infinite; }
 @media (max-width: 720px) {
-  /* Phone: ↻, + and ☰ together on the right. */
-  .topbar h1.brand { flex-basis: auto; }
-  button.refresh { order: 1; flex-basis: auto; margin-left: auto; width: 38px; height: 38px; padding: 0; }
-  button.refresh .label { display: none; }
-  button.add-tx { order: 2; flex-basis: auto; margin: 0; width: 38px; height: 38px; padding: 0; font-size: 1.5rem; font-weight: 500; line-height: 1; }
+  button.add-tx { flex-basis: auto; margin: 0 0 0 auto; width: 38px; height: 38px; padding: 0; font-size: 1.5rem; font-weight: 500; line-height: 1; }
   .add-tx .label { display: none; }
-  .topbar .menu-toggle { order: 3; margin-left: 0; }
+  .topbar .menu-toggle { margin-left: 0; }
   .toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
 }
 .chart-legend { font-size: 0.8rem; font-weight: 400; margin-left: 8px; }

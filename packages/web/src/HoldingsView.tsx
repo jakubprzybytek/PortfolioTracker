@@ -9,6 +9,7 @@ import { RangePicker } from "./RangePicker.tsx";
 import { ValueChart, type ValuePoint } from "./ValueChart.tsx";
 import type { Holding, Snapshot } from "./types.ts";
 import { useApi } from "./useApi.ts";
+import { RefreshPrices } from "./RefreshPrices.tsx";
 
 /** Snapshots written before holdings carried their account have none. */
 const accountOf = (h: Holding) => h.account ?? "–";
@@ -352,8 +353,11 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
     <>
       <header className="view-header">
         <h2 className="view-title">Holdings</h2>
-        <span className="muted" data-testid="holdings-date">
-          {snap.data ? `Valuation as of ${snap.data.date}` : snap.loading ? "Loading…" : ""}
+        <span className="view-meta">
+          <span className="muted" data-testid="holdings-date">
+            {snap.data ? `Valuation as of ${snap.data.date}` : snap.loading ? "Loading…" : ""}
+          </span>
+          <RefreshPrices />
         </span>
       </header>
       {snap.error && <p className="error">{snap.error}</p>}
