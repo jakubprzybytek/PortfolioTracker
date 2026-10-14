@@ -142,7 +142,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed.
 
 ### Missing compared with the sheet
-7. ~~Update the value of a hand-valued asset~~ Done (2026-10-14): "New value" in its chart panel (Prices, Holdings), values listed and deletable (ui.md).
+7. ~~Update the value of a hand-valued asset~~ Done (2026-10-14): "Edit values" in its chart panel (Prices, Holdings), values listed and deletable (ui.md).
 8. **Targets and rebalancing:** target share per asset class (the sheet has them), target vs actual next to the asset mix, amount to buy or sell.
 9. **Closed positions:** realised gain is shown as a total (Dashboard, per account); still missing: the list of closed positions and sales, and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.

@@ -190,7 +190,7 @@ GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
 
 **Cash** of an account = Σ of its transactions' cash effects: BUY = `amount` (the trade value) minus `fee`; every other type's `amount` already is the cash effect (SELL: received, net of the fee). Computed by the valuation (`core/valuation/cash.ts`), not stored per transaction.
 
-**Assets without an ISIN** (manually valued, e.g. a property fund share) get a private id in ISIN format with the ISO user-assigned prefix `ZZ` (`ZZRZESZOW000`), which no real ISIN uses. Their prices are `PX#MANUAL#<date>` items, entered in the app ("New value", `source: "app"`) or from `imports/prices/`. Being your input, they're in the monthly backup.
+**Assets without an ISIN** (manually valued, e.g. a property fund share) get a private id in ISIN format with the ISO user-assigned prefix `ZZ` (`ZZRZESZOW000`), which no real ISIN uses. Their prices are `PX#MANUAL#<date>` items, entered in the app ("Edit values", `source: "app"`) or from `imports/prices/`. Being your input, they're in the monthly backup.
 `tx_id` is deterministic (broker id, or a hash of the row), so imports can be re-run safely. `GSI1` lists all transactions across accounts in date order, which is what valuation replays.
 
 ### Later: settings you enter

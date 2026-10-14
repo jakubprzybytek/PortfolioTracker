@@ -6,7 +6,7 @@ import { useApi } from "./useApi.ts";
 import { useTxForm } from "./txForm.ts";
 
 /**
- * Values of an asset valued by hand (no price source): "New value" opens a small form (date, value per unit) above the
+ * Values of an asset valued by hand (no price source): "Edit values" opens a small form (date, value per unit) above the
  * chart, with the values entered so far, newest first; each can be deleted (a second click confirms). While a value is
  * saved or deleted, its button shows a spinner and the list says it's updating.
  */
@@ -60,8 +60,8 @@ export function ManualValues({ isin, code, currency }: { isin: string; code: str
 
   if (!open)
     return (
-      <button type="button" className="manual-open" onClick={() => setOpen(true)} data-testid="manual-value-open">
-        + New value
+      <button type="button" className="manual-open" onClick={() => setOpen(true)} title="Add or delete values entered by hand" data-testid="manual-value-open">
+        Edit values
       </button>
     );
   const list = [...(values.data ?? [])].sort((a, b) => b.date.localeCompare(a.date));
