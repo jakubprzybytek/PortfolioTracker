@@ -1,14 +1,14 @@
 # PortfolioTracker
 
-A small personal portfolio tracker. You import your transactions; the app collects prices, values the portfolio every day (bonds with accrued interest and inflation indexation) and shows a table and charts. Serverless on AWS, costs nothing when idle.
+A small personal portfolio tracker. You enter your transactions in the app (the history came from file imports); the app collects prices, values the portfolio every day (bonds with accrued interest and inflation indexation) and shows tables and charts. Serverless on AWS, costs nothing when idle.
 
-Phase 1 covers Polish treasury bonds on GPW. Design notes are in [Docs/](Docs/README.md).
+It covers Polish treasury, corporate and retail bonds, ETFs, foreign government bonds at IBKR, hand-valued assets and cash in several currencies. Design notes are in [Docs/](Docs/README.md).
 
 ## Layout
 
 ```
 packages/core   parsers, bond maths, valuation, DynamoDB repository (pure TypeScript, unit-tested)
-packages/jobs   Lambda handlers: import, backfill, eod-gpw, monthly, valuation, api; integration tests
+packages/jobs   Lambda handlers: daily price jobs, live, fx, monthly, valuation, backfill, import, export, api; integration tests
 packages/web    Vite + React dashboard; Playwright E2E tests
 data/           import files (instruments, sample transactions) – see data/README.md
 poc/            the original GPW archive proof of concept
@@ -88,9 +88,15 @@ WEB_URL=https://dev.portfoliotracker.albedoonline.com npx sst shell --stage dev 
 
 | Job | When | Does |
 |---|---|---|
-| `eod-gpw` | 18:30 Mon–Fri | GPW all-bonds XLS for today + any day missing in the last 14 days |
+| `eod-etf` | 19:00 Mon–Fri, 07:00 Tue–Sat | ETF closes from Yahoo, last 14 days |
+| `eod-catalyst` | 19:30 Mon–Fri, 08:00 Tue–Sat | corporate bonds from BiznesRadar |
+| `eod-gpw` | 20:30 and 22:00 Mon–Fri | GPW all-bonds XLS for today + any day missing in the last 14 days |
 | `eod-gpw` (recheck) | 07:15 Tue–Sat | re-fetches yesterday, marks prices final |
-| `valuation` | 22:30, 07:30 | daily snapshot (positions × prices + accrued interest) |
+| `eod-bonds` | 22:10 Mon–Fri, 07:10 Tue–Sat | IBKR bonds from onvista (Börse Stuttgart), last 14 days |
+| `fx` | 12:30, 16:30 Mon–Fri | NBP exchange rates |
+| `valuation` | 22:30, 07:30, and after any change (queued, one at a time) | daily snapshot (positions × prices + accrued interest) |
 | `monthly` | 16th 10:00 | CPI → IZ reference index; cross-check against the Ministry of Finance page; retail-bond rates from the Ministry file (revalues when a rate changes) |
-| `import` | on S3 upload to `imports/` | instruments, transactions, MF calculator |
-| `backfill` | on new instrument, or manual invoke `{ "isin": "…" }` | full GPW history |
+| `export` | 1st 04:00 | backup of accounts, instruments, hand-entered prices and transactions to `exports/<date>/` |
+| `live` | "Refresh" in the app | today's quotes (ETFs, IBKR, Catalyst and treasury bonds), then revalues today |
+| `import` | on S3 upload to `imports/` | instruments, transactions, MF calculator, retail-bond file |
+| `backfill` | on a new instrument (or a new price source), or manual invoke `{ "isin": "…" }` | full price history from the instrument's source |

@@ -21,6 +21,8 @@ Transaction fields: `date`, `account`, `type` (`BUY`, `SELL`, `COUPON`, `REDEMPT
 
 Corporate bonds (Catalyst): `"type": "BOND_CORPORATE"`, `"venue": "CATALYST"`, `"sourceIds": { "biznesradar": "KRU0827" }`, `"nominal": 100`. Prices are clean % of the nominal; no accrued interest. A bond no longer quoted: `"venue": "MANUAL"`, no source, prices from `imports/prices/` (% of nominal).
 
+Foreign government bonds at IBKR, quoted (EUR Bunds, OATs …): `"type": "BOND_IBKR"`, `"venue": "XSTU"`, `"sourceIds": { "onvista": "STU" }`, `"nominal": 1000`, `currency` of the bond. Importing one (or switching an existing one to this source) loads its whole Börse Stuttgart history from onvista. Not quoted in Germany (US T-bills): `"venue": "CALC"`, no source, a `pricePath` (below).
+
 ETF instruments: `"type": "ETF"`, `currency` of the listing, `venue` (`XAMS`, `XETR` …), `"sourceIds": { "yahoo": "VWRL.AS" }` and any `splits` (`[{ "date": "2025-12-15", "ratio": 100 }]`). Importing one loads its full price history from Yahoo and the NBP rates of its currency; recording a new split later reloads the history.
 
 `transactions.sample.json` (with `instruments.sample.json`, `prices.sample.json` and `accounts.sample.json`) is **made-up data** for trying the app out.
@@ -63,4 +65,4 @@ node scripts/ibkr-statements-to-transactions.ts ~/Downloads/statement-2024.csv ~
 # → data/private/ibkr-from-statements.json; prints the cash per currency at the end (check it against the last statement's Cash Report)
 ```
 
-Pass every statement since the account was opened: the file is the account's whole history. To replace what's stored, back up and delete the account's imported transactions (keep those entered in the app), then upload the file to `imports/transactions/`. Bills and bonds need their instruments (`BOND_IBKR`, `pricePath` from the statement's trade prices) imported first.
+Pass every statement since the account was opened: the file is the account's whole history. To replace what's stored, back up and delete the account's imported transactions (keep those entered in the app), then upload the file to `imports/transactions/`. Bills and bonds need their instruments imported first (`BOND_IBKR`: quoted bonds with the onvista source above; bills with a `pricePath` from the statement's trade prices).

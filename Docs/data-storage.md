@@ -4,7 +4,7 @@ Three DynamoDB tables, all on-demand capacity, plus an S3 bucket used only as a 
 
 | Table | Contents | Written by | Can be rebuilt? |
 |---|---|---|---|
-| `market` | Instruments, daily prices, live quotes, events, coupon rates, retail-bond rates, CPI, FX, calendar, backfill status, job runs | Scheduled jobs, backfill, import (instruments) | Yes: re-fetch, or reprocess the S3 archive (the only source for past Catalyst snapshots) |
+| `market` | Instruments, daily prices (incl. today's refreshed quotes), events, coupon rates, retail-bond rates, CPI, FX, calendar, backfill status, job runs | Scheduled jobs, backfill, import (instruments) | Yes: re-fetch, or reprocess the S3 archive (the only source for past Catalyst snapshots) |
 | `transactions` | Accounts, transactions; later also allocation targets and multi-asset splits | You: the app's form, file imports (the sheet once, IBKR statements) | **No.** This is the only data that exists nowhere else (IBKR's can be rebuilt from its statements) |
 | `holdings` | Daily portfolio snapshots | Valuation job only | Yes: recompute from `transactions` + `market` |
 
@@ -67,7 +67,7 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 | `nominal` | Corporate bonds (`BOND_CORPORATE`, no terms): nominal per bond (1000 or 100); prices are clean % of it; value = clean % × nominal, no accrued interest |
 | `pricePath` | Foreign bonds at IBKR (`BOND_IBKR`, `nominal` 1000) without a quote (`venue = CALC`: US T-bills, matured bonds): known prices `[{ date, price }]` (% of nominal: your trades, redemption at maturity); the backfill writes a price per weekday in between at a constant yield. Quoted ones have `venue = XSTU`, `sourceIds.onvista = "STU"` |
 | `splits` | ETFs: `[{ "date": "2025-12-15", "ratio": 100 }]`: from `date` on one unit became `ratio` units. Prices are stored as traded; charts and the 1-year change divide earlier prices by later splits (`core/prices/splits.ts`) |
-| `live` | `true` for instruments polled intraday |
+| `live` | Not used: which instruments "Refresh" covers follows from their price source (ingestion.md, "Live prices") |
 | `active` | `false` once sold/matured (jobs skip inactive instruments) |
 | bonds only | `nominal` (face value), `coupon_type` (`FIXED` / `FLOATING` / `INDEXED`), `coupon_rate` or `margin` + `reference_rate`, `maturity`, `coupon_schedule` (period start/end, payment date); IZ bonds also `base_ref` (e.g. IZ0836: 194.28509) and `issue_date` |
 | retail bonds only | `series` (e.g. `EDO0936`), `first_rate`, `margin`, `redemption_fee` |
@@ -145,7 +145,7 @@ PK = FX#<CCY>               SK = <YYYY-MM-DD>       mid, table_no, source       
 PK = CAL#<venue>            SK = <YYYY-MM-DD>       type = HOLIDAY | HALF_DAY, note
 ```
 
-Entered by hand once a year. Used by gap repair (a holiday isn't a gap) and by the live poller (no polling on holidays).
+Planned, not filled yet: entered by hand once a year, for gap repair (a holiday isn't a gap).
 
 ### Job runs
 
@@ -221,7 +221,9 @@ Each function links only the tables it needs.
 
 | Function | `market` | `transactions` | `holdings` |
 |---|---|---|---|
-| `EodGpw`, `RecheckGpw`, `Monthly` (and later EODHD, IBKR, NBP jobs) | read/write | — | — |
+| `EodGpw`, `RecheckGpw`, `EodEtf`, `EodCatalyst`, `EodBonds` (and their rechecks), `Live`, `Monthly` | read/write | — | — |
+| `Fx` | read/write | read | — |
+| `Export` | read | read | — |
 | `Backfill` | read/write | — | — |
 | `Import` | read/write (instruments, reference index) | read/write | — |
 | `Valuation` | read (writes its job run) | read | write |

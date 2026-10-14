@@ -98,7 +98,7 @@ All transactions from `GET /transactions`.
   - *ETF*: ticker with exchange (AMS:VWRL, FRA:EUNK, LON:CSPX …), ISIN, name, currency: priced from Yahoo.
   - *Corporate bond*: code, ISIN, name, nominal (1000 or 100): priced from BiznesRadar.
   - *Other asset*: name and code; valued by hand (a buy records its price as the asset's value that day).
-  - Foreign bonds at IBKR aren't offered yet (their prices are calculated from the trades; later from IBKR Flex).
+  - Foreign bonds at IBKR aren't offered yet: add one with an instrument file (data/README.md, onvista source) before its first trade.
 - Quantity and price (bonds: % of nominal; retail: PLN per bond, prefilled 100; ETFs: in their currency), fee.
 - **Currency** of the amount and fee, next to the amount: in an account with its own currency (IBKR: EUR) a trade starts in the instrument's currency and the rest in the account's; elsewhere PLN. Paid in PLN for an instrument in another currency (Bossa): the broker's rate too (prefilled with the NBP rate of the day or the last before).
 - **Currency exchange**: what you gave (amount, currency, fee) and what you got (amount, currency); the line below shows both and the rate.

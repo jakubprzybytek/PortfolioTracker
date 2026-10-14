@@ -1,6 +1,6 @@
 # Data ingestion
 
-All jobs are Lambda functions on a schedule (`sst.aws.Cron`, SST v4). Times below are Warsaw time. To check: whether SST's `Cron` supports a time zone. If it's UTC only, either accept a one-hour shift with DST or define an EventBridge Scheduler schedule with `Europe/Warsaw` directly.
+All jobs are Lambda functions on a schedule (`sst.aws.CronV2`, EventBridge Scheduler with `timezone: "Europe/Warsaw"`), except `live` (on demand) and the valuation runs requested by other jobs (queued). Times below are Warsaw time.
 
 Backfills and imports use the same adapters with other triggers; see [backfill.md](backfill.md).
 
@@ -29,8 +29,8 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 | `eod-etf` | 19:00, and 07:00 Tue–Sat | Yahoo chart API, last 14 days of every ETF (`sourceIds.yahoo`). A stored close that would move by more than 20 % isn't overwritten (looks like an unrecorded split; reported in the job note). Full history per ETF on import (backfill), split-adjusted history converted back with the instrument's `splits` | `PX#<venue>#…` final |
 | `eod-bonds` | 22:10, and 07:10 Tue–Sat | onvista per foreign bond at IBKR (`sourceIds.onvista`, Börse Stuttgart): last 14 days of closes (final) + today's quote (provisional; the morning run replaces it with the close). Full history per bond on import (backfill) | `PX#XSTU#…` |
 | `valuation` | 22:30 | DynamoDB only | retail bond `PX#CALC#…`, `PORTFOLIO/SNAP#<date>`, `SNAP#LATEST` |
-| `eod-ibkr` | 07:00 (next day) | IBKR Flex statement for the previous day | `PX#IBKR#…` final, transactions, cash |
-| `recheck` | 07:15 (next day) | re-runs `eod-gpw` for D-1 | overwrites, sets `status = final` |
+| `eod-ibkr` (later, not built) | 07:00 (next day) | IBKR Flex statement for the previous day | transactions, cash |
+| `eod-gpw-recheck` | 07:15 (next day) | re-runs `eod-gpw` for D-1 | overwrites, sets `status = final` |
 | `valuation` | 07:30 (next day) | DynamoDB only | final snapshot for D-1 |
 | `monthly` | 16th, 10:00, retry daily until success (any day) | GUS CPI (monthly CSV); new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `SERIES#…/RATE#…` |
 
@@ -83,8 +83,9 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
 
 ## Failure handling
 
-- Lambda retries: 2 (built in for async invocation), then an on-failure destination → SNS → e-mail.
-- CloudWatch alarm on any job's `Errors` metric.
+- Every run writes a `JOB#…/RUN#…` item; the Dashboard lists the last run of each job and shows a banner for any that failed.
+- Lambda retries: 2 for the scheduled jobs; the valuation queue retries a message 3 times, then moves it to `ValuationDeadLetter`.
+- Planned (README item 16): an on-failure destination → SNS → e-mail, and a CloudWatch alarm on the jobs' `Errors` metric. The "alert" actions in the data quality rules above wait for it; until then they show on the Dashboard.
 - Scraping etiquette: one request per page, 2–5 s delay between requests during backfill, descriptive User-Agent, cache in S3.
 
 ## Secrets

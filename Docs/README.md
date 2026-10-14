@@ -4,7 +4,7 @@ A simple personal portfolio tracker. **You enter your own transactions** (buys, 
 
 Asset types: Polish treasury and corporate bonds (GPW / Catalyst), Polish retail treasury bonds (obligacje detaliczne), UCITS ETFs on EU exchanges, EU government bonds at IBKR, plus manually valued assets and cash.
 
-Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotracker.albedoonline.com (treasury bonds on GPW: import, backfill, daily jobs, valuation, API, dashboard; unit, integration and E2E tests). Every push to `main` goes through `int` to `prod` automatically. Retail bond calculator exists in `core` but isn't wired in yet (needs your series). See the root [README](../README.md) for how to run it.
+Status (2026-10-14, `v0.60`): **the whole portfolio is in production** at https://portfoliotracker.albedoonline.com: every account and asset type from the reference sheet, priced daily (GPW, BiznesRadar, Yahoo, onvista, the Ministry's retail rates, NBP), valued every day, with today's prices on demand ("Refresh"). Transactions are entered in the app. Every push to `main` goes through `int` to `prod` automatically. What's left: "Outstanding work" below. See the root [README](../README.md) for how to run it.
 
 | Document | Contents |
 |---|---|
@@ -19,29 +19,32 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 
 | Phase | Contents |
 |---|---|
-| **1 – Polish bonds** (now) | Treasury bonds on GPW (fixed and inflation-linked IZ), Catalyst corporate bonds, retail bonds (EDO, COI, ROD); transactions import; daily valuation incl. accrued interest; table + charts |
-| 2 – ETFs | Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; today's prices on demand ("Refresh prices": ETFs, IBKR and Catalyst bonds) |
+| 1 – Polish bonds | Done: treasury bonds on GPW (fixed and inflation-linked IZ), Catalyst corporate bonds, retail bonds (EDO, COI, ROD); transactions (import, then the app's form); daily valuation incl. accrued interest; table + charts |
+| 2 – ETFs | Done: Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; today's prices on demand ("Refresh": ETFs and every listed bond) |
 | 3 – IBKR, FX | Done: foreign bonds (Börse Stuttgart closes via onvista; calculated for US T-bills), cash per currency, NBP rates; IBKR's history from its activity statements. Later: IBKR Flex for new trades |
 
 ## Architecture
 
 ```
-                         ┌──────────────────────────── AWS (SST v4) ────────────────────────────┐
-sst.aws.Cron ────────────┼─► Lambda eod-gpw  20:30, 22:00   treasury bonds, daily all-bonds XLS   │
-                         ├─► Lambda eod-catalyst   19:30   corporate bonds (BiznesRadar)         │
-                         │                         (+08:00 next morning)                         ├──► DynamoDB: market, transactions, holdings
-                         ├─► Lambda eod-bonds      22:10   IBKR bonds (onvista, Stuttgart)       │
-                         ├─► Lambda monthly        16th    CPI, IZ reference index, retail rates  │        ▲
-                         └─► Lambda valuation      22:30 + 07:30                                 │        │
-                                                                                                 │   Lambda backfill  ◄── manual (sst shell / CLI)
-                                                                                                 │        ▲ new instruments
-S3 upload imports/… ──────────► Lambda import (Bossa / Cbonds / MF files, transactions) ──────────┤────────┘
-                                                                                                 │
-every job ──► S3 raw archive (sst.aws.Bucket, write-only originals)                              │
-                                                                                                 │
-<stage>.portfoliotracker.albedoonline.com (sst.aws.Router/CloudFront)   login: Cognito (shared pool) │
-   ├─ /*     ──► React UI (sst.aws.StaticSite)                                                  │
-   └─ /api/* ──► sst.aws.ApiGatewayV2 ──► Lambda api ─────────────────────────────────────────┘
+                    ┌──────────────────────────── AWS (SST v4) ─────────────────────────────┐
+CronV2 (Warsaw) ────┼─► eod-etf       19:00 (+07:00)    ETFs (Yahoo)                         │
+                    ├─► eod-catalyst  19:30 (+08:00)    corporate bonds (BiznesRadar)        │
+                    ├─► eod-gpw       20:30, 22:00 (+07:15 final)  treasury bonds (GPW XLS)  ├─► DynamoDB: market,
+                    ├─► eod-bonds     22:10 (+07:10)    IBKR bonds (onvista, Stuttgart)      │   transactions, holdings
+                    ├─► fx            12:30, 16:30      NBP table A                          │
+                    ├─► monthly       16th 10:00        CPI, IZ index, retail rates          │
+                    ├─► export        1st 04:00         backup → S3 exports/<date>/          │
+                    └─► valuation     22:30, 07:30 ──┐                                       │
+                                                     ▼                                       │
+  import, backfill, fx, monthly, api, live ──► ValuationQueue (SQS FIFO, one run at a time) ──► valuation
+                                                     └─ 3 failures → ValuationDeadLetter     │
+S3 upload imports/… ──► import (instruments, transactions, MF files) ──► backfill (history)  │
+every job ──► S3 raw archive (write-only originals)                                          │
+                                                                                             │
+<stage>.portfoliotracker.albedoonline.com (Router/CloudFront)   login: Cognito (shared pool) │
+   ├─ /*     ──► React UI (StaticSite)                                                       │
+   └─ /api/* ──► ApiGatewayV2 ──► api ───────────────────────────────────────────────────────┘
+                                  └─ POST /prices/refresh ──► live (today's quotes) ──► ValuationQueue
 ```
 
 ## Stack
@@ -62,7 +65,7 @@ Repo layout:
 
 ```
 packages/core   parsers (GPW, Catalyst), IZ ratio, accrued interest, retail bonds, valuation – pure functions, tested
-packages/jobs   Lambda handlers (cron, backfill, import, api) + scripts for sst shell
+packages/jobs   Lambda handlers (daily jobs, live, valuation, backfill, import, export, api) + source clients
 packages/web    Vite + React UI
 sst.config.ts
 Docs/
@@ -129,6 +132,10 @@ Later phases:
 - [x] "Add transaction" form: add, edit, delete transactions in the app; new instruments by kind (treasury series by code, ETF by ticker, corporate bond, hand-valued asset). From 2026-10-13 the app, not the spreadsheet, is where transactions are entered.
 - [x] IBKR from the sheet: currency positions (EUR, USD) and foreign zero-coupon bonds with calculated prices; IBKR is complete (cash per currency, bond quantities and costs equal to the sheet). All 753 sheet rows convert; every account is complete.
 - [x] IBKR from its activity statements (2026-10-13): `scripts/ibkr-statements-to-transactions.ts`; the account's history rebuilt from IBKR's own records (cash per currency and cost basis equal to the statements; missing commissions, a coupon and interest added; one T-bill's ISIN corrected).
+- [x] Monthly backup (`Export` job), values of hand-valued assets entered in the app, "Recalculating the valuation…" after every change (2026-10-14).
+- [x] IBKR bonds priced from Börse Stuttgart closes via onvista (2026-10-14), within 0.015 of IBKR's marks; US T-bills stay calculated.
+- [x] Today's prices on demand (2026-10-14): "Refresh" next to the valuation date fetches the current quotes of ETFs, IBKR bonds, Catalyst and treasury bonds and revalues today; Holdings and Prices show each price's time, or the date of an older one.
+- [x] Valuation queue hardening (2026-10-14): a dead-letter queue after 3 failures; a revaluation drops the days of positions that are gone; the old single `Table` deleted from `prod`.
 
 ## Outstanding work (2026-10-14)
 
