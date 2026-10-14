@@ -79,7 +79,7 @@ Try in this order and stop at the first that works:
 3. **Biznesradar** per-bond history pages: slow scrape, only the held bonds, check terms first.
 4. **GPW paid history** (product #15, 1,900 PLN per year of data) – only if a complete licensed record is needed.
 
-Accrued interest is computed by the valuation from each bond's terms. Floating-rate bonds also need the coupon rate of every past period since purchase (entered once, or taken from the Catalyst interest tables).
+Accrued interest is computed by the valuation from each bond's coupon periods. The backfill of a new corporate bond also loads its periods from obligacje.pl (dates of every period, the current rate); past rates come from the coupons received ("Use … (your coupons)" in the bond's Coupon periods panel) or are typed in. See data-sources.md, "Corporate bonds: coupon periods".
 
 ### 10. IBKR bonds
 - Done without Flex: the EUR bonds' whole history from onvista (Börse Stuttgart); US T-bills and matured bonds calculated between the trade prices and 100 % at maturity (data-sources.md). With Flex:

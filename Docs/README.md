@@ -4,7 +4,7 @@ A simple personal portfolio tracker. **You enter your own transactions** (buys, 
 
 Asset types: Polish treasury and corporate bonds (GPW / Catalyst), Polish retail treasury bonds (obligacje detaliczne), UCITS ETFs on EU exchanges, EU government bonds at IBKR, plus manually valued assets and cash.
 
-Status (2026-10-14, `v0.60`): **the whole portfolio is in production** at https://portfoliotracker.albedoonline.com: every account and asset type from the reference sheet, priced daily (GPW, BiznesRadar, Yahoo, onvista, the Ministry's retail rates, NBP), valued every day, with today's prices on demand ("Refresh"). Transactions are entered in the app. Every push to `main` goes through `int` to `prod` automatically. What's left: "Outstanding work" below. See the root [README](../README.md) for how to run it.
+Status (2026-10-15, `v0.63`): **the whole portfolio is in production** at https://portfoliotracker.albedoonline.com: every account and asset type from the reference sheet, priced daily (GPW, BiznesRadar, Yahoo, onvista, the Ministry's retail rates, NBP), valued every day with accrued interest (corporate bonds too, from their coupon periods), with today's prices on demand ("Refresh"). Transactions are entered in the app. Every push to `main` goes through `int` to `prod` automatically. What's left: "Outstanding work" below. See the root [README](../README.md) for how to run it.
 
 | Document | Contents |
 |---|---|
@@ -37,7 +37,7 @@ CronV2 (Warsaw) ────┼─► eod-etf       19:00 (+07:00)    ETFs (Yaho
                     ├─► export        1st 04:00         backup → S3 exports/<date>/          │
                     └─► valuation     22:30, 07:30 ──┐                                       │
                                                      ▼                                       │
-  import, backfill, fx, monthly, api, live ──► ValuationQueue (SQS FIFO, one run at a time) ──► valuation
+  import, backfill, fx, monthly, coupons, api, live ──► ValuationQueue (FIFO, one at a time) ──► valuation
                                                      └─ 3 failures → ValuationDeadLetter     │
 S3 upload imports/… ──► import (instruments, transactions, MF files) ──► backfill (history)  │
 every job ──► S3 raw archive (write-only originals)                                          │

@@ -54,7 +54,7 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
    - Compute the value per bond for each series: 100 PLN + accrued interest according to the rate periods and the compounding rule (EDO compounds yearly, COI/ROD per their terms).
    - Optionally also store the value net of the early-redemption fee and the Belka tax.
    - Write as `PX#CALC#<date>`.
-3. **Exchange-traded bonds:** accrued interest per bond from the bond terms (fixed: coupon rate; floating: `COUPON#…` rate of the current period; IZ: `nominal = 1000 × ratio(date)` from `CPI_REF` and `base_ref`). Write into the bond's `PX` item as `nominal`, `accrued_interest`, `value_per_unit` (= clean % × nominal + accrued). Corporate bonds: clean % × nominal plus the accrued interest of their coupon periods (data-sources.md, "Corporate bonds: coupon periods"); a period without a rate flags the holding `no_coupon_rate` and leaves it at the clean price.
+3. **Exchange-traded bonds:** accrued interest per bond from the bond terms (treasury: the MF calculator's terms; IZ: `nominal = 1000 × ratio(date)` from `CPI_REF` and `base_ref`), kept in the holding as `nominal`, `accruedInterest`, `valuePerUnit` (= clean % × nominal + accrued). Corporate bonds: clean % × nominal plus the accrued interest of their coupon periods (data-sources.md, "Corporate bonds: coupon periods"); a period without a rate flags the holding `no_coupon_rate` and leaves it at the clean price.
 4. Positions = sum of transactions per ISIN and account up to the date.
 5. Value per position in instrument currency and in PLN (NBP rate of the date, falling back to the latest available).
 6. Write `SNAP#<date>` and `SNAP#LATEST`.
