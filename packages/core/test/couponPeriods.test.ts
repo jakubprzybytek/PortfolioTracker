@@ -60,6 +60,10 @@ describe("coupons received", () => {
     expect(taxFromNote("Pobrany podatek: 41.04 PLN")).toBe(41.04);
     expect(taxFromNote(undefined)).toBeUndefined();
     expect(quantityHeld(txs, "Broker", ISIN, "2026-08-04")).toBe(120);
+    // Settled T+2: bought on Thursday 2026-07-30, owned from Monday 2026-08-03.
+    const buy = [tx({ date: "2026-07-30", quantity: 5 })];
+    expect(quantityHeld(buy, "Broker", ISIN, "2026-07-31")).toBe(0);
+    expect(quantityHeld(buy, "Broker", ISIN, "2026-08-03")).toBe(5);
   });
 
   it("matches each coupon to its period and works out the rates it fits", () => {

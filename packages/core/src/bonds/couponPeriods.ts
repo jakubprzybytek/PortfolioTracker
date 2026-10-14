@@ -94,11 +94,30 @@ export function corporateAccrued(
   return { total: round2(total), ...(current?.rate !== undefined ? { rate: { current: current.rate, previous } } : {}) };
 }
 
-/** Bonds of one ISIN held in one account at the end of `day` (by trade date). */
+/** `date` plus `n` business days (weekends skipped; holidays aren't known here). */
+function addBusinessDays(date: IsoDate, n: number): IsoDate {
+  let d = date;
+  while (n > 0) {
+    d = addDays(d, 1);
+    const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
+    if (wd !== 0 && wd !== 6) n--;
+  }
+  return d;
+}
+
+/** Catalyst trades settle two business days after the trade (T+2). */
+const SETTLEMENT_DAYS = 2;
+
+/**
+ * Bonds of one ISIN an account owns at the end of `day`: trades count once settled (T+2), so a bond bought on the
+ * record day (or the day before) doesn't get that coupon and one sold then still does. Redemptions count on their date.
+ */
 export function quantityHeld(transactions: TransactionItem[], account: string, isin: string, day: IsoDate): number {
   let q = 0;
   for (const t of transactions) {
-    if (t.account !== account || t.isin !== isin || t.date > day || t.quantity === undefined) continue;
+    if (t.account !== account || t.isin !== isin || t.quantity === undefined) continue;
+    const settled = t.type === "REDEMPTION" ? t.date : addBusinessDays(t.date, SETTLEMENT_DAYS);
+    if (settled > day) continue;
     if (t.type === "BUY") q += t.quantity;
     else if (t.type === "SELL" || t.type === "REDEMPTION") q -= t.quantity;
   }
