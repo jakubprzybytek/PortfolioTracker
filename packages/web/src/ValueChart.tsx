@@ -1,7 +1,7 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmtCompact, fmtPln } from "./format.ts";
 import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
-import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
+import { amountAxis, chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
 
 export interface ValuePoint {
   date: string;
@@ -30,6 +30,7 @@ export function ValueChart({
   const narrow = useNarrow();
   if (data.length === 0) return <ChartPlaceholder loading={loading} height={height ?? "100%"}>No valuation history in this range.</ChartPlaceholder>;
   const gradient = `val-${testId}`;
+  const axis = amountAxis(data.flatMap((d) => [d.value, d.cost]));
   return (
     <div className="chart-frame" data-testid={testId} style={{ width: "100%", height: height ?? "100%" }}>
       <ResponsiveContainer>
@@ -42,13 +43,13 @@ export function ValueChart({
           </defs>
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
-          <YAxis {...(narrow ? narrowYAxis : { width: 80, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => (narrow ? fmtCompact(v) : Math.round(v).toLocaleString("pl-PL"))} />
+          <YAxis {...(narrow ? narrowYAxis : { width: 80, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={axis.domain} ticks={axis.ticks} interval={0} allowDataOverflow tickFormatter={(v: number) => (narrow ? fmtCompact(v) : Math.round(v).toLocaleString("pl-PL"))} />
           <Tooltip
             formatter={(v, name) => [fmtPln(Number(v)), name === "value" ? labels.value : labels.cost]}
             contentStyle={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 }}
           />
-          <Area type="monotone" dataKey="cost" stroke="var(--muted)" strokeDasharray="4 3" fill="none" dot={false} isAnimationActive={false} />
-          <Area type="monotone" dataKey="value" stroke="var(--accent)" fill={`url(#${gradient})`} dot={false} isAnimationActive={false} />
+          <Area type="monotone" dataKey="cost" baseValue={axis.domain[0]} stroke="var(--muted)" strokeDasharray="4 3" fill="none" dot={false} isAnimationActive={false} />
+          <Area type="monotone" dataKey="value" baseValue={axis.domain[0]} stroke="var(--accent)" fill={`url(#${gradient})`} dot={false} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
       <ChartBusy busy={loading} />

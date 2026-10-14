@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Hub } from "aws-amplify/utils";
-import { APP_VERSION } from "./api.ts";
+import { APP_VERSION, api } from "./api.ts";
 import { currentSession, logout, type Session } from "./auth.ts";
 import { DashboardView } from "./DashboardView.tsx";
 import { HoldingsView } from "./HoldingsView.tsx";
@@ -12,7 +12,7 @@ import { useRoute, VIEWS } from "./route.ts";
 import { TransactionForm } from "./TransactionForm.tsx";
 import { TransactionsView } from "./TransactionsView.tsx";
 import { TxFormContext } from "./txForm.ts";
-import type { Transaction } from "./types.ts";
+import type { Status, Transaction } from "./types.ts";
 
 /** Shows the app to a logged-in user and the login form otherwise. The view (#/…) stays in the URL meanwhile. */
 export function App() {
@@ -50,10 +50,35 @@ function Shell({ email }: { email: string }) {
     const t = setTimeout(() => setToast(null), 6000);
     return () => clearTimeout(t);
   }, [toast]);
+  // After a save the valuation reruns in the background (about a minute): "Recalculating…" stays up until a valuation
+  // run finishes after the save (server clock, from /status), then every view reloads.
+  const [recalc, setRecalc] = useState<{ since: string; startedAt: number } | null>(null);
   const saved = useCallback((message: string) => {
-    setToast(`${message} The valuation updates in about a minute.`);
+    setToast(message);
     setVersion((v) => v + 1);
+    void api<Status>("/status")
+      .then((s) => setRecalc({ since: s.now, startedAt: Date.now() }))
+      .catch(() => setRecalc(null));
   }, []);
+  useEffect(() => {
+    if (!recalc) return;
+    const t = setInterval(() => {
+      void api<Status>("/status")
+        .then((s) => {
+          const run = s.jobs["valuation"];
+          if (run?.finishedAt && run.finishedAt > recalc.since) {
+            setRecalc(null);
+            setVersion((v) => v + 1);
+            setToast(run.status === "ok" ? "Valuation updated." : `The valuation failed: ${run.note ?? "see the Dashboard"}`);
+          } else if (Date.now() - recalc.startedAt > 5 * 60_000) {
+            setRecalc(null);
+            setToast("The valuation is taking longer than usual; refresh the page later.");
+          }
+        })
+        .catch(() => undefined);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [recalc]);
   const txForm = useMemo(() => ({ open: (editing?: Transaction) => setForm({ editing }), saved, version }), [saved, version]);
   // Phone: the menu opens over the page from the ☰ button; any navigation, a tap outside or Escape closes it.
   const [menuOpen, setMenuOpen] = useState(false);
@@ -126,10 +151,16 @@ function Shell({ email }: { email: string }) {
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
       </main>
-      {toast && (
-        <p className="toast" role="status" data-testid="tx-toast">
-          {toast}
-        </p>
+      {(toast || recalc) && (
+        <div className="toast" role="status">
+          {toast && <p data-testid="tx-toast">{toast}</p>}
+          {recalc && (
+            <p className="recalc" data-testid="recalc">
+              <span className="spinner" aria-hidden />
+              Recalculating the valuation…
+            </p>
+          )}
+        </div>
       )}
       {form && (
         <TransactionForm

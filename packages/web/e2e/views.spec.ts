@@ -319,6 +319,7 @@ test.describe("prices view", () => {
     await page.getByTestId("manual-value-price").fill("930,5");
     await page.getByTestId("manual-value-save").click();
     await expect(page.getByTestId("tx-toast")).toContainText("SAMPLE-APARTMENT: value 930,50 PLN on 2026-07-16 saved");
+    await expect(page.getByTestId("recalc")).toContainText("Recalculating the valuation"); // until a valuation run finishes
     await expect(list).toContainText("2026-07-16");
     await page.getByTestId("manual-value-delete-2026-07-16").click();
     await expect(page.getByTestId("manual-value-delete-2026-07-16")).toHaveText("Delete?");
