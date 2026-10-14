@@ -333,3 +333,6 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
 @media (max-width: 720px) {
   .breakdown { display: grid; grid-template-columns: 1fr 1fr; }
 }
+/* How fresh a price is: before the price in Holdings (the time of a refreshed price, or the date of an older one), next to the date in Prices. */
+.price-age { margin-right: 6px; font-size: 0.75rem; color: var(--faint); font-weight: 400; white-space: nowrap; }
+.price-time { margin-left: 6px; color: var(--faint); }

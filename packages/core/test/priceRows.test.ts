@@ -32,6 +32,16 @@ describe("priceRows", () => {
     expect(row).toMatchObject({ price: 1000, priceDate: "2023-03-23", stale: false, manual: true });
   });
 
+  it("passes on when a price fetched during the day was set, and which prices are calculated", () => {
+    const live = { ...px("PL0000113783", "2026-10-14", 80.85), status: "provisional", quoteTime: "2026-10-14T13:23:35+02:00" } as PriceItem;
+    const bill = { ...inst("US912797SA68", "US912797SA68"), type: "BOND_IBKR", venue: "CALC" } as InstrumentItem;
+    const rows = priceRows([inst("PL0000113783", "DS0432"), bill], new Map([["PL0000113783", live]]), new Map(), "2026-10-14");
+    expect(rows[0]).toMatchObject({ priceDate: "2026-10-14", priceTime: "2026-10-14T13:23:35+02:00" });
+    expect(rows[0]).not.toHaveProperty("calculated");
+    expect(rows[1]).toMatchObject({ calculated: true });
+    expect(rows[1]).not.toHaveProperty("priceTime");
+  });
+
   it("marks an instrument without any price", () => {
     const [row] = priceRows([inst("PL0000113783", "DS0432")], new Map(), new Map(), "2026-10-11");
     expect(row).toMatchObject({ price: null, priceDate: null, stale: true, change1y: null });

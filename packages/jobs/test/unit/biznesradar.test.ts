@@ -20,8 +20,8 @@ describe("BiznesRadar", () => {
     expect(parseHistoryPage("<html>not found</html>", "X").bars).toEqual([]);
   });
 
-  it("reads the latest quote with the date of its last trade", () => {
-    expect(parseQuotePage(fixture("biznesradar-quote-CPS0130.html"))).toEqual({ date: "2026-10-12", open: 104, high: 104, low: 103.97, close: 103.98, volume: 47 });
+  it("reads the latest quote with the date and time of its last trade", () => {
+    expect(parseQuotePage(fixture("biznesradar-quote-CPS0130.html"))).toEqual({ date: "2026-10-12", open: 104, high: 104, low: 103.97, close: 103.98, volume: 47, time: "2026-10-12T16:21:08+02:00" });
     expect(parseQuotePage("<html></html>")).toBeUndefined();
   });
 });

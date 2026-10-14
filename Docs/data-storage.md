@@ -97,7 +97,7 @@ Retail bonds and manual entries use the same item with `venue = CALC` or `MANUAL
 
 ### Live quote
 
-Not a separate item: "Refresh prices" writes today's quote as today's price item (`PX#<venue>#<today>`, `status = provisional`), which the evening close overwrites (ingestion.md, "Live prices"). The valuation then values today as usual, so every view reads one shape and history keeps one price per day. (Planned before: a `LIVE` item per instrument swapped in by the api Lambda.)
+Not a separate item: "Refresh prices" writes today's quote as today's price item (`PX#<venue>#<today>`, `status = provisional`, `quoteTime` = when the source set it; holdings and price rows carry it on as `priceTime`), which the evening close overwrites (ingestion.md, "Live prices"). The valuation then values today as usual, so every view reads one shape and history keeps one price per day. (Planned before: a `LIVE` item per instrument swapped in by the api Lambda.)
 
 ### Corporate / bond events
 

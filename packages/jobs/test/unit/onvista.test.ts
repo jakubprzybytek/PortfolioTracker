@@ -11,6 +11,7 @@ describe("onvista", () => {
     expect(snap.quotes.map((q) => q.exchange)).toEqual(["FRA", "STU", "@DE"]); // @DE: Baader Trading, no volume
     expect(snap.quotes.find((q) => q.exchange === "STU")).toEqual({
       exchange: "STU",
+      time: "2026-10-14T10:26:10.191+00:00",
       idNotation: 293356300,
       currency: "EUR",
       date: "2026-10-14",

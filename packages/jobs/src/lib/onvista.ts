@@ -20,6 +20,8 @@ export interface OnvistaBar {
 export interface OnvistaQuote extends OnvistaBar {
   /** The exchange's code, e.g. STU. */
   exchange: string;
+  /** When the last price was set (ISO, UTC). */
+  time: string;
   idNotation: number;
   currency: string;
 }
@@ -69,6 +71,7 @@ export function parseSnapshot(json: SnapshotResponse): OnvistaSnapshot {
     if (q.last === undefined || !q.datetimeLast) continue;
     quotes.push({
       exchange: q.market.codeExchange,
+      time: q.datetimeLast,
       idNotation: q.market.idNotation,
       currency: q.isoCurrency,
       date: berlinDate(q.datetimeLast),

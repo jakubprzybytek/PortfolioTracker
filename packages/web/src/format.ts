@@ -77,6 +77,28 @@ export const TX_TYPE_LABELS: Record<string, string> = {
 };
 
 /** "1 234,56" or "1234.56" → 1234.56; empty → undefined; not a number → NaN. */
+const warsawTime = new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw", hour: "2-digit", minute: "2-digit" });
+/** Time of day in Warsaw, e.g. "13:38". */
+export const fmtTime = (iso: string): string => warsawTime.format(new Date(iso));
+
+/**
+ * How fresh a price is, when it's worth saying: the time of a price fetched during the day ("Refresh prices"), or the
+ * date of one older than the newest price shown (no trade since). Nothing for an ordinary close.
+ */
+export function priceAge(date: string | null, time: string | undefined, newest: string | undefined): string | null {
+  if (time) return fmtTime(time);
+  if (!date || !newest || date >= newest) return null;
+  const d = new Date(`${date}T12:00:00Z`);
+  return date.slice(0, 4) === newest.slice(0, 4) ? shortDate.format(d) : shortDateYear.format(d);
+}
+const shortDate = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const shortDateYear = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+/** Tooltip for a price's age. */
+export function priceAgeTitle(date: string | null, time: string | undefined): string {
+  if (!date) return "";
+  return time ? `Last price at ${fmtTime(time)} on ${date}, fetched during the day ("Refresh"); the day's close replaces it in the evening` : `Price of ${date}`;
+}
+
 export const parseNum = (s: string): number | undefined => {
   const t = s.replace(/[\s ]/g, "").replace(",", ".");
   return t === "" ? undefined : Number(t);

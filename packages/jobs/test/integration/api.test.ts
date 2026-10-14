@@ -442,7 +442,7 @@ describe(`API ${API}`, () => {
         return r?.finishedAt && r.finishedAt > first.body.now! ? r : undefined;
       }, 180_000);
       expect(run).toMatchObject({ status: "ok" });
-      expect(run.note).toMatch(/of 2 prices updated/); // the sample's ETF and Catalyst bond; the Bund is calculated
+      expect(run.note).toMatch(/of 4 prices updated/); // the sample's ETF, Catalyst bond and two treasury bonds; the Bund is calculated
     }
     const again = await send<{ error: string; retryAt: string }>("POST", "/prices/refresh");
     expect(again.status).toBe(429);

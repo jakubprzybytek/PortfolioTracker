@@ -16,6 +16,8 @@ export interface BrBar {
   low: number | null;
   close: number;
   volume: number;
+  /** Quote page only: when the last trade was (ISO with offset). */
+  time?: string;
 }
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
@@ -49,11 +51,12 @@ export function parseQuotePage(html: string): BrBar | undefined {
     const m = new RegExp(`<td[^>]*id="pr_t_${id}"[^>]*>([\\s\\S]*?)</td>`).exec(html);
     return m ? m[1]! : undefined;
   };
-  const date = /datetime="(\d{4}-\d{2}-\d{2})/.exec(cell("date") ?? "")?.[1];
+  const stamp = /datetime="(\d{4}-\d{2}-\d{2})([^"]*)"/.exec(cell("date") ?? "");
+  const date = stamp?.[1];
   const close = num(text(cell("close") ?? ""));
   if (!date || close === null) return undefined;
   const n = (id: string) => num(text(cell(id) ?? ""));
-  return { date, open: n("open"), high: n("max"), low: n("min"), close, volume: n("vol") ?? 0 };
+  return { date, open: n("open"), high: n("max"), low: n("min"), close, volume: n("vol") ?? 0, ...(stamp?.[2] ? { time: `${date}${stamp[2].replace(/([+-]\d{2})(\d{2})$/, "$1:$2")}` } : {}) };
 }
 
 async function get(path: string): Promise<string | undefined> {

@@ -128,6 +128,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       ...base,
       cleanPrice: price?.close ?? null,
       priceDate: price?.date ?? null,
+      ...(price?.quoteTime ? { priceTime: price.quoteTime } : {}),
       nominal,
       accruedInterest,
       valuePerUnit,

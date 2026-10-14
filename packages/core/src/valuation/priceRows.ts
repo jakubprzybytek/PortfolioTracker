@@ -14,6 +14,8 @@ export interface PriceRow {
   currency: string;
   price: number | null;
   priceDate: IsoDate | null;
+  /** A price fetched during the day ("Refresh prices"): when the source set it (ISO). */
+  priceTime?: string;
   /** True when the price is older than `staleAfterDays` (never for manual prices: they're entered when known). */
   stale: boolean;
   /** Price entered by hand (venue MANUAL). */
@@ -56,6 +58,7 @@ export function priceRows(
         currency: i.currency,
         price: now?.close ?? null,
         priceDate: now?.date ?? null,
+        ...(now?.quoteTime ? { priceTime: now.quoteTime } : {}),
         stale: !now || (now.venue !== "MANUAL" && daysBetween(now.date, today) > staleAfterDays),
         ...(now?.venue === "MANUAL" ? { manual: true } : {}),
         ...(i.venue === "CALC" ? { calculated: true } : {}),

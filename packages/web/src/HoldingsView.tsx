@@ -1,10 +1,10 @@
-import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
 import { FilterBar, FilterSelect, uniqueOptions, type Option } from "./Filters.tsx";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
-import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtPln, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
+import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtPln, priceAge, priceAgeTitle, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { RangePicker } from "./RangePicker.tsx";
 import { ValueChart, type ValuePoint } from "./ValueChart.tsx";
 import type { Holding, Snapshot } from "./types.ts";
@@ -76,7 +76,26 @@ const fmtPrice = (h: Holding) =>
 /** Quantity; foreign cash: the amount in its currency. */
 const fmtQty = (h: Holding, quantity = h.quantity) => (isForeignCash(h) ? `${fmtNum(quantity)} ${h.currency}` : fmtInt(quantity));
 const priceTitle = (h: Holding) =>
-  [h.priceDate, h.fx && `1 ${h.currency} = ${fmtNum(h.fx.rate, 4)} PLN (NBP, ${h.fx.date})`].filter(Boolean).join(" · ");
+  [priceAgeTitle(h.priceDate, h.priceTime), h.fx && `1 ${h.currency} = ${fmtNum(h.fx.rate, 4)} PLN (NBP, ${h.fx.date})`].filter(Boolean).join(" · ");
+
+/** The newest price date among the holdings: a price older than it is marked with its date (no trade since). */
+const NewestPrice = createContext<string | undefined>(undefined);
+
+/** The price cell: the price, and before it the time of a price fetched during the day or the date of an older one. */
+function PriceCell({ h, show = true }: { h: Holding; show?: boolean }) {
+  const newest = useContext(NewestPrice);
+  const age = isForeignCash(h) ? null : priceAge(h.priceDate, h.priceTime, newest);
+  return (
+    <td title={priceTitle(h)}>
+      {show && age && (
+        <span className="price-age" data-testid="price-age">
+          {age}
+        </span>
+      )}
+      {show ? fmtPrice(h) : ""}
+    </td>
+  );
+}
 
 interface InstrumentGroup {
   isin: string;
@@ -117,7 +136,7 @@ function HoldingRow({
       <td className="left indent instrument">{label}</td>
       <td className="left">{second ?? typeLabel(shownType(h))}</td>
       <td>{fmtQty(h)}</td>
-      <td title={priceTitle(h)}>{detail ? fmtPrice(h) : ""}</td>
+      <PriceCell h={h} show={detail} />
       <td>{detail ? fmtNum(h.accruedInterest) : ""}</td>
       <td>{fmtPln(h.value)}</td>
       <td title={h.costNative ? `Paid ${fmtMoney(h.costNative.amount, h.costNative.currency)}; in PLN at the NBP rate of the day before each purchase` : ""}>{fmtPln(h.cost)}</td>
@@ -205,6 +224,7 @@ const IncompleteFlag = ({ what }: { what: string[] }) => (
 export function HoldingsView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const snap = useApi<Snapshot>("/holdings");
   const all = useMemo(() => (snap.data?.holdings ?? []).filter((h) => h.quantity > 0), [snap.data]);
+  const newestPrice = useMemo(() => all.map((h) => h.priceDate).filter((d): d is string => !!d).sort().at(-1), [all]);
   const accounts = useMemo(() => snap.data?.accounts ?? {}, [snap.data]);
   const { account = "", type = "" } = params;
   const byInstrument = params["group"] === "instrument";
@@ -306,7 +326,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           <td className="left instrument">{label}</td>
           <td className="left">{accountOf(only)}</td>
           <td>{fmtQty(only)}</td>
-          <td title={priceTitle(only)}>{fmtPrice(only)}</td>
+          <PriceCell h={only} />
           <td>{fmtNum(only.accruedInterest)}</td>
           <SumCells s={g.sums} />
         </tr>
@@ -324,7 +344,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
             <ExpandToggle open={open} count={g.holdings.length} onToggle={() => toggle(g.isin)} testId={`expand-${g.first.code}`} />
           </td>
           <td>{fmtQty(g.first, g.holdings.reduce((n, h) => n + h.quantity, 0))}</td>
-          <td title={priceTitle(g.first)}>{fmtPrice(g.first)}</td>
+          <PriceCell h={g.first} />
           <td>{fmtNum(g.first.accruedInterest)}</td>
           <SumCells s={g.sums} />
         </tr>
@@ -350,7 +370,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const set = (key: string) => (value: string) => setParams({ ...params, [key]: value || undefined });
 
   return (
-    <>
+    <NewestPrice.Provider value={newestPrice}>
       <header className="view-header">
         <h2 className="view-title">Holdings</h2>
         <span className="view-meta">
@@ -533,6 +553,6 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           </div>
         </ChartPanel>
       )}
-    </>
+    </NewestPrice.Provider>
   );
 }

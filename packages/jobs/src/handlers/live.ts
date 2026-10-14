@@ -3,8 +3,10 @@
 // these with the day's close; a final price already stored for today is left alone.
 //   - foreign bonds at IBKR: onvista (Börse Stuttgart), near real time
 //   - ETFs: Yahoo, today's bar so far (about 15 minutes delayed)
-//   - Catalyst corporate bonds: BiznesRadar quote page (2 s between pages)
-// Not covered: GPW treasury bonds (only the end-of-day file), retail bonds and hand-valued assets (no market).
+//   - Catalyst corporate bonds and GPW treasury bonds: BiznesRadar quote page, the last trade (15 minutes delayed;
+//     2 s between pages). Treasury bonds' daily source is GPW's end-of-day file; their page is under the same code.
+// Each price keeps when the source set it (quoteTime), shown in the app. Not covered: retail bonds and hand-valued
+// assets (no market).
 // A source failing for one instrument is reported in the note; the run fails only when nothing could be fetched.
 
 import { today, type InstrumentItem, type IsoDate, type PriceItem } from "@portfolio/core";
@@ -12,6 +14,7 @@ import { queueValuation, repo, runJob } from "../lib/context.ts";
 import { fetchQuotePage, parseQuotePage, type BrBar } from "../lib/biznesradar.ts";
 import { BIZNESRADAR_SOURCE_ID, catalystInstruments } from "../lib/catalystJobs.ts";
 import { YAHOO_SOURCE_ID, yahooInstruments } from "../lib/etfJobs.ts";
+import { GPW_SOURCE_ID, gpwInstruments } from "../lib/gpwJobs.ts";
 import { fetchSnapshot } from "../lib/onvista.ts";
 import { ONVISTA_SOURCE_ID, onvistaInstruments } from "../lib/onvistaJobs.ts";
 import { fetchYahooDaily } from "../lib/yahoo.ts";
@@ -19,7 +22,10 @@ import { fetchYahooDaily } from "../lib/yahoo.ts";
 const PAUSE_MS = 2000;
 const pause = () => new Promise((r) => setTimeout(r, PAUSE_MS));
 
-type Bar = Omit<BrBar, "date"> & { date: IsoDate };
+type Bar = BrBar;
+
+/** The BiznesRadar page of a Catalyst bond, or of a treasury bond (its GPW code). */
+const biznesradarCode = (inst: InstrumentItem) => inst.sourceIds[BIZNESRADAR_SOURCE_ID] ?? inst.sourceIds[GPW_SOURCE_ID];
 
 /** Today's quote so far, or undefined when the market hasn't traded or quoted today. */
 async function quote(inst: InstrumentItem, day: IsoDate): Promise<{ bar?: Bar; source: string }> {
@@ -33,9 +39,9 @@ async function quote(inst: InstrumentItem, day: IsoDate): Promise<{ bar?: Bar; s
     const data = await fetchYahooDaily(inst.sourceIds[YAHOO_SOURCE_ID]!, day, day);
     if (data.currency !== inst.currency) throw new Error(`Yahoo quotes it in ${data.currency}`);
     const b = data.closes.find((x) => x.date === day);
-    return { bar: b, source: YAHOO_SOURCE_ID };
+    return { bar: b && { ...b, ...(data.lastTime ? { time: data.lastTime } : {}) }, source: YAHOO_SOURCE_ID };
   }
-  const html = await fetchQuotePage(inst.sourceIds[BIZNESRADAR_SOURCE_ID]!);
+  const html = await fetchQuotePage(biznesradarCode(inst)!);
   const b = html ? parseQuotePage(html) : undefined;
   return { bar: b?.date === day ? b : undefined, source: BIZNESRADAR_SOURCE_ID };
 }
@@ -46,8 +52,8 @@ export async function handler(event: { date?: IsoDate } = {}) {
     const all = await repo.listInstruments();
     const bonds = onvistaInstruments(all);
     const etfs = yahooInstruments(all);
-    const catalyst = catalystInstruments(all);
-    const tracked = [...new Set([...bonds, ...etfs, ...catalyst])];
+    const pages = [...catalystInstruments(all), ...gpwInstruments(all)];
+    const tracked = [...new Set([...bonds, ...etfs, ...pages])];
     if (tracked.length === 0) return { itemsWritten: 0, note: "no instruments with live quotes" };
 
     const fetchedAt = new Date().toISOString();
@@ -55,9 +61,9 @@ export async function handler(event: { date?: IsoDate } = {}) {
     const failed: string[] = [];
     let notToday = 0;
     let final = 0;
-    let pages = 0;
+    let fetched = 0;
     for (const inst of tracked) {
-      if (catalyst.includes(inst) && pages++ > 0) await pause();
+      if (pages.includes(inst) && fetched++ > 0) await pause();
       try {
         const { bar, source } = await quote(inst, day);
         if (!bar) {
@@ -83,6 +89,8 @@ export async function handler(event: { date?: IsoDate } = {}) {
           trades: 0,
           turnover: 0,
           traded: bar.volume > 0,
+          ...(bar.volume > 0 ? { lastTradeDate: day } : {}),
+          ...(bar.time ? { quoteTime: bar.time } : {}),
           currency: inst.currency,
           source,
           fetchedAt,

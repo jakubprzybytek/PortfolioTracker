@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
-import { fmtNum, fmtPct, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
+import { fmtNum, fmtPct, fmtTime, priceAgeTitle, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
@@ -97,8 +97,13 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                   </>
                 ) : (
                   <>
-                    <td className={r.stale ? "muted" : ""} title={r.stale ? "Older than a week: no recent price" : ""}>
+                    <td className={r.stale || (r.priceDate && newest && r.priceDate < newest) ? "muted" : ""} title={r.stale ? "Older than a week: no recent price" : priceAgeTitle(r.priceDate, r.priceTime)}>
                       {r.priceDate ?? "no price"}
+                      {r.priceTime && (
+                        <span className="price-time" data-testid="price-time">
+                          {fmtTime(r.priceTime)}
+                        </span>
+                      )}
                       {r.stale && r.priceDate && <span className="flag">stale</span>}
                       {r.manual && (
                         <span className="flag" title="Valued by hand: open the chart for a new value">

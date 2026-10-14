@@ -11,6 +11,8 @@ export interface YahooDaily {
   currency: string;
   exchange: string;
   timezone: string;
+  /** When the latest price was set (ISO, UTC), if Yahoo says. */
+  lastTime?: string;
   /** Oldest first; days without a close are left out. */
   closes: YahooBar[];
 }
@@ -27,7 +29,7 @@ export interface YahooBar {
 interface ChartResponse {
   chart: {
     result?: {
-      meta: { symbol: string; currency: string; exchangeName: string; exchangeTimezoneName: string; gmtoffset: number };
+      meta: { symbol: string; currency: string; exchangeName: string; exchangeTimezoneName: string; gmtoffset: number; regularMarketTime?: number };
       timestamp?: number[];
       indicators: { quote: { open?: (number | null)[]; high?: (number | null)[]; low?: (number | null)[]; close: (number | null)[]; volume?: (number | null)[] }[] };
     }[];
@@ -51,7 +53,8 @@ export function parseYahooChart(json: ChartResponse): YahooDaily {
     if (closes.at(-1)?.date === date) closes[closes.length - 1] = bar;
     else closes.push(bar);
   });
-  return { symbol: r.meta.symbol, currency: pence ? "GBP" : r.meta.currency, exchange: r.meta.exchangeName, timezone: r.meta.exchangeTimezoneName, closes };
+  const lastTime = r.meta.regularMarketTime ? new Date(r.meta.regularMarketTime * 1000).toISOString() : undefined;
+  return { symbol: r.meta.symbol, currency: pence ? "GBP" : r.meta.currency, exchange: r.meta.exchangeName, timezone: r.meta.exchangeTimezoneName, ...(lastTime ? { lastTime } : {}), closes };
 }
 
 /** Daily closes between two ISO dates (inclusive). */

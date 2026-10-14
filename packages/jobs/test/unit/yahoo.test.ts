@@ -23,6 +23,13 @@ describe("parseYahooChart", () => {
     expect(d.closes).toEqual([{ date: "2026-10-12", open: null, high: null, low: null, close: 84.355, volume: 0 }]);
   });
 
+  it("keeps when the latest price was set", () => {
+    const c = chart("EUR", 7200, [1791874800], [167.7]);
+    (c.chart.result[0]!.meta as { regularMarketTime?: number }).regularMarketTime = 1791886500; // 2026-10-13 10:15 UTC
+    expect(parseYahooChart(c).lastTime).toBe("2026-10-13T10:15:00.000Z");
+    expect(parseYahooChart(chart("EUR", 7200, [1791874800], [167.7])).lastTime).toBeUndefined();
+  });
+
   it("throws on an error response", () => {
     expect(() => parseYahooChart({ chart: { result: undefined, error: { code: "Not Found", description: "No data found, symbol may be delisted" } } })).toThrow(/delisted/);
   });

@@ -65,6 +65,8 @@ export interface PriceItem {
   turnover: number;
   traded: boolean;
   lastTradeDate?: IsoDate;
+  /** A price fetched during the day ("Refresh prices"): when the source set it (ISO). The day's close drops it. */
+  quoteTime?: string;
   currency: string;
   source: string;
   fetchedAt: string;
@@ -172,6 +174,8 @@ export interface HoldingSnapshot {
   quantity: number;
   cleanPrice: number | null;
   priceDate: IsoDate | null;
+  /** The price was fetched during the day ("Refresh prices"): when the source set it (ISO). */
+  priceTime?: string;
   nominal: number | null;
   accruedInterest: number | null;
   valuePerUnit: number | null;
