@@ -13,6 +13,7 @@ Status (2026-10-15, `v0.63`): **the whole portfolio is in production** at https:
 | [ingestion.md](ingestion.md) | Scheduled daily jobs, valuation, data quality rules |
 | [backfill.md](backfill.md) | How history is loaded: triggers and order per source |
 | [ui.md](ui.md) | Visualisation: holdings table and charts |
+| [nfr-analysis.md](nfr-analysis.md) | Non-functional review (observability, resilience, performance, security, durability, maintainability): findings and a suggested order of work |
 | [reference/ReferenceFeatures.md](reference/ReferenceFeatures.md) | Feature inventory of the Google Sheets tracker the app reproduces (with its Apps Script code) |
 
 ## Scope
@@ -159,6 +160,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 11. **IBKR Flex Web Service:** IBKR trades without downloading statements (needs a Flex Query and a token); mark prices for US T-bills.
 12. **More Dashboard charts:** income per year, drawdown, allocation over time.
 13. **Asset class per instrument:** bond ETFs are recognised by "Bond" in the name; an explicit setting would be safer (gold, mixed funds).
+20. **XIRR per account, per asset type and per instrument:** today XIRR is per account and for the total, from deposits and withdrawals (`core/valuation/accounts.ts`, Accounts table). Also per asset type and per instrument (Holdings rows and group rows), from the position's own cash flows: buys, sells, coupons, dividends, redemptions and fees, plus its value today; per account the same way, so it can be compared with the deposit-based figure. Closed positions keep theirs (with item 9).
 
 ### Operations and housekeeping
 14. ~~`prod`: drop the old `Table`~~ Done (2026-10-14): it was empty; removed from `sst.config.ts` and deleted in AWS.
@@ -166,6 +168,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
 18. ~~Monthly export of `transactions` to S3~~ Done (2026-10-14): the `Export` job backs up accounts, instruments, prices entered by hand and transactions to `exports/<date>/` on the 1st, in the import formats (data-storage.md, restore: data/README.md).
+21. **Responsiveness when switching views (stale-while-revalidate):** every view refetches everything on each visit and shows placeholders meanwhile (`useApi` has no cache). Keep each response in a client cache keyed by path and parameters: show the cached data at once (marked as possibly stale), refetch in the background and swap in the fresh data; a save or a finished revaluation invalidates the cache (today's `version`). As the SWR library does (or SWR / TanStack Query itself; check the latest version first). See also nfr-analysis.md, "Performance and cost".
 
 ### Beyond the sheet
 19. **Hold or sell a bond:** is a bond worth selling now rather than holding it to maturity? Once owned, what was paid doesn't matter: compare the **yield if held** (what it still pays from today: coupons and 100 % at maturity, after tax, against what selling it would bring today) with an **alternative** for the same period, after the cost of switching.
