@@ -18,6 +18,8 @@ export interface PriceRow {
   stale: boolean;
   /** Price entered by hand (venue MANUAL). */
   manual?: boolean;
+  /** Price calculated, not quoted (venue CALC: IBKR bills and bonds without a quote source). */
+  calculated?: boolean;
   /** Price on or before the same day a year earlier (on today's share basis after a split), and the change since (fraction, e.g. 0.021). */
   yearAgo: { date: IsoDate; price: number } | null;
   change1y: number | null;
@@ -56,6 +58,7 @@ export function priceRows(
         priceDate: now?.date ?? null,
         stale: !now || (now.venue !== "MANUAL" && daysBetween(now.date, today) > staleAfterDays),
         ...(now?.venue === "MANUAL" ? { manual: true } : {}),
+        ...(i.venue === "CALC" ? { calculated: true } : {}),
         yearAgo: then ? { date: then.date, price: then.close } : null,
         change1y: now && then && then.close ? Math.round((now.close / then.close - 1) * 10_000) / 10_000 : null,
       };

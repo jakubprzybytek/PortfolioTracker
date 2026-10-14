@@ -8,7 +8,7 @@
 | Polish treasury bonds on GPW / Catalyst | DS, PS, WZ, IZ series | GPW archive: daily XLS with all treasury bonds | – | GPW archive: full history per bond (1 request each) |
 | Polish corporate bonds on Catalyst | fixed and floating coupons | BiznesRadar: history page + today's quote | – | BiznesRadar: full history per bond (~16 pages) |
 | Polish retail treasury bonds (not traded) | EDO, COI, ROD, ROR … | Calculated from terms + CPI | – | Calculated; checked against obligacjeskarbowe.pl interest tables |
-| Foreign government bonds at IBKR | Bunds, OATs, US T-bills (zero-coupon) | Calculated: constant yield between your trades and redemption at maturity (`pricePath`, trade prices from the IBKR statements) | – | Same, computed once on import. Later: IBKR Flex (mark prices) |
+| Foreign government bonds at IBKR | Bunds, OATs, US T-bills (zero-coupon) | onvista, Börse Stuttgart close (EUR bonds); calculated where there's no quote (US T-bills, matured bonds) | – | onvista daily history (Bund from 2020); calculated paths computed once on import |
 | Manually valued assets | e.g. real-estate projects | Entered by you: "Edit values" in the asset's chart panel (Prices, Holdings) | – | `imports/prices/` |
 | Cash | savings accounts, broker cash | From transactions | – | IBKR activity statements (CSV); the sheet import for the other accounts |
 
@@ -134,12 +134,19 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - **Per lot:** interest runs from each purchase's own date (transaction field `valueDate`), so lots of one series bought days apart differ slightly. Checked against the reference sheet: all open lots identical to the grosz per bond on 2026-10-11.
 - A period whose rate isn't in the file yet keeps the last rate and is flagged `rate_pending`.
 
-### Foreign bonds at IBKR – calculated prices (used, 2026-10-13)
-- Meant for zero-coupon government bonds (Bunds, OATs, US T-bills), short and held to maturity. The instrument's `pricePath` holds your trade prices (% of nominal 1000) and, while held, 100 % at maturity (parsed from IBKR's name, "DE Govt 0.0 Nov15'27"); the backfill stores one price per weekday in between at a constant yield (`core/prices/pricePath.ts`) as `PX#CALC#…`. Exact at every trade and at maturity; between them it ignores market moves (a fraction of a percent for bonds this short). A new trade (re-import) recomputes the path.
+### Foreign bonds at IBKR – onvista quotes (used, 2026-10-14)
+- **Source:** the onvista.de API (unofficial, no key), the same data as its website. `GET api.onvista.de/api/v1/bonds/ISIN:<isin>/snapshot` gives the bond's id and a quote per German exchange (each with an `idNotation`); `GET /api/v1/instruments/BOND/<id>/eod_history?idNotation=…&range=MAX&startDate=…` the daily open/high/low/close/volume, up to the last finished session. Client: `jobs/lib/onvista.ts`.
+- **Exchange:** Börse Stuttgart (`sourceIds.onvista = "STU"`, venue `XSTU`): its market maker quotes the Bunds and OATs every trading day, even without trades. Checked on the three IBKR statement dates (2025-04-17, 2026-04-17, 2026-10-12): within 0.015 of IBKR's mark price for both bonds. Paris (the OAT's home market) has gaps and odd closes on onvista; Frankfurt has fewer quotes.
+- **Daily:** the `eod-bonds` job (ingestion.md); the backfill loads the whole history when the source is set. Clean price, % of nominal; the bonds held are zero-coupon, so there's no accrued interest.
+- **Not covered:** US T-bills (not listed in Germany) and matured bonds: they keep calculated prices (below).
+- Compared with the calculated prices, the quotes differed by up to about 1 % (the constant-yield line ignores interest-rate moves).
+
+### Foreign bonds at IBKR – calculated prices (used for bills and matured bonds, 2026-10-13)
+- Meant for zero-coupon government bonds (Bunds, OATs, US T-bills), short and held to maturity. The instrument's `pricePath` holds your trade prices (% of nominal 1000) and, while held, 100 % at maturity (parsed from IBKR's name, "DE Govt 0.0 Nov15'27"); the backfill stores one price per weekday in between at a constant yield (`core/prices/pricePath.ts`) as `PX#CALC#…`. Exact at every trade and at maturity; between them it ignores market moves (up to about 1 % for a two-year Bund). A new trade (re-import) recomputes the path. A bond with a quote source (`sourceIds.onvista`) uses the quotes instead.
 - The trade prices in `pricePath` are IBKR's (statement `T. Price`); a new trade means adding its price to the instrument (re-import it) so the path is recomputed.
 - IBKR is kept in its currencies (2026-10-13): trades, fees and redemptions in the currency paid (EUR, USD), conversions as `EXCHANGE`, cash per currency, the account's own currency EUR. Its transactions come from the IBKR activity statements (above). Before that they were converted from the sheet, which booked everything in PLN (currency positions `Waluty_EUR` bought and sold with PLN); `core/transactions/nativeLedger.ts` pairs those back (sheet conversion `--native IBKR=EUR`) and stays for converting the sheet.
 
-### IBKR Flex Web Service – IBKR bonds, positions, cash (later)
+### IBKR Flex Web Service – IBKR trades, positions, cash (later)
 - Would replace downloading statements by hand: the same activity data, fetched by a job.
 - Token + query ID; plain HTTPS request; works from Lambda (no gateway).
 - Data: positions with IBKR's mark prices and accrued interest, trades, cash, dividends/coupons.

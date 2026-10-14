@@ -34,7 +34,7 @@ Reference data and transactions come first, because they define which instrument
 | 7 | ETFs: prices, splits, dividends | EODHD, one paid month (plan kept afterwards for live quotes) | ≈ $20 | script |
 | 8 | Treasury bonds on GPW | GPW archive XLS, one file per bond with full history | free | script (PoC done) |
 | 9 | Catalyst corporate bonds | Bossa EOD files → Cbonds trial → Biznesradar (see below) | free / trial | depends |
-| 10 | EU government bonds at IBKR | Calculated from the trade prices (done); later IBKR Flex mark prices; Bundesbank for German Bunds | free | script |
+| 10 | EU government bonds at IBKR | onvista (Börse Stuttgart) daily history (done); calculated from the trade prices for US T-bills | free | backfill |
 | 11 | Portfolio snapshots | `valuation` job run for every date in the range | free | script |
 
 ## Per step
@@ -82,7 +82,7 @@ Try in this order and stop at the first that works:
 Accrued interest is computed by the valuation from each bond's terms. Floating-rate bonds also need the coupon rate of every past period since purchase (entered once, or taken from the Catalyst interest tables).
 
 ### 10. IBKR bonds
-- Done without Flex: prices calculated between the trade prices and 100 % at maturity (data-sources.md). With Flex:
+- Done without Flex: the EUR bonds' whole history from onvista (Börse Stuttgart); US T-bills and matured bonds calculated between the trade prices and 100 % at maturity (data-sources.md). With Flex:
 - Flex query with a custom date range; positions include IBKR's mark price and accrued interest per day.
 - Flex limits the length of one statement period, so run it in chunks (e.g. monthly) and merge.
 - German Bunds: optionally cross-check with the Bundesbank daily price series.

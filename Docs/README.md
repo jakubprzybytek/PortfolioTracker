@@ -21,7 +21,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 |---|---|
 | **1 – Polish bonds** (now) | Treasury bonds on GPW (fixed and inflation-linked IZ), Catalyst corporate bonds, retail bonds (EDO, COI, ROD); transactions import; daily valuation incl. accrued interest; table + charts |
 | 2 – ETFs | Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; later "live" (15-min delayed) quotes |
-| 3 – IBKR, FX | Done: foreign bonds (calculated prices), cash per currency, NBP rates; IBKR's history from its activity statements. Later: IBKR Flex for new trades and mark prices |
+| 3 – IBKR, FX | Done: foreign bonds (Börse Stuttgart closes via onvista; calculated for US T-bills), cash per currency, NBP rates; IBKR's history from its activity statements. Later: IBKR Flex for new trades |
 
 ## Architecture
 
@@ -30,6 +30,7 @@ Status (2026-10-11): **phase 1 in production as `v0.1`** at https://portfoliotra
 sst.aws.Cron ────────────┼─► Lambda eod-gpw  20:30, 22:00   treasury bonds, daily all-bonds XLS   │
                          ├─► Lambda eod-catalyst   19:30   corporate bonds (BiznesRadar)         │
                          │                         (+08:00 next morning)                         ├──► DynamoDB: market, transactions, holdings
+                         ├─► Lambda eod-bonds      22:10   IBKR bonds (onvista, Stuttgart)       │
                          ├─► Lambda monthly        16th    CPI, IZ reference index, retail rates  │        ▲
                          └─► Lambda valuation      22:30 + 07:30                                 │        │
                                                                                                  │   Lambda backfill  ◄── manual (sst shell / CLI)
@@ -134,7 +135,7 @@ Later phases:
 The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 19, 8.
 
 ### Correctness and accuracy
-1. **Foreign bonds at IBKR are priced by calculation** (constant yield from the trades to 100 % at maturity), not quoted; the sheet's price for one of them differs by about 1 %. Mark prices from IBKR Flex (11) would settle it.
+1. ~~Foreign bonds at IBKR are priced by calculation~~ Done (2026-10-14): the EUR bonds are priced from Börse Stuttgart's closes (onvista, `eod-bonds`), within 0.015 of IBKR's marks; the calculated prices had been up to 1 % off. US T-bills (none held now) stay calculated.
 2. **Accrued interest of listed treasury bonds:** a few grosz per bond below the sheet's for IZ0836 (the sheet likely counts to settlement, T+2). Check which convention to follow.
 3. **Corporate bonds are valued clean,** without accrued interest (a choice: all are floating WIBOR + margin and WIBOR history isn't free); about 0.1 % of the portfolio below the sheet. Options: rates from the coupons received, or hand-entered rates. gpwcatalyst.pl (the sheet's source) stopped answering from here on 2026-10-12; recheck before relying on it.
 4. ~~Holdings row charts after an edit or a delete~~ Done (2026-10-14): a revaluation removes the days of positions that are gone; the days left by earlier edits were cleaned up on `prod` (1,856, all from the IBKR rebuild).
@@ -146,7 +147,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 8. **Targets and rebalancing:** target share per asset class (the sheet has them), target vs actual next to the asset mix, amount to buy or sell.
 9. **Closed positions:** realised gain is shown as a total (Dashboard, per account); still missing: the list of closed positions and sales, and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
-11. **IBKR Flex Web Service:** IBKR trades and mark prices without typing them or downloading statements (needs a Flex Query and a token).
+11. **IBKR Flex Web Service:** IBKR trades without downloading statements (needs a Flex Query and a token); mark prices for US T-bills.
 12. **More Dashboard charts:** income per year, drawdown, allocation over time.
 13. **Asset class per instrument:** bond ETFs are recognised by "Bond" in the name; an explicit setting would be safer (gold, mixed funds).
 
@@ -163,4 +164,4 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
     - "Sell" by kind: listed treasury and corporate bonds at the market price (corporates: often a thin bid); retail bonds by early redemption (nominal + interest − the Ministry's fee per bond); IBKR bonds at IBKR's price.
     - Tax: in a taxable account a sale at a gain pays 19 % now instead of at maturity (counts against selling); none in IKE/IKZE (from the account).
     - Assumptions (a small settings screen): a CPI path (IZ and retail bonds: EDO, COI, ROD), a WIBOR path (floating corporates, WZ), the alternative: by default the current retail offer nearest the remaining term (rates and margins already in the Ministry file), or a listed treasury bond of similar maturity, or a rate you set.
-    - Order: retail bonds and fixed-rate DS (all data in place) → IZ and corporate bonds (need the corporates' margins and coupon dates, item 3) → IBKR bonds (need real quotes: their prices are calculated from the purchase, so the yield would always equal the purchase yield; item 11 or Bundesbank).
+    - Order: retail bonds and fixed-rate DS (all data in place) → IZ and corporate bonds (need the corporates' margins and coupon dates, item 3) → IBKR bonds (quoted since 2026-10-14; US T-bills are still calculated, so their yield would equal the purchase yield).

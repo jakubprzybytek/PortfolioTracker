@@ -119,8 +119,10 @@ export async function importInstruments(json: string) {
     const splitsChanged = JSON.stringify(before?.splits ?? []) !== JSON.stringify(item.splits ?? []);
     // Calculated prices: recompute whenever the known points change (a new trade).
     const pathChanged = JSON.stringify(before?.pricePath ?? []) !== JSON.stringify(item.pricePath ?? []);
+    // A new source or venue (e.g. an IBKR bond going from calculated to quoted prices): load its history.
+    const sourceChanged = !!before && (before.venue !== item.venue || JSON.stringify(before.sourceIds) !== JSON.stringify(item.sourceIds));
     if (item.pricePath?.length && pathChanged) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
-    else if (hasSource && (splitsChanged || !(await repo.getBackfillStatus(i.isin)))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
+    else if (hasSource && (splitsChanged || sourceChanged || !(await repo.getBackfillStatus(i.isin)))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
   }
   // Instruments priced in another currency need NBP rates for their whole history: fetch what's missing now.
   if (inputs.some((i) => i.currency !== "PLN")) await invokeAsync(Resource.Fx.name, {});

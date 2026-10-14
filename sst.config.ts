@@ -142,6 +142,20 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
+    // Foreign government bonds at IBKR (onvista, Börse Stuttgart, open until 22:00): before the 22:30 valuation,
+    // and a morning pass that turns today's quote into the final close.
+    new sst.aws.CronV2("EodBonds", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/eodBonds.handler" },
+      schedule: "cron(10 22 ? * MON-FRI *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
+    new sst.aws.CronV2("RecheckBonds", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/eodBonds.handler" },
+      schedule: "cron(10 7 ? * TUE-SAT *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
     // NBP table A is published around 12:00 on business days; the afternoon run catches a late table.
     new sst.aws.CronV2("FxNoon", { function: fx.arn, schedule: "cron(30 12 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
     new sst.aws.CronV2("FxAfternoon", { function: fx.arn, schedule: "cron(30 16 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });

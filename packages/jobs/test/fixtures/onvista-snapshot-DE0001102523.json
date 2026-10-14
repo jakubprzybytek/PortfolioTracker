@@ -1,0 +1,64 @@
+{
+ "instrument": {
+  "entityValue": "175499953",
+  "isin": "DE0001102523",
+  "name": "Bundesanleihe v. 2020 (15.11.2027)"
+ },
+ "quoteList": {
+  "list": [
+   {
+    "market": {
+     "name": "Frankfurt",
+     "codeMarket": "_FRA",
+     "nameExchange": "Frankfurt",
+     "codeExchange": "FRA",
+     "idNotation": 293356294,
+     "isoCountry": "DE",
+     "codeExchangeGoogle": "FRA"
+    },
+    "isoCurrency": "EUR",
+    "datetimeLast": "2026-10-14T09:36:03.550+00:00",
+    "open": 96.881,
+    "high": 96.893,
+    "low": 96.874,
+    "last": 96.888,
+    "volume": 70000
+   },
+   {
+    "market": {
+     "name": "Stuttgart",
+     "codeMarket": "_STU",
+     "nameExchange": "Stuttgart",
+     "codeExchange": "STU",
+     "idNotation": 293356300,
+     "isoCountry": "DE"
+    },
+    "isoCurrency": "EUR",
+    "datetimeLast": "2026-10-14T10:26:10.191+00:00",
+    "open": 96.843,
+    "high": 96.879,
+    "low": 96.843,
+    "last": 96.879,
+    "volume": 3100000
+   },
+   {
+    "market": {
+     "name": "Baader Trading",
+     "codeMarket": "@_BBF",
+     "nameExchange": "außerbörslich Deutschland",
+     "codeExchange": "@DE",
+     "nameContributor": "Baader Trading",
+     "codeContributor": "BBF",
+     "idNotation": 293858576,
+     "isoCountry": "DE"
+    },
+    "isoCurrency": "EUR",
+    "datetimeLast": "2026-10-14T09:50:54.347+00:00",
+    "open": 96.8695,
+    "high": 96.8965,
+    "low": 96.8665,
+    "last": 96.8805
+   }
+  ]
+ }
+}

@@ -134,7 +134,9 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                 {sel?.type === "BOND_LISTED" || sel?.type === "BOND_CORPORATE"
                   ? " · clean price, % of nominal"
                   : sel?.type === "BOND_IBKR"
-                    ? ` · calculated (constant yield between your trades and redemption), % of nominal in ${sel.currency}`
+                    ? sel.calculated
+                      ? ` · calculated (constant yield between your trades and redemption), % of nominal in ${sel.currency}`
+                      : ` · clean price on Börse Stuttgart, % of nominal in ${sel.currency}`
                   : sel?.type === "BOND_RETAIL"
                     ? " · value per bond, PLN (calculated, nominal 100)"
                     : sel

@@ -7,6 +7,7 @@ import { interpolatePricePath, today, type PriceItem } from "@portfolio/core";
 import { BIZNESRADAR_SOURCE_ID, backfillBiznesradarHistory } from "../lib/catalystJobs.ts";
 import { YAHOO_SOURCE_ID, backfillYahooHistory } from "../lib/etfJobs.ts";
 import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
+import { ONVISTA_SOURCE_ID, backfillOnvistaHistory } from "../lib/onvistaJobs.ts";
 
 export interface BackfillEvent {
   isin: string;
@@ -54,7 +55,19 @@ export async function backfillInstrument(isin: string): Promise<{ status: string
     }
   }
 
-  // Calculated prices (foreign bonds at IBKR): the whole path from the first trade to maturity, at once.
+  if (inst.sourceIds[ONVISTA_SOURCE_ID]) {
+    await repo.putBackfillStatus({ isin, status: "running", source: ONVISTA_SOURCE_ID });
+    try {
+      const result = await backfillOnvistaHistory(inst, today());
+      await repo.putBackfillStatus({ isin, status: "done", source: ONVISTA_SOURCE_ID, ...result });
+      return { status: "done", ...result };
+    } catch (err) {
+      await repo.putBackfillStatus({ isin, status: "failed", source: ONVISTA_SOURCE_ID, note: String((err as Error).message) });
+      throw err;
+    }
+  }
+
+  // Calculated prices (foreign bonds at IBKR without a quote: bills, matured bonds): the whole path from the first trade to maturity, at once.
   if (inst.pricePath?.length) {
     const fetchedAt = new Date().toISOString();
     const items = interpolatePricePath(inst.pricePath).map(
