@@ -40,6 +40,11 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
       ),
     [all, instrument, account, type],
   );
+  // Rows of one date share a background; the next date switches to the other one (as shown, after the filters).
+  const bands = useMemo(() => {
+    let band: "a" | "b" = "b";
+    return rows.map((t, i) => (band = i > 0 && t.date === rows[i - 1]!.date ? band : band === "a" ? "b" : "a"));
+  }, [rows]);
 
   const set = (key: string) => (value: string) => setParams({ ...params, [key]: value || undefined });
 
@@ -74,8 +79,15 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
           </thead>
           <tbody>
             {!txs.data && txs.loading && <SkeletonRows rows={12} cols={10} />}
-            {rows.map((t) => (
-              <tr key={`${t.account}/${t.id}`} data-testid="transaction-row" data-id={t.id} className="clickable" onClick={() => form.open(t)} title="Edit or delete">
+            {rows.map((t, i) => (
+              <tr
+                key={`${t.account}/${t.id}`}
+                data-testid="transaction-row"
+                data-id={t.id}
+                className={`clickable band-${bands[i]}`}
+                onClick={() => form.open(t)}
+                title="Edit or delete"
+              >
                 <td className="left">{t.date}</td>
                 <td className="left">{t.account}</td>
                 <td className="left">{TX_TYPE_LABELS[t.type] ?? t.type}</td>

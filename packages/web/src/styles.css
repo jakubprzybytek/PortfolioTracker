@@ -12,6 +12,7 @@
   --pos: #047857;
   --neg: #b91c1c;
   --row: #fafbfc;
+  --band: #f1f4f8;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   font-size: 15px;
@@ -32,6 +33,7 @@
     --pos: #4ade80;
     --neg: #f87171;
     --row: #1b2029;
+    --band: #212733;
     --shadow: none;
   }
 }
@@ -102,6 +104,13 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
 }
 table.static th { cursor: default; }
 tr.group td { font-weight: 600; background: var(--row); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+/* Holdings by account: each account's header row stands out, so the accounts are easy to tell apart. */
+tr.account-group td { background: var(--accent-soft); font-size: 0.95rem; font-weight: 700; padding-top: 11px; padding-bottom: 11px; border-top: 2px solid color-mix(in srgb, var(--accent) 35%, var(--border)); }
+tr.account-group td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+tbody tr.account-group:first-child td { border-top: 0; }
+/* Transactions: rows of one date share a background, neighbouring dates alternate. */
+tr.band-b td { background: var(--band); }
+tr.band-b:hover td { background: transparent; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--fg); border-bottom: 0; }
 td.indent { padding-left: 26px; }
 td.wrap { white-space: normal; min-width: 160px; }

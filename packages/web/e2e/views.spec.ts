@@ -34,6 +34,20 @@ test.describe("transactions view", () => {
     await expect(page.getByTestId("filters-summary")).toHaveText("31 of 31 transactions");
   });
 
+  test("rows of one date share a background; the next date has the other one", async ({ page }) => {
+    await page.goto("/#/transactions");
+    const rows = page.getByTestId("transaction-row");
+    await expect(rows).toHaveCount(31);
+    const list = await rows.evaluateAll((trs) => trs.map((tr) => ({ date: tr.querySelector("td")!.textContent, band: tr.className.match(/band-(a|b)/)?.[1] })));
+    expect(list[0]!.band).toBe("a");
+    for (let i = 1; i < list.length; i++) {
+      const same = list[i]!.date === list[i - 1]!.date;
+      expect(list[i]!.band === list[i - 1]!.band, `${list[i]!.date} after ${list[i - 1]!.date}`).toBe(same);
+    }
+    const colors = await rows.evaluateAll((trs) => trs.slice(0, 2).map((tr) => getComputedStyle(tr.querySelector("td")!).backgroundColor));
+    expect(colors[0]).not.toBe(colors[1]); // different dates (2026-09-30, 2026-06-01): visibly different
+  });
+
   test("filters by instrument, account and asset type, and keeps filters in the URL", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");

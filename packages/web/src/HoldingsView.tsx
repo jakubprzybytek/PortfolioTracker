@@ -477,7 +477,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
             {!byInstrument &&
               groups.map((g) => (
               <Fragment key={g.name}>
-                <tr className="group" data-testid={`account-${g.name}`}>
+                <tr className="group account-group" data-testid={`account-${g.name}`}>
                   <td className="left" colSpan={5}>
                     {g.name} <span className="muted">· {g.holdings.length}</span>
                     {g.incomplete.length > 0 && <IncompleteFlag what={g.incomplete} />}
