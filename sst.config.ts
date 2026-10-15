@@ -180,7 +180,7 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
-    // Backup of accounts, instruments, hand-entered prices and transactions (the data that exists nowhere else) to
+    // Backup of accounts, instruments, hand-entered prices, transactions and notes (the data that exists nowhere else) to
     // exports/<date>/ in the bucket, in the import formats.
     new sst.aws.CronV2("Export", {
       function: { ...defaults, handler: "packages/jobs/src/handlers/export.handler", link: [...link, market, transactions] },
@@ -270,6 +270,10 @@ export default $config({
     api.route("GET /indicators/{id}", apiHandler, auth);
     api.route("GET /holdings/history", apiHandler, auth);
     api.route("GET /status", apiHandler, auth);
+    api.route("GET /notes", apiHandler, auth);
+    api.route("POST /notes", apiHandler, auth);
+    api.route("PUT /notes/{id}", apiHandler, auth);
+    api.route("DELETE /notes/{id}", apiHandler, auth);
 
     const router = new sst.aws.Router("Router", { domain });
     router.route("/api", api.url, { rewrite: { regex: "^/api/(.*)$", to: "/$1" } });

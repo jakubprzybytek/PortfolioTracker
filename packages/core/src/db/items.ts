@@ -180,6 +180,19 @@ export interface TransactionItem {
   source: string;
 }
 
+/** A note (Notes view): Markdown text with a title. Transactions table, as it's your input. */
+export interface NoteItem {
+  PK: `NOTE#${string}`;
+  SK: "META";
+  GSI1PK: "NOTE";
+  GSI1SK: string; // id
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** One position: an instrument held in one account. */
 export interface HoldingSnapshot {
   account: string;
@@ -285,6 +298,7 @@ export const keys = {
   backfill: (isin: string) => ({ PK: `INST#${isin}` as const, SK: "BACKFILL" as const }),
   positionDay: (account: string, isin: string, date: IsoDate) => ({ PK: `POS#${account}#${isin}` as const, SK: date }),
   account: (account: string) => ({ PK: `ACCT#${account}` as const, SK: "META" as const }),
+  note: (id: string) => ({ PK: `NOTE#${id}` as const, SK: "META" as const }),
   retailSeries: (series: string) => ({ PK: `SERIES#${series}` as const, SK: "META" as const }),
   jobRun: (job: string, startedAt: string) => ({ PK: `JOB#${job}` as const, SK: `RUN#${startedAt}` as const }),
 };

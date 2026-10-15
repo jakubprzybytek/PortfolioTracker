@@ -1,15 +1,16 @@
 // The backup of what the app can't fetch again: accounts, instruments, hand-entered prices, coupon periods (rates you
-// entered or accepted) and transactions, each in
+// entered or accepted), transactions and notes, each in
 // its import file format (data/README.md). Restoring = uploading the files to imports/<kind>/ in that order.
 
-import type { AccountItem, CouponPeriodItem, InstrumentItem, PriceItem, TransactionItem } from "../db/items.ts";
+import type { AccountItem, CouponPeriodItem, InstrumentItem, NoteItem, PriceItem, TransactionItem } from "../db/items.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
 import type { InstrumentInput } from "../instruments/schema.ts";
+import type { NoteInput } from "../notes/schema.ts";
 import type { ManualPriceInput } from "../prices/manual.ts";
 import type { TransactionInput } from "../transactions/schema.ts";
 
 /** In restore order. */
-export const EXPORT_KINDS = ["accounts", "instruments", "prices", "coupons", "transactions"] as const;
+export const EXPORT_KINDS = ["accounts", "instruments", "prices", "coupons", "transactions", "notes"] as const;
 export type ExportKind = (typeof EXPORT_KINDS)[number];
 
 /** Not instruments: the MF calculator terms are kept as a pseudo-instrument (restored by importing the calculator). */
@@ -35,7 +36,7 @@ export function instrumentInput(i: InstrumentItem): InstrumentInput {
   };
 }
 
-export function exportFiles(data: { accounts: AccountItem[]; instruments: InstrumentItem[]; manualPrices: PriceItem[]; couponPeriods?: CouponPeriodItem[]; transactions: TransactionItem[] }): Record<ExportKind, unknown[]> {
+export function exportFiles(data: { accounts: AccountItem[]; instruments: InstrumentItem[]; manualPrices: PriceItem[]; couponPeriods?: CouponPeriodItem[]; transactions: TransactionItem[]; notes?: NoteItem[] }): Record<ExportKind, unknown[]> {
   const accounts = [...data.accounts]
     .sort((a, b) => a.account.localeCompare(b.account))
     .map((a) => ({ account: a.account, ...(a.incomplete?.length ? { incomplete: a.incomplete } : {}), ...(a.baseCurrency ? { baseCurrency: a.baseCurrency } : {}) }));
@@ -54,5 +55,6 @@ export function exportFiles(data: { accounts: AccountItem[]; instruments: Instru
   const transactions: TransactionInput[] = [...data.transactions]
     .sort((a, b) => a.date.localeCompare(b.date) || a.account.localeCompare(b.account) || a.id.localeCompare(b.id))
     .map(({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...t }) => t);
-  return { accounts, instruments, prices, coupons, transactions };
+  const notes: NoteInput[] = [...(data.notes ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)).map(({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...n }) => n);
+  return { accounts, instruments, prices, coupons, transactions, notes };
 }

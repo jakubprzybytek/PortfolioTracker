@@ -1,5 +1,5 @@
 // HTTP API for the UI (see Docs/ui.md). Reads, plus adding/editing/deleting transactions and adding instruments
-// (the "Add transaction" form), new values of hand-valued assets, and corporate bonds' coupon periods. Every route needs a Cognito login (checked by API Gateway) in one of the stage's
+// (the "Add transaction" form), new values of hand-valued assets, corporate bonds' coupon periods, and notes. Every route needs a Cognito login (checked by API Gateway) in one of the stage's
 // access groups (checked here).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
@@ -12,6 +12,8 @@ import {
   InstrumentInput,
   ManualTransaction,
   NewInstrument,
+  NoteFields,
+  newNoteId,
   corporateInstrument,
   etfInstrument,
   manualInstrument,
@@ -37,6 +39,7 @@ import {
   type IndicatorSummary,
   type InstrumentItem,
   type InterestPeriod,
+  type NoteItem,
   type PriceItem,
   type TransactionItem,
 } from "@portfolio/core";
@@ -104,6 +107,8 @@ async function corporateBond(isin: string | undefined): Promise<{ inst: Instrume
   if (inst.type !== "BOND_CORPORATE" || !inst.nominal) return { error: json(400, { error: `${inst.code} isn't a corporate bond: no coupon periods` }) };
   return { inst };
 }
+
+const noteOf = ({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...n }: NoteItem) => n;
 
 const periodOf = ({ PK: _p, SK: _s, updatedAt: _u, ...p }: InterestPeriod & { PK?: unknown; SK?: unknown; updatedAt?: unknown }): InterestPeriod => p;
 
@@ -391,6 +396,31 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
         const txs = (await repo.listTransactions()).filter((t) => t.isin === isin);
         return json(200, txs.map(withoutKeys));
+      }
+      case "GET /notes": {
+        // All notes, the last changed first.
+        const notes = (await repo.listNotes()).map(noteOf);
+        return json(200, notes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+      }
+      case "POST /notes":
+      case "PUT /notes/{id}": {
+        const parsed = NoteFields.safeParse(bodyOf(event));
+        if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+        const now = new Date().toISOString();
+        let existing: NoteItem | undefined;
+        if (route.startsWith("PUT")) {
+          existing = await repo.getNote(event.pathParameters?.["id"] ?? "");
+          if (!existing) return json(404, { error: "No such note" });
+        }
+        const note = { ...parsed.data, id: existing?.id ?? newNoteId(), createdAt: existing?.createdAt ?? now, updatedAt: now };
+        await repo.putNotes([note]);
+        return json(existing ? 200 : 201, note);
+      }
+      case "DELETE /notes/{id}": {
+        const existing = await repo.getNote(event.pathParameters?.["id"] ?? "");
+        if (!existing) return json(404, { error: "No such note" });
+        await repo.deleteNote(existing.id);
+        return json(200, noteOf(existing));
       }
       case "GET /status": {
         const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];

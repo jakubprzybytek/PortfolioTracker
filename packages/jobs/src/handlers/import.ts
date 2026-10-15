@@ -6,6 +6,7 @@
 //   imports/accounts/*.json        account metadata [{ account, incomplete: ["ETFs", …] }]
 //   imports/coupons/*.json         coupon periods of corporate bonds [{ isin, start, end, recordDate, paymentDate, rate … }]
 //   imports/transactions/*.json    your transactions
+//   imports/notes/*.json           notes [{ id, title, body, createdAt, updatedAt }] (the backup's notes.json)
 
 import type { S3Event } from "aws-lambda";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -16,6 +17,7 @@ import {
   parseInstrumentFile,
   parseManualPrices,
   parseMfCalculator,
+  parseNotesFile,
   parseRetailRates,
   parseTransactionFile,
   type BondTerms,
@@ -168,6 +170,10 @@ export async function importKey(bucket: string, key: string): Promise<{ itemsWri
       const r = await importTransactions(content.toString("utf8"), key);
       return { itemsWritten: r.transactions, note: `${key}: ${r.transactions} transactions` };
     }
+    case "notes": {
+      const n = await repo.putNotes(parseNotesFile(content.toString("utf8")));
+      return { itemsWritten: n, note: `${key}: ${n} notes` };
+    }
     default:
       throw new Error(`Unknown import kind "${kind}" in ${key}`);
   }
@@ -183,7 +189,7 @@ export async function handler(event: S3Event) {
       const result = await importKey(r.s3.bucket.name, key);
       itemsWritten += result.itemsWritten;
       notes.push(result.note);
-      revalue ||= !key.includes("/instruments/"); // new instruments get valued after their backfill instead
+      revalue ||= !key.includes("/instruments/") && !key.includes("/notes/"); // new instruments get valued after their backfill instead; notes don't count
     }
     if (revalue) await queueValuation({ reason: "import" });
     return { itemsWritten, note: notes.join("; ") };

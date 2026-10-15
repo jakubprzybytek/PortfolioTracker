@@ -518,3 +518,39 @@ test.describe("indicators view", () => {
     await expect.poll(async () => Number(await page.getByTestId("indicator-chart").getAttribute("data-points"))).toBeGreaterThan(240); // ~250 business days in 1Y
   });
 });
+
+test.describe("notes view", () => {
+  test("writes a note in Markdown with a live preview, shows it rendered, edits and deletes it", async ({ page }) => {
+    const title = `E2E note ${Date.now()}`;
+    await page.goto("/#/notes");
+    await expect(page.getByTestId("nav-notes")).toHaveAttribute("aria-current", "page");
+    await page.getByTestId("note-new").click();
+    await expect(page).toHaveURL(/#\/notes\?note=new$/);
+    await page.getByTestId("note-title-input").fill(title);
+    await page.getByTestId("note-body-input").fill("## Checklist\n\n- **bold** item\n- [x] done\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n<script>window.hacked = 1</script>");
+    await expect(page.getByLabel("Preview").getByRole("heading", { name: "Checklist" })).toBeVisible();
+    await page.getByTestId("note-save").click();
+
+    await expect(page).toHaveURL(/#\/notes\?note=[a-f0-9]+$/);
+    await expect(page.getByTestId("note-title")).toHaveText(title);
+    const rendered = page.getByTestId("note-rendered");
+    await expect(rendered.getByRole("heading", { name: "Checklist", level: 2 })).toBeVisible();
+    await expect(rendered.locator("strong")).toHaveText("bold");
+    await expect(rendered.locator("table td")).toHaveText(["1", "2"]);
+    await expect(rendered.locator('input[type="checkbox"]')).toBeChecked();
+    expect(await page.evaluate(() => (window as unknown as { hacked?: number }).hacked)).toBeUndefined(); // raw HTML isn't run
+    await expect(page.getByTestId("note-item").filter({ hasText: title })).toHaveAttribute("aria-current", "page");
+
+    await page.getByTestId("note-edit").click();
+    await page.getByTestId("note-body-input").fill("Just *text* now");
+    await page.getByTestId("note-save").click();
+    await expect(page.getByTestId("note-rendered").locator("em")).toHaveText("text");
+    await page.reload();
+    await expect(page.getByTestId("note-rendered")).toHaveText("Just text now");
+
+    await page.getByTestId("note-delete").click();
+    await page.getByTestId("note-delete-confirm").click();
+    await expect(page).toHaveURL(/#\/notes$/);
+    await expect(page.getByTestId("note-item").filter({ hasText: title })).toHaveCount(0);
+  });
+});

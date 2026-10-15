@@ -8,6 +8,7 @@ const paths: Record<View | "menu" | "close" | "logout" | "clear-filters" | "refr
   prices: "M3 17l6-6 4 4 8-8M15 7h6v6",
   indicators: "M5 20V10M12 20V4M19 20v-7",
   transactions: "M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3",
+  notes: "M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7",
   menu: "M4 7h16M4 12h16M4 17h16",
   close: "M6 6l12 12M18 6L6 18",
   logout: "M9 4H5v16h4M16 16l4-4-4-4M20 12H10",

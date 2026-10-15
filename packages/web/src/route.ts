@@ -3,13 +3,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type View = "dashboard" | "holdings" | "prices" | "indicators" | "transactions";
+export type View = "dashboard" | "holdings" | "prices" | "indicators" | "transactions" | "notes";
 export const VIEWS: { view: View; label: string; path: string }[] = [
   { view: "dashboard", label: "Dashboard", path: "#/" },
   { view: "holdings", label: "Holdings", path: "#/holdings" },
   { view: "prices", label: "Prices", path: "#/prices" },
   { view: "indicators", label: "Indicators", path: "#/indicators" },
   { view: "transactions", label: "Transactions", path: "#/transactions" },
+  { view: "notes", label: "Notes", path: "#/notes" },
 ];
 
 export interface Route {
@@ -20,7 +21,7 @@ export interface Route {
 export function parseHash(hash: string): Route {
   const [path = "", query = ""] = hash.replace(/^#/, "").split("?");
   const name = path.replace(/^\/+|\/+$/g, "");
-  const view: View = name === "holdings" || name === "prices" || name === "indicators" || name === "transactions" ? name : "dashboard";
+  const view: View = name === "holdings" || name === "prices" || name === "indicators" || name === "transactions" || name === "notes" ? name : "dashboard";
   return { view, params: Object.fromEntries(new URLSearchParams(query)) };
 }
 

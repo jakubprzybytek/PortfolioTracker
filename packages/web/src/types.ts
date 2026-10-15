@@ -16,3 +16,11 @@ export interface Status {
   now: string;
   jobs: Record<string, { status: "ok" | "failed"; finishedAt?: string; note?: string; itemsWritten?: number } | null>;
 }
+export interface Note {
+  id: string;
+  title: string;
+  /** Markdown. */
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}

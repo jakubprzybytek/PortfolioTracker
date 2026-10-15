@@ -3,6 +3,7 @@ import { exportFiles } from "../src/backup/export.ts";
 import { parseCouponPeriods } from "../src/bonds/couponPeriods.ts";
 import type { AccountItem, InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
 import { parseInstrumentFile } from "../src/instruments/schema.ts";
+import { NoteFields, parseNotesFile } from "../src/notes/schema.ts";
 import { parseManualPrices } from "../src/prices/manual.ts";
 import { parseTransactionFile } from "../src/transactions/schema.ts";
 
@@ -28,6 +29,10 @@ describe("exportFiles", () => {
       tx({ id: "b", date: "2026-10-02", type: "DEPOSIT", amount: 100, source: "app" }),
       tx({ id: "a", date: "2026-10-01", type: "BUY", isin: "ZZRZESZOW000", quantity: 1, price: 1000, amount: -1000, source: "imports/transactions/x.json" }),
     ],
+    notes: [
+      { PK: "NOTE#n2", SK: "META", GSI1PK: "NOTE", GSI1SK: "n2", id: "n2", title: "Later", body: "", createdAt: "2026-10-15T10:00:00.000Z", updatedAt: "2026-10-15T10:00:00.000Z" },
+      { PK: "NOTE#n1", SK: "META", GSI1PK: "NOTE", GSI1SK: "n1", id: "n1", title: "IBKR", body: "# Best practices\n\n- one", createdAt: "2026-10-14T10:00:00.000Z", updatedAt: "2026-10-16T10:00:00.000Z" },
+    ],
   });
 
   it("writes each kind in its import format, which the importers read back", () => {
@@ -50,5 +55,25 @@ describe("exportFiles", () => {
       ["a", "imports/transactions/x.json"],
       ["b", "app"],
     ]);
+  });
+
+  it("keeps notes whole, oldest first, readable by the notes import", () => {
+    expect(parseNotesFile(JSON.stringify(files.notes))).toEqual([
+      { id: "n1", title: "IBKR", body: "# Best practices\n\n- one", createdAt: "2026-10-14T10:00:00.000Z", updatedAt: "2026-10-16T10:00:00.000Z" },
+      { id: "n2", title: "Later", body: "", createdAt: "2026-10-15T10:00:00.000Z", updatedAt: "2026-10-15T10:00:00.000Z" },
+    ]);
+  });
+});
+
+describe("notes", () => {
+  it("need a title; the text may be empty", () => {
+    expect(NoteFields.safeParse({ title: "  a ", body: "" }).data).toEqual({ title: "a", body: "" });
+    expect(NoteFields.safeParse({ title: "   ", body: "x" }).success).toBe(false);
+    expect(NoteFields.safeParse({ title: "a" }).success).toBe(false);
+  });
+
+  it("reject a backup record with a bad id or date", () => {
+    expect(() => parseNotesFile(JSON.stringify([{ id: "../x", title: "a", body: "", createdAt: "2026-10-14T10:00:00.000Z", updatedAt: "2026-10-14T10:00:00.000Z" }]))).toThrow();
+    expect(() => parseNotesFile(JSON.stringify([{ id: "a1", title: "a", body: "", createdAt: "yesterday", updatedAt: "2026-10-14T10:00:00.000Z" }]))).toThrow();
   });
 });

@@ -11,6 +11,7 @@ Upload a file to the bucket under `imports/<kind>/` and the `Import` Lambda load
 | `instruments` | `imports/instruments/<name>.json` | Instruments to track ([instruments.json](instruments.json)). `"terms": "mf"` resolves bond terms from the calculator by code. A new instrument starts its own history backfill. |
 | `coupons` | `imports/coupons/<name>.json` | Coupon periods of corporate bonds ([coupons.sample.json](coupons.sample.json)): `[{ "isin", "start", "end", "recordDate", "paymentDate", "datesSource", "rate": 0.0713, "rateSource": "manual" }]`. Easier in the app ("Coupon periods" in the bond's chart panel); the `coupons` job adds the dates from obligacje.pl. Mostly for restoring a backup. |
 | `transactions` | `imports/transactions/<name>.json` | Your transactions ([transactions.sample.json](transactions.sample.json) shows the format). Re-importing the same file is safe: ids are derived from the row contents. |
+| `notes` | `imports/notes/<name>.json` | Notes (Markdown): `[{ "id", "title", "body", "createdAt", "updatedAt" }]`. Written in the app (Notes view); for restoring a backup. Same id = the same note, replaced. |
 
 ```sh
 BUCKET=$(node -e "console.log(require('./.sst/outputs.json').files)")
@@ -30,11 +31,11 @@ ETF instruments: `"type": "ETF"`, `currency` of the listing, `venue` (`XAMS`, `X
 
 ## Restoring from a backup
 
-The `Export` job writes `exports/<date>/{accounts,instruments,prices,coupons,transactions}.json` on the 1st of every month (Docs/data-storage.md). Each file is in the format above, so a restore is uploading them, in this order, after the MF calculator and the retail-bond file:
+The `Export` job writes `exports/<date>/{accounts,instruments,prices,coupons,transactions,notes}.json` on the 1st of every month (Docs/data-storage.md). Each file is in the format above, so a restore is uploading them, in this order, after the MF calculator and the retail-bond file:
 
 ```sh
 D=exports/2026-11-01
-for k in accounts instruments prices coupons transactions; do aws s3 cp s3://$BUCKET/$D/$k.json s3://$BUCKET/imports/$k/restore-$k.json; done
+for k in accounts instruments prices coupons transactions notes; do aws s3 cp s3://$BUCKET/$D/$k.json s3://$BUCKET/imports/$k/restore-$k.json; done
 ```
 
 Transactions keep their ids and sources, so restoring into a table that still has them changes nothing.

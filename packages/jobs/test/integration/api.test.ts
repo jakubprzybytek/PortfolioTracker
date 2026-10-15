@@ -467,6 +467,27 @@ describe(`API ${API}`, () => {
     expect((await get("/holdings", { token: forged })).status).toBe(401);
   });
 
+  it("GET/POST/PUT/DELETE /notes keep Markdown notes, the last changed first, checking them first", async () => {
+    type Note = { id: string; title: string; body: string; createdAt: string; updatedAt: string };
+    expect((await send("POST", "/notes", { title: " ", body: "x" })).status).toBe(400);
+    expect((await send("POST", "/notes", { body: "no title" })).status).toBe(400);
+    const a = await send<Note>("POST", "/notes", { title: "Integration A", body: "# Heading\n\n- one" });
+    expect(a.status).toBe(201);
+    expect(a.body).toMatchObject({ title: "Integration A", body: "# Heading\n\n- one" });
+    const b = await send<Note>("POST", "/notes", { title: "Integration B", body: "" });
+    expect(b.status).toBe(201);
+    const edited = await send<Note>("PUT", `/notes/${a.body.id}`, { title: "Integration A2", body: "changed" });
+    expect(edited.status).toBe(200);
+    expect(edited.body).toMatchObject({ id: a.body.id, title: "Integration A2", body: "changed", createdAt: a.body.createdAt });
+    expect(edited.body.updatedAt >= a.body.updatedAt).toBe(true);
+    const list = (await get<Note[]>("/notes")).body.filter((n) => n.title.startsWith("Integration"));
+    expect(list.map((n) => n.title)).toEqual(["Integration A2", "Integration B"]);
+    expect((await send("PUT", "/notes/nonexistent", { title: "x", body: "" })).status).toBe(404);
+    for (const n of [a.body, b.body]) expect((await send("DELETE", `/notes/${n.id}`)).status).toBe(200);
+    expect((await send("DELETE", `/notes/${a.body.id}`)).status).toBe(404);
+    expect((await get<Note[]>("/notes")).body.some((n) => n.title.startsWith("Integration"))).toBe(false);
+  });
+
   it("rejects bad input", async () => {
     expect((await get("/instruments/not-an-isin/prices")).status).toBe(400);
     expect((await get("/nope")).status).toBe(404);

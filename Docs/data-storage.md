@@ -186,6 +186,15 @@ GSI1PK = TX                 GSI1SK = <YYYY-MM-DD>#<tx_id>
 **Assets without an ISIN** (manually valued, e.g. a property fund share) get a private id in ISIN format with the ISO user-assigned prefix `ZZ` (`ZZRZESZOW000`), which no real ISIN uses. Their prices are `PX#MANUAL#<date>` items, entered in the app ("Edit values", `source: "app"`) or from `imports/prices/`. Being your input, they're in the monthly backup.
 `tx_id` is deterministic (broker id, or a hash of the row), so imports can be re-run safely. `GSI1` lists all transactions across accounts in date order, which is what valuation replays.
 
+### Notes
+
+```
+PK = NOTE#<note_id>         SK = META
+GSI1PK = NOTE               GSI1SK = <note_id>
+```
+
+`id` (random), `title`, `body` (Markdown), `createdAt`, `updatedAt`. Written in the app (Notes view); `GSI1` lists them all. Your input, so here and in the monthly backup.
+
 ### Later: settings you enter
 
 ```
@@ -227,7 +236,7 @@ Each function links only the tables it needs.
 | `Backfill` | read/write | — | — |
 | `Import` | read/write (instruments, reference index) | read/write | — |
 | `Valuation` | read (writes its job run) | read | write |
-| `Api` | read | read | read |
+| `Api` | read | read/write (transactions, notes) | read |
 
 ## Access patterns
 
@@ -239,6 +248,7 @@ Each function links only the tables it needs.
 | All instruments (jobs, UI) | `market` | `Query GSI1 GSI1PK=INSTRUMENT` |
 | Transactions of an account | `transactions` | `Query PK=ACCT#<acct>, SK begins_with TX#` |
 | All transactions in date order (valuation) | `transactions` | `Query GSI1 GSI1PK=TX` |
+| All notes (Notes view) | `transactions` | `Query GSI1 GSI1PK=NOTE` |
 | FX for a tax calculation | `market` | `Query PK=FX#EUR, SK <= <date>, ScanIndexForward=false, Limit=1` (previous business day) |
 | Retail bond rate on a date | `market` | `Query PK=SERIES#<s>, SK <= RATE#<date>, ScanIndexForward=false, Limit=1` |
 | Gap check | `market` | `Query PK=INST#<isin>, SK begins_with PX#<venue>#` over the look-back window, compared with the calendar |
@@ -267,5 +277,5 @@ Total < 100 MB. A 10-year chart query reads about 2,500 items (≈ 500 KB, 1 pag
 ## Backup / export
 
 - PITR covers mistakes in the last 35 days on `market` and `transactions`.
-- **Monthly backup** (`Export` job, 1st of the month 04:00): what exists nowhere else, written to `exports/<date>/` in the files bucket, each in its import format (data/README.md): `accounts.json`, `instruments.json` (treasury terms by reference, `"mf"` / `"mf-retail"`, resolved again on import), `prices.json` (prices entered by hand) and `transactions.json` (with their ids and sources, so a restore gives the same rows). Restore: upload the files to `imports/<kind>/` in that order (after the MF calculator and retail files). The rest of `market` (prices, rates, CPI) is fetched again by the jobs and the backfill.
+- **Monthly backup** (`Export` job, 1st of the month 04:00): what exists nowhere else, written to `exports/<date>/` in the files bucket, each in its import format (data/README.md): `accounts.json`, `instruments.json` (treasury terms by reference, `"mf"` / `"mf-retail"`, resolved again on import), `prices.json` (prices entered by hand), `coupons.json`, `transactions.json` (with their ids and sources, so a restore gives the same rows) and `notes.json`. Restore: upload the files to `imports/<kind>/` in that order (after the MF calculator and retail files). The rest of `market` (prices, rates, CPI) is fetched again by the jobs and the backfill.
 - `holdings` isn't backed up: rerun valuation over the needed date range instead.

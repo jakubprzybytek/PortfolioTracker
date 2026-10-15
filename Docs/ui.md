@@ -29,6 +29,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/prices?type=…&chart=<ISIN>` | Prices |
 | `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
+| `#/notes?note=<id or new>` | Notes (`note` = the open note; `new` = writing one) |
 
 Changing a filter replaces the history entry, so "back" goes to the previous view, not the previous filter. Filter dropdowns have a fixed width (no jump when their options load); on a phone they share one row with the "clear filters" button (a funnel with ✕, so it isn't taken for a refresh; Transactions: the instrument on a row of its own), the label shown inside the dropdown while nothing is picked, the count below. No router library: `packages/web/src/route.ts`.
 
@@ -107,6 +108,15 @@ All transactions from `GET /transactions`.
 - The server checks it again (`core/transactions/manual.ts`: real dates, an instrument where needed, the direction of the money) and returns the problem, shown in the form.
 - From here on transactions are entered in the app (source `app`, random id). Re-importing the spreadsheet would add its newer rows a second time: the history up to the switch came from it, new ones come from the form.
 
+## Notes
+
+Free notes in Markdown (`NotesView.tsx`), e.g. trading checklists. Not linked to the portfolio: saving one doesn't revalue anything.
+
+- **Layout:** the list on the left (title and when it was last changed, the last changed first), the open note on the right, rendered. On a phone the list and the note take turns ("← All notes" goes back).
+- **Markdown:** GitHub flavour (`react-markdown` + `remark-gfm`): headings, lists, task lists, tables, links, code, quotes. Raw HTML in a note is shown as text, never run.
+- **New note / Edit:** a title (required) and the text, with a live preview next to it (below it on a phone). **Delete** asks to confirm.
+- Stored in the `transactions` table (your input) and in the monthly backup (`notes.json`).
+
 ## API (Lambda `api`)
 
 | Endpoint | What |
@@ -123,6 +133,10 @@ All transactions from `GET /transactions`.
 | `GET /indicators/{id}?from&to` | one series, oldest first: `[{ date, value }]` (`cpi-mom`, `cpi-index`: by month; `fx-eur`, `fx-usd`: daily) |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |
 | `GET /status` | last run of each job |
+| `GET /notes` | all notes, the last changed first: `[{ id, title, body, createdAt, updatedAt }]` (`body` is Markdown) |
+| `POST /notes` | adds one `{ title, body }`; 201 with it, 400 without a title |
+| `PUT /notes/{id}` | replaces its title and text (keeps `createdAt`); 404 if there's no such note |
+| `DELETE /notes/{id}` | deletes it |
 | `POST /transactions` | adds one (body: a transaction as in the import file, without `id`); 201 with it, 400 with the problem |
 | `PUT /transactions/{id}?account=` | replaces it (same id; a new date or account moves it) |
 | `DELETE /transactions/{id}?account=` | deletes it |
@@ -133,7 +147,7 @@ All transactions from `GET /transactions`.
 | `GET /instruments/lookup?code=` | `{ tracked, instrument }`: a tracked instrument, or a treasury series to add (404: unknown) |
 | `POST /instruments` | adds one: a full instrument (as in the import file) or `{ kind: "treasury" \| "etf" \| "corporate" \| "manual", … }`; starts its price history; 409 if tracked |
 
-Writes queue a revaluation from the earliest date touched.
+Writes (except notes) queue a revaluation from the earliest date touched.
 
 The UI loads all transactions and filters them in the browser; at a few hundred to a few thousand rows that's one small request.
 

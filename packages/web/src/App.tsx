@@ -7,6 +7,7 @@ import { HoldingsView } from "./HoldingsView.tsx";
 import { Icon } from "./Icons.tsx";
 import { IndicatorsView } from "./IndicatorsView.tsx";
 import { LoginForm } from "./LoginForm.tsx";
+import { NotesView } from "./NotesView.tsx";
 import { PricesView } from "./PricesView.tsx";
 import { useRoute, VIEWS } from "./route.ts";
 import { TransactionForm } from "./TransactionForm.tsx";
@@ -172,6 +173,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "prices" && <PricesView key="prices" params={route.params} setParams={setParams} />}
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
+        {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}
       </main>
       {(toast || recalc) && (
         <div className="toast" role="status">

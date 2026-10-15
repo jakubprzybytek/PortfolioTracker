@@ -20,6 +20,7 @@ import {
   type FxRateItem,
   type InstrumentItem,
   type JobRunItem,
+  type NoteItem,
   type PositionDayItem,
   type PriceItem,
   type ReferenceIndexItem,
@@ -301,6 +302,32 @@ export class Repository {
       KeyConditionExpression: "GSI1PK = :pk",
       ExpressionAttributeValues: { ":pk": "TX" },
     });
+  }
+
+  // --- notes ---------------------------------------------------------------------------------
+
+  putNotes(notes: Omit<NoteItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {
+    return this.batchPut(
+      "transactions",
+      notes.map((n) => ({ ...keys.note(n.id), GSI1PK: "NOTE", GSI1SK: n.id, ...n })),
+    );
+  }
+
+  getNote(id: string): Promise<NoteItem | undefined> {
+    return this.get<NoteItem>("transactions", keys.note(id));
+  }
+
+  /** All notes (any order). */
+  listNotes(): Promise<NoteItem[]> {
+    return this.queryAll<NoteItem>("transactions", {
+      IndexName: GSI1,
+      KeyConditionExpression: "GSI1PK = :pk",
+      ExpressionAttributeValues: { ":pk": "NOTE" },
+    });
+  }
+
+  async deleteNote(id: string): Promise<void> {
+    await this.doc.send(new DeleteCommand({ TableName: this.tables.transactions, Key: keys.note(id) }));
   }
 
   // --- snapshots -------------------------------------------------------------------------------
