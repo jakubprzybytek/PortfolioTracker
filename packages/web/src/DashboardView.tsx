@@ -93,7 +93,15 @@ export function DashboardView() {
           value={fmtPln(sum?.profit)}
           className={signClass(sum?.profit)}
           testId="total-profit"
-          note={sum ? [sum.netDeposits ? `${fmtPct((sum.profit / sum.netDeposits) * 100)} of net deposits` : "", sum.xirr != null ? `XIRR ${fmtPct(sum.xirr * 100)} a year` : ""].filter(Boolean).join(" · ") : undefined}
+          note={sum?.netDeposits ? `${fmtPct((sum.profit / sum.netDeposits) * 100)} of net deposits` : undefined}
+        />
+        <Card
+          loading={sumLoading}
+          label="XIRR"
+          value={sum?.xirr != null ? fmtPct(sum.xirr * 100) : "–"}
+          className={signClass(sum?.xirr)}
+          testId="total-xirr"
+          note={sum ? `a year, money-weighted, since ${sum.firstDate}` : undefined}
         />
       </section>
       <ProfitBreakdown summary={sum} loading={sumLoading} />

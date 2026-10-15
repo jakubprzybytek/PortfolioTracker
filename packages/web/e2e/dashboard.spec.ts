@@ -12,7 +12,12 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("snapshot-date")).toHaveText(/Valuation as of \d{4}-\d{2}-\d{2}/);
     await expect(page.getByTestId("total-deposits")).toContainText("66 403,69 zł");
     await expect(page.getByTestId("total-profit")).toContainText("%");
-    await expect(page.getByTestId("total-profit")).toContainText("XIRR");
+    // XIRR has its own card, equal to the Accounts table's total
+    await expect(page.getByTestId("total-xirr").locator(".value")).toHaveText(/%$/);
+    await expect(page.getByTestId("total-xirr")).toContainText("money-weighted");
+    const xirrCell = page.getByTestId("accounts-total").locator("td").nth(6);
+    await expect(xirrCell).toHaveText(/%$/);
+    await expect(page.getByTestId("total-xirr").locator(".value")).toHaveText((await xirrCell.textContent())!); // the ▲ is CSS, not text
     // Where the profit comes from: the parts add up to it
     await expect(page.getByTestId("profit-income")).toContainText("1 016,70 zł"); // coupons, the manual asset's income, the closed account's interest
     const num = (t: string) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", "."));
