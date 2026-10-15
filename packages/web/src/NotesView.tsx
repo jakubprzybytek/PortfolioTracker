@@ -21,8 +21,7 @@ const fmtUpdated = (iso: string) => new Date(iso).toLocaleString("en-GB", { day:
  * into a title and a text box with a live preview. On a phone the list and the note take turns.
  */
 export function NotesView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
-  const [reload, setReload] = useState(0);
-  const notes = useApi<Note[]>("/notes", {}, [reload]);
+  const notes = useApi<Note[]>("/notes");
   const selectedId = params["note"];
   const creating = params["note"] === "new";
   const selected = notes.data?.find((n) => n.id === selectedId);
@@ -32,11 +31,11 @@ export function NotesView({ params, setParams }: { params: Record<string, string
   const open = (id: string | undefined) => setParams({ note: id });
   const saved = (n: Note) => {
     setEditing(false);
-    setReload((r) => r + 1);
+    notes.update((list) => [n, ...(list ?? []).filter((m) => m.id !== n.id)]);
     open(n.id);
   };
   const deleted = () => {
-    setReload((r) => r + 1);
+    notes.update((list) => list?.filter((m) => m.id !== selectedId));
     open(undefined);
   };
 

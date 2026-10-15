@@ -14,6 +14,7 @@ import { TransactionForm } from "./TransactionForm.tsx";
 import { TransactionsView } from "./TransactionsView.tsx";
 import { TxFormContext } from "./txForm.ts";
 import type { Status, Transaction } from "./types.ts";
+import { clearApiCache, reloadAll, useApiBusy } from "./useApi.ts";
 
 /** Shows the app to a logged-in user and the login form otherwise. The view (#/…) stays in the URL meanwhile. */
 export function App() {
@@ -24,7 +25,10 @@ export function App() {
     refresh();
     // Logged out (button, expired session, failed token renewal) → login form.
     return Hub.listen("auth", ({ payload }) => {
-      if (payload.event === "signedOut" || payload.event === "tokenRefresh_failure") setSession(null);
+      if (payload.event === "signedOut" || payload.event === "tokenRefresh_failure") {
+        clearApiCache();
+        setSession(null);
+      }
       if (payload.event === "signedIn") refresh();
     });
   }, [refresh]);
@@ -44,7 +48,6 @@ function Shell({ email }: { email: string }) {
   const [route, setParams] = useRoute();
   // The transaction form, open from any view ("Add transaction", or a row of Transactions to edit it).
   const [form, setForm] = useState<{ editing?: Transaction } | null>(null);
-  const [version, setVersion] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
   useEffect(() => {
     if (!toast) return;
@@ -57,7 +60,7 @@ function Shell({ email }: { email: string }) {
   const [recalc, setRecalc] = useState<{ since: string; startedAt: number; phase: "prices" | "valuation"; done?: string } | null>(null);
   const saved = useCallback((message: string) => {
     setToast(message);
-    setVersion((v) => v + 1);
+    reloadAll();
     void api<Status>("/status")
       .then((s) => setRecalc({ since: s.now, startedAt: Date.now(), phase: "valuation" }))
       .catch(() => setRecalc(null));
@@ -87,7 +90,7 @@ function Shell({ email }: { email: string }) {
           const run = s.jobs["valuation"];
           if (run?.finishedAt && run.finishedAt > recalc.since) {
             setRecalc(null);
-            setVersion((v) => v + 1);
+            reloadAll();
             setToast(run.status === "ok" ? (recalc.done ?? "Valuation updated.") : `The valuation failed: ${run.note ?? "see the Dashboard"}`);
           } else if (Date.now() - recalc.startedAt > 5 * 60_000) {
             setRecalc(null);
@@ -100,9 +103,10 @@ function Shell({ email }: { email: string }) {
   }, [recalc]);
   const busy = recalc?.phase ?? null;
   const txForm = useMemo(
-    () => ({ open: (editing?: Transaction) => setForm({ editing }), saved, version, refreshPrices: () => void refreshPrices(), busy }),
-    [saved, version, refreshPrices, busy],
+    () => ({ open: (editing?: Transaction) => setForm({ editing }), saved, refreshPrices: () => void refreshPrices(), busy }),
+    [saved, refreshPrices, busy],
   );
+  const fetching = useApiBusy();
   // Phone: the menu opens over the page from the ☰ button; any navigation, a tap outside or Escape closes it.
   const [menuOpen, setMenuOpen] = useState(false);
   const hash = window.location.hash;
@@ -129,6 +133,18 @@ function Shell({ email }: { email: string }) {
             <button type="button" className="primary add-tx" onClick={() => setForm({})} aria-label="Add transaction" data-testid="tx-add">
               <span aria-hidden>+</span>
               <span className="label"> Add transaction</span>
+            </button>
+            <button
+              type="button"
+              className="reload"
+              onClick={reloadAll}
+              title="Reload this view's data from the server (doesn't fetch new prices)"
+              aria-label="Reload"
+              aria-busy={fetching}
+              data-testid="reload"
+            >
+              <Icon name="reload" size={16} className={fetching ? "spin" : undefined} />
+              <span className="label">Reload</span>
             </button>
             <button
               type="button"

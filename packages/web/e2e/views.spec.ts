@@ -23,6 +23,61 @@ test.describe("navigation", () => {
   });
 });
 
+test.describe("cached data and Reload", () => {
+  const slow = (ms: number) => async (route: import("@playwright/test").Route) => {
+    await new Promise((r) => setTimeout(r, ms));
+    await route.continue();
+  };
+
+  test("a view visited before shows its data at once and refetches it in the background", async ({ page }) => {
+    await page.goto("/#/transactions");
+    const rows = page.getByTestId("transaction-row");
+    await expect(rows).toHaveCount(31);
+    await page.getByTestId("nav-dashboard").click();
+    await expect(page.getByTestId("total-all")).toBeVisible();
+    await page.waitForTimeout(2500); // within 2 s of the last fetch SWR wouldn't fetch again
+
+    await page.route("**/transactions", slow(3000));
+    const refetch = page.waitForRequest("**/transactions");
+    await page.getByTestId("nav-transactions").click();
+    await expect(rows).toHaveCount(31, { timeout: 1000 }); // from the cache, while the request is held back
+    await refetch;
+    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "true");
+    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "false", { timeout: 10_000 });
+    await expect(rows).toHaveCount(31);
+  });
+
+  test("Reload refetches the view's data and keeps it on screen meanwhile", async ({ page }) => {
+    await page.goto("/#/transactions");
+    const rows = page.getByTestId("transaction-row");
+    await expect(rows).toHaveCount(31);
+    await page.route("**/transactions", slow(1500));
+    const refetch = page.waitForRequest("**/transactions");
+    await page.getByTestId("reload").click();
+    await refetch;
+    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "true");
+    await expect(rows).toHaveCount(31);
+    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "false", { timeout: 10_000 });
+  });
+
+  test("'Reload' (the frame) and 'Update prices' (the view header) are separate buttons", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("refresh-prices")).toHaveText("Update prices");
+    await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /refresh/i })).toHaveCount(0);
+    // Reload doesn't start the live prices
+    let started = false;
+    await page.route("**/prices/refresh", (route) => {
+      started = true;
+      return route.abort();
+    });
+    await page.getByTestId("reload").click();
+    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "false");
+    await expect(page.getByTestId("recalc")).toHaveCount(0);
+    expect(started).toBe(false);
+  });
+});
+
 test.describe("transactions view", () => {
   test("lists all transactions, newest first", async ({ page }) => {
     await page.goto("/#/transactions");
@@ -544,6 +599,8 @@ test.describe("notes view", () => {
     await page.getByTestId("note-edit").click();
     await page.getByTestId("note-body-input").fill("Just *text* now");
     await page.getByTestId("note-save").click();
+    await expect(page.getByTestId("note-body-input")).toBeHidden(); // saved: the editor (with its own preview) closed
+    await expect(page.getByTestId("note-rendered")).toHaveText("Just text now"); // the saved text at once, not the old one
     await expect(page.getByTestId("note-rendered").locator("em")).toHaveText("text");
     await page.reload();
     await expect(page.getByTestId("note-rendered")).toHaveText("Just text now");

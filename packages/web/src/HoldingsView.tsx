@@ -256,7 +256,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const [panelHeight, setPanelHeight] = useState(0);
   /** The bond whose coupon periods replace its chart in the panel. */
   const [couponsFor, setCouponsFor] = useState<string | null>(null);
-  const history = useApi<ValuePoint[]>(chartIsin ? "/holdings/history" : null, { isin: chartIsin, account: chartAccount, from: rangeFrom(range), to: today() }, [chartIsin, chartAccount, range]);
+  const history = useApi<ValuePoint[]>(chartIsin ? "/holdings/history" : null, { isin: chartIsin, account: chartAccount, from: rangeFrom(range), to: today() });
   const select = (isin: string, acct?: string) =>
     setParams(chartIsin === isin && chartAccount === acct ? { ...params, chart: undefined, chartAccount: undefined } : { ...params, chart: isin, chartAccount: acct });
   const closeChart = useCallback(() => setParams({ ...params, chart: undefined, chartAccount: undefined }), [params, setParams]);

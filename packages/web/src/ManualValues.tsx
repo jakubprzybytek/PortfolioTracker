@@ -11,7 +11,7 @@ import { useTxForm } from "./txForm.ts";
  * saved or deleted, its button shows a spinner and the list says it's updating.
  */
 export function ManualValues({ isin, code, currency }: { isin: string; code: string; currency: string }) {
-  const { saved, version } = useTxForm();
+  const { saved } = useTxForm();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(today());
   const [value, setValue] = useState("");
@@ -20,7 +20,7 @@ export function ManualValues({ isin, code, currency }: { isin: string; code: str
   const busy = pending !== null;
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
-  const values = useApi<Price[]>(open ? `/instruments/${isin}/prices` : null, { from: "1900-01-01", to: today() }, [isin, open, version]);
+  const values = useApi<Price[]>(open ? `/instruments/${isin}/prices` : null, { from: "1900-01-01", to: today() });
   // An unanswered "Delete?" goes back to ✕ after a few seconds.
   useEffect(() => {
     if (!confirm) return;

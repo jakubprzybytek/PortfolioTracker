@@ -42,7 +42,7 @@ export function IndicatorsView({ params, setParams }: { params: Record<string, s
   const years = RANGES.find((r) => r.key === range)!.years;
   const sel = rows.data?.find((i) => i.id === selected);
   const from = rangeStart(years, sel);
-  const series = useApi<IndicatorPoint[]>(sel ? `/indicators/${sel.id}` : null, { from, to: today() }, [sel?.id, from]);
+  const series = useApi<IndicatorPoint[]>(sel ? `/indicators/${sel.id}` : null, { from, to: today() });
   const groups = [...new Set((rows.data ?? []).map((i) => i.group))];
 
   return (

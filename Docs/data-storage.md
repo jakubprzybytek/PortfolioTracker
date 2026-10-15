@@ -67,7 +67,7 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 | `nominal` | Corporate bonds (`BOND_CORPORATE`, no terms): nominal per bond (1000 or 100); prices are clean % of it; value = clean % × nominal + accrued interest from its coupon periods |
 | `pricePath` | Foreign bonds at IBKR (`BOND_IBKR`, `nominal` 1000) without a quote (`venue = CALC`: US T-bills, matured bonds): known prices `[{ date, price }]` (% of nominal: your trades, redemption at maturity); the backfill writes a price per weekday in between at a constant yield. Quoted ones have `venue = XSTU`, `sourceIds.onvista = "STU"` |
 | `splits` | ETFs: `[{ "date": "2025-12-15", "ratio": 100 }]`: from `date` on one unit became `ratio` units. Prices are stored as traded; charts and the 1-year change divide earlier prices by later splits (`core/prices/splits.ts`) |
-| `live` | Not used: which instruments "Refresh" covers follows from their price source (ingestion.md, "Live prices") |
+| `live` | Not used: which instruments "Update prices" covers follows from their price source (ingestion.md, "Live prices") |
 | `active` | `false` once sold/matured (jobs skip inactive instruments) |
 | bonds only | `nominal` (face value), `coupon_type` (`FIXED` / `FLOATING` / `INDEXED`), `coupon_rate` or `margin` + `reference_rate`, `maturity`, `coupon_schedule` (period start/end, payment date); IZ bonds also `base_ref` (e.g. IZ0836: 194.28509) and `issue_date` |
 | retail bonds only | `series` (e.g. `EDO0936`), `first_rate`, `margin`, `redemption_fee` |
@@ -97,7 +97,7 @@ Retail bonds and manual entries use the same item with `venue = CALC` or `MANUAL
 
 ### Live quote
 
-Not a separate item: "Refresh prices" writes today's quote as today's price item (`PX#<venue>#<today>`, `status = provisional`, `quoteTime` = when the source set it; holdings and price rows carry it on as `priceTime`), which the evening close overwrites (ingestion.md, "Live prices"). The valuation then values today as usual, so every view reads one shape and history keeps one price per day. (Planned before: a `LIVE` item per instrument swapped in by the api Lambda.)
+Not a separate item: "Update prices" writes today's quote as today's price item (`PX#<venue>#<today>`, `status = provisional`, `quoteTime` = when the source set it; holdings and price rows carry it on as `priceTime`), which the evening close overwrites (ingestion.md, "Live prices"). The valuation then values today as usual, so every view reads one shape and history keeps one price per day. (Planned before: a `LIVE` item per instrument swapped in by the api Lambda.)
 
 ### Corporate / bond events
 
@@ -242,7 +242,7 @@ Each function links only the tables it needs.
 
 | Need | Table | Operation |
 |---|---|---|
-| Dashboard | `holdings` | `Get PORTFOLIO/SNAP#LATEST` (after "Refresh prices", valued with today's quotes) |
+| Dashboard | `holdings` | `Get PORTFOLIO/SNAP#LATEST` (after "Update prices", valued with today's quotes) |
 | Portfolio value over time | `holdings` | `Query PK=PORTFOLIO, SK between SNAP#<from> and SNAP#<to>` |
 | Price chart for one instrument | `market` | `Query PK=INST#<isin>, SK between PX#<venue>#<from> and PX#<venue>#<to>` |
 | All instruments (jobs, UI) | `market` | `Query GSI1 GSI1PK=INSTRUMENT` |

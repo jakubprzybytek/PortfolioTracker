@@ -44,8 +44,8 @@ const draftOf = (p: InterestPeriod): Draft => ({ start: p.start, end: p.end, rec
  * accrued interest. Rates are set by hand, or by accepting the one your coupons imply or the one obligacje.pl shows.
  */
 export function CouponPeriods({ isin, code }: { isin: string; code: string }) {
-  const { saved, version } = useTxForm();
-  const data = useApi<CouponsResponse>(`/instruments/${isin}/coupons`, {}, [isin, version]);
+  const { saved } = useTxForm();
+  const data = useApi<CouponsResponse>(`/instruments/${isin}/coupons`);
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   /** What's being sent: a period's start, or "new". */

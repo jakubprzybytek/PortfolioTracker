@@ -2,7 +2,7 @@
 
 ## Sources by asset type
 
-| Asset | Examples | Daily source | Live source ("Refresh", on demand) | Backfill source |
+| Asset | Examples | Daily source | Live source ("Update prices", on demand) | Backfill source |
 |---|---|---|---|---|
 | UCITS ETFs on EU exchanges | Xetra, LSE, Euronext listings | Yahoo chart API (EODHD if it gets blocked) | Yahoo: today's bar, ~15 min delayed | Yahoo (full daily history, one request per ETF) |
 | Polish treasury bonds on GPW / Catalyst | DS, PS, WZ, IZ series | GPW archive: daily XLS with all treasury bonds | BiznesRadar quote page (last trade, 15 min delayed) | GPW archive: full history per bond (1 request each) |

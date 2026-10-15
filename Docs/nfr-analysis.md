@@ -55,7 +55,7 @@ Scale is tiny (hundreds of transactions, ~30 positions), so nothing here is urge
 - **Every read endpoint re-lists all transactions** (`/accounts`, `/portfolio/history`, `/transactions`, `/instruments/{isin}/transactions`, `/instruments/{isin}/coupons`): the `GSI1PK = "TX"` partition grows with history. At 10× the data it is still fine; at 100× per-ISIN queries (a sparse `GSI2PK = ISIN#…`) would be wanted.
 - **The API Lambda bundles SheetJS.** `api.ts` imports from `import.ts`, which imports `parseMfCalculator` → `xlsx` (~1 MB), so every API cold start carries it although the API never parses a spreadsheet. Move `mfTermsByCode`/`importInstruments` into a module without the XLS parsers, or lazy-`import()` them.
 - **Lambda architecture defaults to `x86_64`.** Everything is pure JS; `architecture: "arm64"` in `defaults` is ~20 % cheaper and usually faster for Node.
-- **No HTTP caching.** API responses carry no `Cache-Control`; the SPA re-fetches `/holdings`, `/accounts`, `/status`, `/instruments` on every view switch (`useApi` has no cache). A 30–60 s in-memory cache keyed by path in `useApi.ts` would remove most calls; `GET /holdings` could carry an `ETag` of `computedAt`.
+- **No HTTP caching.** API responses carry no `Cache-Control`; the SPA re-fetched `/holdings`, `/accounts`, `/status`, `/instruments` on every view switch; since 2026-10-15 `useApi` keeps them in an SWR cache (shown at once, refetched in the background, deduplicated within 2 s), so what's left is the HTTP side. `GET /holdings` could carry an `ETag` of `computedAt`, so a refetch of an unchanged snapshot is a 304.
 - **Front-end bundle:** one 835 KB JS chunk; Amplify, Recharts and all five views load before the login form renders. `React.lazy` per view and Recharts behind the chart panels would roughly halve the first paint on a phone. No `manualChunks`, so every deploy invalidates vendor code too.
 - **Cost guardrails:** no AWS Budget alarm. The design is near-free, but a retry loop against on-demand DynamoDB is the kind of thing a $5 budget alarm catches.
 
@@ -91,7 +91,7 @@ Scale is tiny (hundreds of transactions, ~30 positions), so nothing here is urge
 
 **Gaps**
 
-- **No linter or formatter.** No ESLint/Biome/Prettier config in the repo; the code is consistent, but nothing enforces it in CI, and `useApi.ts` carries an `eslint-disable` comment for a linter that isn't installed. Biome is one dependency and one CI step.
+- **No linter or formatter.** No ESLint/Biome/Prettier config in the repo; the code is consistent, but nothing enforces it in CI. Biome is one dependency and one CI step.
 - **No `ErrorBoundary`** in the web app: a render error in any view blanks the page without a message; `useApi`'s error path covers fetch errors only.
 - **`api.ts` is a 250-line `switch`** with validation, data access and shaping inline. Readable, but every route grows it; a route map with shared `parseIsin()`/`parseDate()` helpers would also make the validation gaps above systematic rather than per case.
 - **`queueValuation` casts `Resource`** to reach `ValuationQueue.url`; the cast hides a missing link until runtime, where the generated `sst-env.d.ts` would have typed it.

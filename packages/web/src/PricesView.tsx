@@ -28,8 +28,8 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const [panelHeight, setPanelHeight] = useState(0);
   /** The bond whose coupon periods replace its chart in the panel. */
   const [couponsFor, setCouponsFor] = useState<string | null>(null);
-  const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, { from: rangeFrom(range), to: today() }, [selected, range]);
-  const txs = useApi<Transaction[]>(selected ? `/instruments/${selected}/transactions` : null, {}, [selected]);
+  const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, { from: rangeFrom(range), to: today() });
+  const txs = useApi<Transaction[]>(selected ? `/instruments/${selected}/transactions` : null);
   const all = rows.data ?? [];
   const shown = all.filter((r) => !type || r.type === type);
   const types = useMemo(() => uniqueOptions(all, (r) => ({ value: r.type, label: typeLabel(r.type) })), [all]);

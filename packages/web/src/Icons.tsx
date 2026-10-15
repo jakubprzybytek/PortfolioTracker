@@ -2,7 +2,7 @@ import type { View } from "./route.ts";
 
 // Line icons (24 × 24, currentColor) for the menu and buttons.
 
-const paths: Record<View | "menu" | "close" | "logout" | "clear-filters" | "refresh", string> = {
+const paths: Record<View | "menu" | "close" | "logout" | "clear-filters" | "reload" | "update-prices", string> = {
   dashboard: "M4 3h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM15 3h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM15 12h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM4 17h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1z",
   holdings: "M4 6h16M4 12h16M4 18h10",
   prices: "M3 17l6-6 4 4 8-8M15 7h6v6",
@@ -13,7 +13,8 @@ const paths: Record<View | "menu" | "close" | "logout" | "clear-filters" | "refr
   close: "M6 6l12 12M18 6L6 18",
   logout: "M9 4H5v16h4M16 16l4-4-4-4M20 12H10",
   "clear-filters": "M13 3H2l8 9.46V19l4 2v-8.54l.9-1.06M22 3l-5 5M17 3l5 5",
-  refresh: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5",
+  reload: "M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5",
+  "update-prices": "M12 13v8M8 17l4 4 4-4M20 16.6A5 5 0 0 0 18 7h-1.3A8 8 0 1 0 4 15.3",
 };
 
 export function Icon({ name, size = 20, className }: { name: keyof typeof paths; size?: number; className?: string }) {

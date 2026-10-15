@@ -2,8 +2,8 @@ import { Icon } from "./Icons.tsx";
 import { useTxForm } from "./txForm.ts";
 
 /**
- * "Refresh" next to the valuation date (Dashboard, Holdings, Prices): today's quotes of the instruments with a live
- * source, then a revaluation of today. Disabled while that or any other revaluation runs; the icon turns while prices
+ * "Update prices" next to the valuation date (Dashboard, Holdings, Prices): today's quotes of the instruments with a
+ * live source, then a revaluation of today. Not the "Reload" of the app frame, which only refetches what's shown. Disabled while that or any other revaluation runs; the icon turns while prices
  * are fetched. Progress and the outcome show in the corner (App).
  */
 export function RefreshPrices() {
@@ -15,11 +15,10 @@ export function RefreshPrices() {
       onClick={refreshPrices}
       disabled={busy !== null}
       title="Fetch today's prices (ETFs, IBKR and corporate bonds) and revalue"
-      aria-label="Refresh prices"
       data-testid="refresh-prices"
     >
-      <Icon name="refresh" size={14} className={busy === "prices" ? "spin" : undefined} />
-      Refresh
+      <Icon name="update-prices" size={14} className={busy === "prices" ? "pulse" : undefined} />
+      Update prices
     </button>
   );
 }

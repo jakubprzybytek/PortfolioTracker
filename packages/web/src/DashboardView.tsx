@@ -47,7 +47,7 @@ export function DashboardView() {
   const [range, setRange] = useState<RangeKey>("1Y");
 
   const holdings = useApi<Snapshot>("/holdings");
-  const history = useApi<HistoryPoint[]>("/portfolio/history", { from: rangeFrom(range), to: today() }, [range]);
+  const history = useApi<HistoryPoint[]>("/portfolio/history", { from: rangeFrom(range), to: today() });
   const status = useApi<Status>("/status");
   const summaries = useApi<AccountsResponse>("/accounts");
   const sum = summaries.data?.total;

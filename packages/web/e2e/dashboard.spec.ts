@@ -142,7 +142,7 @@ test.describe("dashboard", () => {
     }
   });
 
-  test("'Refresh prices' starts the live prices and shows the progress, or why not now", async ({ page }) => {
+  test("'Update prices' starts the live prices and shows the progress, or why not now", async ({ page }) => {
     // Mocked: a real refresh revalues today, and the API allows one every 5 minutes.
     let answer = { status: 202, body: { now: new Date().toISOString() } as object };
     await page.route("**/prices/refresh", (route) => route.fulfill({ status: answer.status, contentType: "application/json", body: JSON.stringify(answer.body) }));

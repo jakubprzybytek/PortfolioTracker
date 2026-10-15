@@ -4,7 +4,7 @@ A simple personal portfolio tracker. **You enter your own transactions** (buys, 
 
 Asset types: Polish treasury and corporate bonds (GPW / Catalyst), Polish retail treasury bonds (obligacje detaliczne), UCITS ETFs on EU exchanges, EU government bonds at IBKR, plus manually valued assets and cash.
 
-Status (2026-10-15, `v0.63`): **the whole portfolio is in production** at https://portfoliotracker.albedoonline.com: every account and asset type from the reference sheet, priced daily (GPW, BiznesRadar, Yahoo, onvista, the Ministry's retail rates, NBP), valued every day with accrued interest (corporate bonds too, from their coupon periods), with today's prices on demand ("Refresh"). Transactions are entered in the app. Every push to `main` goes through `int` to `prod` automatically. What's left: "Outstanding work" below. See the root [README](../README.md) for how to run it.
+Status (2026-10-15, `v0.63`): **the whole portfolio is in production** at https://portfoliotracker.albedoonline.com: every account and asset type from the reference sheet, priced daily (GPW, BiznesRadar, Yahoo, onvista, the Ministry's retail rates, NBP), valued every day with accrued interest (corporate bonds too, from their coupon periods), with today's prices on demand ("Update prices"). Transactions are entered in the app. Every push to `main` goes through `int` to `prod` automatically. What's left: "Outstanding work" below. See the root [README](../README.md) for how to run it.
 
 | Document | Contents |
 |---|---|
@@ -21,7 +21,7 @@ Status (2026-10-15, `v0.63`): **the whole portfolio is in production** at https:
 | Phase | Contents |
 |---|---|
 | 1 – Polish bonds | Done: treasury bonds on GPW (fixed and inflation-linked IZ), Catalyst corporate bonds, retail bonds (EDO, COI, ROD); transactions (import, then the app's form); daily valuation incl. accrued interest; table + charts |
-| 2 – ETFs | Done: Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; today's prices on demand ("Refresh": ETFs and every listed bond) |
+| 2 – ETFs | Done: Yahoo end-of-day prices and backfill (EODHD as paid fallback); NBP FX; today's prices on demand ("Update prices": ETFs and every listed bond) |
 | 3 – IBKR, FX | Done: foreign bonds (Börse Stuttgart closes via onvista; calculated for US T-bills), cash per currency, NBP rates; IBKR's history from its activity statements. Later: IBKR Flex for new trades |
 
 ## Architecture
@@ -136,7 +136,7 @@ Later phases:
 - [x] IBKR from its activity statements (2026-10-13): `scripts/ibkr-statements-to-transactions.ts`; the account's history rebuilt from IBKR's own records (cash per currency and cost basis equal to the statements; missing commissions, a coupon and interest added; one T-bill's ISIN corrected).
 - [x] Monthly backup (`Export` job), values of hand-valued assets entered in the app, "Recalculating the valuation…" after every change (2026-10-14).
 - [x] IBKR bonds priced from Börse Stuttgart closes via onvista (2026-10-14), within 0.015 of IBKR's marks; US T-bills stay calculated.
-- [x] Today's prices on demand (2026-10-14): "Refresh" next to the valuation date fetches the current quotes of ETFs, IBKR bonds, Catalyst and treasury bonds and revalues today; Holdings and Prices show each price's time, or the date of an older one.
+- [x] Today's prices on demand (2026-10-14): "Update prices" (until 2026-10-15 "Refresh") next to the valuation date fetches the current quotes of ETFs, IBKR bonds, Catalyst and treasury bonds and revalues today; Holdings and Prices show each price's time, or the date of an older one.
 - [x] Accrued interest of corporate bonds (2026-10-14): interest periods per bond (first day, record day, payment day, rate) from obligacje.pl each morning (`coupons` job: new periods and the current rate, never replacing a stored one), past rates from the coupons you received (accepted with a click) or typed in, in the bond's chart panel ("Coupon periods"); coupons checked against the rate.
 - [x] Valuation queue hardening (2026-10-14): a dead-letter queue after 3 failures; a revaluation drops the days of positions that are gone; the old single `Table` deleted from `prod`.
 
@@ -168,7 +168,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
 18. ~~Monthly export of `transactions` to S3~~ Done (2026-10-14): the `Export` job backs up accounts, instruments, prices entered by hand and transactions to `exports/<date>/` on the 1st, in the import formats (data-storage.md, restore: data/README.md).
-21. **Responsiveness when switching views (stale-while-revalidate):** every view refetches everything on each visit and shows placeholders meanwhile (`useApi` has no cache). Keep each response in a client cache keyed by path and parameters: show the cached data at once (marked as possibly stale), refetch in the background and swap in the fresh data; a save or a finished revaluation invalidates the cache (today's `version`). As the SWR library does (or SWR / TanStack Query itself; check the latest version first). See also nfr-analysis.md, "Performance and cost".
+21. ~~Responsiveness when switching views~~ Done (2026-10-15): `useApi` goes through SWR, so a view visited before shows its last data at once and refetches it in the background (placeholders only the first time); a save or a finished valuation refetches what's on screen. **Reload** in the menu frame refetches the current view without asking the server for anything new; its icon turns while any request is under way. The "Refresh" button next to the valuation date is now **Update prices**, with its own icon (ui.md).
 
 ### Beyond the sheet
 19. **Hold or sell a bond:** is a bond worth selling now rather than holding it to maturity? Once owned, what was paid doesn't matter: compare the **yield if held** (what it still pays from today: coupons and 100 % at maturity, after tax, against what selling it would bring today) with an **alternative** for the same period, after the cost of switching.
