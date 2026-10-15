@@ -10,10 +10,10 @@ A review of the app as built against the usual non-functional requirements: obse
 |---|---|---|---|
 | 1 | No alerting at all: failed jobs, DLQ messages and Lambda errors only show on the Dashboard | Observability | S |
 | 2 | Every outbound `fetch` (Yahoo, BiznesRadar, onvista, obligacje.pl, NBP, GUS, MF) has no timeout; only the GPW client does | Resilience | S |
-| 3 | `data-storage.md` says deletion protection is on for the prod tables; `sst.config.ts` never sets `deletionProtection` | Durability | XS |
-| 4 | `GET /status` reads *every* job run of 13 jobs (90-day TTL, no `Limit`) and the UI polls it every 5 s during a recalc | Performance | XS |
-| 5 | `GET /instruments` does an N+1 `getBackfillStatus` per instrument | Performance | XS |
-| 6 | 500 responses echo `err.message` to the browser; a malformed JSON body becomes a 500, not a 400 | Security / API hygiene | XS |
+| 3 | ~~`data-storage.md` says deletion protection is on for the prod tables; `sst.config.ts` never sets `deletionProtection`~~ Done (2026-10-15): on for all three tables on prod | Durability | XS |
+| 4 | ~~`GET /status` reads *every* job run of 13 jobs (90-day TTL, no `Limit`) and the UI polls it every 5 s during a recalc~~ Done (2026-10-15): `latestJobRun`, one item per job (also in `POST /prices/refresh`) | Performance | XS |
+| 5 | ~~`GET /instruments` does an N+1 `getBackfillStatus` per instrument~~ Done (2026-10-15): one `BatchGet` (`listBackfillStatuses`) | Performance | XS |
+| 6 | ~~500 responses echo `err.message` to the browser; a malformed JSON body becomes a 500, not a 400~~ Done (2026-10-15): a generic 500 with the request id (the detail in the log); a body that isn't JSON is a 400 | Security / API hygiene | XS |
 | 7 | The CI deploy role has `dynamodb:*`, `s3:*`, `lambda:*`, `iam:PassRole` on `*` | Security | M |
 | 8 | No CSP / security headers on the site while the tokens (incl. the 30-day refresh token) sit in `localStorage` | Security | S |
 | 9 | One 835 KB JS chunk, no code-splitting, no `ErrorBoundary` | Front-end | S |
@@ -110,6 +110,6 @@ Scale is tiny (hundreds of transactions, ~30 positions), so nothing here is urge
 
 ## Suggested order of work
 
-1. **Day 1 (XS each):** `deletionProtection` on the prod tables · `Limit: 1` in `listJobRuns` · batch the `BACKFILL` lookups · generic 500 and a 400 on bad JSON · CORS origins · `arm64`.
+1. ~~**Day 1 (XS each):**~~ **Done (2026-10-15):** `deletionProtection` on the prod tables · `Limit: 1` in `listJobRuns` · batch the `BACKFILL` lookups · generic 500 and a 400 on bad JSON · CORS origins (the stage's domain, plus `http://localhost:5173` off prod) · `arm64`.
 2. **Week 1 (S):** shared `fetch` with a timeout · SNS topic + alarms (Lambda errors, DLQ depth, valuation staleness) · structured JSON logs · bucket versioning + lifecycle · CSP/HSTS response headers · Biome in CI · Dependabot · actions pinned by SHA · `ErrorBoundary` + `React.lazy` views · a prod guard in the integration setup.
 3. **Later (M):** scope the deploy policy by resource and split the int/prod roles · per-user TOTP MFA · route map refactor of `api.ts` · `GetItem` path for `findTransaction` · XLS parsing out of the API bundle · an audit log of transaction edits.

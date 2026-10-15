@@ -1,5 +1,6 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import {
+  BatchGetCommand,
   BatchWriteCommand,
   DeleteCommand,
   DynamoDBDocumentClient,
@@ -86,6 +87,23 @@ export class Repository {
       }
     }
     return items.length;
+  }
+
+  /** Reads by key in batches of 100, retrying unprocessed keys; missing items are left out. */
+  private async batchGet<T>(table: Table, all: { PK: string; SK: string }[]): Promise<T[]> {
+    const tableName = this.tables[table];
+    const out: T[] = [];
+    for (let i = 0; i < all.length; i += 100) {
+      let requested: Record<string, unknown>[] = all.slice(i, i + 100);
+      for (let attempt = 0; requested.length > 0; attempt++) {
+        if (attempt > 8) throw new Error(`BatchGet: ${requested.length} keys still unprocessed after ${attempt} attempts`);
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 100 * 2 ** attempt));
+        const res = await this.doc.send(new BatchGetCommand({ RequestItems: { [tableName]: { Keys: requested } } }));
+        out.push(...((res.Responses?.[tableName] ?? []) as T[]));
+        requested = res.UnprocessedKeys?.[tableName]?.Keys ?? [];
+      }
+    }
+    return out;
   }
 
   private async scanAll<T>(table: Table, input: Omit<ScanCommandInput, "TableName">): Promise<T[]> {
@@ -403,16 +421,28 @@ export class Repository {
     return this.get<BackfillItem>("market", keys.backfill(isin));
   }
 
+  /** The backfill status of each of these instruments that has one, by ISIN (batched reads). */
+  async listBackfillStatuses(isins: string[]): Promise<Map<string, BackfillItem>> {
+    const items = await this.batchGet<BackfillItem>("market", isins.map((isin) => keys.backfill(isin)));
+    return new Map(items.map((i) => [i.isin, i]));
+  }
+
   async putJobRun(item: Omit<JobRunItem, "PK" | "SK" | "ttl">): Promise<void> {
     const ttl = Math.floor(Date.now() / 1000) + 90 * 86_400;
     await this.put("market", { ...keys.jobRun(item.job, item.startedAt), ...item, ttl });
   }
 
-  listJobRuns(job: string): Promise<JobRunItem[]> {
-    return this.queryAll<JobRunItem>("market", {
-      KeyConditionExpression: "PK = :pk",
-      ExpressionAttributeValues: { ":pk": `JOB#${job}` },
-      ScanIndexForward: false,
-    });
+  /** The job's most recent run (one item read, not its 90 days of runs). */
+  async latestJobRun(job: string): Promise<JobRunItem | undefined> {
+    const res = await this.doc.send(
+      new QueryCommand({
+        TableName: this.tables.market,
+        KeyConditionExpression: "PK = :pk",
+        ExpressionAttributeValues: { ":pk": `JOB#${job}` },
+        ScanIndexForward: false,
+        Limit: 1,
+      }),
+    );
+    return res.Items?.[0] as JobRunItem | undefined;
   }
 }

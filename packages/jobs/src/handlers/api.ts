@@ -63,10 +63,17 @@ const REFRESH_EVERY_MS = 5 * 60_000;
 /** Comma-separated, set per stage in sst.config.ts (accessGroups). */
 const ACCESS_GROUPS = (process.env["ACCESS_GROUPS"] ?? "portfolio-tracker").split(",");
 
-/** JSON body of a POST/PUT (API Gateway may pass it base64-encoded). */
+/** A request the API refuses with a 400 and this message, wherever it's found. */
+class BadRequest extends Error {}
+
+/** JSON body of a POST/PUT (API Gateway may pass it base64-encoded); not JSON → 400. */
 const bodyOf = (event: APIGatewayProxyEventV2WithJWTAuthorizer): unknown => {
   if (!event.body) return undefined;
-  return JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body);
+  try {
+    return JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, "base64").toString("utf8") : event.body);
+  } catch {
+    throw new BadRequest("The request body isn't valid JSON");
+  }
 };
 
 type TxOut = Omit<TransactionItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">;
@@ -193,7 +200,8 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       }
       case "GET /instruments": {
         const items = (await repo.listInstruments()).filter((i) => i.isin !== "MF-TERMS");
-        const withStatus = await Promise.all(items.map(async (i) => ({ ...i, backfill: await repo.getBackfillStatus(i.isin) })));
+        const statuses = await repo.listBackfillStatuses(items.map((i) => i.isin));
+        const withStatus = items.map((i) => ({ ...i, backfill: statuses.get(i.isin) }));
         return json(200, withStatus);
       }
       case "GET /instruments/{isin}/prices": {
@@ -307,7 +315,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       case "POST /prices/refresh": {
         // "Refresh prices": starts the Live job (today's quotes, then a revaluation of today). At most one every few
         // minutes, so the sources aren't asked over and over.
-        const last = (await repo.listJobRuns("live"))[0];
+        const last = await repo.latestJobRun("live");
         const retryAt = last ? Date.parse(last.startedAt) + REFRESH_EVERY_MS : 0;
         if (retryAt > Date.now()) return json(429, { error: `Prices were refreshed less than ${REFRESH_EVERY_MS / 60_000} minutes ago.`, retryAt: new Date(retryAt).toISOString() });
         await invokeAsync(Resource.Live.name, {});
@@ -435,14 +443,17 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       }
       case "GET /status": {
         const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];
-        const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.listJobRuns(j))[0] ?? null])));
+        const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.latestJobRun(j)) ?? null])));
         return json(200, { now: new Date().toISOString(), jobs: runs });
       }
       default:
         return json(404, { error: `No route ${route}` });
     }
   } catch (err) {
-    console.error(err);
-    return json(500, { error: (err as Error).message });
+    if (err instanceof BadRequest) return json(400, { error: err.message });
+    // The details (table names, SDK messages) stay in the log; the browser gets the request id to find them.
+    const requestId = event.requestContext.requestId;
+    console.error(`${route} failed (request ${requestId}):`, err);
+    return json(500, { error: `Something went wrong on the server (request ${requestId})` });
   }
 }

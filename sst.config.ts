@@ -44,16 +44,19 @@ export default $config({
       },
     };
 
-    const market = new sst.aws.Dynamo("Market", { ...byType, ttl: "ttl", transform: withPitr });
-    const transactions = new sst.aws.Dynamo("Transactions", { ...byType, transform: withPitr });
-    const holdings = new sst.aws.Dynamo("Holdings", { fields: keys, primaryIndex });
+    // On prod a table can't be deleted (by a deploy, the console or the API) until its deletion protection is turned off.
+    const deletionProtection = $app.stage === "prod";
+    const market = new sst.aws.Dynamo("Market", { ...byType, ttl: "ttl", deletionProtection, transform: withPitr });
+    const transactions = new sst.aws.Dynamo("Transactions", { ...byType, deletionProtection, transform: withPitr });
+    const holdings = new sst.aws.Dynamo("Holdings", { fields: keys, primaryIndex, deletionProtection });
 
     // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload.
     const files = new sst.aws.Bucket("Files");
 
     // Each function links only the tables it needs (Docs/data-storage.md, "Access per function").
     const link = [files];
-    const defaults = { link: [...link, market], timeout: "5 minutes" as const, memory: "512 MB" as const };
+    // arm64 (Graviton): all the code is plain JS, and it's ~20 % cheaper than x86_64.
+    const defaults = { link: [...link, market], timeout: "5 minutes" as const, memory: "512 MB" as const, architecture: "arm64" as const };
 
     // --- jobs ----------------------------------------------------------------------------------
     // Revaluations requested by imports, backfills, FX and the monthly job go through a FIFO queue with one message group:
@@ -228,7 +231,11 @@ export default $config({
     }
 
     // --- api + web -----------------------------------------------------------------------------
-    const api = new sst.aws.ApiGatewayV2("Api", { cors: true });
+    // The site calls the API on its own origin (/api through the Router); only `sst dev` (localhost) and the E2E tests
+    // against the local dev server call API Gateway cross-origin, never on prod.
+    const api = new sst.aws.ApiGatewayV2("Api", {
+      cors: { allowOrigins: [`https://${domain}`, ...(testing ? ["http://localhost:5173"] : [])], allowHeaders: ["authorization", "content-type"] },
+    });
     // API Gateway accepts only this pool's tokens issued to our clients; the Lambda checks the group.
     const authorizer = api.addAuthorizer({
       name: "Cognito",

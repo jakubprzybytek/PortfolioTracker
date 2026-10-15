@@ -48,17 +48,18 @@ export async function get<T = unknown>(path: string, opts: { auth?: boolean; tok
   return { status: res.status, body };
 }
 
-/** A write request (POST/PUT/DELETE) with a JSON body, logged in as the test user. */
-export async function send<T = unknown>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<{ status: number; body: T }> {
+/** A write request (POST/PUT/DELETE) with a JSON body (`raw`: this text as the body instead), logged in as the test user. */
+export async function send<T = unknown>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown, opts: { raw?: string } = {}): Promise<{ status: number; body: T }> {
   const headers: Record<string, string> = { Authorization: `Bearer ${await (token ??= login())}` };
-  if (body !== undefined) headers["content-type"] = "application/json";
-  const res = await fetch(API + path, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
-  const text = await res.text();
+  const text = opts.raw ?? (body !== undefined ? JSON.stringify(body) : undefined);
+  if (text !== undefined) headers["content-type"] = "application/json";
+  const res = await fetch(API + path, { method, headers, ...(text !== undefined ? { body: text } : {}) });
+  const out = await res.text();
   let parsed: T;
   try {
-    parsed = JSON.parse(text) as T;
+    parsed = JSON.parse(out) as T;
   } catch {
-    parsed = text as unknown as T;
+    parsed = out as unknown as T;
   }
   return { status: res.status, body: parsed };
 }

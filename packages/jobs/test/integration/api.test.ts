@@ -458,6 +458,14 @@ describe(`API ${API}`, () => {
     expect((await send("POST", "/instruments", { kind: "corporate", code: "X" })).status).toBe(400);
   });
 
+  it("a body that isn't JSON is a 400 with a plain message, not a 500", async () => {
+    for (const [method, route] of [["POST", "/transactions"], ["POST", "/notes"], ["POST", "/instruments"]] as const) {
+      const r = await send<{ error: string }>(method, route, undefined, { raw: "{not json" });
+      expect(r.status, route).toBe(400);
+      expect(r.body.error, route).toBe("The request body isn't valid JSON");
+    }
+  });
+
   it("requires a login: no token or a forged token gets 401", async () => {
     for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators", "/indicators/fx-eur", "/accounts"]) {
       expect((await get(route, { auth: false })).status, route).toBe(401);
