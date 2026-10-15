@@ -25,6 +25,11 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("total-cash")).toContainText(/\d\s\d{3},\d{2}\s*zł/);
     await expect(page.getByTestId("total-cash")).toContainText("1 incomplete account not included");
     await expect(page.getByTestId("total-all")).toContainText("zł");
+    // The cards stay compact: their note line isn't styled as a note of the Notes view (padding, 200 px tall)
+    const card = await page.getByTestId("total-all").boundingBox();
+    expect(card!.height).toBeLessThan(140);
+    const note = page.getByTestId("total-all").locator(".note");
+    expect(await note.evaluate((el) => getComputedStyle(el).paddingLeft)).toBe("0px");
   });
 
   test("renders the portfolio chart and switches ranges", async ({ page }) => {

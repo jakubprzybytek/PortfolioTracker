@@ -382,7 +382,7 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
 .notes-list a[aria-current="page"] .note-title { color: var(--accent); font-weight: 600; }
 .notes-list .note-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notes-list .faint { font-size: 0.78rem; }
-.note { padding: 16px 22px 20px; min-height: 200px; }
+.notes .note { padding: 16px 22px 20px; min-height: 200px; }
 .note-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .note-header h3 { margin: 0; font-size: 1.3rem; letter-spacing: -0.01em; }
 .note-actions { display: flex; align-items: center; gap: 14px; flex: none; }
@@ -422,7 +422,7 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .notes { grid-template-columns: minmax(0, 1fr); }
   .notes.has-note .notes-list, .notes:not(.has-note) .note { display: none; }
   .notes-back { display: inline-block; }
-  .note { padding: 14px 14px 18px; }
+  .notes .note { padding: 14px 14px 18px; }
   .note-header { flex-wrap: wrap; }
   .note-editor-panes { grid-template-columns: minmax(0, 1fr); }
   .note-editor textarea { min-height: 260px; }
