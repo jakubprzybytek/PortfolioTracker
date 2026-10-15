@@ -46,6 +46,23 @@ test.describe("dashboard", () => {
     await expect(chart.locator("svg.recharts-surface")).toBeVisible();
   });
 
+  test("renders the drawdown and the allocation over time, following the range", async ({ page }) => {
+    const dd = page.getByTestId("drawdown-chart");
+    await expect(dd.locator("path.recharts-area-area")).toHaveCount(1);
+    const alloc = page.getByTestId("allocation-chart");
+    await expect(alloc.locator("path.recharts-area-area").first()).toBeVisible();
+    expect(await alloc.locator("path.recharts-area-area").count()).toBeGreaterThanOrEqual(3); // shares, bonds, cash (and other)
+    await page.getByTestId("portfolio-range").getByRole("button", { name: "ALL" }).click();
+    await expect(page.getByTestId("portfolio-range")).toHaveAttribute("aria-busy", "false");
+    await expect(dd.locator("path.recharts-area-area")).toHaveCount(1);
+    // y axis of the drawdown: from 0 % down, nothing above it
+    const ticks = dd.locator(".recharts-yAxis-tick-labels text");
+    await expect(ticks.first()).toBeVisible();
+    const labels = (await ticks.allTextContents()).map((t) => t.replace(/\s/g, " "));
+    expect(labels).toContain("0 %");
+    expect(labels.every((t) => t === "0 %" || /^[-−]/.test(t))).toBe(true);
+  });
+
   test("shows totals, chart and jobs only (holdings and prices have their own views)", async ({ page }) => {
     await expect(page.getByTestId("total-all")).toBeVisible();
     await expect(page.getByTestId("holdings-table")).toHaveCount(0);
@@ -94,8 +111,8 @@ test.describe("dashboard", () => {
       await route.continue();
     });
     await page.goto("/");
-    await expect(page.getByTestId("chart-skeleton")).toBeVisible();
-    const box = await page.getByTestId("chart-skeleton").boundingBox();
+    await expect(page.getByTestId("chart-skeleton")).toHaveCount(3); // value, drawdown, allocation over time
+    const box = await page.getByTestId("chart-skeleton").first().boundingBox();
     expect(box!.height).toBe(260);
     release();
     await expect(page.getByTestId("portfolio-chart")).toBeVisible();
@@ -134,7 +151,7 @@ test.describe("dashboard", () => {
     });
     const range = page.getByTestId("portfolio-range");
     await range.getByRole("button", { name: "ALL" }).click();
-    await expect(page.getByTestId("chart-busy")).toBeVisible();
+    await expect(page.getByTestId("chart-busy")).toHaveCount(3); // the three charts share the range
     await expect(range.getByRole("button", { name: "1M" })).toBeDisabled();
     await expect(range).toHaveAttribute("aria-busy", "true");
     release();

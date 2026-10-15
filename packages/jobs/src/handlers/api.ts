@@ -19,6 +19,7 @@ import {
   manualInstrument,
   accountSummaries,
   netDepositsByDate,
+  valueByClass,
   checkManualTransaction,
   isCalendarDate,
   listedTreasuryInstrument,
@@ -187,6 +188,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       case "GET /portfolio/history": {
         // Each day: positions, cash, their sum (`total`) and the money put in so far (`netDeposits`, fully tracked
         // accounts, other currencies at NBP D-1), so a sale kept as cash doesn't show as a drop.
+        // `byClass`: shares, bonds, cash, other (the allocation over time).
         const [snaps, txs, accounts] = await Promise.all([repo.querySnapshots(from, to), repo.listTransactions(), repo.listAccounts()]);
         const currencies = [...new Set(txs.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => t.currency))].filter((c) => c && c !== "PLN");
         const first = txs.map((t) => t.date).sort()[0] ?? from;
@@ -195,7 +197,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const deposits = netDepositsByDate(txs, snaps.map((s) => s.date), fx, incomplete);
         return json(
           200,
-          snaps.map((s) => ({ date: s.date, totals: s.totals, byType: s.byType, total: Math.round((s.totals.value + (s.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(s.date) ?? 0 })),
+          snaps.map((s) => ({ date: s.date, totals: s.totals, byType: s.byType, byClass: valueByClass(s), total: Math.round((s.totals.value + (s.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(s.date) ?? 0 })),
         );
       }
       case "GET /instruments": {

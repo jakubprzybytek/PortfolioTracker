@@ -1,4 +1,5 @@
 import { fmtNum, fmtPln, typeLabel } from "./format.ts";
+import { ASSET_CLASSES, valueByClass, type AssetClass } from "@portfolio/core/valuation/history";
 import type { Snapshot } from "./types.ts";
 
 interface Slice {
@@ -65,34 +66,18 @@ export function Allocation({ snapshot }: { snapshot: Snapshot }) {
   );
 }
 
-/** Asset classes of the big picture; instrument types map onto them (ETFs: by what they hold, see assetClassOf). */
-const ASSET_CLASS: Record<string, string> = {
-  ETF: "SHARES",
-  BOND_LISTED: "BONDS",
-  BOND_CORPORATE: "BONDS",
-  BOND_RETAIL: "BONDS",
-  BOND_IBKR: "BONDS",
-  CURRENCY: "CASH",
-  CASH: "CASH",
-  FUND_MANUAL: "OTHER",
-};
-const CLASS_LABELS: Record<string, string> = { SHARES: "Shares", BONDS: "Bonds", CASH: "Cash", OTHER: "Other" };
-const CLASS_ORDER = ["SHARES", "BONDS", "CASH", "OTHER"];
-
-/** An ETF holding bonds ("… Corporate Bond UCITS ETF") counts as bonds; other ETFs as shares. */
-export const assetClassOf = (h: { type: string; name: string }): string => (h.type === "ETF" && /\bbond/i.test(h.name) ? "BONDS" : (ASSET_CLASS[h.type] ?? "OTHER"));
+export const CLASS_LABELS: Record<AssetClass, string> = { SHARES: "Shares", BONDS: "Bonds", CASH: "Cash", OTHER: "Other" };
+/** The classes' colours, as in the asset mix (`.mix-*` in styles.css). */
+export const CLASS_COLORS: Record<AssetClass, string> = { SHARES: "var(--mix-shares)", BONDS: "var(--mix-bonds)", CASH: "var(--mix-cash)", OTHER: "var(--mix-other)" };
 
 /**
  * The big picture in one bar: shares, bonds (incl. bond ETFs), cash and other (manually valued), as shares of positions + cash of
  * the fully tracked accounts.
  */
 export function AssetMix({ snapshot }: { snapshot: Snapshot }) {
-  const byClass = new Map<string, number>();
-  const add = (key: string, value: number) => byClass.set(key, (byClass.get(key) ?? 0) + value);
-  for (const h of snapshot.holdings) if (h.value) add(assetClassOf(h), h.value);
-  add("CASH", snapshot.totals.cash ?? 0);
-  const total = [...byClass.values()].reduce((s, v) => s + v, 0);
-  const slices = CLASS_ORDER.filter((k) => (byClass.get(k) ?? 0) > 0).map((key) => ({ key, value: byClass.get(key)!, share: total ? byClass.get(key)! / total : 0 }));
+  const byClass = valueByClass(snapshot);
+  const total = ASSET_CLASSES.reduce((s, k) => s + byClass[k], 0);
+  const slices = ASSET_CLASSES.filter((k) => byClass[k] > 0).map((key) => ({ key, value: byClass[key], share: total ? byClass[key] / total : 0 }));
   return (
     <section className="asset-mix" data-testid="asset-mix" aria-label="Asset mix">
       <div className="mix-bar" aria-hidden>

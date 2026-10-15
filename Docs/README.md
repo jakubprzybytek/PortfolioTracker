@@ -142,6 +142,7 @@ Later phases:
 - [x] Valuation queue hardening (2026-10-14): a dead-letter queue after 3 failures; a revaluation drops the days of positions that are gone; the old single `Table` deleted from `prod`.
 - [x] Revaluations write only what changed (2026-10-15): a day that comes out as stored is not written again, and of a changed day only the positions that moved get their position day rewritten (`{ force: true }` writes all). A full run had written ~64k units (~$0.045 per run and stage).
 - [x] Notes (2026-10-15): free notes in Markdown in their own view (list by last change, edit with a live preview), in the monthly backup (`notes.json`).
+- [x] Drawdown and allocation over time on the Dashboard (2026-10-15): drawdown on the time-weighted return (deposits and withdrawals don't count), shares/bonds/cash/other stacked to 100 % per day; both follow the portfolio chart's range.
 - [x] IZ nominal on the price chart (2026-10-15): an inflation-linked bond's chart also shows its indexed nominal per bond (dashed, PLN, right-hand axis), so the months of negative CPI show as dips three months later.
 
 ## Outstanding work (2026-10-15)
@@ -162,7 +163,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 9. **Closed positions:** realised gain is shown as a total (Dashboard, per account); still missing: the list of closed positions and sales, and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
 11. **IBKR Flex Web Service:** IBKR trades without downloading statements (needs a Flex Query and a token); mark prices for US T-bills.
-12. **More Dashboard charts:** income per year, drawdown, allocation over time.
+12. **More Dashboard charts:** income per year. (Drawdown and allocation over time done on 2026-10-15.)
 13. **Asset class per instrument:** bond ETFs are recognised by "Bond" in the name; an explicit setting would be safer (gold, mixed funds).
 20. **XIRR per account, per asset type and per instrument:** today XIRR is per account and for the total, from deposits and withdrawals (`core/valuation/accounts.ts`, Accounts table). Also per asset type and per instrument (Holdings rows and group rows), from the position's own cash flows: buys, sells, coupons, dividends, redemptions and fees, plus its value today; per account the same way, so it can be compared with the deposit-based figure. Closed positions keep theirs (with item 9).
 

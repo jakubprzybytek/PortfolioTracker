@@ -223,6 +223,10 @@ describe(`API ${API}`, () => {
     expect(body[2]!.netDeposits).toBe(30000);
     expect(body[2]!.total).toBeCloseTo(body[2]!.totals.value + body[2]!.totals.cash!, 1);
     expect(body[2]!.totals.value).toBeGreaterThan(15000); // after the DS0432 buy
+    // per asset class: the bond bought, the rest cash; together the total
+    const byClass = (body[2] as unknown as { byClass: Record<"SHARES" | "BONDS" | "CASH" | "OTHER", number> }).byClass;
+    expect(byClass.BONDS).toBeCloseTo(body[2]!.totals.value, 1);
+    expect(byClass.SHARES + byClass.BONDS + byClass.CASH + byClass.OTHER).toBeCloseTo(body[2]!.total, 1);
   });
 
   it("GET /instruments/{isin}/transactions filters by ISIN", async () => {

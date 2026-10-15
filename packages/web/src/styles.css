@@ -249,10 +249,11 @@ td .ccy { color: var(--muted); font-weight: 400; }
 .mix-legend .muted { color: var(--faint); }
 .mix-legend li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .mix-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.mix-SHARES { background: var(--accent); }
-.mix-BONDS { background: #f59e0b; }
-.mix-CASH { background: #10b981; }
-.mix-OTHER { background: #a78bfa; }
+:root { --mix-shares: var(--accent); --mix-bonds: #f59e0b; --mix-cash: #10b981; --mix-other: #a78bfa; }
+.mix-SHARES { background: var(--mix-shares); }
+.mix-BONDS { background: var(--mix-bonds); }
+.mix-CASH { background: var(--mix-cash); }
+.mix-OTHER { background: var(--mix-other); }
 @media (max-width: 720px) {
   td.instrument { min-width: 12rem; }
   /* Cards two per row: smaller figures so 1 577 174,28 zł fits. */
@@ -339,6 +340,8 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
 }
 .chart-legend { font-size: 0.8rem; font-weight: 400; margin-left: 8px; }
+.chart-legend .legend-item { white-space: nowrap; margin-right: 12px; }
+.chart-legend .mix-dot { width: 8px; height: 8px; }
 /* Profit breakdown under the cards: the parts that add up to the profit. */
 .breakdown { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 12px; padding: 12px 16px; }
 .breakdown-part { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }

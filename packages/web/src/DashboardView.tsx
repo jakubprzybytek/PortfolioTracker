@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { fmtPct, fmtPln, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
 import { AccountsTable, type AccountsResponse } from "./AccountsTable.tsx";
-import { Allocation, AssetMix } from "./Allocation.tsx";
+import { Allocation, AssetMix, CLASS_LABELS } from "./Allocation.tsx";
+import { AllocationChart, DrawdownChart } from "./HistoryCharts.tsx";
 import { Skeleton, SkeletonRows } from "./Placeholders.tsx";
 import { PortfolioChart } from "./PortfolioChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
@@ -114,6 +115,27 @@ export function DashboardView() {
       <section className="panel">
         <RangePicker value={range} onChange={setRange} busy={history.loading} testId="portfolio-range" />
         {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} loading={history.loading} />}
+      </section>
+
+      <h2>
+        Drawdown <span className="muted chart-legend">below the best so far in the range; deposits and withdrawals don't count</span>
+      </h2>
+      <section className="panel">
+        {history.error ? <p className="error">{history.error}</p> : <DrawdownChart history={history.data ?? []} loading={history.loading} />}
+      </section>
+
+      <h2>
+        Allocation over time{" "}
+        <span className="muted chart-legend">
+          {(["SHARES", "BONDS", "CASH", "OTHER"] as const).map((k) => (
+            <span key={k} className="legend-item">
+              <i className={`mix-dot mix-${k}`} aria-hidden /> {CLASS_LABELS[k]}
+            </span>
+          ))}
+        </span>
+      </h2>
+      <section className="panel">
+        {history.error ? <p className="error">{history.error}</p> : <AllocationChart history={history.data ?? []} loading={history.loading} />}
       </section>
 
       <h2>Accounts</h2>
