@@ -1,9 +1,11 @@
 // Values the portfolio: one date by default (today), or every day from `from` to `to`.
 // Runs only from the FIFO queue (one at a time, in order). A direct invocation (the 22:30/07:30 schedules, or by hand
 // with { from, to, reason }) just queues its request, so it can't overlap a run started by an import or backfill.
+// Days that come out as stored aren't written again (writes are what a run costs); { force: true } writes them all.
 
 import {
   addDays,
+  changedPositionDays,
   firstTransactionDate,
   toReferenceIndex,
   today,
@@ -12,6 +14,7 @@ import {
   type FxRateItem,
   type IsoDate,
   type PriceItem,
+  snapshotChanged,
 } from "@portfolio/core";
 import type { SQSEvent } from "aws-lambda";
 import { queueValuation, repo, runJob } from "../lib/context.ts";
@@ -20,6 +23,8 @@ export interface ValuationEvent {
   from?: IsoDate;
   to?: IsoDate;
   reason?: string;
+  /** Write every day even if unchanged (e.g. after a change to what a position day stores). */
+  force?: boolean;
 }
 
 export async function handler(event: ValuationEvent | SQSEvent = {}) {
@@ -73,8 +78,10 @@ async function revalue(event: ValuationEvent) {
 
     // The positions each day had before: one that's gone now (a transaction edited or deleted) loses its days too,
     // so its row chart doesn't keep stale days.
-    const before = new Map((await repo.querySnapshots(from, to)).map((s) => [s.date, s.holdings.map((h) => ({ account: h.account, isin: h.isin }))]));
+    // The stored days also tell which come out unchanged: those aren't written again.
+    const before = new Map((await repo.querySnapshots(from, to)).map((s) => [s.date, s]));
     let written = 0;
+    let unchanged = 0;
     let removed = 0;
     for (let date = from; date <= to; date = addDays(date, 1)) {
       const prices = new Map<string, PriceItem>();
@@ -88,13 +95,21 @@ async function revalue(event: ValuationEvent) {
         if (r) fx.set(c, { mid: r.mid, date: r.date });
       }
       const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponPeriods, accounts, fx, fxHistory });
+      const stored = event.force ? undefined : before.get(date);
+      if (!snapshotChanged(stored, snapshot)) {
+        if (date === to) await repo.putLatestSnapshot(snapshot);
+        unchanged++;
+        continue;
+      }
       await repo.putSnapshot(snapshot, date === to);
-      await repo.putPositionDays(snapshot); // per-position history for the Holdings row charts
+      // Per-position history for the Holdings row charts: only the positions whose day changed.
+      await repo.putPositionDays({ date, holdings: changedPositionDays(stored, snapshot) });
       const now = new Set(snapshot.holdings.map((h) => `${h.account}#${h.isin}`));
-      const gone = (before.get(date) ?? []).filter((h) => !now.has(`${h.account}#${h.isin}`));
-      if (gone.length) removed += await repo.deletePositionDays(gone.map((h) => ({ ...h, date })));
+      const gone = (before.get(date)?.holdings ?? []).filter((h) => !now.has(`${h.account}#${h.isin}`));
+      if (gone.length) removed += await repo.deletePositionDays(gone.map((h) => ({ account: h.account, isin: h.isin, date })));
       written++;
     }
-    return { itemsWritten: written, note: `${from} → ${to} (${event.reason ?? "schedule"})${removed ? `; ${removed} days of positions gone removed` : ""}` };
+    const notes = [unchanged ? `${unchanged} days unchanged` : "", removed ? `${removed} days of positions gone removed` : ""].filter(Boolean);
+    return { itemsWritten: written, note: `${from} → ${to} (${event.reason ?? "schedule"})${notes.map((n) => `; ${n}`).join("")}` };
   });
 }

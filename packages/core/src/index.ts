@@ -16,6 +16,7 @@ export * from "./valuation/priceRows.ts";
 export * from "./valuation/retailLots.ts";
 export * from "./valuation/cash.ts";
 export * from "./valuation/fx.ts";
+export * from "./valuation/unchanged.ts";
 export * from "./prices/manual.ts";
 export * from "./accounts/schema.ts";
 export * from "./transactions/schema.ts";

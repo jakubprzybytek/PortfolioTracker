@@ -139,6 +139,7 @@ Later phases:
 - [x] Today's prices on demand (2026-10-14): "Update prices" (until 2026-10-15 "Refresh") next to the valuation date fetches the current quotes of ETFs, IBKR bonds, Catalyst and treasury bonds and revalues today; Holdings and Prices show each price's time, or the date of an older one.
 - [x] Accrued interest of corporate bonds (2026-10-14): interest periods per bond (first day, record day, payment day, rate) from obligacje.pl each morning (`coupons` job: new periods and the current rate, never replacing a stored one), past rates from the coupons you received (accepted with a click) or typed in, in the bond's chart panel ("Coupon periods"); coupons checked against the rate.
 - [x] Valuation queue hardening (2026-10-14): a dead-letter queue after 3 failures; a revaluation drops the days of positions that are gone; the old single `Table` deleted from `prod`.
+- [x] Revaluations write only what changed (2026-10-15): a day that comes out as stored is not written again, and of a changed day only the positions that moved get their position day rewritten (`{ force: true }` writes all). A full run had written ~64k units (~$0.045 per run and stage).
 
 ## Outstanding work (2026-10-14)
 
@@ -150,7 +151,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 3. ~~Corporate bonds are valued clean~~ Done (2026-10-14): coupon periods with a rate each (obligacje.pl, your coupons, or typed in); a period without a rate is flagged "no rate" and valued clean.
 4. ~~Holdings row charts after an edit or a delete~~ Done (2026-10-14): a revaluation removes the days of positions that are gone; the days left by earlier edits were cleaned up on `prod` (1,856, all from the IBKR rebuild).
 5. ~~Dashboard cards vs the chart~~ Done (2026-10-13): Total, Cash, Net deposits, Profit cards; the profit split into unrealised, realised, income, fees, currency and other; unrealised and realised per account.
-6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed.
+6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed. Since 2026-10-15 such a revaluation only reads (unchanged days aren't written), so what's left is the wasted run.
 
 ### Missing compared with the sheet
 7. ~~Update the value of a hand-valued asset~~ Done (2026-10-14): "Edit values" in its chart panel (Prices, Holdings), values listed and deletable (ui.md).

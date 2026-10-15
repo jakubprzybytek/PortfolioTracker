@@ -334,7 +334,12 @@ export class Repository {
 
   async putSnapshot(snapshot: Omit<SnapshotItem, "PK" | "SK">, alsoLatest: boolean): Promise<void> {
     await this.put("holdings", { ...keys.snapshot(snapshot.date), ...snapshot });
-    if (alsoLatest) await this.put("holdings", { ...keys.snapshot("LATEST"), ...snapshot });
+    if (alsoLatest) await this.putLatestSnapshot(snapshot);
+  }
+
+  /** Only SNAP#LATEST (the day's own item is already up to date). */
+  async putLatestSnapshot(snapshot: Omit<SnapshotItem, "PK" | "SK">): Promise<void> {
+    await this.put("holdings", { ...keys.snapshot("LATEST"), ...snapshot });
   }
 
   getSnapshot(date: IsoDate | "LATEST"): Promise<SnapshotItem | undefined> {
@@ -350,7 +355,7 @@ export class Repository {
 
   // --- position history (one item per position per day) --------------------------------------
 
-  /** Writes each holding of a snapshot as that position's value on the snapshot's day. */
+  /** Writes each holding of a snapshot as that position's value on the snapshot's day (pass only the changed ones). */
   putPositionDays(snapshot: Pick<SnapshotItem, "date" | "holdings">): Promise<number> {
     return this.batchPut(
       "holdings",

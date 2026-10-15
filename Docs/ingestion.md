@@ -22,7 +22,7 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 
 | Job | When | Source | Writes |
 |---|---|---|---|
-| `live` | on demand ("Refresh prices" in the app, `POST /prices/refresh`, at most every 5 min) | today's quote of every instrument with an intraday source: onvista (IBKR bonds), Yahoo (ETFs), BiznesRadar quote page (Catalyst and GPW treasury bonds); then revalues today | `PX#<venue>#<today>` provisional, with `quoteTime` |
+| `live` | on demand ("Update prices" in the app, `POST /prices/refresh`, at most every 5 min) | today's quote of every instrument with an intraday source: onvista (IBKR bonds), Yahoo (ETFs), BiznesRadar quote page (Catalyst and GPW treasury bonds); then revalues today | `PX#<venue>#<today>` provisional, with `quoteTime` |
 | `fx` | 12:30, 16:30; also after importing a foreign-currency instrument | NBP table A: EUR, USD and every instrument currency, from the day after the last stored rate (first run: from 2002); revalues the affected days when older rates arrive for a held currency | `FX#<ccy>/<date>` |
 | `eod-gpw` | 20:30 and 22:00 (GPW publishes the day's file after 18:30; today's file missing = "not published yet") | GPW archive daily XLS, all treasury bonds in one file (+ one file per missing day in the look-back; full history per bond weekly as a check) | `PX#XWAR#…` provisional |
 | `eod-catalyst` | 19:30, and 08:00 Tue–Sat | BiznesRadar per bond (`sourceIds.biznesradar`): the first history page (last ~50 sessions, final; it lags a day) + today's quote (provisional), 2 s between requests. Full history per bond on import (backfill, ~16 pages) | `PX#CATALYST#…` |
@@ -39,7 +39,7 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
 
 ## Live prices (on demand, 2026-10-14)
 
-- **Trigger:** "Refresh prices" in the app → `POST /prices/refresh` → the `Live` function (async). At most one run every 5 minutes (the API answers 429 with `retryAt`), so the sources aren't asked over and over.
+- **Trigger:** "Update prices" in the app → `POST /prices/refresh` → the `Live` function (async). At most one run every 5 minutes (the API answers 429 with `retryAt`), so the sources aren't asked over and over.
 - **What it does** (`jobs/handlers/live.ts`): for every active instrument with an intraday source, today's quote so far, stored as today's **provisional** price in the usual `PX#<venue>#<date>` item: IBKR bonds from onvista (Börse Stuttgart, near real time), ETFs from Yahoo (today's bar, about 15 minutes delayed), Catalyst corporate bonds and GPW treasury bonds (DS, IZ …, the page under their GPW code) from the BiznesRadar quote page: the last trade, 15 minutes delayed, 2 s apart. Each price keeps when the source set it (`quoteTime`: the last trade or quote), shown in the app. An instrument not traded or quoted today is skipped (it keeps the last close); a price already final for today is left alone. Then it queues a revaluation of today, and the evening jobs replace the provisional prices with the closes.
 - **Not covered:** retail bonds and hand-valued assets (no market), exchange rates (NBP, once a day). Treasury bonds' end-of-day source stays GPW's file: its close replaces the refreshed price in the evening.
 - **Failures:** an instrument whose source fails is listed in the run's note; the run fails only when nothing could be fetched.
@@ -57,7 +57,9 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
 3. **Exchange-traded bonds:** accrued interest per bond from the bond terms (treasury: the MF calculator's terms; IZ: `nominal = 1000 × ratio(date)` from `CPI_REF` and `base_ref`), kept in the holding as `nominal`, `accruedInterest`, `valuePerUnit` (= clean % × nominal + accrued). Corporate bonds: clean % × nominal plus the accrued interest of their coupon periods (data-sources.md, "Corporate bonds: coupon periods"); a period without a rate flags the holding `no_coupon_rate` and leaves it at the clean price.
 4. Positions = sum of transactions per ISIN and account up to the date.
 5. Value per position in instrument currency and in PLN (NBP rate of the date, falling back to the latest available).
-6. Write `SNAP#<date>` and `SNAP#LATEST`.
+6. Write `SNAP#<date>` and `SNAP#LATEST`, and the position days (`POS#<account>#<isin>`) for the Holdings row charts.
+
+**Only what changed is written.** The run reads the stored snapshots of its range first. A day that comes out the same (ignoring `computedAt`) isn't written again, and of a changed day only the positions whose quantity, value or cost changed get their position day rewritten; `SNAP#LATEST` is always written. Writes are what a run costs: a full range (from 2022-03-01, ~1,690 days) used to write ~64k units, about $0.045 per run and stage, and on 2026-10-13 runs from imports, backfills and the CD tests cost ~$1.30 in a day. The note says how many days were unchanged. `{ force: true }` writes every day, e.g. after a change to what a position day stores.
 
 ## Data quality rules
 

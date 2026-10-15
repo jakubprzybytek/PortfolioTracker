@@ -222,7 +222,7 @@ Items stay small: about 25 holdings, well under the 400 KB item limit.
 PK = POS#<account>#<isin>   SK = <YYYY-MM-DD>
 ```
 
-`account`, `isin`, `date`, `quantity`, `value`, `cost`: each position's value on each day, written by the valuation alongside the snapshot (one batch per day). Read by the Holdings row charts (`GET /holdings/history`); about 15 items a day, so a year of one position is one small query instead of reading 365 snapshots.
+`account`, `isin`, `date`, `quantity`, `value`, `cost`: each position's value on each day, written by the valuation alongside the snapshot (one batch per day, only the positions whose quantity, value or cost changed: ingestion.md, "Only what changed is written"). Read by the Holdings row charts (`GET /holdings/history`); about 15 items a day, so a year of one position is one small query instead of reading 365 snapshots.
 
 ## Access per function
 
