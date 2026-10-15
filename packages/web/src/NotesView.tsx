@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { apiSend } from "./api.ts";
 import type { Note } from "./types.ts";
 import { useApi } from "./useApi.ts";
+import { useNarrow } from "./useNarrow.ts";
 
 /** Markdown (GitHub flavour: tables, task lists, strikethrough). Raw HTML in the text is shown as text, not run. */
 export function MarkdownText({ text }: { text: string }) {
@@ -16,9 +17,13 @@ export function MarkdownText({ text }: { text: string }) {
 
 const fmtUpdated = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
+/** The note open when you last left Notes (in memory, until the page reloads): coming back opens it again. */
+let lastNote: string | undefined;
+
 /**
  * Notes in Markdown: the list (last changed first) and the open note (`?note=<id>`), shown rendered; "Edit" turns it
- * into a title and a text box with a live preview. On a phone the list and the note take turns.
+ * into a title and a text box with a live preview. On a phone the list and the note take turns. Coming to Notes
+ * without a note in the URL opens the one open last time, or else the first (on a phone: the list).
  */
 export function NotesView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const notes = useApi<Note[]>("/notes");
@@ -27,6 +32,19 @@ export function NotesView({ params, setParams }: { params: Record<string, string
   const selected = notes.data?.find((n) => n.id === selectedId);
   const [editing, setEditing] = useState(false);
   useEffect(() => setEditing(creating), [selectedId, creating]);
+  const narrow = useNarrow();
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !notes.data) return;
+    restored.current = true;
+    if (selectedId) return;
+    const id = notes.data.some((n) => n.id === lastNote) ? lastNote : narrow ? undefined : notes.data[0]?.id;
+    if (id) setParams({ note: id });
+  }, [notes.data, selectedId, narrow, setParams]);
+  useEffect(() => {
+    if (selectedId && !creating) lastNote = selectedId;
+    else if (!selectedId && restored.current) lastNote = undefined;
+  }, [selectedId, creating]);
 
   const open = (id: string | undefined) => setParams({ note: id });
   const saved = (n: Note) => {

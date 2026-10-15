@@ -575,6 +575,42 @@ test.describe("indicators view", () => {
 });
 
 test.describe("notes view", () => {
+  test("opens the first note when you come to Notes, and the one open last time when you come back", async ({ page }) => {
+    const stamp = Date.now();
+    const ids: string[] = [];
+    await page.goto("/#/notes");
+    for (const title of [`E2E older ${stamp}`, `E2E newer ${stamp}`]) {
+      await page.getByTestId("note-new").click();
+      await page.getByTestId("note-title-input").fill(title);
+      await page.getByTestId("note-body-input").fill("text");
+      await page.getByTestId("note-save").click();
+      await expect(page.getByTestId("note-title")).toHaveText(title);
+      ids.push(new URL(page.url()).hash.match(/note=([a-f0-9]+)/)![1]!);
+    }
+    const [older, newer] = ids as [string, string];
+
+    // A fresh page: nothing remembered, so the first note (the last changed) opens
+    await page.goto("/#/");
+    await page.reload();
+    await page.getByTestId("nav-notes").click();
+    await expect(page).toHaveURL(new RegExp(`#/notes\\?note=${newer}$`));
+    await expect(page.getByTestId("note-title")).toHaveText(`E2E newer ${stamp}`);
+
+    // Another view and back: the note open when leaving
+    await page.getByTestId("note-item").filter({ hasText: `E2E older ${stamp}` }).click();
+    await page.getByTestId("nav-holdings").click();
+    await page.getByTestId("nav-notes").click();
+    await expect(page).toHaveURL(new RegExp(`#/notes\\?note=${older}$`));
+    await expect(page.getByTestId("note-title")).toHaveText(`E2E older ${stamp}`);
+
+    for (const id of [older, newer]) {
+      await page.goto(`/#/notes?note=${id}`);
+      await page.getByTestId("note-delete").click();
+      await page.getByTestId("note-delete-confirm").click();
+      await expect(page).toHaveURL(/#\/notes$/);
+    }
+  });
+
   test("writes a note in Markdown with a live preview, shows it rendered, edits and deletes it", async ({ page }) => {
     const title = `E2E note ${Date.now()}`;
     await page.goto("/#/notes");

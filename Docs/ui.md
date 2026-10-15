@@ -115,6 +115,7 @@ All transactions from `GET /transactions`.
 Free notes in Markdown (`NotesView.tsx`), e.g. trading checklists. Not linked to the portfolio: saving one doesn't revalue anything.
 
 - **Layout:** the list on the left (title and when it was last changed, the last changed first), the open note on the right, rendered. On a phone the list and the note take turns ("← All notes" goes back).
+- **Which note opens:** coming to Notes without a note in the URL opens the one that was open when you last left Notes (kept in memory until the page is reloaded), or else the first one (on a phone: the list instead). The choice replaces the URL, so "back" doesn't bounce.
 - **Markdown:** GitHub flavour (`react-markdown` + `remark-gfm`): headings, lists, task lists, tables, links, code, quotes. Raw HTML in a note is shown as text, never run.
 - **New note / Edit:** a title (required) and the text, with a live preview next to it (below it on a phone). **Delete** asks to confirm.
 - Stored in the `transactions` table (your input) and in the monthly backup (`notes.json`).
