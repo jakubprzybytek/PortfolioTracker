@@ -117,26 +117,31 @@ export function DashboardView() {
         {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} loading={history.loading} />}
       </section>
 
-      <h2>
-        Drawdown <span className="muted chart-legend">below the best so far in the range; deposits and withdrawals don't count</span>
-      </h2>
-      <section className="panel">
-        {history.error ? <p className="error">{history.error}</p> : <DrawdownChart history={history.data ?? []} loading={history.loading} />}
-      </section>
-
-      <h2>
-        Allocation over time{" "}
-        <span className="muted chart-legend">
-          {(["SHARES", "BONDS", "CASH", "OTHER"] as const).map((k) => (
-            <span key={k} className="legend-item">
-              <i className={`mix-dot mix-${k}`} aria-hidden /> {CLASS_LABELS[k]}
+      <div className="chart-pair" data-testid="chart-pair">
+        <div>
+          <h2>
+            Drawdown <span className="muted chart-legend">below the best so far in the range; deposits don't count</span>
+          </h2>
+          <section className="panel">
+            {history.error ? <p className="error">{history.error}</p> : <DrawdownChart history={history.data ?? []} loading={history.loading} />}
+          </section>
+        </div>
+        <div>
+          <h2>
+            Allocation over time{" "}
+            <span className="muted chart-legend">
+              {(["SHARES", "BONDS", "CASH", "OTHER"] as const).map((k) => (
+                <span key={k} className="legend-item">
+                  <i className={`mix-dot mix-${k}`} aria-hidden /> {CLASS_LABELS[k]}
+                </span>
+              ))}
             </span>
-          ))}
-        </span>
-      </h2>
-      <section className="panel">
-        {history.error ? <p className="error">{history.error}</p> : <AllocationChart history={history.data ?? []} loading={history.loading} />}
-      </section>
+          </h2>
+          <section className="panel">
+            {history.error ? <p className="error">{history.error}</p> : <AllocationChart history={history.data ?? []} loading={history.loading} />}
+          </section>
+        </div>
+      </div>
 
       <h2>Accounts</h2>
       <AccountsTable data={summaries} />

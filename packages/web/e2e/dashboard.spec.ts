@@ -55,6 +55,10 @@ test.describe("dashboard", () => {
     await page.getByTestId("portfolio-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("portfolio-range")).toHaveAttribute("aria-busy", "false");
     await expect(dd.locator("path.recharts-area-area")).toHaveCount(1);
+    // side by side on a computer, at the same height
+    const [a, b] = [(await dd.boundingBox())!, (await alloc.boundingBox())!];
+    expect(Math.abs(a.y - b.y)).toBeLessThan(2);
+    expect(b.x).toBeGreaterThan(a.x + a.width);
     // y axis of the drawdown: from 0 % down, nothing above it
     const ticks = dd.locator(".recharts-yAxis-tick-labels text");
     await expect(ticks.first()).toBeVisible();

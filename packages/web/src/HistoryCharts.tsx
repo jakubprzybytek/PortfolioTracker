@@ -15,7 +15,7 @@ const yAxis = (narrow: boolean) => (narrow ? narrowYAxis : { width: 56, tick: { 
  * How far below its best so far the portfolio was each day (%), on the time-weighted return, so deposits and
  * withdrawals don't count (`drawdowns` in core). The best counts from the start of the range shown.
  */
-export function DrawdownChart({ history, loading, height = 200 }: { history: HistoryPoint[]; loading: boolean; height?: number }) {
+export function DrawdownChart({ history, loading, height = 220 }: { history: HistoryPoint[]; loading: boolean; height?: number }) {
   const narrow = useNarrow();
   const points = history.filter((h) => h.total !== undefined && h.netDeposits !== undefined);
   if (points.length === 0) return <ChartPlaceholder loading={loading} height={height}>No valuation history in this range.</ChartPlaceholder>;

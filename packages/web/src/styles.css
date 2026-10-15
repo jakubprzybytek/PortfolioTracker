@@ -340,6 +340,11 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
 }
 .chart-legend { font-size: 0.8rem; font-weight: 400; margin-left: 8px; }
+/* Two charts side by side (Dashboard: drawdown, allocation over time); headings and panels line up across them. */
+.chart-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
+.chart-pair > div { display: grid; grid-row: span 2; grid-template-rows: subgrid; }
+.chart-pair h2 { align-self: end; }
+@media (max-width: 960px) { .chart-pair { grid-template-columns: minmax(0, 1fr); } }
 .chart-legend .legend-item { white-space: nowrap; margin-right: 12px; }
 .chart-legend .mix-dot { width: 8px; height: 8px; }
 /* Profit breakdown under the cards: the parts that add up to the profit. */
