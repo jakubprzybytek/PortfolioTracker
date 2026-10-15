@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { HoldingSnapshot, SnapshotItem } from "@portfolio/core";
+import { settlementDate, type HoldingSnapshot, type SnapshotItem } from "@portfolio/core";
 import { API, get, repoRoot, send, uploadImport, waitFor } from "./setup.ts";
 
 const IZ = "PL0000117024";
@@ -149,14 +149,15 @@ describe(`API ${API}`, () => {
     expect(bund.cleanPrice!).toBeLessThan(100);
     expect(bund.value!).toBeCloseTo(2 * 10 * bund.cleanPrice! * bund.fx!.rate, 0);
     // Catalyst corporate bond: clean price (% of nominal) x nominal 100, plus accrued interest from the sample periods
-    // (ACT/365; from the record day the whole coupon); the coupon counts as received.
+    // (ACT/365, to the settlement day T+2; from the record day the whole coupon); the coupon counts as received.
     const kru = by["bonds/KRU0827"]!;
     expect(kru).toMatchObject({ type: "BOND_CORPORATE", quantity: 40, nominal: 100, cost: 4056.1, couponsReceived: 70 });
     expect(kru.cleanPrice!).toBeGreaterThan(90);
-    const period = samplePeriods.find((p) => p.start <= snap.date && snap.date < p.end);
+    const settle = settlementDate(snap.date);
+    const period = samplePeriods.find((p) => p.start <= settle && settle < p.end);
     if (period) {
       const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
-      const accrued = Math.round(100 * period.rate * (snap.date >= period.recordDate ? days(period.start, period.end) : days(period.start, snap.date)) / 365 * 100) / 100;
+      const accrued = Math.round(100 * period.rate * (settle >= period.recordDate ? days(period.start, period.end) : days(period.start, settle)) / 365 * 100) / 100;
       expect(kru).toMatchObject({ accruedInterest: accrued, flags: [], rate: { current: period.rate } });
       expect(kru.value!).toBeCloseTo(40 * (kru.cleanPrice! + accrued), 1);
     } else expect(kru).toMatchObject({ accruedInterest: null, flags: ["no_coupon_rate"] }); // after the sample's last period

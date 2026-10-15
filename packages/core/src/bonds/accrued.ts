@@ -1,6 +1,7 @@
 import { daysBetween, type IsoDate } from "../dates.ts";
+import { settlementDate } from "../settlement.ts";
 import { round2, type ReferenceIndex, indexRatioAt } from "./izIndex.ts";
-import { periodAt, type BondTerms } from "./terms.ts";
+import { periodAt, type BondTerms, type CouponPeriod } from "./terms.ts";
 
 export interface BondValuationInputs {
   /** INDEXED bonds: the reference index (monthly W values). */
@@ -28,6 +29,33 @@ export interface BondValuation {
 export function valueBond(terms: BondTerms, date: IsoDate, inputs: BondValuationInputs = {}): BondValuation {
   const period = periodAt(terms, date);
   if (!period) return { nominal: terms.nominal, accruedInterest: 0, rate: 0, problem: "no_period" };
+  return valueIn(terms, period, date, inputs);
+}
+
+/**
+ * A listed bond's nominal and accrued interest on `date` as the market prices it: to the settlement day of a sale that
+ * day (T+2, `settlementDate`), as GPW and Catalyst quote it and a buyer pays it. A coupon whose period ends by then
+ * but isn't paid on `date` yet is added whole (whoever holds the bond on `date` gets it), so the value doesn't dip in
+ * the days before a coupon. After the last period (a sale would settle after maturity): the last coupon, nominal at
+ * maturity.
+ */
+export function valueBondAtSettlement(terms: BondTerms, date: IsoDate, inputs: BondValuationInputs = {}): BondValuation & { settlementDate: IsoDate } {
+  const settle = settlementDate(date);
+  const ended = terms.periods.filter((p) => p.end <= settle && date < p.paymentDate);
+  const settledIn = periodAt(terms, settle);
+  const base = settledIn ? valueIn(terms, settledIn, settle, inputs) : ended.length ? valueIn(terms, ended.at(-1)!, ended.at(-1)!.end, inputs) : valueBond(terms, date, inputs);
+  if (base.problem) return { ...base, settlementDate: settle };
+  let accrued = settledIn ? base.accruedInterest : 0;
+  for (const p of ended) {
+    const c = valueIn(terms, p, p.end, { ...inputs, periodRate: p.rate });
+    if (c.problem) return { ...c, settlementDate: settle };
+    accrued += c.accruedInterest;
+  }
+  return { ...base, accruedInterest: round2(accrued), settlementDate: settle };
+}
+
+/** Nominal and accrued interest in `period` on `date` (`period.end` gives the whole coupon). */
+function valueIn(terms: BondTerms, period: CouponPeriod, date: IsoDate, inputs: BondValuationInputs): BondValuation {
 
   const rate = period.rate ?? (terms.couponType === "FLOATING" ? inputs.periodRate : terms.couponRate);
   if (rate === undefined) return { nominal: terms.nominal, accruedInterest: 0, rate: 0, problem: "missing_coupon_rate" };

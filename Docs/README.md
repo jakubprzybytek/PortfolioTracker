@@ -147,11 +147,11 @@ Later phases:
 
 ## Outstanding work (2026-10-15)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 3, 4, 5, 7, 14, 15, 18, 21. Open: 2, 6, 8–13, 16, 17, 19, 20, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested order: 19, 8.
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 7, 14, 15, 18, 21. Open: 6, 8–13, 16, 17, 19, 20, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested order: 19, 8.
 
 ### Correctness and accuracy
 1. ~~Foreign bonds at IBKR are priced by calculation~~ Done (2026-10-14): the EUR bonds are priced from Börse Stuttgart's closes (onvista, `eod-bonds`), within 0.015 of IBKR's marks; the calculated prices had been up to 1 % off. US T-bills (none held now) stay calculated.
-2. **Accrued interest of listed treasury bonds:** a few grosz per bond below the sheet's for IZ0836 (the sheet likely counts to settlement, T+2). Check which convention to follow.
+2. ~~Accrued interest of listed treasury bonds~~ Done (2026-10-15): listed treasury and Catalyst corporate bonds carry accrued interest (and IZ their indexed nominal) to the settlement day, T+2, as gpwcatalyst.pl and the sheet; it had been to the valuation day (IZ0836: 3,09 instead of 3,33 PLN per bond on 2026-10-15). Settlement days from a Polish holiday calendar (data-sources.md).
 3. ~~Corporate bonds are valued clean~~ Done (2026-10-14): coupon periods with a rate each (obligacje.pl, your coupons, or typed in); a period without a rate is flagged "no rate" and valued clean.
 4. ~~Holdings row charts after an edit or a delete~~ Done (2026-10-14): a revaluation removes the days of positions that are gone; the days left by earlier edits were cleaned up on `prod` (1,856, all from the IBKR rebuild).
 5. ~~Dashboard cards vs the chart~~ Done (2026-10-13): Total, Cash, Net deposits, Profit cards; the profit split into unrealised, realised, income, fees, currency and other; unrealised and realised per account.

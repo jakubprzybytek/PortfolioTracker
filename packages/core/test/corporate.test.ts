@@ -25,9 +25,16 @@ describe("corporate bonds", () => {
   it("with the period's rate: clean value plus accrued interest", () => {
     const period = { isin: KRU, start: "2026-08-12", end: "2026-11-12", recordDate: "2026-11-03", paymentDate: "2026-11-12", datesSource: "obligacje.pl" as const, rate: 0.0713 };
     const snap = valuePortfolio({ date: "2026-10-12", instruments: [inst], transactions: [buy], prices: new Map([[KRU, price]]), referenceIndex: new Map(), couponPeriods: new Map([[KRU, [period]]]) });
-    // 61 days of 7.13 % on 100: 1.19 per bond.
-    expect(snap.holdings[0]).toMatchObject({ accruedInterest: 1.19, valuePerUnit: 101.64, value: 4065.6, flags: [], rate: { current: 0.0713, previous: null } });
+    // To the settlement day (Monday 2026-10-12 → Wednesday 10-14, T+2): 63 days of 7.13 % on 100, 1.23 per bond.
+    expect(snap.holdings[0]).toMatchObject({ accruedInterest: 1.23, valuePerUnit: 101.68, value: 4067.2, flags: [], rate: { current: 0.0713, previous: null } });
     expect(snap.holdings[0]!.noCouponRate).toBeUndefined();
+  });
+
+  it("a sale settling on the record day or later keeps the whole coupon", () => {
+    const period = { isin: KRU, start: "2026-08-12", end: "2026-11-12", recordDate: "2026-11-03", paymentDate: "2026-11-12", datesSource: "obligacje.pl" as const, rate: 0.0713 };
+    // Friday 2026-10-30 settles on Tuesday 11-03, the record day: the whole coupon, 92 days of 7.13 % on 100 = 1.80
+    const snap = valuePortfolio({ date: "2026-10-30", instruments: [inst], transactions: [buy], prices: new Map([[KRU, price]]), referenceIndex: new Map(), couponPeriods: new Map([[KRU, [period]]]) });
+    expect(snap.holdings[0]).toMatchObject({ accruedInterest: 1.8 });
   });
 
   it("converts the sheet's Catalyst rows; a bond no longer held gets its trade prices as manual prices", () => {

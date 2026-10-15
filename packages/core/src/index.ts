@@ -1,4 +1,5 @@
 export * from "./dates.ts";
+export * from "./settlement.ts";
 export * from "./gpw/parseHistory.ts";
 export * from "./gpw/archive.ts";
 export * from "./gpw/toPriceItems.ts";

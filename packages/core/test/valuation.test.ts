@@ -89,16 +89,18 @@ describe("valuePortfolio", () => {
     expect(snap.holdings.map((h) => `${h.account}/${h.code}`)).toEqual(["a/DS0432", "a/IZ0836"]);
 
     const izH = snap.holdings.find((h) => h.code === "IZ0836")!;
-    expect(izH).toMatchObject({ quantity: 10, cleanPrice: 87.92, nominal: 1105.53, accruedInterest: 2.73, valuePerUnit: 974.71, value: 9747.1, cost: 9505, flags: [] });
-    expect(izH.gain).toBe(242.1);
+    // Nominal and accrued interest to the settlement day: Friday 2026-10-09 settles on Tuesday 2026-10-13 (T+2), where
+    // the Ministry publishes ratio 1.10595 and 2.97 PLN; gpwcatalyst.pl quotes the same.
+    expect(izH).toMatchObject({ quantity: 10, cleanPrice: 87.92, nominal: 1105.95, accruedInterest: 2.97, valuePerUnit: 975.32, value: 9753.2, cost: 9505, flags: [] });
+    expect(izH.gain).toBe(248.2);
 
     const dsH = snap.holdings.find((h) => h.code === "DS0432")!;
-    // 2026-04-25 → 2026-10-09 = 167 days of 365 × 17.50 = 8.01
-    expect(dsH).toMatchObject({ cleanPrice: 81.09, nominal: 1000, accruedInterest: 8.01, valuePerUnit: 818.91, value: 16378.2 });
+    // 2026-04-25 → 2026-10-13 (settlement) = 171 days of 365 × 17.50 = 8.20
+    expect(dsH).toMatchObject({ cleanPrice: 81.09, nominal: 1000, accruedInterest: 8.2, valuePerUnit: 819.1, value: 16382 });
 
-    expect(snap.totals.value).toBe(26125.3);
+    expect(snap.totals.value).toBe(26135.2);
     expect(snap.totals.cost).toBe(25510);
-    expect(snap.byType["BOND_LISTED"]!.value).toBe(26125.3);
+    expect(snap.byType["BOND_LISTED"]!.value).toBe(26135.2);
   });
 
   it("flags missing and stale prices and unknown instruments", () => {

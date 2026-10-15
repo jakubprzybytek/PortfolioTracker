@@ -7,6 +7,7 @@ import { z } from "zod";
 import { addDays, daysBetween, type IsoDate } from "../dates.ts";
 import { isCalendarDate } from "../transactions/manual.ts";
 import type { CouponPeriodItem, CouponSource, TransactionItem } from "../db/items.ts";
+import { settlementDate } from "../settlement.ts";
 import { round2 } from "./izIndex.ts";
 
 export type InterestPeriod = Omit<CouponPeriodItem, "PK" | "SK" | "updatedAt">;
@@ -58,9 +59,10 @@ export interface CorporateAccrued {
 }
 
 /**
- * Accrued interest of a position of `quantity` bonds on `date`. Within a period it grows by day; from the record day
- * on, the whole coupon is due to whoever held the bond that day (`heldOn`), and stays counted until its payment day
- * (when that's after the period's end). Bonds bought after the record day earn nothing until the next period.
+ * Accrued interest of a position of `quantity` bonds on `date`, counted to `settle` (the settlement day of a sale on
+ * `date`, T+2, as Catalyst quotes it; `date` itself when not given). Within a period it grows by day; from the record
+ * day on, the whole coupon is due to whoever held the bond that day (`heldOn`), and stays counted until its payment
+ * day (when that's after the period's end). Bonds bought after the record day earn nothing until the next period.
  */
 export function corporateAccrued(
   periods: InterestPeriod[],
@@ -68,16 +70,17 @@ export function corporateAccrued(
   date: IsoDate,
   quantity: number,
   heldOn: (day: IsoDate) => number,
+  settle: IsoDate = date,
 ): CorporateAccrued {
   if (periods.length === 0) return { total: null, missingFrom: null };
   const sorted = [...periods].sort((a, b) => a.start.localeCompare(b.start));
-  const i = sorted.findIndex((p) => p.start <= date && date < p.end);
+  const i = sorted.findIndex((p) => p.start <= settle && settle < p.end);
   let total = 0;
   let missingFrom: IsoDate | undefined;
 
   // A coupon of an ended period not paid yet (its payment day falls after the period's end).
   for (const p of sorted)
-    if (p.end <= date && date < p.paymentDate) {
+    if (p.end <= settle && date < p.paymentDate) {
       const coupon = couponPerBond(nominal, p);
       if (coupon === undefined) missingFrom ??= p.start;
       else total += coupon * Math.min(quantity, heldOn(p.recordDate ?? addDays(p.end, -1)));
@@ -86,27 +89,13 @@ export function corporateAccrued(
   const current = i >= 0 ? sorted[i]! : undefined;
   if (current) {
     if (current.rate === undefined) missingFrom ??= current.start;
-    else if (current.recordDate && date >= current.recordDate) total += couponPerBond(nominal, current)! * Math.min(quantity, heldOn(current.recordDate));
-    else total += interest(nominal, current.rate, daysBetween(current.start, date)) * quantity;
+    else if (current.recordDate && settle >= current.recordDate) total += couponPerBond(nominal, current)! * Math.min(quantity, heldOn(current.recordDate));
+    else total += interest(nominal, current.rate, daysBetween(current.start, settle)) * quantity;
   }
   if (missingFrom !== undefined) return { total: null, missingFrom };
   const previous = i > 0 ? (sorted[i - 1]!.rate ?? null) : null;
   return { total: round2(total), ...(current?.rate !== undefined ? { rate: { current: current.rate, previous } } : {}) };
 }
-
-/** `date` plus `n` business days (weekends skipped; holidays aren't known here). */
-function addBusinessDays(date: IsoDate, n: number): IsoDate {
-  let d = date;
-  while (n > 0) {
-    d = addDays(d, 1);
-    const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
-    if (wd !== 0 && wd !== 6) n--;
-  }
-  return d;
-}
-
-/** Catalyst trades settle two business days after the trade (T+2). */
-const SETTLEMENT_DAYS = 2;
 
 /**
  * Bonds of one ISIN an account owns at the end of `day`: trades count once settled (T+2), so a bond bought on the
@@ -116,7 +105,7 @@ export function quantityHeld(transactions: TransactionItem[], account: string, i
   let q = 0;
   for (const t of transactions) {
     if (t.account !== account || t.isin !== isin || t.quantity === undefined) continue;
-    const settled = t.type === "REDEMPTION" ? t.date : addBusinessDays(t.date, SETTLEMENT_DAYS);
+    const settled = t.type === "REDEMPTION" ? t.date : settlementDate(t.date);
     if (settled > day) continue;
     if (t.type === "BUY") q += t.quantity;
     else if (t.type === "SELL" || t.type === "REDEMPTION") q -= t.quantity;

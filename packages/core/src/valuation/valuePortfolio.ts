@@ -1,5 +1,6 @@
 import type { IsoDate } from "../dates.ts";
-import { dirtyValue, valueBond } from "../bonds/accrued.ts";
+import { dirtyValue, valueBondAtSettlement } from "../bonds/accrued.ts";
+import { settlementDate } from "../settlement.ts";
 import type { ReferenceIndex } from "../bonds/izIndex.ts";
 import { corporateAccrued, quantityHeld, type InterestPeriod } from "../bonds/couponPeriods.ts";
 import type { AccountSnapshot, HoldingSnapshot, InstrumentItem, PriceItem, SnapshotItem, TransactionItem } from "../db/items.ts";
@@ -94,8 +95,10 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     let positionValue: number | undefined;
 
     if (inst?.terms) {
-      const periodRate = ctx.couponPeriods.get(p.isin)?.find((c) => c.start <= date && date < c.end)?.rate;
-      const v = valueBond(inst.terms, date, {
+      // Listed treasury bonds: nominal and accrued interest to the settlement day (T+2), as the exchange quotes them.
+      const settle = settlementDate(date);
+      const periodRate = ctx.couponPeriods.get(p.isin)?.find((c) => c.start <= settle && settle < c.end)?.rate;
+      const v = valueBondAtSettlement(inst.terms, date, {
         referenceIndex: ctx.referenceIndex,
         ...(periodRate !== undefined ? { periodRate } : {}),
       });
@@ -109,7 +112,8 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       nominal = inst.nominal;
       // (IBKR bonds come here too: zero-coupon, so the clean price is the whole value.)
       if (inst.type === "BOND_CORPORATE") {
-        corporate = corporateAccrued(ctx.couponPeriods.get(p.isin) ?? [], inst.nominal, date, p.quantity, (day) => quantityHeld(ctx.transactions, p.account, p.isin, day));
+        // To the settlement day (T+2), as Catalyst quotes it.
+        corporate = corporateAccrued(ctx.couponPeriods.get(p.isin) ?? [], inst.nominal, date, p.quantity, (day) => quantityHeld(ctx.transactions, p.account, p.isin, day), settlementDate(date));
         if (corporate.total !== null) accruedInterest = round2(corporate.total / p.quantity);
         else flags.push("no_coupon_rate");
       }
