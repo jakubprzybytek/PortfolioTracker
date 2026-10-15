@@ -7,7 +7,8 @@ export type Holding = HoldingSnapshot;
 export type Snapshot = SnapshotItem;
 /** A day of the portfolio: `total` = positions + cash (fully tracked accounts); `netDeposits` = money put in so far. */
 export type HistoryPoint = Pick<SnapshotItem, "date" | "totals" | "byType"> & { total?: number; netDeposits?: number };
-export type Price = Omit<PriceItem, "PK" | "SK">;
+/** `GET /instruments/{isin}/prices` row; inflation-linked (IZ) bonds also carry the indexed nominal per bond in PLN. */
+export type Price = Omit<PriceItem, "PK" | "SK"> & { nominal?: number | null };
 export type Transaction = Omit<TransactionItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">;
 /** `GET /transactions` row: the transaction plus its instrument (null for cash movements). */
 export type TransactionRow = Transaction & { instrument: Pick<InstrumentItem, "code" | "name" | "type"> | null };

@@ -337,6 +337,9 @@ test.describe("prices view", () => {
     await page.getByTestId("price-IZ0836").click();
     await page.getByTestId("price-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("price-chart").locator(".recharts-reference-dot")).toHaveCount(1);
+    // An IZ bond also shows its indexed nominal: a second line on a right-hand axis
+    await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(2);
+    await expect(page.getByTestId("price-title")).toContainText("dashed: indexed nominal per bond");
 
     // Retail bond: the chart is its calculated value per bond
     await page.getByTestId("price-EDO0935").click();

@@ -98,6 +98,8 @@ describe(`API ${API}`, () => {
     expect(status).toBe(200);
     expect(body.map((p) => p.date)).toEqual(["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"]);
     expect(body.at(-1)).toMatchObject({ close: 87.92, traded: true, lastTradeDate: "2026-10-09" });
+    // An IZ bond also carries its indexed nominal per bond (1000 × the MF index ratio of 2026-10-09: 1.10553)
+    expect((body.at(-1) as { nominal?: number }).nominal).toBe(1105.53);
   });
 
   it("GET /instruments/{isin}/prices gives a retail bond's calculated value per bond, from its purchase", async () => {

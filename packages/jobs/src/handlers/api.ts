@@ -34,6 +34,8 @@ import {
   retailValueHistory,
   summarize,
   today,
+  toReferenceIndex,
+  valueBond,
   yearBefore,
   type FxHistory,
   type IndicatorSummary,
@@ -206,7 +208,16 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         }
         // On today's share basis: closes before a split are divided by its ratio, so the line has no cliff.
         const prices = adjustForSplits(await repo.queryPrices(isin, inst.venue, from, to), inst.splits);
-        return json(200, prices.map(({ PK: _p, SK: _s, ...rest }) => rest));
+        // Inflation-linked bonds: the indexed nominal per bond on each day (1000 × index ratio), drawn on its own axis.
+        const indexed = inst.terms?.couponType === "INDEXED" ? { terms: inst.terms, referenceIndex: toReferenceIndex(await repo.listReferenceIndex()) } : null;
+        return json(
+          200,
+          prices.map(({ PK: _p, SK: _s, ...rest }) => {
+            if (!indexed) return rest;
+            const v = valueBond(indexed.terms, rest.date, { referenceIndex: indexed.referenceIndex });
+            return { ...rest, nominal: v.problem ? null : v.nominal };
+          }),
+        );
       }
       case "POST /instruments/{isin}/prices": {
         // A new value of a hand-valued asset (venue MANUAL): { date, price } per unit in the instrument's currency.

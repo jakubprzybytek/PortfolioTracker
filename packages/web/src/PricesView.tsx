@@ -154,6 +154,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                     : sel
                       ? ` · close, ${sel.currency}`
                       : ""}
+                {prices.data?.some((p) => p.nominal != null) && " · dashed: indexed nominal per bond, PLN (right axis)"}
               </span>
             </span>
           }

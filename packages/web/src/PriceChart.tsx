@@ -6,7 +6,7 @@ import type { Price, Transaction } from "./types.ts";
 
 /**
  * Market close (bonds: % of nominal; others in `unit`, e.g. EUR), or for retail bonds (`calculated`) the value per bond in PLN
- * (nominal 100). Fills its parent's height unless `height` is given; until the first data arrives (`loading`), a placeholder.
+ * (nominal 100). Inflation-linked bonds also get their indexed nominal per bond (PLN) as a dashed line on a right-hand axis. Fills its parent's height unless `height` is given; until the first data arrives (`loading`), a placeholder.
  */
 export function PriceChart({
   prices,
@@ -25,7 +25,8 @@ export function PriceChart({
 }) {
   const narrow = useNarrow();
   if (prices.length === 0) return <ChartPlaceholder loading={loading} height={height ?? "100%"}>No prices in this range.</ChartPlaceholder>;
-  const data = prices.map((p) => ({ date: p.date, close: p.close, traded: p.traded, volume: p.volume }));
+  const data = prices.map((p) => ({ date: p.date, close: p.close, traded: p.traded, volume: p.volume, nominal: p.nominal ?? null }));
+  const withNominal = data.some((d) => d.nominal !== null);
   const byDate = new Map(data.map((d) => [d.date, d.close]));
   // Buys/sells shown on the price line at their date (or the next available session).
   const markers = transactions
@@ -42,18 +43,26 @@ export function PriceChart({
         <ComposedChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
-          <YAxis {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
+          <YAxis yAxisId="price" {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
+          {withNominal && (
+            <YAxis yAxisId="nominal" orientation="right" {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 0)} />
+          )}
           <Tooltip
-            formatter={(v, _name, item) =>
-              calculated
+            formatter={(v, name, item) =>
+              name === "nominal"
+                ? [`${fmtNum(Number(v))} PLN`, "Nominal"]
+                : calculated
                 ? [`${fmtNum(Number(v))} PLN`, "Value per bond"]
                 : [`${fmtNum(Number(v))} ${unit}${(item?.payload as { traded?: boolean } | undefined)?.traded === false ? " (no trades)" : ""}`, "Close"]
             }
             contentStyle={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 }}
           />
-          <Line type="linear" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={1.5} isAnimationActive={false} />
+          <Line yAxisId="price" type="linear" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={1.5} isAnimationActive={false} />
+          {withNominal && (
+            <Line yAxisId="nominal" type="linear" dataKey="nominal" stroke="var(--muted)" strokeDasharray="4 3" dot={false} strokeWidth={1.5} isAnimationActive={false} connectNulls={false} />
+          )}
           {markers.map((m, i) => (
-            <ReferenceDot key={i} x={m.date} y={m.y} r={5} fill={m.type === "BUY" ? "var(--pos)" : "var(--neg)"} stroke="var(--bg)" label={{ value: m.type, position: "top", fontSize: 10 }} />
+            <ReferenceDot key={i} yAxisId="price" x={m.date} y={m.y} r={5} fill={m.type === "BUY" ? "var(--pos)" : "var(--neg)"} stroke="var(--bg)" label={{ value: m.type, position: "top", fontSize: 10 }} />
           ))}
         </ComposedChart>
       </ResponsiveContainer>
