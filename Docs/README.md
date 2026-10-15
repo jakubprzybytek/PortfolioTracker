@@ -13,6 +13,7 @@ Status (2026-10-15, `v0.63`): **the whole portfolio is in production** at https:
 | [ingestion.md](ingestion.md) | Scheduled daily jobs, valuation, data quality rules |
 | [backfill.md](backfill.md) | How history is loaded: triggers and order per source |
 | [ui.md](ui.md) | Visualisation: holdings table and charts |
+| [Development.md](Development.md) | Running locally, checking changes in the browser, tests, continuous delivery (every change goes to prod; when to ask first) |
 | [nfr-analysis.md](nfr-analysis.md) | Non-functional review (observability, resilience, performance, security, durability, maintainability): findings and a suggested order of work |
 | [reference/ReferenceFeatures.md](reference/ReferenceFeatures.md) | Feature inventory of the Google Sheets tracker the app reproduces (with its Apps Script code) |
 
