@@ -140,10 +140,12 @@ Later phases:
 - [x] Accrued interest of corporate bonds (2026-10-14): interest periods per bond (first day, record day, payment day, rate) from obligacje.pl each morning (`coupons` job: new periods and the current rate, never replacing a stored one), past rates from the coupons you received (accepted with a click) or typed in, in the bond's chart panel ("Coupon periods"); coupons checked against the rate.
 - [x] Valuation queue hardening (2026-10-14): a dead-letter queue after 3 failures; a revaluation drops the days of positions that are gone; the old single `Table` deleted from `prod`.
 - [x] Revaluations write only what changed (2026-10-15): a day that comes out as stored is not written again, and of a changed day only the positions that moved get their position day rewritten (`{ force: true }` writes all). A full run had written ~64k units (~$0.045 per run and stage).
+- [x] Notes (2026-10-15): free notes in Markdown in their own view (list by last change, edit with a live preview), in the monthly backup (`notes.json`).
+- [x] IZ nominal on the price chart (2026-10-15): an inflation-linked bond's chart also shows its indexed nominal per bond (dashed, PLN, right-hand axis), so the months of negative CPI show as dips three months later.
 
-## Outstanding work (2026-10-14)
+## Outstanding work (2026-10-15)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Suggested order: 19, 8.
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 3, 4, 5, 7, 14, 15, 18, 21. Open: 2, 6, 8–13, 16, 17, 19, 20, and the non-functional review's list (nfr-analysis.md, none of it started). Suggested order: 19, 8.
 
 ### Correctness and accuracy
 1. ~~Foreign bonds at IBKR are priced by calculation~~ Done (2026-10-14): the EUR bonds are priced from Börse Stuttgart's closes (onvista, `eod-bonds`), within 0.015 of IBKR's marks; the calculated prices had been up to 1 % off. US T-bills (none held now) stay calculated.
