@@ -419,7 +419,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
             </>
           )}
           <Field label="Note" wide>
-            <input value={note} onChange={(e) => setNote(e.target.value)} data-testid="tx-note" />
+            <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} data-testid="tx-note" />
           </Field>
         </div>
 

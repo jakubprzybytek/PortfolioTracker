@@ -12,8 +12,9 @@ const NO_INSTRUMENT = "none";
 const assetType = (t: TransactionRow) => t.instrument?.type ?? "CASH";
 
 /**
- * All transactions, newest first (the API sorts), filtered by instrument, account and asset type. "Add transaction"
- * opens the form; a row opens it to edit (or delete) that transaction.
+ * All transactions, newest first (the API sorts), filtered by account, instrument and asset type. "Add transaction"
+ * opens the form; a row opens it to edit (or delete) that transaction. Notes show as a one-line excerpt (all of it on
+ * hover and in the form).
  */
 export function TransactionsView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const txs = useApi<TransactionRow[]>("/transactions");
@@ -56,8 +57,8 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
       {txs.error && <p className="error">{txs.error}</p>}
 
       <FilterBar active={!!(instrument || account || type)} onReset={() => setParams({})} summary={txs.loading ? "Loading…" : `${rows.length} of ${all.length} transactions`}>
-        <FilterSelect label="Instrument" value={instrument} options={options.instrument} onChange={set("instrument")} testId="filter-instrument" width="16rem" wide />
         <FilterSelect label="Account" value={account} options={options.account} onChange={set("account")} testId="filter-account" width="13rem" />
+        <FilterSelect label="Instrument" value={instrument} options={options.instrument} onChange={set("instrument")} testId="filter-instrument" width="16rem" />
         <FilterSelect label="Asset type" value={type} options={options.type} onChange={set("type")} testId="filter-type" />
       </FilterBar>
 
@@ -111,7 +112,9 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
                   )}
                 </td>
                 <td>{t.fee ? fmtMoney(t.fee, t.currency) : "–"}</td>
-                <td className="left muted wrap">{t.note ?? ""}</td>
+                <td className="left muted note" title={t.note} data-testid="tx-note-cell">
+                  {t.note ?? ""}
+                </td>
               </tr>
             ))}
             {!txs.loading && rows.length === 0 && (

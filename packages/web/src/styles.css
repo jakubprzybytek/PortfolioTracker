@@ -123,6 +123,8 @@ tr.band-b:hover td { background: transparent; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--fg); border-bottom: 0; }
 td.indent { padding-left: 26px; }
 td.wrap { white-space: normal; min-width: 160px; }
+/* A note: one line, cut with an ellipsis (all of it in the tooltip). */
+td.note { max-width: 18rem; overflow: hidden; text-overflow: ellipsis; }
 /* Instrument: one line; a long name is cut with "…" (the full name in its tooltip). */
 /* The column takes the width the others leave (max-width: 0 + width: 100%), so names are cut only as much as needed. */
 td.instrument { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; width: 100%; min-width: 12rem; }
@@ -318,8 +320,9 @@ button.danger-link { font: inherit; background: none; border: 0; padding: 0; col
 .form-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; font-weight: 600; color: var(--muted); min-width: 0; }
 .form-field.wide, .form-grid .wide { grid-column: 1 / -1; }
 .form-field small { font-weight: 400; }
-.modal input, .modal select { font: inherit; font-size: 0.97rem; font-weight: 400; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); min-width: 0; width: 100%; }
-.modal input:focus, .modal select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.modal input, .modal select, .modal textarea { font: inherit; font-size: 0.97rem; font-weight: 400; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); min-width: 0; width: 100%; }
+.modal input:focus, .modal select:focus, .modal textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.modal textarea { resize: vertical; line-height: 1.4; }
 .new-instrument { border: 1px dashed var(--border); border-radius: 10px; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; margin: 0; }
 .new-instrument legend { font-size: 0.85rem; font-weight: 600; color: var(--muted); padding: 0 4px; }
 .new-instrument .inline { display: flex; gap: 8px; }

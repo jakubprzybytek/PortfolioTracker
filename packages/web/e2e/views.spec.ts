@@ -107,6 +107,8 @@ test.describe("transactions view", () => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
     await expect(rows).toHaveCount(31);
+    // Account first.
+    expect(await page.locator(".filters select").evaluateAll((ss) => ss.map((s) => s.getAttribute("data-testid")))).toEqual(["filter-account", "filter-instrument", "filter-type"]);
 
     await page.getByTestId("filter-instrument").selectOption({ label: "DS0432" });
     await expect(rows).toHaveCount(4); // broker: buy + 2 coupons, ike: buy
@@ -157,7 +159,10 @@ test.describe("adding transactions", () => {
     await page.getByTestId("tx-new-account").fill("e2e-test");
     await page.getByTestId("tx-amount").fill("250");
     await expect(page.getByTestId("tx-summary")).toContainText("Cash in e2e-test: 250,00 zł");
-    await page.getByTestId("tx-note").fill("E2E test");
+    // A long note on two lines: the field takes several lines.
+    const note = "E2E test\nA second line, long enough to wrap in the table if it were shown in full: it isn't, only its start.";
+    await expect(page.getByTestId("tx-note")).toHaveJSProperty("tagName", "TEXTAREA");
+    await page.getByTestId("tx-note").fill(note);
     await page.getByTestId("tx-save").click();
     await expect(form).toBeHidden();
     await expect(page.getByTestId("tx-toast")).toContainText("Transaction added.");
@@ -165,10 +170,17 @@ test.describe("adding transactions", () => {
     await expect(row).toHaveCount(1);
     await expect(row).toContainText("2099-03-04");
     await expect(row).toContainText("250,00 zł");
+    // The note: one line, cut short; all of it on hover.
+    const noteCell = row.getByTestId("tx-note-cell");
+    await expect(noteCell).toHaveAttribute("title", note);
+    const dateCell = (await row.locator("td").first().boundingBox())!;
+    expect((await noteCell.boundingBox())!.height).toBeLessThanOrEqual(dateCell.height + 1);
+    expect(await noteCell.evaluate((td) => td.scrollWidth > td.clientWidth)).toBe(true);
 
     // Edit: the form opens with its values; a new amount replaces the old.
     await row.click();
     await expect(page.getByTestId("tx-amount")).toHaveValue("250");
+    await expect(page.getByTestId("tx-note")).toHaveValue(note);
     await page.getByTestId("tx-amount").fill("300");
     await page.getByTestId("tx-save").click();
     await expect(page.getByTestId("tx-toast")).toContainText("Transaction updated.");
