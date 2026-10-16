@@ -583,6 +583,17 @@ test.describe("holdings row chart", () => {
     await expect(page.getByTestId("position-tx-toggle")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByTestId("position-tx-row")).toHaveCount(4);
     await expect(page.getByTestId("position-tx").locator("th").nth(1)).toHaveText("Account");
+
+    // On a phone they take the chart's place (and the range buttons'), without the price column.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByTestId("holding-chart")).toHaveCount(0);
+    await expect(page.getByTestId("holding-range")).toHaveCount(0);
+    await expect(page.getByTestId("position-tx-row")).toHaveCount(4);
+    await expect(page.getByTestId("position-tx").getByRole("columnheader", { name: "Price" })).toBeHidden();
+    const table = (await page.getByTestId("position-tx").boundingBox())!;
+    expect(table.x + table.width).toBeLessThanOrEqual(390);
+    await page.getByTestId("position-tx-toggle").click();
+    await expect(page.getByTestId("holding-chart")).toBeVisible();
   });
 
   test("grouped by instrument, the group row charts the instrument across accounts", async ({ page }) => {

@@ -33,7 +33,7 @@ export function FilterSelect({ label, value, options, onChange, testId, width = 
 export function FilterText({ label, value, onChange, testId, placeholder = "Name or code", width = "13rem" }: { label: string; value: string; onChange: (value: string) => void; testId: string; placeholder?: string; width?: string }) {
   const narrow = useNarrow();
   return (
-    <label className={["filter", value ? "" : "unset"].filter(Boolean).join(" ")} style={{ "--w": width } as CSSProperties}>
+    <label className={["filter", "text", value ? "" : "unset"].filter(Boolean).join(" ")} style={{ "--w": width } as CSSProperties}>
       <span className="muted">{label}</span>
       <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={narrow ? label : placeholder} data-testid={testId} />
     </label>

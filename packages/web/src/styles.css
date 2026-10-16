@@ -98,6 +98,12 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
   /* Dropdowns side by side, sharing the row with Reset; the count goes below. */
   .filters { gap: 6px; align-items: center; }
   .filter { flex: 1 1 0; min-width: 0; }
+  /* The text filter wants more room than a dropdown: on the dropdown's row while it fits. */
+  .filters:has(.filter.text) .filter { flex-basis: 5.5rem; }
+  .filters .filter.text { flex-basis: 7rem; }
+  /* After two dropdowns (Holdings): on the second row, with the toggle and the reset. */
+  .filters .filter:not(.text) ~ .filter:not(.text) ~ .filter.text { flex-basis: 55%; }
+  .filters input[type="search"] { width: 100%; padding: 6px 8px; font-size: 0.85rem; }
   .filter > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .filters select { width: 100%; padding: 6px 4px 6px 8px; font-size: 0.85rem; }
   .filter.wide { flex-basis: 100%; }
@@ -189,7 +195,11 @@ tr.muted td { color: var(--muted); }
 .chart-side table.position-tx th { position: sticky; top: 0; background: var(--panel); }
 @media (max-width: 720px) {
   .chart-with-side { flex-direction: column; }
-  .chart-side { flex: 0 0 45%; border-left: 0; border-top: 1px solid var(--border); padding: 6px 0 0; }
+  /* The transactions take the chart's place: the whole panel, tighter, no price column (it's in the row's tooltip). */
+  .chart-side { flex: 1; border-left: 0; padding: 0; }
+  .chart-side table.position-tx { font-size: 0.78rem; }
+  .chart-side table.position-tx th, .chart-side table.position-tx td { padding: 7px 4px; }
+  .chart-side table.position-tx .tx-price { display: none; }
 }
 .manual-values { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; max-width: 100%; }
 .manual-values form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
