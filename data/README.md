@@ -70,7 +70,7 @@ node scripts/history-sheet-to-import.ts ~/Downloads/history.xlsx   # or a folder
 - Tabs read, by their headers: Bonds, Savings, Lokata, Arka, DM BZWBK, XTB, Bond prices.
 - The bonds are no longer quoted: `BOND_CORPORATE`, venue `MANUAL`, inactive, priced from the "Bond prices" tab (% of nominal; a defaulted bond gets no price at 0 %: its `WRITE_OFF` closes the position). Arka's fund categories, the DM BZWBK shares/certificates and XTB are `FUND_MANUAL` with ids from their codes (`privateAssetId`), priced from the tabs' price tables.
 - Santander's rows stop where the app's own history of the account starts (2022-05): the sheet's last row hands over the balance (Savings tab, 2022-06-01). Don't import anything else of that account from the sheet.
-- It prints each account's cash at the end (0 for all), any position still open (XTB keeps 0.033 units, 0.78 PLN) and the lowest cash balance.
+- It prints each account's cash at the end (0 for all), any position still open (none: XTB's last 0.78 PLN is sold and withdrawn on 2010-12-31, though the account was actually closed on 2017-04-06) and the lowest cash balance.
 
 ## IBKR transactions from activity statements
 
