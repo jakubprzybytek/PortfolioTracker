@@ -103,6 +103,31 @@ test.describe("transactions view", () => {
     expect(colors[0]).not.toBe(colors[1]); // different dates (2026-09-30, 2026-06-01): visibly different
   });
 
+  test("a long history is drawn 200 rows at a time, the next ones as you scroll to the end", async ({ page }) => {
+    // Made up: 450 deposits, a day apart, in two accounts.
+    const long = Array.from({ length: 450 }, (_, i) => {
+      const d = new Date(Date.UTC(2020, 0, 1) + (449 - i) * 864e5).toISOString().slice(0, 10);
+      return { id: `long-${i}`, date: d, account: i % 2 ? "long-a" : "long-b", type: "DEPOSIT", amount: 100 + i, currency: "PLN", source: "e2e" };
+    });
+    await page.route("**/transactions", (route) => (route.request().method() === "GET" ? route.fulfill({ json: long }) : route.continue()));
+    await page.goto("/#/transactions");
+    const rows = page.getByTestId("transaction-row");
+    await expect(rows).toHaveCount(200);
+    await expect(page.getByTestId("filters-summary")).toHaveText("450 of 450 transactions");
+    await expect(page.getByTestId("transactions-more")).toHaveText("250 more…");
+    await page.getByTestId("transactions-more").scrollIntoViewIfNeeded();
+    await expect(rows).toHaveCount(400);
+    await page.getByTestId("transactions-more").scrollIntoViewIfNeeded();
+    await expect(rows).toHaveCount(450);
+    await expect(page.getByTestId("transactions-more")).toHaveCount(0);
+    // A filter starts from the first rows again (seen from the top of the page).
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByTestId("filter-account").selectOption("long-a");
+    await expect(page.getByTestId("filters-summary")).toHaveText("225 of 450 transactions");
+    await expect(rows).toHaveCount(200);
+    await expect(page.getByTestId("transactions-more")).toHaveText("25 more…");
+  });
+
   test("filters by instrument, account and asset type, and keeps filters in the URL", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");

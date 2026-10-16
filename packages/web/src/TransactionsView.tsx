@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
 import { TX_TYPE_LABELS, fmtInt, fmtMoney, fmtNum, signClass, typeLabel } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
@@ -10,11 +10,14 @@ import { useApi } from "./useApi.ts";
 /** Filter value for transactions without an instrument (deposits, fees …). */
 const NO_INSTRUMENT = "none";
 const assetType = (t: TransactionRow) => t.instrument?.type ?? "CASH";
+/** Rows drawn at first, and added each time the list's end comes near: a long history stays a short page. */
+const PAGE = 200;
 
 /**
  * All transactions, newest first (the API sorts), filtered by account, instrument and asset type. "Add transaction"
  * opens the form; a row opens it to edit (or delete) that transaction. Notes show as a one-line excerpt (all of it on
- * hover and in the form).
+ * hover and in the form). A long list is drawn 200 rows at a time, the next ones as you scroll near its end (a page
+ * with every row of a long history is very tall: slow to redraw, e.g. on every width while resizing).
  */
 export function TransactionsView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const txs = useApi<TransactionRow[]>("/transactions");
@@ -46,6 +49,18 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
     let band: "a" | "b" = "b";
     return rows.map((t, i) => (band = i > 0 && t.date === rows[i - 1]!.date ? band : band === "a" ? "b" : "a"));
   }, [rows]);
+
+  // Drawn so far; back to the first rows when the filters change.
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [instrument, account, type]);
+  const more = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const el = more.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setLimit((n) => n + PAGE), { rootMargin: "800px 0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [limit, rows.length]);
 
   const set = (key: string) => (value: string) => setParams({ ...params, [key]: value || undefined });
 
@@ -80,7 +95,7 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
           </thead>
           <tbody>
             {!txs.data && txs.loading && <SkeletonRows rows={12} cols={10} />}
-            {rows.map((t, i) => (
+            {rows.slice(0, limit).map((t, i) => (
               <tr
                 key={`${t.account}/${t.id}`}
                 data-testid="transaction-row"
@@ -117,6 +132,13 @@ export function TransactionsView({ params, setParams }: { params: Record<string,
                 </td>
               </tr>
             ))}
+            {rows.length > limit && (
+              <tr ref={more} data-testid="transactions-more">
+                <td className="left muted" colSpan={10}>
+                  {rows.length - limit} more…
+                </td>
+              </tr>
+            )}
             {!txs.loading && rows.length === 0 && (
               <tr>
                 <td className="left muted" colSpan={10}>
