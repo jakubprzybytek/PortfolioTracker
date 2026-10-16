@@ -38,7 +38,7 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 ## Dashboard
 
 - **Totals:** total (positions + cash), cash (only accounts whose assets are all tracked; the card says how many it leaves out), net deposits (money put in − taken out), profit (total − net deposits; also as % of net deposits), XIRR (money-weighted annual return of all deposits and withdrawals plus today's total, as the Accounts table's total row; the card says since when).
-- **Profit breakdown** (`GET /accounts`, `core/valuation/accounts.ts`): unrealised gain (open positions: value − FIFO cost), realised gain (sales and redemptions: proceeds − FIFO cost of the units sold, PLN at NBP D-1, as for tax), income (dividends, coupons, interest), fees and taxes outside trades (account fees, taxes, exchange fees; trade commissions are in the cost and proceeds), and "currency and other", the rest (exchange-rate effects on cash, a broker's spread, positions without a price), so the five add up to the profit.
+- **Profit breakdown** (`GET /accounts`, `core/valuation/accounts.ts`): unrealised gain (open positions: value − FIFO cost), realised gain (sales, redemptions and write-offs: proceeds − FIFO cost of the units sold; a write-off's proceeds are 0, PLN at NBP D-1, as for tax), income (dividends, coupons, interest), fees and taxes outside trades (account fees, taxes, exchange fees; trade commissions are in the cost and proceeds), and "currency and other", the rest (exchange-rate effects on cash, a broker's spread, positions without a price), so the five add up to the profit.
 - **Asset mix:** one bar split into shares (ETFs), bonds (all bond types, and ETFs with "Bond" in their name, e.g. high-yield bond ETFs), cash (PLN and foreign) and other (manually valued), with each share and amount: positions plus the cash of complete accounts, as in the totals.
 - **Portfolio value over time:** positions + cash (fully tracked accounts) as the area, net deposits (money put in − taken out so far, other currencies at NBP D-1) dashed; the gap is the profit. A sale or redemption kept as cash doesn't move the line (before, the chart showed positions only, so the T-bill redemption on 2026-10-01 looked like a drop). Range selector: 1M, 6M, 1Y, all.
 - **Drawdown:** how far below its best so far the portfolio was each day (%), as the sheet's `Historia` drawdown, but on the time-weighted return (`drawdowns`, `core/valuation/history.ts`): a day's return is (total − money put in that day) / the day before's total, so deposits and withdrawals are neither a gain nor a loss. The best counts from the start of the range shown (ALL: since the first deposit). Shares the portfolio chart's range.
@@ -98,8 +98,8 @@ All transactions from `GET /transactions`.
 
 ### The form (`TransactionForm.tsx`)
 
-- Date, type (buy, sell, coupon, dividend, redemption, deposit, withdrawal, interest, fee, tax, split), account (or a new one).
-- **Instrument** for buys, sells, coupons, dividends, redemptions and splits (optional for interest): the tracked ones first, then those no longer held, then **New instrument…**:
+- Date, type (buy, sell, coupon, dividend, redemption, write-off, deposit, withdrawal, interest, fee, tax, split), account (or a new one).
+- **Instrument** for buys, sells, coupons, dividends, redemptions, write-offs and splits (optional for interest): the tracked ones first, then those no longer held, then **New instrument…**:
   - *Treasury bond by code*: "Find" looks it up (`GET /instruments/lookup`): retail series (EDO1036) from the Ministry file, listed ones (DS1030) from the MF calculator terms; added on save, its terms and prices follow.
   - *ETF*: ticker with exchange (AMS:VWRL, FRA:EUNK, LON:CSPX …), ISIN, name, currency: priced from Yahoo.
   - *Corporate bond*: code, ISIN, name, nominal (1000 or 100): priced from BiznesRadar.
@@ -107,6 +107,7 @@ All transactions from `GET /transactions`.
   - Foreign bonds at IBKR aren't offered yet: add one with an instrument file (data/README.md, onvista source) before its first trade.
 - Quantity and price (bonds: % of nominal; retail: PLN per bond, prefilled 100; ETFs: in their currency), fee.
 - **Currency** of the amount and fee, next to the amount: in an account with its own currency (IBKR: EUR) a trade starts in the instrument's currency and the rest in the account's; elsewhere PLN. Paid in PLN for an instrument in another currency (Bossa): the broker's rate too (prefilled with the NBP rate of the day or the last before).
+- **Write-off** (the issuer defaulted, nothing came back): the instrument and the quantity lost, no amount. The units close at 0 and their remaining FIFO cost is a realised loss on that day; cash doesn't move. Money recovered later (e.g. from a bankruptcy estate) is its own transaction.
 - **Currency exchange**: what you gave (amount, currency, fee) and what you got (amount, currency); the line below shows both and the rate.
 - **Amount** as a positive number (the type gives the direction: buys, fees, taxes, withdrawals take money out). For trades it is suggested from quantity × price (bonds × nominal, foreign × rate; sell: net of the fee) until you type your own: for a bond add the accrued interest, as on the broker's note. A line below shows the account's cash change.
 - The server checks it again (`core/transactions/manual.ts`: real dates, an instrument where needed, the direction of the money) and returns the problem, shown in the form.

@@ -99,16 +99,16 @@ export function corporateAccrued(
 
 /**
  * Bonds of one ISIN an account owns at the end of `day`: trades count once settled (T+2), so a bond bought on the
- * record day (or the day before) doesn't get that coupon and one sold then still does. Redemptions count on their date.
+ * record day (or the day before) doesn't get that coupon and one sold then still does. Redemptions and write-offs count on their date.
  */
 export function quantityHeld(transactions: TransactionItem[], account: string, isin: string, day: IsoDate): number {
   let q = 0;
   for (const t of transactions) {
     if (t.account !== account || t.isin !== isin || t.quantity === undefined) continue;
-    const settled = t.type === "REDEMPTION" ? t.date : settlementDate(t.date);
+    const settled = t.type === "REDEMPTION" || t.type === "WRITE_OFF" ? t.date : settlementDate(t.date);
     if (settled > day) continue;
     if (t.type === "BUY") q += t.quantity;
-    else if (t.type === "SELL" || t.type === "REDEMPTION") q -= t.quantity;
+    else if (t.type === "SELL" || t.type === "REDEMPTION" || t.type === "WRITE_OFF") q -= t.quantity;
   }
   return q;
 }

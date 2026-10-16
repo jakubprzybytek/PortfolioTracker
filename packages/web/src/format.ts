@@ -66,6 +66,7 @@ export const TX_TYPE_LABELS: Record<string, string> = {
   SELL: "Sell",
   COUPON: "Coupon",
   REDEMPTION: "Redemption",
+  WRITE_OFF: "Write-off",
   DEPOSIT: "Deposit",
   WITHDRAWAL: "Withdrawal",
   FEE: "Fee",

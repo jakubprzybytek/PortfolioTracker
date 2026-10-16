@@ -15,12 +15,12 @@ export interface RetailLot {
 export function retailLotsAt(transactions: TransactionItem[], date: IsoDate): RetailLot[] {
   const lots: RetailLot[] = [];
   // Within a day: buys before sales (as in positionsAt).
-  const rank = (t: TransactionItem) => (t.type === "BUY" ? 0 : t.type === "SELL" || t.type === "REDEMPTION" ? 2 : 1);
+  const rank = (t: TransactionItem) => (t.type === "BUY" ? 0 : t.type === "SELL" || t.type === "REDEMPTION" || t.type === "WRITE_OFF" ? 2 : 1);
   const sorted = transactions.filter((t) => t.date <= date).sort((a, b) => a.date.localeCompare(b.date) || rank(a) - rank(b) || a.id.localeCompare(b.id));
   for (const t of sorted) {
     const qty = t.quantity ?? 0;
     if (t.type === "BUY" && qty > 0) lots.push({ valueDate: t.valueDate ?? t.date, quantity: qty });
-    if ((t.type === "SELL" || t.type === "REDEMPTION") && qty > 0) {
+    if ((t.type === "SELL" || t.type === "REDEMPTION" || t.type === "WRITE_OFF") && qty > 0) {
       let left = qty;
       while (left > 0 && lots.length > 0) {
         const take = Math.min(left, lots[0]!.quantity);

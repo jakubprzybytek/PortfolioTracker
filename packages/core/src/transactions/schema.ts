@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { TransactionItem } from "../db/items.ts";
 
-export const transactionTypes = ["BUY", "SELL", "COUPON", "REDEMPTION", "DEPOSIT", "WITHDRAWAL", "FEE", "TAX", "INTEREST", "DIVIDEND", "SPLIT", "EXCHANGE"] as const;
+export const transactionTypes = ["BUY", "SELL", "COUPON", "REDEMPTION", "DEPOSIT", "WITHDRAWAL", "FEE", "TAX", "INTEREST", "DIVIDEND", "SPLIT", "EXCHANGE", "WRITE_OFF"] as const;
 
 export const TransactionInput = z.object({
   id: z.string().min(1).optional(),

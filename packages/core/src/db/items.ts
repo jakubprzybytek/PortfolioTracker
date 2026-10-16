@@ -141,6 +141,8 @@ export type TransactionType =
   | "SELL"
   | "COUPON"
   | "REDEMPTION"
+  /** Bonds (or units) lost: the issuer defaulted, nothing came back. Closes `quantity` at 0 (`amount` 0); money recovered later is its own row. */
+  | "WRITE_OFF"
   | "DEPOSIT"
   | "WITHDRAWAL"
   | "FEE"

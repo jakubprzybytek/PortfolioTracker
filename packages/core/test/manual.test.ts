@@ -35,6 +35,15 @@ describe("checkManualTransaction", () => {
     expect(checkManualTransaction(tx({ type: "DEPOSIT", amount: 1, date: "2028-02-29" }), known)).toEqual([]);
   });
 
+  it("a write-off needs an instrument and a quantity, and nothing comes back", () => {
+    expect(checkManualTransaction(tx({ type: "WRITE_OFF", isin: DS, quantity: 7, amount: 0 }), known)).toEqual([]);
+    expect(checkManualTransaction(tx({ type: "WRITE_OFF", quantity: 7, amount: 0 }), known)).toContain("WRITE_OFF needs an instrument");
+    expect(checkManualTransaction(tx({ type: "WRITE_OFF", isin: DS, amount: 0 }), known)).toContain("WRITE_OFF needs a quantity");
+    expect(checkManualTransaction(tx({ type: "WRITE_OFF", isin: DS, quantity: 7, amount: 50 }), known)).toEqual([
+      "WRITE_OFF: nothing comes back, so the amount is 0 (money recovered later is its own transaction)",
+    ]);
+  });
+
   it("gives random ids", () => {
     const a = newTransactionId();
     expect(a).toMatch(/^[0-9a-f]{16}$/);

@@ -131,6 +131,19 @@ test.describe("transactions view", () => {
 });
 
 test.describe("adding transactions", () => {
+  test("a write-off takes the instrument and the quantity, no amount", async ({ page }) => {
+    await page.goto("/#/transactions");
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-type").selectOption("WRITE_OFF");
+    await expect(page.getByTestId("tx-instrument")).toBeVisible();
+    await expect(page.getByTestId("tx-quantity")).toBeVisible();
+    await expect(page.getByTestId("tx-amount")).toHaveCount(0);
+    await expect(page.getByTestId("tx-price")).toHaveCount(0);
+    await expect(page.getByTestId("tx-summary")).toContainText("No cash moves");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("tx-form")).toBeHidden();
+  });
+
   test("adds, edits and deletes a transaction from the form", async ({ page }) => {
     // Dated far ahead in its own account, so no valuation day (and no other test) sees it meanwhile.
     await page.goto("/#/transactions");

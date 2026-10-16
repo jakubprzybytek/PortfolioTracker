@@ -56,7 +56,7 @@ export function positionsAt(transactions: TransactionItem[], date: IsoDate, fx?:
   const positions = new Map<string, Position>();
   // Within a day: buys first, sales last (a same-day sale of what was just bought, e.g. currency at IBKR, must not be
   // clipped to the holding before the buy).
-  const rank = (t: TransactionItem) => (t.type === "BUY" ? 0 : t.type === "SELL" || t.type === "REDEMPTION" ? 2 : 1);
+  const rank = (t: TransactionItem) => (t.type === "BUY" ? 0 : t.type === "SELL" || t.type === "REDEMPTION" || t.type === "WRITE_OFF" ? 2 : 1);
   const sorted = [...transactions]
     .filter((t) => t.date <= date && t.isin)
     .sort((a, b) => a.date.localeCompare(b.date) || rank(a) - rank(b) || a.id.localeCompare(b.id));
@@ -74,7 +74,9 @@ export function positionsAt(transactions: TransactionItem[], date: IsoDate, fx?:
         break;
       }
       case "SELL":
-      case "REDEMPTION": {
+      case "REDEMPTION":
+      case "WRITE_OFF": {
+        // A write-off is a disposal for nothing: its remaining cost becomes a realised loss.
         let left = Math.min(qty, p.lots.reduce((n, l) => n + l.quantity, 0));
         const sold = left;
         let cost = 0;

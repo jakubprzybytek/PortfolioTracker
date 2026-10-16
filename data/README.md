@@ -19,7 +19,7 @@ aws s3 cp data/instruments.json s3://$BUCKET/imports/instruments/instruments.jso
 aws s3 cp my-transactions.json s3://$BUCKET/imports/transactions/2026-10.json
 ```
 
-Transaction fields: `date`, `account`, `type` (`BUY`, `SELL`, `COUPON`, `REDEMPTION`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`, `DIVIDEND`, `SPLIT`, `EXCHANGE`), `isin`, `quantity`, `price` (bonds: clean % of nominal; ETFs: in the instrument's currency), `fxRate` (paid in PLN for an instrument in another currency: the broker's PLN per unit), `ratio` (`SPLIT`: units after per unit before), `amount` (signed cash in `currency`: negative = money out), `fee` (in `currency`), `currency` (what was paid or received; default PLN), `toAmount` and `toCurrency` (`EXCHANGE`: what came in), `note`, optional `id`. Accounts: `baseCurrency` (e.g. EUR) for an account kept in several currencies.
+Transaction fields: `date`, `account`, `type` (`BUY`, `SELL`, `COUPON`, `REDEMPTION`, `WRITE_OFF`, `DEPOSIT`, `WITHDRAWAL`, `FEE`, `TAX`, `INTEREST`, `DIVIDEND`, `SPLIT`, `EXCHANGE`), `isin`, `quantity`, `price` (bonds: clean % of nominal; ETFs: in the instrument's currency), `fxRate` (paid in PLN for an instrument in another currency: the broker's PLN per unit), `ratio` (`SPLIT`: units after per unit before), `WRITE_OFF` (the issuer defaulted: `quantity` lost, `amount` 0; the remaining cost becomes a realised loss), `amount` (signed cash in `currency`: negative = money out), `fee` (in `currency`), `currency` (what was paid or received; default PLN), `toAmount` and `toCurrency` (`EXCHANGE`: what came in), `note`, optional `id`. Accounts: `baseCurrency` (e.g. EUR) for an account kept in several currencies.
 
 Corporate bonds (Catalyst): `"type": "BOND_CORPORATE"`, `"venue": "CATALYST"`, `"sourceIds": { "biznesradar": "KRU0827" }`, `"nominal": 100`. Prices are clean % of the nominal; accrued interest comes from the bond's coupon periods (`coupons` above). A bond no longer quoted: `"venue": "MANUAL"`, no source, prices from `imports/prices/` (% of nominal).
 
@@ -68,7 +68,7 @@ node scripts/history-sheet-to-import.ts ~/Downloads/history.xlsx   # or a folder
 ```
 
 - Tabs read, by their headers: Bonds, Savings, Lokata, Arka, DM BZWBK, XTB, Bond prices.
-- The bonds are no longer quoted: `BOND_CORPORATE`, venue `MANUAL`, inactive, priced from the "Bond prices" tab (% of nominal; a write-off at 0 % gets no price, its redemption at 0 closes the position). Arka's fund categories, the DM BZWBK shares/certificates and XTB are `FUND_MANUAL` with ids from their codes (`privateAssetId`), priced from the tabs' price tables.
+- The bonds are no longer quoted: `BOND_CORPORATE`, venue `MANUAL`, inactive, priced from the "Bond prices" tab (% of nominal; a defaulted bond gets no price at 0 %: its `WRITE_OFF` closes the position). Arka's fund categories, the DM BZWBK shares/certificates and XTB are `FUND_MANUAL` with ids from their codes (`privateAssetId`), priced from the tabs' price tables.
 - Santander's rows stop where the app's own history of the account starts (2022-05): the sheet's last row hands over the balance (Savings tab, 2022-06-01). Don't import anything else of that account from the sheet.
 - It prints each account's cash at the end (0 for all), any position still open (XTB keeps 0.033 units, 0.78 PLN) and the lowest cash balance.
 

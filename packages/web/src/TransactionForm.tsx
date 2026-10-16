@@ -7,14 +7,16 @@ import { useApi } from "./useApi.ts";
 // The "Add transaction" form (Docs/ui.md): a dialog over the Transactions view, for a new transaction or one
 // being edited. The server checks it again (POST/PUT /transactions) and revalues from its date.
 
-const TYPES = ["BUY", "SELL", "COUPON", "DIVIDEND", "REDEMPTION", "DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "EXCHANGE", "SPLIT"] as const;
+const TYPES = ["BUY", "SELL", "COUPON", "DIVIDEND", "REDEMPTION", "WRITE_OFF", "DEPOSIT", "WITHDRAWAL", "INTEREST", "FEE", "TAX", "EXCHANGE", "SPLIT"] as const;
 type TxType = (typeof TYPES)[number];
 /** Money out: stored as a negative amount (the form takes the size only). */
 const MONEY_OUT = new Set<string>(["BUY", "FEE", "TAX", "WITHDRAWAL", "EXCHANGE"]);
 /** Currencies money can be in (plus an instrument's own). */
 const CURRENCIES = ["PLN", "EUR", "USD"];
-const NEEDS_INSTRUMENT = new Set<string>(["BUY", "SELL", "COUPON", "DIVIDEND", "REDEMPTION", "SPLIT"]);
+const NEEDS_INSTRUMENT = new Set<string>(["BUY", "SELL", "COUPON", "DIVIDEND", "REDEMPTION", "SPLIT", "WRITE_OFF"]);
 const HAS_QUANTITY = new Set<string>(["BUY", "SELL", "REDEMPTION"]);
+/** No money moves: a split changes the units, a write-off closes them at 0 (the issuer defaulted). */
+const NO_AMOUNT = new Set<string>(["SPLIT", "WRITE_OFF"]);
 const NEW = "__new__";
 const NEW_ACCOUNT = "__new_account__";
 
@@ -137,7 +139,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   }, [inst, type, q, p, fx, f, cur]);
   const amountShown = amountTouched ? amount : str(suggested);
   const size = parseNum(amountShown);
-  const signed = type === "SPLIT" ? 0 : size === undefined ? undefined : MONEY_OUT.has(type) ? -Math.abs(size) : Math.abs(size);
+  const signed = NO_AMOUNT.has(type) ? 0 : size === undefined ? undefined : MONEY_OUT.has(type) ? -Math.abs(size) : Math.abs(size);
   const cashEffect = signed === undefined ? undefined : type === "BUY" ? signed - f : signed;
 
   async function lookup() {
@@ -160,7 +162,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
     if (needsInstrument && !isin) return setError("Choose an instrument");
     for (const [label, v] of [["Quantity", q], ["Price", p], ["FX rate", fx], ["Fee", parseNum(fee)], ["Amount", size], ["Ratio", parseNum(ratio)]] as const)
       if (v !== undefined && !Number.isFinite(v)) return setError(`${label}: not a number`);
-    if (type !== "SPLIT" && signed === undefined) return setError("Enter the amount");
+    if (!NO_AMOUNT.has(type) && signed === undefined) return setError("Enter the amount");
+    if (type === "WRITE_OFF" && !(q !== undefined && q > 0)) return setError("Enter how many units are written off");
     const got = parseNum(toAmount);
     if (type === "EXCHANGE" && (got === undefined || !Number.isFinite(got) || got <= 0)) return setError("Enter what you got");
     if (type === "EXCHANGE" && otherCur === cur) return setError("Choose two different currencies");
@@ -183,7 +186,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
         account: acct,
         type,
         ...(needsInstrument || (type === "INTEREST" && isin) ? { isin: instrumentIsin } : {}),
-        ...(HAS_QUANTITY.has(type) && q !== undefined ? { quantity: q } : {}),
+        ...((HAS_QUANTITY.has(type) || type === "WRITE_OFF") && q !== undefined ? { quantity: q } : {}),
         ...(HAS_QUANTITY.has(type) && p !== undefined ? { price: p } : {}),
         ...(foreign && fx !== undefined ? { fxRate: fx } : {}),
         ...(type === "SPLIT" ? { ratio: parseNum(ratio) } : {}),
@@ -356,11 +359,16 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
               <input inputMode="decimal" value={fxRate} onChange={(e) => setFxRate(e.target.value)} data-testid="tx-fx" />
             </Field>
           )}
+          {type === "WRITE_OFF" && (
+            <Field label="Quantity written off" hint="The units lost. Nothing comes back: they close at 0 and their cost becomes a loss.">
+              <input inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} data-testid="tx-quantity" />
+            </Field>
+          )}
           {type === "SPLIT" ? (
             <Field label="Units per unit before" hint="100:1 split: 100">
               <input inputMode="decimal" value={ratio} onChange={(e) => setRatio(e.target.value)} data-testid="tx-ratio" />
             </Field>
-          ) : (
+          ) : type === "WRITE_OFF" ? null : (
             <>
               <Field
                 label={type === "BUY" ? "Amount paid (without the fee)" : type === "SELL" ? "Amount received (after the fee)" : type === "EXCHANGE" ? "You gave" : "Amount"}
@@ -416,7 +424,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
         </div>
 
         <p className="form-summary" data-testid="tx-summary">
-          {cashEffect !== undefined && type !== "SPLIT" ? (
+          {cashEffect !== undefined && !NO_AMOUNT.has(type) ? (
             <>
               Cash in {account === NEW_ACCOUNT ? newAccount || "the new account" : account}:{" "}
               <strong className={cashEffect < 0 ? "neg" : "pos"}>{fmtMoney(type === "EXCHANGE" ? cashEffect - f : cashEffect, cur)}</strong>
@@ -429,7 +437,13 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
               {(type === "BUY" || type === "EXCHANGE") && f > 0 && <span className="faint"> (incl. fee {fmtNum(f)})</span>}
             </>
           ) : (
-            <span className="faint">{type === "SPLIT" ? "A split changes the number of units only." : "Enter the amount."}</span>
+            <span className="faint">
+              {type === "SPLIT"
+                ? "A split changes the number of units only."
+                : type === "WRITE_OFF"
+                  ? "No cash moves: the units close at 0 and their remaining cost is a realised loss. Money recovered later goes in as its own transaction."
+                  : "Enter the amount."}
+            </span>
           )}
         </p>
         {error && (

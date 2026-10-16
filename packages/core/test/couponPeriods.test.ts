@@ -64,6 +64,10 @@ describe("coupons received", () => {
     const buy = [tx({ date: "2026-07-30", quantity: 5 })];
     expect(quantityHeld(buy, "Broker", ISIN, "2026-07-31")).toBe(0);
     expect(quantityHeld(buy, "Broker", ISIN, "2026-08-03")).toBe(5);
+    // A write-off counts on its date, like a redemption.
+    const lost = [...buy, tx({ date: "2026-09-01", type: "WRITE_OFF", quantity: 5, amount: 0 })];
+    expect(quantityHeld(lost, "Broker", ISIN, "2026-08-31")).toBe(5);
+    expect(quantityHeld(lost, "Broker", ISIN, "2026-09-01")).toBe(0);
   });
 
   it("matches each coupon to its period and works out the rates it fits", () => {

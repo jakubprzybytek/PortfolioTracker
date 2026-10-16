@@ -60,6 +60,21 @@ describe("positionsAt", () => {
     expect(p.realised).toEqual([{ date: "2025-04-10", quantity: 300, proceeds: 4000, cost: 3500 }]);
   });
 
+  it("a write-off closes the bonds at 0: their remaining cost is a realised loss, cash doesn't move", () => {
+    const txs = [
+      tx({ id: "1", date: "2012-03-01", type: "BUY", isin: "PLGANT000204", quantity: 4, price: 100, amount: -4000, fee: 10 }),
+      tx({ id: "2", date: "2012-05-04", type: "BUY", isin: "PLGANT000204", quantity: 3, price: 100, amount: -3000, fee: 7.5 }),
+      tx({ id: "3", date: "2012-08-03", type: "COUPON", isin: "PLGANT000204", amount: 161.7 }),
+      tx({ id: "4", date: "2013-05-31", type: "WRITE_OFF", isin: "PLGANT000204", quantity: 7, amount: 0, note: "issuer bankrupt" }),
+    ];
+    const p = positionsAt(txs, "2013-12-31").get(positionKey("a", "PLGANT000204"))!;
+    expect(p).toMatchObject({ quantity: 0, cost: 0, couponsReceived: 161.7 });
+    expect(p.realised).toEqual([{ date: "2013-05-31", quantity: 7, proceeds: 0, cost: 7017.5 }]);
+    // Held until the write-off
+    expect(positionsAt(txs, "2013-05-30").get(positionKey("a", "PLGANT000204"))!.quantity).toBe(7);
+    expect(parseTransactionFile(JSON.stringify([{ date: "2013-05-31", account: "a", type: "WRITE_OFF", isin: "PLGANT000204", quantity: 7, amount: 0 }]), "t")[0]!.type).toBe("WRITE_OFF");
+  });
+
   it("keeps the same instrument in two accounts as separate positions", () => {
     const txs = [
       tx({ id: "1", date: "2025-01-10", type: "BUY", isin: "PL0000113783", quantity: 10, amount: -8000 }),
