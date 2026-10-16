@@ -29,6 +29,21 @@ export function FilterSelect({ label, value, options, onChange, testId, width = 
   );
 }
 
+/** Free text: instruments whose name or code contains it (case and Polish accents ignored). */
+export function FilterText({ label, value, onChange, testId, placeholder = "Name or code", width = "13rem" }: { label: string; value: string; onChange: (value: string) => void; testId: string; placeholder?: string; width?: string }) {
+  const narrow = useNarrow();
+  return (
+    <label className={["filter", value ? "" : "unset"].filter(Boolean).join(" ")} style={{ "--w": width } as CSSProperties}>
+      <span className="muted">{label}</span>
+      <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={narrow ? label : placeholder} data-testid={testId} />
+    </label>
+  );
+}
+
+const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").replace(/Ł/g, "L").toLowerCase();
+/** Whether an instrument matches the free-text filter (empty: everything). */
+export const matchesText = (text: string, i: { code: string; name: string }) => !text.trim() || fold(`${i.code} ${i.name}`).includes(fold(text.trim()));
+
 export function FilterBar({ children, active, onReset, summary }: { children: ReactNode; active: boolean; onReset: () => void; summary: string }) {
   return (
     <div className="filters" data-testid="filters">

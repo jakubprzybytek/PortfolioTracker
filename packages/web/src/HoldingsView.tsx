@@ -2,7 +2,7 @@ import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, u
 import { ChartPanel } from "./ChartPanel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
 import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
-import { FilterBar, FilterSelect, FilterToggle, uniqueOptions, type Option } from "./Filters.tsx";
+import { FilterBar, FilterSelect, FilterText, FilterToggle, matchesText, uniqueOptions, type Option } from "./Filters.tsx";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtPln, priceAge, priceAgeTitle, rangeBefore, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
@@ -290,7 +290,7 @@ const IncompleteFlag = ({ what }: { what: string[] }) => (
  * By instrument: one row per instrument (by code) with the account it's in; one held in several accounts shows
  * "▸ n accounts" and expands into one row per account. Cash is one row the same way.
  * An incomplete account (not all of its assets tracked yet) shows its cash greyed and leaves it out of the sums.
- * Filters: account, asset type ("Cash" shows only the cash rows). "Show closed" (shared with Prices while the app is open) adds the positions held no
+ * Filters: account, asset type ("Cash" shows only the cash rows), free text (instruments whose name or code contains it; no cash rows then). "Show closed" (shared with Prices while the app is open) adds the positions held no
  * more, greyed, after the open ones (by account: in their account; by instrument: at the end), with their realised gain;
  * they're not in the sums. A closed row's chart ranges count back from the day it closed (ALL: the time it was held).
  */
@@ -300,9 +300,9 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const all = useMemo(() => (snap.data?.holdings ?? []).filter((h) => h.quantity > 0), [snap.data]);
   const newestPrice = useMemo(() => all.map((h) => h.priceDate).filter((d): d is string => !!d).sort().at(-1), [all]);
   const accounts = useMemo(() => snap.data?.accounts ?? {}, [snap.data]);
-  const { account = "", type = "" } = params;
+  const { account = "", type = "", q: text = "" } = params;
   const closedAll = useMemo(() => (showClosed ? (snap.data?.closed ?? []) : []), [showClosed, snap.data]);
-  const closedShown = useMemo(() => closedAll.filter((c) => (!account || c.account === account) && (!type || c.type === type)).sort(byClosedDate), [closedAll, account, type]);
+  const closedShown = useMemo(() => closedAll.filter((c) => (!account || c.account === account) && (!type || c.type === type) && matchesText(text, c)).sort(byClosedDate), [closedAll, account, type, text]);
   const byInstrument = params["group"] === "instrument";
   // By instrument: instruments (ISIN, or "cash") expanded into their accounts.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -369,14 +369,15 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
       .map((name): Group => {
         const info = accounts[name];
         const incomplete = info?.incomplete ?? [];
-        const holdings = all.filter((h) => accountOf(h) === name && (!type || shownType(h) === type)).sort(byCode);
-        const showCash = (!type || type === "CASH") && info !== undefined && (info.cash !== 0 || incomplete.length > 0);
+        // Text: instruments only (foreign cash isn't one).
+        const holdings = all.filter((h) => accountOf(h) === name && (!type || shownType(h) === type) && (!text.trim() || (!isForeignCash(h) && matchesText(text, h)))).sort(byCode);
+        const showCash = (!type || type === "CASH") && !text.trim() && info !== undefined && (info.cash !== 0 || incomplete.length > 0);
         const cash = showCash ? info.cash : null;
         const closed = closedShown.filter((c) => c.account === name);
         return { name, holdings, cash, cashLines: showCash ? cashLinesOf(info) : [], incomplete, sums: sums(holdings, cash !== null && incomplete.length === 0 ? cash : 0), closed };
       })
       .filter((g) => g.holdings.length > 0 || g.cash !== null || g.closed.length > 0);
-  }, [options.account, accounts, all, account, type, closedShown]);
+  }, [options.account, accounts, all, account, type, text, closedShown]);
 
   // By instrument: the same filtered holdings, regrouped; cash becomes one group with a row per account.
   const instrumentGroups = useMemo((): InstrumentGroup[] => {
@@ -491,12 +492,13 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
       </div>
 
       <FilterBar
-        active={!!(account || type)}
+        active={!!(account || type || text)}
         onReset={() => setParams({ group: params["group"], chart: chartIsin, chartAccount })}
         summary={snap.loading ? "Loading…" : `${shownCount} of ${all.length} holdings${showClosed ? ` + ${closedShown.length} closed` : ""}`}
       >
         <FilterSelect label="Account" value={account} options={options.account} onChange={set("account")} testId="filter-account" width="13rem" />
         <FilterSelect label="Asset type" value={type} options={options.type} onChange={set("type")} testId="filter-type" />
+        <FilterText label="Instrument" value={text} onChange={set("q")} testId="filter-text" />
         <FilterToggle label="Show closed" checked={showClosed} onChange={setShowClosed} testId="show-closed" title="Also the positions sold, redeemed or written off, with their realised gain" />
       </FilterBar>
 

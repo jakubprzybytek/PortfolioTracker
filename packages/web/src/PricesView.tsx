@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
-import { FilterBar, FilterSelect, FilterToggle, uniqueOptions } from "./Filters.tsx";
+import { FilterBar, FilterSelect, FilterText, FilterToggle, matchesText, uniqueOptions } from "./Filters.tsx";
 import { addDays, fmtNum, fmtPct, fmtTime, priceAgeTitle, rangeBefore, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
@@ -18,7 +18,7 @@ const fmtPrice = (r: PriceRow) =>
   r.rate ? `${fmtNum(r.rate.current * 100)} % p.a.` : r.price === null ? "–" : r.type.startsWith("BOND") ? `${fmtNum(r.price)} %` : `${fmtNum(r.price)} ${r.currency}`;
 
 /**
- * Held instruments: latest price, its date, change over a year. Filter by asset type. Clicking a row shows its price
+ * Held instruments: latest price, its date, change over a year. Filter by asset type and free text (name or code). Clicking a row shows its price
  * chart in a resizable panel docked to the bottom (as in Holdings); the open chart and the filter are in the URL.
  * "Show closed" (shared with Holdings while the app is open) adds the instruments traded but held no more, greyed, after the others: their last price
  * and the year up to it; their chart ranges count back from a month after the last transaction (ALL: from a month before the first).
@@ -27,6 +27,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const [showClosed, setShowClosed] = useShowClosed();
   const rows = useApi<PriceRow[]>("/prices", { closed: showClosed ? "1" : undefined });
   const type = params["type"] ?? "";
+  const text = params["q"] ?? "";
   const selected = params["chart"] ?? null;
   const [range, setRange] = useState<RangeKey>("1Y");
   const [panelHeight, setPanelHeight] = useState(0);
@@ -40,7 +41,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, span && spanEnd ? { from: rangeBefore(range, spanEnd, addDays(span.firstDate, -31)), to: spanEnd } : { from: rangeFrom(range), to: today() });
   const txs = useApi<Transaction[]>(selected ? `/instruments/${selected}/transactions` : null);
   // Held ones by code, then the closed ones by code.
-  const shown = all.filter((r) => !type || r.type === type).sort((a, b) => Number(!!a.closed) - Number(!!b.closed) || a.code.localeCompare(b.code));
+  const shown = all.filter((r) => (!type || r.type === type) && matchesText(text, r)).sort((a, b) => Number(!!a.closed) - Number(!!b.closed) || a.code.localeCompare(b.code));
   const closedCount = shown.filter((r) => r.closed).length;
   const types = useMemo(() => uniqueOptions(all, (r) => ({ value: r.type, label: typeLabel(r.type) })), [all]);
   const newest = all.filter((r) => !r.closed).map((r) => r.priceDate).filter((d): d is string => !!d).sort().at(-1);
@@ -69,11 +70,12 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
       {rows.error && <p className="error">{rows.error}</p>}
 
       <FilterBar
-        active={!!type}
+        active={!!(type || text)}
         onReset={() => setParams({ chart: selected ?? undefined })}
         summary={rows.loading ? "Loading…" : `${shown.length - closedCount} of ${all.filter((r) => !r.closed).length} instruments${showClosed ? ` + ${closedCount} closed` : ""}`}
       >
         <FilterSelect label="Asset type" value={type} options={types} onChange={(v) => setParams({ ...params, type: v || undefined })} testId="filter-type" />
+        <FilterText label="Instrument" value={text} onChange={(v) => setParams({ ...params, q: v || undefined })} testId="filter-text" />
         <FilterToggle label="Show closed" checked={showClosed} onChange={setShowClosed} testId="show-closed" title="Also the instruments traded but held no more" />
       </FilterBar>
 
@@ -150,7 +152,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             {!rows.loading && shown.length === 0 && (
               <tr>
                 <td className="left muted" colSpan={5}>
-                  {all.length === 0 ? "Nothing held yet." : "No instruments of this type."}
+                  {all.length === 0 ? "Nothing held yet." : "No instruments match the filters."}
                 </td>
               </tr>
             )}

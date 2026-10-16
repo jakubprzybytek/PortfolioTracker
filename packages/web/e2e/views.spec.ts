@@ -316,6 +316,29 @@ test.describe("holdings view", () => {
   });
 });
 
+test.describe("free-text filter", () => {
+  test("holdings and prices: instruments whose name or code contains the text, case and accents ignored; in the URL", async ({ page }) => {
+    await page.goto("/#/holdings");
+    await expect(page.getByTestId("holding-row")).toHaveCount(10);
+    await page.getByTestId("filter-text").fill("INFLACJA"); // IZ0836: "… indeksowane inflacją"
+    await expect(page.getByTestId("holding-row")).toHaveCount(1);
+    await expect(page.getByTestId("holding-row").locator("td:first-child strong")).toHaveText("IZ0836");
+    await expect(page.getByTestId("cash-row")).toHaveCount(0); // cash isn't an instrument
+    await expect(page.getByTestId("filters-summary")).toHaveText("1 of 10 holdings");
+    await expect(page).toHaveURL(/q=INFLACJA/);
+    await page.getByTestId("filters-reset").click();
+    await expect(page.getByTestId("filter-text")).toHaveValue("");
+    await expect(page.getByTestId("holding-row")).toHaveCount(10);
+
+    await page.goto("/#/prices");
+    await page.getByTestId("filter-text").fill("kruk");
+    await expect(page.getByTestId("filters-summary")).toHaveText("1 of 7 instruments");
+    await expect(page.getByTestId("price-KRU0827")).toBeVisible();
+    await page.getByTestId("filter-text").fill("nothing like this");
+    await expect(page.getByTestId("prices-table")).toContainText("No instruments match the filters.");
+  });
+});
+
 test.describe("prices view", () => {
   test("lists held instruments with price, date and 1-year change; a click shows the chart", async ({ page }) => {
     await page.goto("/");
