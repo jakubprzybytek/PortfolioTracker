@@ -53,12 +53,11 @@ export function uniqueOptions<T>(items: T[], pick: (item: T) => Option | null): 
   return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/** A checkbox among the filters (e.g. "Show closed"), as tall as the dropdowns. */
+/** A toggle button among the filters (e.g. "Show closed"), as tall as the dropdowns; filled while on. */
 export function FilterToggle({ label, checked, onChange, testId, title }: { label: string; checked: boolean; onChange: (checked: boolean) => void; testId: string; title?: string }) {
   return (
-    <label className="filter-toggle" title={title}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} data-testid={testId} />
+    <button type="button" className={`toggle${checked ? " active" : ""}`} aria-pressed={checked} onClick={() => onChange(!checked)} title={title} data-testid={testId}>
       {label}
-    </label>
+    </button>
   );
 }

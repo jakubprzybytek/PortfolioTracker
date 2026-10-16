@@ -90,8 +90,8 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
 .filters button { cursor: pointer; }
 .filters button:disabled { cursor: default; opacity: 0.5; }
 .filters select { width: var(--w, 11rem); text-overflow: ellipsis; }
-.filter-toggle { display: flex; align-items: center; gap: 6px; height: 34px; font-size: 0.9rem; white-space: nowrap; cursor: pointer; }
-.filter-toggle input { margin: 0; accent-color: var(--accent); }
+.filters button.toggle { height: 34px; white-space: nowrap; }
+.filters button.toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
 .filters button.reset { display: grid; place-items: center; padding: 0; width: 34px; height: 34px; }
 @media (max-width: 720px) {
   /* Dropdowns side by side, sharing the row with Reset; the count goes below. */

@@ -574,7 +574,7 @@ const closedPosition = {
 const withClosed = (path: string) => (url: URL) => url.pathname.endsWith(path) && url.searchParams.get("closed") === "1";
 
 test.describe("show closed", () => {
-  test("holdings: closed positions greyed after the open ones, with the realised gain, not in the sums; their chart covers the time held", async ({ page }) => {
+  test("holdings: closed positions greyed after the open ones, with the realised gain, not in the sums; their chart ranges count back from the close", async ({ page }) => {
     await page.route(withClosed("/holdings"), async (route) => {
       const res = await route.fetch();
       const body = await res.json();
@@ -592,8 +592,11 @@ test.describe("show closed", () => {
     await page.goto("/#/holdings");
     const totalBefore = await page.getByTestId("holdings-total").locator("td").nth(1).textContent();
     await expect(page.getByTestId("closed-row")).toHaveCount(0);
-    await page.getByTestId("show-closed").check();
-    await expect(page).toHaveURL(/closed=1/);
+    const toggle = page.getByTestId("show-closed");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(toggle).toHaveClass(/active/);
     await expect(page.getByTestId("filters-summary")).toHaveText("10 of 10 holdings + 1 closed");
     const row = page.getByTestId("closed-row");
     await expect(row).toHaveCount(1);
@@ -611,14 +614,16 @@ test.describe("show closed", () => {
     expect(groups.at(-1)).toBe("account-old-broker");
     await expect(page.getByTestId("holdings-total").locator("td").nth(1)).toHaveText(totalBefore!);
 
-    // Its chart: from the first transaction to the close, no range buttons.
+    // Its chart: the ranges count back from the close; ALL is the time it was held.
     await row.click();
     await expect(page).toHaveURL(/chart=PLZZOLDBOND1&chartAccount=old-broker/);
     await expect(page.getByTestId("chart-panel-title")).toContainText("held 2012-03-01 – 2013-05-31");
-    await expect(page.getByTestId("holding-range")).toHaveCount(0);
     await expect(page.getByTestId("holding-chart").locator("path.recharts-area-area")).toHaveCount(2);
-    expect(historyAsked?.searchParams.get("from")).toBe("2012-03-01");
+    await expect.poll(() => historyAsked?.searchParams.get("from")).toBe("2012-05-31"); // 1Y before the close
     expect(historyAsked?.searchParams.get("to")).toBe("2013-05-31");
+    await page.getByTestId("holding-range").getByRole("button", { name: "ALL" }).click();
+    await expect.poll(() => historyAsked?.searchParams.get("from")).toBe("2012-03-01");
+    await page.getByTestId("holding-range").getByRole("button", { name: "1Y" }).click();
     await page.keyboard.press("Escape");
 
     // Grouped by instrument: at the end, with the account; filters apply.
@@ -628,12 +633,19 @@ test.describe("show closed", () => {
     await page.getByTestId("filter-type").selectOption("ETF");
     await expect(page.getByTestId("closed-row")).toHaveCount(0);
     await page.getByTestId("filters-reset").click();
-    await expect(page).toHaveURL(/closed=1/); // the toggle isn't a filter: it stays
-    await page.getByTestId("show-closed").uncheck();
+    await expect(toggle).toHaveAttribute("aria-pressed", "true"); // the toggle isn't a filter: it stays
+
+    // One switch for Holdings and Prices while the app is open; a reload resets it.
+    await page.getByTestId("nav-prices").click();
+    await expect(page.getByTestId("show-closed")).toHaveAttribute("aria-pressed", "true");
+    await page.getByTestId("nav-holdings").click();
+    await expect(page.getByTestId("closed-row")).toHaveCount(1);
+    await page.reload();
+    await expect(page.getByTestId("show-closed")).toHaveAttribute("aria-pressed", "false");
     await expect(page.getByTestId("closed-row")).toHaveCount(0);
   });
 
-  test("prices: instruments held no more greyed after the others, with their last price; their chart covers the time traded", async ({ page }) => {
+  test("prices: instruments held no more greyed after the others, with their last price; their chart ranges count back from the last trade", async ({ page }) => {
     const oldRow = { isin: OLD_BOND, code: "OLD0513", name: "Old bond (made up)", type: "BOND_CORPORATE", currency: "PLN", price: 48.5, priceDate: "2013-05-30", stale: false, manual: true, yearAgo: { date: "2012-05-30", price: 97 }, change1y: -0.5, closed: { firstDate: "2012-03-01", lastDate: "2013-05-31" } };
     await page.route(withClosed("/prices"), async (route) => {
       const res = await route.fetch();
@@ -649,8 +661,7 @@ test.describe("show closed", () => {
     await page.route(`**/instruments/${OLD_BOND}/transactions`, (route) => route.fulfill({ json: [] }));
     await page.goto("/#/prices");
     await expect(page.getByTestId("price-OLD0513")).toHaveCount(0);
-    await page.getByTestId("show-closed").check();
-    await expect(page).toHaveURL(/closed=1/);
+    await page.getByTestId("show-closed").click();
     await expect(page.getByTestId("filters-summary")).toHaveText("7 of 7 instruments + 1 closed");
     const row = page.getByTestId("price-OLD0513");
     await expect(row).toHaveClass(/closed/);
@@ -661,10 +672,12 @@ test.describe("show closed", () => {
     expect(codes.at(-1)).toBe("price-OLD0513"); // after the held ones
     await expect(page.getByTestId("prices-date")).not.toContainText("2013"); // "as of" the held ones
 
+    // The ranges count back from a month after the last trade; ALL from a month before the first.
     await row.click();
-    await expect(page.getByTestId("price-range")).toHaveCount(0);
-    await expect.poll(() => pricesAsked?.searchParams.get("from")).toBe("2012-01-30"); // a month around the trades
+    await expect.poll(() => pricesAsked?.searchParams.get("from")).toBe("2012-07-01");
     expect(pricesAsked?.searchParams.get("to")).toBe("2013-07-01");
+    await page.getByTestId("price-range").getByRole("button", { name: "ALL" }).click();
+    await expect.poll(() => pricesAsked?.searchParams.get("from")).toBe("2012-01-30");
   });
 });
 

@@ -5,12 +5,13 @@ import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
 import { FilterBar, FilterSelect, FilterToggle, uniqueOptions, type Option } from "./Filters.tsx";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
-import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtPln, priceAge, priceAgeTitle, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
+import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtPln, priceAge, priceAgeTitle, rangeBefore, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { RangePicker } from "./RangePicker.tsx";
 import { ValueChart, type ValuePoint } from "./ValueChart.tsx";
 import type { ClosedPosition, Holding, Snapshot } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
+import { useShowClosed } from "./showClosed.ts";
 
 /** Snapshots written before holdings carried their account have none. */
 const accountOf = (h: Holding) => h.account ?? "–";
@@ -289,12 +290,12 @@ const IncompleteFlag = ({ what }: { what: string[] }) => (
  * By instrument: one row per instrument (by code) with the account it's in; one held in several accounts shows
  * "▸ n accounts" and expands into one row per account. Cash is one row the same way.
  * An incomplete account (not all of its assets tracked yet) shows its cash greyed and leaves it out of the sums.
- * Filters: account, asset type ("Cash" shows only the cash rows). "Show closed" (`?closed=1`) adds the positions held no
+ * Filters: account, asset type ("Cash" shows only the cash rows). "Show closed" (shared with Prices while the app is open) adds the positions held no
  * more, greyed, after the open ones (by account: in their account; by instrument: at the end), with their realised gain;
- * they're not in the sums. A closed row's chart covers the time it was held.
+ * they're not in the sums. A closed row's chart ranges count back from the day it closed (ALL: the time it was held).
  */
 export function HoldingsView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
-  const showClosed = params["closed"] === "1";
+  const [showClosed, setShowClosed] = useShowClosed();
   const snap = useApi<Snapshot>("/holdings", { closed: showClosed ? "1" : undefined });
   const all = useMemo(() => (snap.data?.holdings ?? []).filter((h) => h.quantity > 0), [snap.data]);
   const newestPrice = useMemo(() => all.map((h) => h.priceDate).filter((d): d is string => !!d).sort().at(-1), [all]);
@@ -320,12 +321,12 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   /** The bond whose coupon periods replace its chart in the panel. */
   const [couponsFor, setCouponsFor] = useState<string | null>(null);
   const openHolding = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin && (!chartAccount || h.account === chartAccount));
-  // A closed position's chart: the time it was held.
+  // A closed position's chart: the range counts back from the day it closed.
   const chartClosed = openHolding ? undefined : closedAll.find((c) => c.isin === chartIsin && c.account === chartAccount);
   const history = useApi<ValuePoint[]>(chartIsin ? "/holdings/history" : null, {
     isin: chartIsin,
     account: chartAccount,
-    from: chartClosed ? chartClosed.firstDate : rangeFrom(range),
+    from: chartClosed ? rangeBefore(range, chartClosed.closedDate, chartClosed.firstDate) : rangeFrom(range),
     to: chartClosed ? chartClosed.closedDate : today(),
   });
   const select = (isin: string, acct?: string) =>
@@ -491,12 +492,12 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
 
       <FilterBar
         active={!!(account || type)}
-        onReset={() => setParams({ group: params["group"], closed: params["closed"], chart: chartIsin, chartAccount })}
+        onReset={() => setParams({ group: params["group"], chart: chartIsin, chartAccount })}
         summary={snap.loading ? "Loading…" : `${shownCount} of ${all.length} holdings${showClosed ? ` + ${closedShown.length} closed` : ""}`}
       >
         <FilterSelect label="Account" value={account} options={options.account} onChange={set("account")} testId="filter-account" width="13rem" />
         <FilterSelect label="Asset type" value={type} options={options.type} onChange={set("type")} testId="filter-type" />
-        <FilterToggle label="Show closed" checked={showClosed} onChange={(on) => setParams({ ...params, closed: on ? "1" : undefined })} testId="show-closed" title="Also the positions sold, redeemed or written off, with their realised gain" />
+        <FilterToggle label="Show closed" checked={showClosed} onChange={setShowClosed} testId="show-closed" title="Also the positions sold, redeemed or written off, with their realised gain" />
       </FilterBar>
 
       <div className="table-wrap">
@@ -653,7 +654,7 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           }
         >
           <div className="chart-tools">
-            {couponsFor === chartIsin || chartClosed ? <span /> : <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />}
+            {couponsFor === chartIsin ? <span /> : <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />}
             {chartHolding?.type === "FUND_MANUAL" && <ManualValues key={chartHolding.isin} isin={chartHolding.isin} code={chartHolding.code} currency={chartHolding.currency} />}
             {chartHolding?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === chartIsin} onToggle={() => setCouponsFor(couponsFor === chartIsin ? null : chartIsin)} />}
           </div>

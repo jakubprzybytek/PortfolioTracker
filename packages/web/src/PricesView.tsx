@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, FilterToggle, uniqueOptions } from "./Filters.tsx";
-import { addDays, fmtNum, fmtPct, fmtTime, priceAgeTitle, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
+import { addDays, fmtNum, fmtPct, fmtTime, priceAgeTitle, rangeBefore, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
 import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
@@ -11,6 +11,7 @@ import { RangePicker } from "./RangePicker.tsx";
 import type { Price, PriceRow, Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
+import { useShowClosed } from "./showClosed.ts";
 
 /** Bonds are priced in % of nominal; other instruments in their currency; retail bonds show their interest rate. */
 const fmtPrice = (r: PriceRow) =>
@@ -19,11 +20,11 @@ const fmtPrice = (r: PriceRow) =>
 /**
  * Held instruments: latest price, its date, change over a year. Filter by asset type. Clicking a row shows its price
  * chart in a resizable panel docked to the bottom (as in Holdings); the open chart and the filter are in the URL.
- * "Show closed" (`?closed=1`) adds the instruments traded but held no more, greyed, after the others: their last price
- * and the year up to it; their chart covers the time they were traded.
+ * "Show closed" (shared with Holdings while the app is open) adds the instruments traded but held no more, greyed, after the others: their last price
+ * and the year up to it; their chart ranges count back from a month after the last transaction (ALL: from a month before the first).
  */
 export function PricesView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
-  const showClosed = params["closed"] === "1";
+  const [showClosed, setShowClosed] = useShowClosed();
   const rows = useApi<PriceRow[]>("/prices", { closed: showClosed ? "1" : undefined });
   const type = params["type"] ?? "";
   const selected = params["chart"] ?? null;
@@ -33,9 +34,10 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const [couponsFor, setCouponsFor] = useState<string | null>(null);
   const all = rows.data ?? [];
   const sel = all.find((r) => r.isin === selected);
-  // An instrument held no more: from a month before its first transaction to a month after its last.
+  // An instrument held no more: the range counts back from a month after its last transaction (ALL: from a month before its first).
   const span = sel?.closed;
-  const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, span ? { from: addDays(span.firstDate, -31), to: addDays(span.lastDate, 31) } : { from: rangeFrom(range), to: today() });
+  const spanEnd = span ? addDays(span.lastDate, 31) : undefined;
+  const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, span && spanEnd ? { from: rangeBefore(range, spanEnd, addDays(span.firstDate, -31)), to: spanEnd } : { from: rangeFrom(range), to: today() });
   const txs = useApi<Transaction[]>(selected ? `/instruments/${selected}/transactions` : null);
   // Held ones by code, then the closed ones by code.
   const shown = all.filter((r) => !type || r.type === type).sort((a, b) => Number(!!a.closed) - Number(!!b.closed) || a.code.localeCompare(b.code));
@@ -68,11 +70,11 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
 
       <FilterBar
         active={!!type}
-        onReset={() => setParams({ chart: selected ?? undefined, closed: params["closed"] })}
+        onReset={() => setParams({ chart: selected ?? undefined })}
         summary={rows.loading ? "Loading…" : `${shown.length - closedCount} of ${all.filter((r) => !r.closed).length} instruments${showClosed ? ` + ${closedCount} closed` : ""}`}
       >
         <FilterSelect label="Asset type" value={type} options={types} onChange={(v) => setParams({ ...params, type: v || undefined })} testId="filter-type" />
-        <FilterToggle label="Show closed" checked={showClosed} onChange={(on) => setParams({ ...params, closed: on ? "1" : undefined })} testId="show-closed" title="Also the instruments traded but held no more" />
+        <FilterToggle label="Show closed" checked={showClosed} onChange={setShowClosed} testId="show-closed" title="Also the instruments traded but held no more" />
       </FilterBar>
 
       <div className="table-wrap">
@@ -184,7 +186,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
           }
         >
           <div className="chart-tools">
-            {couponsFor === selected || span ? <span /> : <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />}
+            {couponsFor === selected ? <span /> : <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />}
             {sel?.manual && <ManualValues key={sel.isin} isin={sel.isin} code={sel.code} currency={sel.currency} />}
             {sel?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === selected} onToggle={() => setCouponsFor(couponsFor === selected ? null : selected)} />}
           </div>

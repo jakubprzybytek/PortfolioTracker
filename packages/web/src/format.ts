@@ -48,6 +48,13 @@ export const rangeFrom = (key: RangeKey): string => {
   return days === null ? "2000-01-01" : addDays(today(), -days);
 };
 
+/** A range counted back from `end` (a closed position's last day) instead of today; never before `start` (ALL: from it). */
+export const rangeBefore = (key: RangeKey, end: string, start: string): string => {
+  const days = RANGES.find((r) => r.key === key)!.days;
+  const from = days === null ? start : addDays(end, -days);
+  return from < start ? start : from;
+};
+
 /** Readable labels for instrument types (the "asset type" filters). Cash movements have no instrument: "CASH". */
 export const TYPE_LABELS: Record<string, string> = {
   BOND_LISTED: "Listed bond",
