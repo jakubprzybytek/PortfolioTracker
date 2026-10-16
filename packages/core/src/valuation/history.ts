@@ -1,5 +1,6 @@
 // Pure functions for the Dashboard's history charts; no AWS imports, so the web app can import this file directly
 // (`@portfolio/core/valuation/history`).
+import { addDays } from "../dates.ts";
 import type { HoldingSnapshot, SnapshotItem } from "../db/items.ts";
 
 /** The big picture's asset classes, in display order. */
@@ -48,4 +49,19 @@ export function drawdowns(points: { date: string; total: number; netDeposits: nu
     peak = Math.max(peak, index);
     return { date: p.date, drawdown: Math.round((index / peak - 1) * 1e6) / 1e6 };
   });
+}
+
+/**
+ * A position's daily points (oldest first) with the days it wasn't held filled in as zero, so the chart drops to 0 for
+ * that time (as wide as it lasted: the chart spaces its points evenly) instead of drawing a line across (e.g. money
+ * moved out of a fund category and back years later).
+ */
+export function withZeroGaps<P extends { date: string; value: number; cost: number; quantity: number }>(points: P[]): { date: string; value: number; cost: number; quantity: number }[] {
+  const out: { date: string; value: number; cost: number; quantity: number }[] = [];
+  for (const p of points) {
+    const prev = out.at(-1);
+    if (prev) for (let d = addDays(prev.date, 1); d < p.date; d = addDays(d, 1)) out.push({ date: d, value: 0, cost: 0, quantity: 0 });
+    out.push(p);
+  }
+  return out;
 }

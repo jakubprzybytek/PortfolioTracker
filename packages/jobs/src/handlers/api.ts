@@ -22,6 +22,7 @@ import {
   formerInstruments,
   positionsAt,
   netDepositsByDate,
+  withZeroGaps,
   valueByClass,
   checkManualTransaction,
   isCalendarDate,
@@ -382,7 +383,8 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
             p.quantity += d.quantity;
             byDate.set(d.date, p);
           }
-        return json(200, [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)));
+        // Days it wasn't held (sold out and bought back later): zero, not a line across.
+        return json(200, withZeroGaps([...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))));
       }
       case "GET /transactions": {
         // All transactions, newest first, with the instrument's code, name and type (none for cash movements).

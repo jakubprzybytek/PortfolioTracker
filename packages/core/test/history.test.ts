@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HoldingSnapshot } from "../src/db/items.ts";
-import { assetClassOf, drawdowns, valueByClass } from "../src/valuation/history.ts";
+import { assetClassOf, drawdowns, valueByClass, withZeroGaps } from "../src/valuation/history.ts";
 
 describe("assetClassOf", () => {
   it("maps instrument types onto classes; a bond ETF is bonds", () => {
@@ -46,5 +46,23 @@ describe("drawdowns", () => {
       { date: "d2", total: 450, netDeposits: 500 },
     ]);
     expect(dd.map((d) => d.drawdown)).toEqual([0, 0, -0.1]);
+  });
+});
+
+describe("a position's days with gaps", () => {
+  const p = (date: string, value: number) => ({ date, value, cost: value, quantity: 1 });
+  it("fills the days it wasn't held with zero, and leaves consecutive days alone", () => {
+    expect(withZeroGaps([p("2015-11-13", 5), p("2015-11-14", 6), p("2015-11-18", 7), p("2015-11-19", 8)]).map((x) => [x.date, x.value])).toEqual([
+      ["2015-11-13", 5],
+      ["2015-11-14", 6],
+      ["2015-11-15", 0],
+      ["2015-11-16", 0],
+      ["2015-11-17", 0],
+      ["2015-11-18", 7],
+      ["2015-11-19", 8],
+    ]);
+    // Years out: a zero for every day, so the gap is as wide on the chart as it lasted.
+    expect(withZeroGaps([p("2015-11-14", 6), p("2019-10-15", 7)])).toHaveLength(1430 + 2);
+    expect(withZeroGaps([p("2020-01-01", 1), p("2020-01-03", 1)]).map((x) => x.date)).toEqual(["2020-01-01", "2020-01-02", "2020-01-03"]);
   });
 });

@@ -136,7 +136,7 @@ Free notes in Markdown (`NotesView.tsx`), e.g. trading checklists. Not linked to
 | `GET /instruments/{isin}/prices?from&to` | `PX#…` items; retail bonds: the daily calculated value per bond of your lots (`calculated: true`) |
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
 | `GET /prices` | held instruments: latest price + date, stale flag, price a year earlier and the change (`core/valuation/priceRows.ts`); `?closed=1` adds the instruments traded but not held (`closed`: first and last transaction dates; the year up to their last price) |
-| `GET /holdings/history?isin&account&from&to` | a position's daily value, cost and quantity (`POS#…` items); without `account`, the instrument summed over the accounts holding it (held nowhere: over the accounts that traded it) |
+| `GET /holdings/history?isin&account&from&to` | a position's daily value, cost and quantity (`POS#…` items); without `account`, the instrument summed over the accounts holding it (held nowhere: over the accounts that traded it); days it wasn't held in between (sold out, bought back later) are zero |
 | `GET /indicators` | one row per indicator (`core/indicators/indicators.ts`): `[{ id, name, group, unit, frequency, note, latest: { date, value }, yearAgo }]` |
 | `GET /indicators/{id}?from&to` | one series, oldest first: `[{ date, value }]` (`cpi-mom`, `cpi-index`: by month; `fx-eur`, `fx-usd`: daily) |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |
