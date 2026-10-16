@@ -26,12 +26,25 @@ describe("closed positions", () => {
     const closed = closedPositions(positionsAt(txs, "2026-10-16").values(), instruments);
     expect(closed).toEqual([
       // 1003 for 10: 4 sold for 420 (net of the fee in the amount) cost 401.2, 6 redeemed for 600 cost 601.8.
-      { account: "a", isin: "PLAAAAAAAAA1", code: "AAA1214", name: "AAA1214 name", type: "BOND_CORPORATE", currency: "PLN", firstDate: "2012-03-01", closedDate: "2013-01-15", quantity: 10, proceeds: 1020, cost: 1003, gain: 17, gainPct: 1.69, couponsReceived: 30 },
+      { account: "a", isin: "PLAAAAAAAAA1", code: "AAA1214", name: "AAA1214 name", type: "BOND_CORPORATE", currency: "PLN", firstDate: "2012-03-01", closedDate: "2013-01-15", quantity: 10, proceeds: 1020, cost: 1003, peakQuantity: 10, peakCost: 1003, gain: 17, gainPct: 1.69, couponsReceived: 30 },
       // Written off: nothing back, the whole cost lost.
-      { account: "a", isin: "PLBBBBBBBBB2", code: "BBB0513", name: "BBB0513 name", type: "BOND_CORPORATE", currency: "PLN", firstDate: "2012-03-02", closedDate: "2013-05-31", quantity: 7, proceeds: 0, cost: 700, gain: -700, gainPct: -100, couponsReceived: 0 },
+      { account: "a", isin: "PLBBBBBBBBB2", code: "BBB0513", name: "BBB0513 name", type: "BOND_CORPORATE", currency: "PLN", firstDate: "2012-03-02", closedDate: "2013-05-31", quantity: 7, proceeds: 0, cost: 700, peakQuantity: 7, peakCost: 700, gain: -700, gainPct: -100, couponsReceived: 0 },
     ]);
     // Before its redemption the first bond is still partly held: not closed.
     expect(closedPositions(positionsAt(txs, "2012-12-31").values(), instruments)).toEqual([]);
+  });
+
+  it("a position sold out and bought back again (money moved between funds): units and cost at its largest, the gain against that cost", () => {
+    const fund = [
+      tx({ id: "1", date: "2015-01-05", type: "BUY", isin: "ZZFUND000001", quantity: 100, amount: -1000 }),
+      tx({ id: "2", date: "2015-06-05", type: "SELL", isin: "ZZFUND000001", quantity: 100, amount: 1100 }),
+      tx({ id: "3", date: "2016-01-05", type: "BUY", isin: "ZZFUND000001", quantity: 90, amount: -1080 }),
+      tx({ id: "4", date: "2016-02-05", type: "BUY", isin: "ZZFUND000001", quantity: 10, amount: -120 }),
+      tx({ id: "5", date: "2016-06-05", type: "SELL", isin: "ZZFUND000001", quantity: 100, amount: 1150 }),
+    ];
+    const [c] = closedPositions(positionsAt(fund, "2026-10-16").values(), [inst("ZZFUND000001", "FUND", "FUND_MANUAL")]);
+    // 200 units disposed of, 2200 cost over both rounds; at most 100 units and 1200 held at once. Gain 100 + −50.
+    expect(c).toMatchObject({ quantity: 200, cost: 2200, proceeds: 2250, peakQuantity: 100, peakCost: 1200, gain: 50, gainPct: 4.17 });
   });
 
   it("finds the instruments traded but not held now, with their first and last transaction dates", () => {

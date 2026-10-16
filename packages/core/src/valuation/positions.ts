@@ -35,6 +35,9 @@ export interface Position {
   /** Coupons, interest and dividends received, PLN (another currency at NBP D-1). */
   couponsReceived: number;
   firstDate: IsoDate;
+  /** The most units held at once, and the most cost held at once (PLN): what a closed position was at its largest. */
+  peakQuantity: number;
+  peakCost: number;
   /** Open lots, oldest first. */
   lots: Lot[];
   realised: Realisation[];
@@ -63,7 +66,7 @@ export function positionsAt(transactions: TransactionItem[], date: IsoDate, fx?:
   for (const t of sorted) {
     const isin = t.isin!;
     const key = positionKey(t.account, isin);
-    const p = positions.get(key) ?? { account: t.account, isin, quantity: 0, cost: 0, couponsReceived: 0, firstDate: t.date, lots: [], realised: [] };
+    const p = positions.get(key) ?? { account: t.account, isin, quantity: 0, cost: 0, couponsReceived: 0, firstDate: t.date, peakQuantity: 0, peakCost: 0, lots: [], realised: [] };
     const qty = t.quantity ?? 0;
     const currency = t.currency || "PLN";
     const pln = (v: number) => (currency === "PLN" ? v : toPlnD1(v, currency, t.date, fx));
@@ -107,6 +110,8 @@ export function positionsAt(transactions: TransactionItem[], date: IsoDate, fx?:
         break;
     }
     p.quantity = Math.round(p.lots.reduce((n, l) => n + l.quantity, 0) * 1e6) / 1e6;
+    p.peakQuantity = Math.max(p.peakQuantity, p.quantity);
+    p.peakCost = Math.max(p.peakCost, round2(p.lots.reduce((s, l) => s + l.cost, 0)));
     positions.set(key, p);
   }
   for (const [key, p] of positions) {

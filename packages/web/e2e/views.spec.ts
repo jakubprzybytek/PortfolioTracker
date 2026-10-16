@@ -627,6 +627,8 @@ const closedPosition = {
   quantity: 7,
   proceeds: 0,
   cost: 700,
+  peakQuantity: 7,
+  peakCost: 700,
   gain: -700,
   gainPct: -100,
   couponsReceived: 50,
@@ -662,6 +664,8 @@ test.describe("show closed", () => {
     await expect(row).toHaveCount(1);
     await expect(row).toHaveClass(/closed/);
     await expect(page.getByTestId("closed-old-broker")).toContainText("Closed · 1");
+    await expect(page.getByTestId("closed-old-broker").locator("td").nth(2)).toHaveText(""); // no summed cost
+    await expect(page.getByTestId("closed-old-broker").locator("td").nth(3)).toHaveText(/^[-−]700,00\s*zł$/);
     await expect(row.getByTestId("closed-date")).toHaveText("closed 2013-05-31");
     await expect(row.locator("td").nth(1)).toHaveText("Corporate bond");
     await expect(row.locator("td").nth(2)).toHaveText("7");

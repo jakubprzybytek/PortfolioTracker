@@ -13,14 +13,18 @@ export interface ClosedPosition {
   /** The first transaction and the last disposal (the day it closed). */
   firstDate: IsoDate;
   closedDate: IsoDate;
-  /** Units disposed of over its life. */
+  /** Units disposed of over its life (sold out and bought back again: counted each time). */
   quantity: number;
   /** Cash received for them, net of fees (PLN; a write-off brings 0). */
   proceeds: number;
-  /** Their cost, fees included (PLN). */
+  /** Their cost, fees included (PLN; the same money in and out again counts each time). */
   cost: number;
+  /** At its largest: the most units held at once and the most cost held at once (PLN), fees included. */
+  peakQuantity: number;
+  peakCost: number;
   /** Realised: proceeds − cost (coupons are their own column, as for open positions). */
   gain: number;
+  /** The gain against the most it held at once (peakCost). */
   gainPct: number | null;
   couponsReceived: number;
 }
@@ -53,8 +57,10 @@ export function closedPositions(positions: Iterable<Position>, instruments: Inst
       quantity: Math.round(p.realised.reduce((n, r) => n + r.quantity, 0) * 1e6) / 1e6,
       proceeds,
       cost,
+      peakQuantity: p.peakQuantity,
+      peakCost: p.peakCost,
       gain,
-      gainPct: cost ? round2((gain / cost) * 100) : null,
+      gainPct: p.peakCost ? round2((gain / p.peakCost) * 100) : null,
       couponsReceived: round2(p.couponsReceived),
     });
   }

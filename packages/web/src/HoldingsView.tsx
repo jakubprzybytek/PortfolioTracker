@@ -247,7 +247,10 @@ const fmtUnits = (q: number) =>
 const byClosedDate = (a: ClosedPosition, b: ClosedPosition) =>
   b.closedDate.localeCompare(a.closedDate) || a.code.localeCompare(b.code);
 
-/** "Closed · n": the closed positions' header, with their cost, realised gain and coupons (no value: nothing is held). */
+/**
+ * "Closed · n": the closed positions' header, with their realised gain and coupons (no value: nothing is held). No cost:
+ * money moved from one to the next (e.g. between fund categories) would count once per position it went through.
+ */
 function ClosedHeader({
   closed,
   testId,
@@ -255,28 +258,29 @@ function ClosedHeader({
   closed: ClosedPosition[];
   testId: string;
 }) {
-  const cost = closed.reduce((n, c) => n + c.cost, 0);
   const gain = closed.reduce((n, c) => n + c.gain, 0);
-  const pct = cost ? (gain / cost) * 100 : null;
   return (
     <tr className="group closed" data-testid={testId}>
       <td
         className="left indent"
         colSpan={5}
-        title="Sold, redeemed or written off: cost of the units, realised gain (what they brought in − their cost), coupons received. Not in the sums."
+        title="Sold, redeemed or written off: realised gain (what they brought in − their cost), coupons received. Not in the sums."
       >
         Closed <span className="muted">· {closed.length}</span>
       </td>
       <td></td>
-      <td>{fmtPln(cost)}</td>
+      <td></td>
       <td className={signClass(gain)}>{fmtPln(gain)}</td>
-      <td className={signClass(pct)}>{fmtPct(pct)}</td>
+      <td></td>
       <td>{fmtPln(closed.reduce((n, c) => n + c.couponsReceived, 0))}</td>
     </tr>
   );
 }
 
-/** A position held no more, greyed: units disposed of, the day it closed, cost, realised gain, coupons. */
+/**
+ * A position held no more, greyed: the day it closed, units and cost at its largest (sold out and bought back again,
+ * the units disposed of would count the same ones twice), realised gain (% of that cost), coupons.
+ */
 function ClosedRow({
   c,
   second,
@@ -297,14 +301,14 @@ function ClosedRow({
       data-isin={c.isin}
       className={`clickable closed${selected ? " selected" : ""}`}
       onClick={onSelect}
-      title={`Held ${c.firstDate} – ${c.closedDate}; ${fmtUnits(c.quantity)} units brought in ${fmtPln(c.proceeds)}. Click for its value over time.`}
+      title={`Held ${c.firstDate} – ${c.closedDate}; ${fmtUnits(c.quantity)} units disposed of brought in ${fmtPln(c.proceeds)} against ${fmtPln(c.cost)} cost. Click for its value over time.`}
     >
       <td className={`left instrument${indent ? " indent" : ""}`}>
         <InstrumentLabel code={c.code} name={c.name} />
       </td>
       <td className="left">{second}</td>
-      <td title="Units sold, redeemed or written off">
-        {fmtUnits(c.quantity)}
+      <td title="The most units held at once">
+        {fmtUnits(c.peakQuantity)}
       </td>
       <td>
         <span className="flag" data-testid="closed-date">
@@ -313,8 +317,8 @@ function ClosedRow({
       </td>
       <td></td>
       <td>–</td>
-      <td title="Cost of the units disposed of (FIFO), fees included">
-        {fmtPln(c.cost)}
+      <td title="The most it cost at once (FIFO), fees included">
+        {fmtPln(c.peakCost)}
       </td>
       <td
         className={signClass(c.gain)}
