@@ -146,6 +146,28 @@ test.describe("adding transactions", () => {
     await expect(page.getByTestId("tx-form")).toBeHidden();
   });
 
+  test("editing shows the transaction's account while the accounts are still loading", async ({ page }) => {
+    await page.goto("/#/transactions");
+    const row = page.getByTestId("transaction-row").filter({ hasText: "2025-02-05" }).filter({ hasText: "broker" });
+    await expect(row).toHaveCount(1);
+    // A fresh page: /accounts answers late (as with a long history).
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    await page.route("**/accounts", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.reload();
+    await row.click();
+    const select = page.getByTestId("tx-account");
+    await expect(select).toHaveValue("broker");
+    await expect(select.locator("option:checked")).toHaveText("broker"); // not "New account…"
+    release();
+    await expect(select.locator("option")).not.toHaveCount(2);
+    await expect(select.locator("option:checked")).toHaveText("broker");
+    await page.keyboard.press("Escape");
+  });
+
   test("adds, edits and deletes a transaction from the form", async ({ page }) => {
     // Dated far ahead in its own account, so no valuation day (and no other test) sees it meanwhile.
     await page.goto("/#/transactions");

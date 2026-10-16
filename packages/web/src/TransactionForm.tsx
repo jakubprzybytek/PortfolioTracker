@@ -19,6 +19,8 @@ const HAS_QUANTITY = new Set<string>(["BUY", "SELL", "REDEMPTION"]);
 const NO_AMOUNT = new Set<string>(["SPLIT", "WRITE_OFF"]);
 const NEW = "__new__";
 const NEW_ACCOUNT = "__new_account__";
+/** The note field: as tall as its text (about 60 characters a line), 3 to 10 lines. */
+const noteRows = (note: string) => Math.min(10, Math.max(3, note.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 60)), 0)));
 
 type NewKind = "treasury" | "etf" | "corporate" | "manual";
 const NEW_KINDS: { kind: NewKind; label: string }[] = [
@@ -255,7 +257,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           </Field>
           <Field label="Account" wide={account === NEW_ACCOUNT}>
             <select value={account} onChange={(e) => setAccount(e.target.value)} data-testid="tx-account">
-              {accounts.map((a) => (
+              {/* Before the accounts arrive, the one being edited is an option already (else "New account…" would show). */}
+              {(account && account !== NEW_ACCOUNT && !accounts.includes(account) ? [account, ...accounts] : accounts).map((a) => (
                 <option key={a} value={a}>
                   {a}
                 </option>
@@ -419,7 +422,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
             </>
           )}
           <Field label="Note" wide>
-            <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} data-testid="tx-note" />
+            <textarea rows={noteRows(note)} value={note} onChange={(e) => setNote(e.target.value)} data-testid="tx-note" />
           </Field>
         </div>
 
