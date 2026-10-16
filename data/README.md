@@ -58,6 +58,20 @@ node scripts/sheet-to-transactions.ts ~/Downloads/portfolio.xlsx --mf-retail ~/D
 - The file is validated with the same schema as the Import Lambda before it's written.
 - The app is now where transactions are entered: don't re-import the sheet into `prod` (its newer rows would duplicate them). IBKR comes from its statements instead (below).
 
+## History before the app (2008–2022)
+
+`scripts/history-sheet-to-import.ts` converts the "Bonds 2010-2015" history spreadsheet (accounts closed before the app started: the DM BZWBK brokerage account with its Catalyst and treasury bonds and an unitised shares/certificates position, the BZ WBK/Santander and ING savings accounts, the Arka funds, XTB and a term deposit) into import files:
+
+```sh
+node scripts/history-sheet-to-import.ts ~/Downloads/history.xlsx   # or a folder with one JSON file of values per tab
+# → data/private/history/: instruments.json, prices.json, accounts.json, transactions.json; import in that order
+```
+
+- Tabs read, by their headers: Bonds, Savings, Lokata, Arka, DM BZWBK, XTB, Bond prices.
+- The bonds are no longer quoted: `BOND_CORPORATE`, venue `MANUAL`, inactive, priced from the "Bond prices" tab (% of nominal; a write-off at 0 % gets no price, its redemption at 0 closes the position). Arka's fund categories, the DM BZWBK shares/certificates and XTB are `FUND_MANUAL` with ids from their codes (`privateAssetId`), priced from the tabs' price tables.
+- Santander's rows stop where the app's own history of the account starts (2022-05): the sheet's last row hands over the balance (Savings tab, 2022-06-01). Don't import anything else of that account from the sheet.
+- It prints each account's cash at the end (0 for all), any position still open (XTB keeps 0.033 units, 0.78 PLN) and the lowest cash balance.
+
 ## IBKR transactions from activity statements
 
 `scripts/ibkr-statements-to-transactions.ts` converts IBKR activity statements (Client Portal → Performance & Reports → Statements → Activity, CSV, at most a year each) into the IBKR account's transactions, in its currencies (rules: [Docs/data-sources.md](../Docs/data-sources.md)):
