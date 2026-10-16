@@ -25,6 +25,8 @@ export interface PriceRow {
   /** Price on or before the same day a year earlier (on today's share basis after a split), and the change since (fraction, e.g. 0.021). */
   yearAgo: { date: IsoDate; price: number } | null;
   change1y: number | null;
+  /** An instrument held no more ("Show closed"): its first and last transaction dates; never stale. */
+  closed?: { firstDate: IsoDate; lastDate: IsoDate };
   /** Retail bonds: annual rate now and in the previous period (instead of a price). */
   rate?: { current: number; previous: number | null };
 }

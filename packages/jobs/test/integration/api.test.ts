@@ -282,6 +282,17 @@ describe(`API ${API}`, () => {
     }
   });
 
+  it("?closed=1 adds what's held no more: none in the sample (every position is open), the rest unchanged", async () => {
+    const [plain, closed] = await Promise.all([get<SnapshotItem>("/holdings"), get<SnapshotItem & { closed: unknown[] }>("/holdings?closed=1")]);
+    expect(closed.status).toBe(200);
+    expect(closed.body.closed).toEqual([]);
+    expect(closed.body.holdings).toEqual(plain.body.holdings);
+    const prices = await get<{ code: string; closed?: unknown }[]>("/prices?closed=1");
+    expect(prices.status).toBe(200);
+    expect(prices.body.map((r) => r.code)).toEqual(["DE0001102523", "DS0432", "EDO0935", "IZ0836", "KRU0827", "SAMPLE-APARTMENT", "SPXS"]);
+    expect(prices.body.some((r) => r.closed)).toBe(false);
+  });
+
   it("GET /instruments/{isin}/prices: an ETF's prices are stored as traded and charted on today's share basis", async () => {
     const inst = (await get<(InstrumentOut & { splits?: unknown; sourceIds?: unknown })[]>("/instruments")).body.find((i) => i.isin === SPXS)!;
     expect(inst).toMatchObject({ code: "SPXS", splits: [{ date: "2025-12-15", ratio: 100 }], sourceIds: { yahoo: "SPXS.AS" }, backfill: { status: "done" } });

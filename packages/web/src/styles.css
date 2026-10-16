@@ -90,6 +90,8 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
 .filters button { cursor: pointer; }
 .filters button:disabled { cursor: default; opacity: 0.5; }
 .filters select { width: var(--w, 11rem); text-overflow: ellipsis; }
+.filter-toggle { display: flex; align-items: center; gap: 6px; height: 34px; font-size: 0.9rem; white-space: nowrap; cursor: pointer; }
+.filter-toggle input { margin: 0; accent-color: var(--accent); }
 .filters button.reset { display: grid; place-items: center; padding: 0; width: 34px; height: 34px; }
 @media (max-width: 720px) {
   /* Dropdowns side by side, sharing the row with Reset; the count goes below. */
@@ -237,8 +239,9 @@ tr.skeleton-row:hover { background: none; }
 .range button:disabled:not(.active) { opacity: 0.5; }
 @media (prefers-reduced-motion: reduce) { .chart-skeleton::after { animation: none; } .spinner { animation-duration: 2s; } }
 .card .value .skeleton-bar { width: 7rem; height: 1em; }
-/* Closed accounts (nothing left in them): greyed, below the open ones, folded by default. */
+/* Closed accounts (nothing left in them), positions and instruments held no more ("Show closed"): greyed, below the open ones. */
 tr.closed td { color: var(--muted); }
+tr.closed td.pos, tr.closed td.neg { opacity: 0.75; }
 /* Foreign cash next to the account's PLN cash. */
 td .ccy { color: var(--muted); font-weight: 400; }
 /* Asset mix: one bar split by asset class, legend below. */

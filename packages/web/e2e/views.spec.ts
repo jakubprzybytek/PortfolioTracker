@@ -553,6 +553,121 @@ test.describe("holdings row chart", () => {
   });
 });
 
+// The sample has no closed position: the API's answer gets a made-up one (a bond written off in an old account).
+const OLD_BOND = "PLZZOLDBOND1";
+const closedPosition = {
+  account: "old-broker",
+  isin: OLD_BOND,
+  code: "OLD0513",
+  name: "Old bond (made up)",
+  type: "BOND_CORPORATE",
+  currency: "PLN",
+  firstDate: "2012-03-01",
+  closedDate: "2013-05-31",
+  quantity: 7,
+  proceeds: 0,
+  cost: 700,
+  gain: -700,
+  gainPct: -100,
+  couponsReceived: 50,
+};
+const withClosed = (path: string) => (url: URL) => url.pathname.endsWith(path) && url.searchParams.get("closed") === "1";
+
+test.describe("show closed", () => {
+  test("holdings: closed positions greyed after the open ones, with the realised gain, not in the sums; their chart covers the time held", async ({ page }) => {
+    await page.route(withClosed("/holdings"), async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      expect(body.closed).toEqual([]); // the sample's own: none
+      await route.fulfill({ response: res, json: { ...body, closed: [closedPosition] } });
+    });
+    let historyAsked: URL | undefined;
+    await page.route(
+      (url) => url.pathname.endsWith("/holdings/history") && url.searchParams.get("isin") === OLD_BOND,
+      async (route) => {
+        historyAsked = new URL(route.request().url());
+        await route.fulfill({ json: [{ date: "2012-03-01", value: 700, cost: 700, quantity: 7 }, { date: "2013-05-30", value: 350, cost: 700, quantity: 7 }] });
+      },
+    );
+    await page.goto("/#/holdings");
+    const totalBefore = await page.getByTestId("holdings-total").locator("td").nth(1).textContent();
+    await expect(page.getByTestId("closed-row")).toHaveCount(0);
+    await page.getByTestId("show-closed").check();
+    await expect(page).toHaveURL(/closed=1/);
+    await expect(page.getByTestId("filters-summary")).toHaveText("10 of 10 holdings + 1 closed");
+    const row = page.getByTestId("closed-row");
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveClass(/closed/);
+    await expect(page.getByTestId("closed-old-broker")).toContainText("Closed · 1");
+    await expect(row.getByTestId("closed-date")).toHaveText("closed 2013-05-31");
+    await expect(row.locator("td").nth(1)).toHaveText("Corporate bond");
+    await expect(row.locator("td").nth(2)).toHaveText("7");
+    await expect(row.locator("td").nth(6)).toHaveText("700,00 zł");
+    await expect(row.locator("td").nth(7)).toHaveText(/^[-−]700,00\s*zł$/);
+    await expect(row.locator("td").nth(9)).toHaveText("50,00 zł");
+    // The account with only a closed position is a group of its own, after the others; the total is unchanged.
+    const groups = await page.getByTestId("holdings-by-account").locator("tr.account-group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
+    expect(groups.at(-2)).toBe("account-ike");
+    expect(groups.at(-1)).toBe("account-old-broker");
+    await expect(page.getByTestId("holdings-total").locator("td").nth(1)).toHaveText(totalBefore!);
+
+    // Its chart: from the first transaction to the close, no range buttons.
+    await row.click();
+    await expect(page).toHaveURL(/chart=PLZZOLDBOND1&chartAccount=old-broker/);
+    await expect(page.getByTestId("chart-panel-title")).toContainText("held 2012-03-01 – 2013-05-31");
+    await expect(page.getByTestId("holding-range")).toHaveCount(0);
+    await expect(page.getByTestId("holding-chart").locator("path.recharts-area-area")).toHaveCount(2);
+    expect(historyAsked?.searchParams.get("from")).toBe("2012-03-01");
+    expect(historyAsked?.searchParams.get("to")).toBe("2013-05-31");
+    await page.keyboard.press("Escape");
+
+    // Grouped by instrument: at the end, with the account; filters apply.
+    await page.getByTestId("group-by").getByRole("button", { name: "Instrument" }).click();
+    await expect(page.getByTestId("closed-instruments")).toContainText("Closed · 1");
+    await expect(row.locator("td").nth(1)).toHaveText("old-broker");
+    await page.getByTestId("filter-type").selectOption("ETF");
+    await expect(page.getByTestId("closed-row")).toHaveCount(0);
+    await page.getByTestId("filters-reset").click();
+    await expect(page).toHaveURL(/closed=1/); // the toggle isn't a filter: it stays
+    await page.getByTestId("show-closed").uncheck();
+    await expect(page.getByTestId("closed-row")).toHaveCount(0);
+  });
+
+  test("prices: instruments held no more greyed after the others, with their last price; their chart covers the time traded", async ({ page }) => {
+    const oldRow = { isin: OLD_BOND, code: "OLD0513", name: "Old bond (made up)", type: "BOND_CORPORATE", currency: "PLN", price: 48.5, priceDate: "2013-05-30", stale: false, manual: true, yearAgo: { date: "2012-05-30", price: 97 }, change1y: -0.5, closed: { firstDate: "2012-03-01", lastDate: "2013-05-31" } };
+    await page.route(withClosed("/prices"), async (route) => {
+      const res = await route.fetch();
+      const body = (await res.json()) as { code: string; closed?: unknown }[];
+      expect(body.filter((r) => r.closed)).toEqual([]); // the sample's own: none
+      await route.fulfill({ response: res, json: [...body, oldRow] });
+    });
+    let pricesAsked: URL | undefined;
+    await page.route(`**/instruments/${OLD_BOND}/prices**`, async (route) => {
+      pricesAsked = new URL(route.request().url());
+      await route.fulfill({ json: [{ isin: OLD_BOND, venue: "MANUAL", date: "2012-03-01", close: 100, traded: true, currency: "PLN" }, { isin: OLD_BOND, venue: "MANUAL", date: "2013-05-30", close: 48.5, traded: true, currency: "PLN" }] });
+    });
+    await page.route(`**/instruments/${OLD_BOND}/transactions`, (route) => route.fulfill({ json: [] }));
+    await page.goto("/#/prices");
+    await expect(page.getByTestId("price-OLD0513")).toHaveCount(0);
+    await page.getByTestId("show-closed").check();
+    await expect(page).toHaveURL(/closed=1/);
+    await expect(page.getByTestId("filters-summary")).toHaveText("7 of 7 instruments + 1 closed");
+    const row = page.getByTestId("price-OLD0513");
+    await expect(row).toHaveClass(/closed/);
+    await expect(row.getByTestId("closed-flag")).toHaveText("closed 2013-05-31");
+    await expect(row.locator("td").nth(3)).not.toContainText("stale");
+    await expect(row.locator("td").nth(4)).toHaveText(/^[-−]50\s*%$/);
+    const codes = await page.getByTestId("prices-table").locator("tbody tr").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
+    expect(codes.at(-1)).toBe("price-OLD0513"); // after the held ones
+    await expect(page.getByTestId("prices-date")).not.toContainText("2013"); // "as of" the held ones
+
+    await row.click();
+    await expect(page.getByTestId("price-range")).toHaveCount(0);
+    await expect.poll(() => pricesAsked?.searchParams.get("from")).toBe("2012-01-30"); // a month around the trades
+    expect(pricesAsked?.searchParams.get("to")).toBe("2013-07-01");
+  });
+});
+
 test.describe("indicators view", () => {
   test("lists CPI m/m and the reference index; a click shows the chart, its range in the URL", async ({ page }) => {
     await page.goto("/#/indicators");

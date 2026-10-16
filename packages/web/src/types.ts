@@ -1,10 +1,11 @@
 // API response shapes, taken from the core item types (type-only import: nothing from core is bundled).
-import type { AccountSummary, AssetClass, BackfillItem, HoldingSnapshot, IndicatorPoint, IndicatorSummary, InstrumentItem, PriceItem, PriceRow, SnapshotItem, TransactionItem } from "@portfolio/core";
+import type { AccountSummary, AssetClass, BackfillItem, ClosedPosition, HoldingSnapshot, IndicatorPoint, IndicatorSummary, InstrumentItem, PriceItem, PriceRow, SnapshotItem, TransactionItem } from "@portfolio/core";
 
-export type { AccountSummary, IndicatorPoint, IndicatorSummary, PriceRow };
+export type { AccountSummary, ClosedPosition, IndicatorPoint, IndicatorSummary, PriceRow };
 
 export type Holding = HoldingSnapshot;
-export type Snapshot = SnapshotItem;
+/** `GET /holdings`; with `?closed=1` also the positions held no more. */
+export type Snapshot = SnapshotItem & { closed?: ClosedPosition[] };
 /**
  * A day of the portfolio: `total` = positions + cash (fully tracked accounts); `netDeposits` = money put in so far;
  * `byClass` = the value of shares, bonds, cash and other.

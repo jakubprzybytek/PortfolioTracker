@@ -18,6 +18,9 @@ import {
   etfInstrument,
   manualInstrument,
   accountSummaries,
+  closedPositions,
+  formerInstruments,
+  positionsAt,
   netDepositsByDate,
   valueByClass,
   checkManualTransaction,
@@ -161,6 +164,13 @@ async function savePeriod(inst: InstrumentItem, body: unknown, existing?: Intere
   return json(existing ? 200 : 201, p);
 }
 
+/** NBP rates of every currency in the transactions (and `more`), from a fortnight before the first one to `to`. */
+async function fxHistoryOf(txs: TransactionItem[], to: string, more: string[] = []): Promise<FxHistory> {
+  const first = txs.map((t) => t.date).sort()[0] ?? to;
+  const currencies = [...new Set([...txs.flatMap((t) => [t.currency, t.toCurrency ?? "PLN"]), ...more])].filter((c) => c && c !== "PLN");
+  return new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), to)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
+}
+
 export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
   if (!hasAnyGroup(event.requestContext.authorizer?.jwt?.claims, ACCESS_GROUPS)) return json(403, { error: "This account has no access" });
   const route = event.routeKey; // e.g. "GET /holdings"
@@ -172,17 +182,20 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
   try {
     switch (route) {
       case "GET /holdings": {
+        // `?closed=1`: also the positions held no more (`closed`: realised gain, coupons, open and close dates).
         const snap = await repo.getSnapshot("LATEST");
-        return snap ? json(200, snap) : json(404, { error: "No valuation yet" });
+        if (!snap) return json(404, { error: "No valuation yet" });
+        if (q["closed"] !== "1") return json(200, snap);
+        const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
+        const positions = positionsAt(txs, today(), await fxHistoryOf(txs, today()));
+        return json(200, { ...snap, closed: closedPositions(positions.values(), instruments) });
       }
       case "GET /accounts": {
         // Per account (latest snapshot): net deposits, value, cash, profit, income, costs, XIRR; total of the complete ones.
         const [snap, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listTransactions()]);
         if (!snap) return json(404, { error: "No valuation yet" });
         // Money in other currencies counts at NBP rates (the day before each transaction; base currencies: today too).
-        const first = txs.map((t) => t.date).sort()[0] ?? snap.date;
-        const currencies = [...new Set([...txs.flatMap((t) => [t.currency, t.toCurrency ?? "PLN"]), ...Object.values(snap.accounts ?? {}).map((a) => a.baseCurrency ?? "PLN")])].filter((c) => c && c !== "PLN");
-        const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), snap.date)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
+        const fx = await fxHistoryOf(txs, snap.date, Object.values(snap.accounts ?? {}).map((a) => a.baseCurrency ?? "PLN"));
         return json(200, { date: snap.date, ...accountSummaries(snap, txs, fx) });
       }
       case "GET /portfolio/history": {
@@ -324,30 +337,42 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(202, { now: new Date().toISOString() });
       }
       case "GET /prices": {
-        // Held instruments (latest snapshot): latest price, its date, and the price a year earlier.
-        const [snap, instruments] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments()]);
+        // Held instruments (latest snapshot): latest price, its date, and the price a year earlier. `?closed=1`: also
+        // the instruments traded but held no more (`closed`), with the year up to their last price; never stale.
+        const withClosed = q["closed"] === "1";
+        const [snap, instruments, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments(), withClosed ? repo.listTransactions() : Promise.resolve([])]);
         const held = new Set((snap?.holdings ?? []).filter((h) => h.quantity > 0).map((h) => h.isin));
+        const former = formerInstruments(txs, held);
         // Currencies held (IBKR cash) have no price of their own: their rates are in the Indicators view.
-        const shown = instruments.filter((i) => held.has(i.isin) && i.type !== "CURRENCY");
+        const shown = instruments.filter((i) => (held.has(i.isin) || former.has(i.isin)) && i.type !== "CURRENCY");
         const day = today();
         const latest = new Map<string, PriceItem>();
         const yearAgo = new Map<string, PriceItem>();
         await Promise.all(
           shown.filter((i) => i.type !== "BOND_RETAIL").map(async (i) => {
-            const [now, then] = await Promise.all([repo.latestPrice(i.isin, i.venue, day), repo.latestPrice(i.isin, i.venue, addDays(day, -365))]);
+            const now = await repo.latestPrice(i.isin, i.venue, day);
+            const then = await repo.latestPrice(i.isin, i.venue, addDays(former.has(i.isin) && now ? now.date : day, -365));
             if (now) latest.set(i.isin, now);
             if (then) yearAgo.set(i.isin, then);
           }),
         );
         const rates = new Map((snap?.holdings ?? []).filter((h) => h.rate).map((h) => [h.isin, h.rate!] as const));
-        return json(200, priceRows(shown, latest, yearAgo, day, 7, rates));
+        return json(
+          200,
+          priceRows(shown, latest, yearAgo, day, 7, rates).map((r) => {
+            const f = former.get(r.isin);
+            return f ? { ...r, stale: false, closed: f } : r;
+          }),
+        );
       }
       case "GET /holdings/history": {
         // One position's daily value and cost (`account` + `isin`), or an instrument's total across the accounts
         // that hold it now (`isin` only).
         const id = q["isin"];
         if (!id || !ISIN.test(id)) return json(400, { error: "Invalid ISIN" });
-        const accounts = q["account"] ? [q["account"]] : [...new Set(((await repo.getSnapshot("LATEST"))?.holdings ?? []).filter((h) => h.isin === id).map((h) => h.account))];
+        // Held nowhere now (a closed position): every account that traded it.
+        let accounts = q["account"] ? [q["account"]] : [...new Set(((await repo.getSnapshot("LATEST"))?.holdings ?? []).filter((h) => h.isin === id).map((h) => h.account))];
+        if (accounts.length === 0) accounts = [...new Set((await repo.listTransactions()).filter((t) => t.isin === id).map((t) => t.account))];
         const byDate = new Map<string, { date: string; value: number; cost: number; quantity: number }>();
         for (const a of accounts)
           for (const d of await repo.queryPositionDays(a, id, from, to)) {

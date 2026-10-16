@@ -2,13 +2,13 @@ import { createContext, Fragment, useCallback, useContext, useEffect, useMemo, u
 import { ChartPanel } from "./ChartPanel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
 import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
-import { FilterBar, FilterSelect, uniqueOptions, type Option } from "./Filters.tsx";
+import { FilterBar, FilterSelect, FilterToggle, uniqueOptions, type Option } from "./Filters.tsx";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { fmtInt, fmtMoney, fmtNum, fmtPct, fmtPln, priceAge, priceAgeTitle, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { RangePicker } from "./RangePicker.tsx";
 import { ValueChart, type ValuePoint } from "./ValueChart.tsx";
-import type { Holding, Snapshot } from "./types.ts";
+import type { ClosedPosition, Holding, Snapshot } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
 
@@ -50,6 +50,8 @@ interface Group {
   cashLines: CashLine[];
   incomplete: string[];
   sums: Sums;
+  /** Positions held no more ("Show closed"), last closed first. */
+  closed: ClosedPosition[];
 }
 
 /**
@@ -159,6 +161,62 @@ function AccruedCell({ h }: { h: Holding }) {
   );
 }
 
+/** Closed positions: units whole, or with decimals (fund units). */
+const fmtUnits = (q: number) => (Number.isInteger(q) ? fmtInt(q) : fmtNum(q, 4));
+const byClosedDate = (a: ClosedPosition, b: ClosedPosition) => b.closedDate.localeCompare(a.closedDate) || a.code.localeCompare(b.code);
+
+/** "Closed · n": the closed positions' header, with their cost, realised gain and coupons (no value: nothing is held). */
+function ClosedHeader({ closed, testId }: { closed: ClosedPosition[]; testId: string }) {
+  const cost = closed.reduce((n, c) => n + c.cost, 0);
+  const gain = closed.reduce((n, c) => n + c.gain, 0);
+  const pct = cost ? (gain / cost) * 100 : null;
+  return (
+    <tr className="group closed" data-testid={testId}>
+      <td className="left indent" colSpan={5} title="Sold, redeemed or written off: cost of the units, realised gain (what they brought in − their cost), coupons received. Not in the sums.">
+        Closed <span className="muted">· {closed.length}</span>
+      </td>
+      <td></td>
+      <td>{fmtPln(cost)}</td>
+      <td className={signClass(gain)}>{fmtPln(gain)}</td>
+      <td className={signClass(pct)}>{fmtPct(pct)}</td>
+      <td>{fmtPln(closed.reduce((n, c) => n + c.couponsReceived, 0))}</td>
+    </tr>
+  );
+}
+
+/** A position held no more, greyed: units disposed of, the day it closed, cost, realised gain, coupons. */
+function ClosedRow({ c, second, indent, selected, onSelect }: { c: ClosedPosition; second: ReactNode; indent: boolean; selected: boolean; onSelect: () => void }) {
+  return (
+    <tr
+      data-testid="closed-row"
+      data-account={c.account}
+      data-isin={c.isin}
+      className={`clickable closed${selected ? " selected" : ""}`}
+      onClick={onSelect}
+      title={`Held ${c.firstDate} – ${c.closedDate}; ${fmtUnits(c.quantity)} units brought in ${fmtPln(c.proceeds)}. Click for its value over time.`}
+    >
+      <td className={`left instrument${indent ? " indent" : ""}`}>
+        <InstrumentLabel code={c.code} name={c.name} />
+      </td>
+      <td className="left">{second}</td>
+      <td title="Units sold, redeemed or written off">{fmtUnits(c.quantity)}</td>
+      <td>
+        <span className="flag" data-testid="closed-date">
+          closed {c.closedDate}
+        </span>
+      </td>
+      <td></td>
+      <td>–</td>
+      <td title="Cost of the units disposed of (FIFO), fees included">{fmtPln(c.cost)}</td>
+      <td className={signClass(c.gain)} title={`Realised: ${fmtPln(c.proceeds)} received − ${fmtPln(c.cost)} cost`}>
+        {fmtPln(c.gain)}
+      </td>
+      <td className={signClass(c.gainPct)}>{fmtPct(c.gainPct)}</td>
+      <td>{fmtPln(c.couponsReceived)}</td>
+    </tr>
+  );
+}
+
 interface CashLine {
   /** Absent: the account holds only PLN. */
   currency?: string;
@@ -231,14 +289,19 @@ const IncompleteFlag = ({ what }: { what: string[] }) => (
  * By instrument: one row per instrument (by code) with the account it's in; one held in several accounts shows
  * "▸ n accounts" and expands into one row per account. Cash is one row the same way.
  * An incomplete account (not all of its assets tracked yet) shows its cash greyed and leaves it out of the sums.
- * Filters: account, asset type ("Cash" shows only the cash rows).
+ * Filters: account, asset type ("Cash" shows only the cash rows). "Show closed" (`?closed=1`) adds the positions held no
+ * more, greyed, after the open ones (by account: in their account; by instrument: at the end), with their realised gain;
+ * they're not in the sums. A closed row's chart covers the time it was held.
  */
 export function HoldingsView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
-  const snap = useApi<Snapshot>("/holdings");
+  const showClosed = params["closed"] === "1";
+  const snap = useApi<Snapshot>("/holdings", { closed: showClosed ? "1" : undefined });
   const all = useMemo(() => (snap.data?.holdings ?? []).filter((h) => h.quantity > 0), [snap.data]);
   const newestPrice = useMemo(() => all.map((h) => h.priceDate).filter((d): d is string => !!d).sort().at(-1), [all]);
   const accounts = useMemo(() => snap.data?.accounts ?? {}, [snap.data]);
   const { account = "", type = "" } = params;
+  const closedAll = useMemo(() => (showClosed ? (snap.data?.closed ?? []) : []), [showClosed, snap.data]);
+  const closedShown = useMemo(() => closedAll.filter((c) => (!account || c.account === account) && (!type || c.type === type)).sort(byClosedDate), [closedAll, account, type]);
   const byInstrument = params["group"] === "instrument";
   // By instrument: instruments (ISIN, or "cash") expanded into their accounts.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -256,12 +319,20 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const [panelHeight, setPanelHeight] = useState(0);
   /** The bond whose coupon periods replace its chart in the panel. */
   const [couponsFor, setCouponsFor] = useState<string | null>(null);
-  const history = useApi<ValuePoint[]>(chartIsin ? "/holdings/history" : null, { isin: chartIsin, account: chartAccount, from: rangeFrom(range), to: today() });
+  const openHolding = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin && (!chartAccount || h.account === chartAccount));
+  // A closed position's chart: the time it was held.
+  const chartClosed = openHolding ? undefined : closedAll.find((c) => c.isin === chartIsin && c.account === chartAccount);
+  const history = useApi<ValuePoint[]>(chartIsin ? "/holdings/history" : null, {
+    isin: chartIsin,
+    account: chartAccount,
+    from: chartClosed ? chartClosed.firstDate : rangeFrom(range),
+    to: chartClosed ? chartClosed.closedDate : today(),
+  });
   const select = (isin: string, acct?: string) =>
     setParams(chartIsin === isin && chartAccount === acct ? { ...params, chart: undefined, chartAccount: undefined } : { ...params, chart: isin, chartAccount: acct });
   const closeChart = useCallback(() => setParams({ ...params, chart: undefined, chartAccount: undefined }), [params, setParams]);
   const isSelected = (isin: string, acct?: string) => chartIsin === isin && chartAccount === acct;
-  const chartHolding = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin);
+  const chartHolding: Pick<Holding, "isin" | "code" | "name" | "type" | "currency"> | undefined = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin) ?? chartClosed;
 
   // A chart opened (e.g. from the URL) on one account of a multi-account instrument: show that row.
   useEffect(() => {
@@ -278,17 +349,17 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   }, [chartIsin, chartAccount, panelHeight]);
 
   const options = useMemo(() => {
-    const names = new Set([...all.map(accountOf), ...Object.entries(accounts).filter(([, a]) => a.cash !== 0 || a.incomplete).map(([n]) => n)]);
+    const names = new Set([...all.map(accountOf), ...Object.entries(accounts).filter(([, a]) => a.cash !== 0 || a.incomplete).map(([n]) => n), ...closedAll.map((c) => c.account)]);
     const hasCash = Object.values(accounts).some((a) => a.cash !== 0) || all.some(isForeignCash);
     const types: Option[] = uniqueOptions(
-      all.filter((h) => !isForeignCash(h)),
+      [...all.filter((h) => !isForeignCash(h)), ...closedAll],
       (h) => ({ value: h.type, label: typeLabel(h.type) }),
     );
     return {
       account: [...names].sort().map((n) => ({ value: n, label: n })),
       type: hasCash ? [...types, { value: "CASH", label: typeLabel("CASH") }].sort((a, b) => a.label.localeCompare(b.label)) : types,
     };
-  }, [all, accounts]);
+  }, [all, accounts, closedAll]);
 
   const groups = useMemo((): Group[] => {
     return options.account
@@ -300,10 +371,11 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
         const holdings = all.filter((h) => accountOf(h) === name && (!type || shownType(h) === type)).sort(byCode);
         const showCash = (!type || type === "CASH") && info !== undefined && (info.cash !== 0 || incomplete.length > 0);
         const cash = showCash ? info.cash : null;
-        return { name, holdings, cash, cashLines: showCash ? cashLinesOf(info) : [], incomplete, sums: sums(holdings, cash !== null && incomplete.length === 0 ? cash : 0) };
+        const closed = closedShown.filter((c) => c.account === name);
+        return { name, holdings, cash, cashLines: showCash ? cashLinesOf(info) : [], incomplete, sums: sums(holdings, cash !== null && incomplete.length === 0 ? cash : 0), closed };
       })
-      .filter((g) => g.holdings.length > 0 || g.cash !== null);
-  }, [options.account, accounts, all, account, type]);
+      .filter((g) => g.holdings.length > 0 || g.cash !== null || g.closed.length > 0);
+  }, [options.account, accounts, all, account, type, closedShown]);
 
   // By instrument: the same filtered holdings, regrouped; cash becomes one group with a row per account.
   const instrumentGroups = useMemo((): InstrumentGroup[] => {
@@ -417,9 +489,14 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
         ))}
       </div>
 
-      <FilterBar active={!!(account || type)} onReset={() => setParams({ group: params["group"], chart: chartIsin, chartAccount })} summary={snap.loading ? "Loading…" : `${shownCount} of ${all.length} holdings`}>
+      <FilterBar
+        active={!!(account || type)}
+        onReset={() => setParams({ group: params["group"], closed: params["closed"], chart: chartIsin, chartAccount })}
+        summary={snap.loading ? "Loading…" : `${shownCount} of ${all.length} holdings${showClosed ? ` + ${closedShown.length} closed` : ""}`}
+      >
         <FilterSelect label="Account" value={account} options={options.account} onChange={set("account")} testId="filter-account" width="13rem" />
         <FilterSelect label="Asset type" value={type} options={options.type} onChange={set("type")} testId="filter-type" />
+        <FilterToggle label="Show closed" checked={showClosed} onChange={(on) => setParams({ ...params, closed: on ? "1" : undefined })} testId="show-closed" title="Also the positions sold, redeemed or written off, with their realised gain" />
       </FilterBar>
 
       <div className="table-wrap">
@@ -492,6 +569,14 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
               </Fragment>
             )}
             {byInstrument && foreignCashGroups.map(renderInstrument)}
+            {byInstrument && closedShown.length > 0 && (
+              <>
+                <ClosedHeader closed={closedShown} testId="closed-instruments" />
+                {closedShown.map((c) => (
+                  <ClosedRow key={`${c.account}/${c.isin}`} c={c} second={c.account} indent={false} selected={isSelected(c.isin, c.account)} onSelect={() => select(c.isin, c.account)} />
+                ))}
+              </>
+            )}
             {!byInstrument &&
               groups.map((g) => (
               <Fragment key={g.name}>
@@ -527,6 +612,10 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
                     label={labelOf(h)}
                   />
                 ))}
+                {g.closed.length > 0 && <ClosedHeader closed={g.closed} testId={`closed-${g.name}`} />}
+                {g.closed.map((c) => (
+                  <ClosedRow key={`closed/${c.isin}`} c={c} second={typeLabel(c.type)} indent selected={isSelected(c.isin, g.name)} onSelect={() => select(c.isin, g.name)} />
+                ))}
               </Fragment>
             ))}
             {groupCount > 1 && (
@@ -558,12 +647,13 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
               {chartHolding?.code ?? chartIsin}{" "}
               <span className="muted" style={{ fontWeight: 400 }}>
                 {chartHolding && chartHolding.name !== chartHolding.code ? chartHolding.name : ""} · {chartAccount ?? "all accounts"} · value and cost
+                {chartClosed && ` · held ${chartClosed.firstDate} – ${chartClosed.closedDate}`}
               </span>
             </>
           }
         >
           <div className="chart-tools">
-            {couponsFor === chartIsin ? <span /> : <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />}
+            {couponsFor === chartIsin || chartClosed ? <span /> : <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />}
             {chartHolding?.type === "FUND_MANUAL" && <ManualValues key={chartHolding.isin} isin={chartHolding.isin} code={chartHolding.code} currency={chartHolding.currency} />}
             {chartHolding?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === chartIsin} onToggle={() => setCouponsFor(couponsFor === chartIsin ? null : chartIsin)} />}
           </div>

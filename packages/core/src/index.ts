@@ -12,6 +12,7 @@ export * from "./mf/retailRates.ts";
 export * from "./db/items.ts";
 export * from "./db/repository.ts";
 export * from "./valuation/positions.ts";
+export * from "./valuation/closed.ts";
 export * from "./valuation/valuePortfolio.ts";
 export * from "./valuation/priceRows.ts";
 export * from "./valuation/retailLots.ts";
