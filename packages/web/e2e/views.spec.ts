@@ -559,6 +559,32 @@ test.describe("holdings row chart", () => {
     await page.evaluate(() => window.localStorage.removeItem("portfolio-tracker.chartPanel.height"));
   });
 
+  test("the position's transactions open next to its chart, collapsed by default, and stay open from one row to the next", async ({ page }) => {
+    await page.goto("/#/holdings");
+    await page.locator('tr[data-testid="holding-row"][data-account="broker"][data-isin="PL0000113783"]').click();
+    const toggle = page.getByTestId("position-tx-toggle");
+    await expect(toggle).toHaveText("Transactions (3)");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByTestId("position-tx")).toHaveCount(0);
+    await toggle.click();
+    const rows = page.getByTestId("position-tx-row");
+    await expect(rows).toHaveCount(3); // broker's DS0432 only: the buy and two coupons, newest first
+    expect(await rows.locator("td:first-child").allTextContents()).toEqual(["2026-04-27", "2025-04-28", "2025-02-05"]);
+    await expect(rows.nth(2)).toContainText("Buy");
+    await expect(rows.nth(2).locator("td").nth(2)).toHaveText("20");
+    await expect(page.getByTestId("holding-chart")).toBeVisible(); // side by side with the chart
+    const chart = (await page.getByTestId("holding-chart").boundingBox())!;
+    const list = (await page.getByTestId("position-tx").boundingBox())!;
+    expect(list.x).toBeGreaterThan(chart.x + chart.width - 1);
+
+    // Across accounts (grouped by instrument): all of them, with the account.
+    await page.goto("/#/holdings?group=instrument");
+    await page.getByTestId("instrument-DS0432").click();
+    await expect(page.getByTestId("position-tx-toggle")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("position-tx-row")).toHaveCount(4);
+    await expect(page.getByTestId("position-tx").locator("th").nth(1)).toHaveText("Account");
+  });
+
   test("grouped by instrument, the group row charts the instrument across accounts", async ({ page }) => {
     await page.goto("/#/holdings?group=instrument");
     await page.getByTestId("instrument-DS0432").click();

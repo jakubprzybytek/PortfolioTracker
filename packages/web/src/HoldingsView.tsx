@@ -12,6 +12,7 @@ import type { ClosedPosition, Holding, Snapshot } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
 import { useShowClosed } from "./showClosed.ts";
+import { PositionTransactions, TransactionsButton, usePositionTransactions } from "./PositionTransactions.tsx";
 
 /** Snapshots written before holdings carried their account have none. */
 const accountOf = (h: Holding) => h.account ?? "–";
@@ -320,6 +321,9 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
   const [panelHeight, setPanelHeight] = useState(0);
   /** The bond whose coupon periods replace its chart in the panel. */
   const [couponsFor, setCouponsFor] = useState<string | null>(null);
+  /** The position's transactions next to its chart (stays open from one row to the next). */
+  const [showTxs, setShowTxs] = useState(false);
+  const positionTxs = usePositionTransactions(chartIsin, chartAccount);
   const openHolding = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin && (!chartAccount || h.account === chartAccount));
   // A closed position's chart: the range counts back from the day it closed.
   const chartClosed = openHolding ? undefined : closedAll.find((c) => c.isin === chartIsin && c.account === chartAccount);
@@ -658,15 +662,25 @@ export function HoldingsView({ params, setParams }: { params: Record<string, str
           <div className="chart-tools">
             {couponsFor === chartIsin ? <span /> : <RangePicker value={range} onChange={setRange} busy={history.loading} testId="holding-range" />}
             {chartHolding?.type === "FUND_MANUAL" && <ManualValues key={chartHolding.isin} isin={chartHolding.isin} code={chartHolding.code} currency={chartHolding.currency} />}
-            {chartHolding?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === chartIsin} onToggle={() => setCouponsFor(couponsFor === chartIsin ? null : chartIsin)} />}
+            <span className="chart-tools-end">
+              {chartHolding?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === chartIsin} onToggle={() => setCouponsFor(couponsFor === chartIsin ? null : chartIsin)} />}
+              <TransactionsButton open={showTxs} onToggle={() => setShowTxs(!showTxs)} count={positionTxs.loading ? undefined : positionTxs.rows.length} />
+            </span>
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: couponsFor === chartIsin ? "auto" : undefined }}>
-            {chartHolding?.type === "BOND_CORPORATE" && couponsFor === chartIsin ? (
-              <CouponPeriods key={chartIsin} isin={chartIsin} code={chartHolding.code} />
-            ) : history.error ? (
-              <p className="error">{history.error}</p>
-            ) : (
-              <ValueChart testId="holding-chart" data={history.data ?? []} loading={history.loading} />
+          <div className="chart-with-side">
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: couponsFor === chartIsin ? "auto" : undefined }}>
+              {chartHolding?.type === "BOND_CORPORATE" && couponsFor === chartIsin ? (
+                <CouponPeriods key={chartIsin} isin={chartIsin} code={chartHolding.code} />
+              ) : history.error ? (
+                <p className="error">{history.error}</p>
+              ) : (
+                <ValueChart testId="holding-chart" data={history.data ?? []} loading={history.loading} />
+              )}
+            </div>
+            {showTxs && (
+              <div className="chart-side">
+                <PositionTransactions rows={positionTxs.rows} loading={positionTxs.loading} error={positionTxs.error} showAccount={!chartAccount} />
+              </div>
             )}
           </div>
         </ChartPanel>

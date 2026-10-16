@@ -180,6 +180,17 @@ tr.muted td { color: var(--muted); }
 .chart-tools button, .manual-values input { font: inherit; font-size: 0.85rem; padding: 4px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--fg); }
 .chart-tools button { cursor: pointer; }
 .chart-tools .manual-open { margin: 4px 0; }
+.chart-tools-end { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-left: auto; }
+.chart-tools button.toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
+/* Holdings chart panel: the position's transactions next to the chart (below it on phones), scrolling on their own. */
+.chart-with-side { flex: 1; min-height: 0; display: flex; gap: 14px; }
+.chart-side { flex: 0 0 min(460px, 42%); overflow: auto; border-left: 1px solid var(--border); padding-left: 10px; }
+.chart-side table.position-tx { width: 100%; font-size: 0.82rem; }
+.chart-side table.position-tx th { position: sticky; top: 0; background: var(--panel); }
+@media (max-width: 720px) {
+  .chart-with-side { flex-direction: column; }
+  .chart-side { flex: 0 0 45%; border-left: 0; border-top: 1px solid var(--border); padding: 6px 0 0; }
+}
 .manual-values { display: flex; flex-direction: column; gap: 4px; margin: 4px 0; max-width: 100%; }
 .manual-values form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .manual-values input[type="date"] { width: 9.5rem; }
