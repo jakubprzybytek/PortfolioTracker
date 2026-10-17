@@ -38,6 +38,8 @@
   }
 }
 * { box-sizing: border-box; }
+/* No text autosizing ("font boosting") on phones: it rescales text block by block as the width changes, and the layout jumps until it settles. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); }
 /* Figures line up in columns (same width for every digit). */
 table, .card .value, .mix-legend, .allocation, .chart-panel { font-variant-numeric: tabular-nums; }

@@ -13,6 +13,7 @@ This runs `sst dev` against the `dev` stage:
 - **Infrastructure** (tables, bucket, queue, API Gateway, Cognito client) is deployed to AWS as the `dev` stage, so the data is dev's sample data in AWS.
 - **Lambdas run on your machine** ("Live"): API calls and jobs execute locally, so a code change takes effect without a deploy. The scheduled jobs only fire while `sst dev` is running.
 - **The site** runs in Vite on http://localhost:5173 (fixed port) and calls API Gateway directly. CORS allows `localhost:5173` on every stage except prod.
+- **Only the site, against a deployed stage** (no `sst dev`, nothing changes in AWS; quick for CSS and layout work): in `packages/web`, `VITE_API_URL=<the stage's apiGateway from .sst/outputs.json> VITE_AUTH_USER_POOL_ID=<COGNITO_POOL_ID in sst.config.ts> VITE_AUTH_CLIENT_ID=<authClientId> npx vite`. Log in once on localhost (its own session). Edits show at once (hot reload).
 
 Log in with your own account (it must be in the `portfolio-tracker` group) or with the test user (`portfolio-tracker-test@albedoonline.com`, password = the `TestUserPassword` secret of the stage).
 
