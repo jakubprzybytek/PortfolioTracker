@@ -9,7 +9,7 @@ export interface Option {
 
 /**
  * A labelled dropdown with an "All" entry (value ""). Its width is fixed (`width`), so it doesn't jump when the options
- * arrive. On phones the dropdowns share a row (a `wide` one takes a row of its own): the label is hidden and the empty
+ * arrive. On phones the dropdowns share a row (a `wide` one takes a row of its own, below the others): the label is hidden and the empty
  * entry shows it instead, greyed.
  */
 export function FilterSelect({ label, value, options, onChange, testId, width = "11rem", wide = false }: { label: string; value: string; options: Option[]; onChange: (value: string) => void; testId: string; width?: string; wide?: boolean }) {
@@ -44,7 +44,28 @@ const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").r
 /** Whether an instrument matches the free-text filter (empty: everything). */
 export const matchesText = (text: string, i: { code: string; name: string }) => !text.trim() || fold(`${i.code} ${i.name}`).includes(fold(text.trim()));
 
+/**
+ * The filters, a Reset button and the "n of m" count. On a phone Reset is a "Clear" link at the end of the count's line,
+ * shown only while a filter is set, so the filters get the whole width.
+ */
 export function FilterBar({ children, active, onReset, summary }: { children: ReactNode; active: boolean; onReset: () => void; summary: string }) {
+  const narrow = useNarrow();
+  if (narrow)
+    return (
+      <div className="filters" data-testid="filters">
+        {children}
+        <div className="filters-foot">
+          <span className="muted filters-summary" data-testid="filters-summary">
+            {summary}
+          </span>
+          {active && (
+            <button type="button" className="clear" onClick={onReset} title="Clear filters" data-testid="filters-reset">
+              <Icon name="clear-filters" size={14} /> Clear
+            </button>
+          )}
+        </div>
+      </div>
+    );
   return (
     <div className="filters" data-testid="filters">
       {children}

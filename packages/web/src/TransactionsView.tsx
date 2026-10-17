@@ -139,6 +139,7 @@ export function TransactionsView({
           onChange={set("instrument")}
           testId="filter-instrument"
           width="16rem"
+          wide
         />
         <FilterSelect
           label="Asset type"

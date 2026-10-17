@@ -120,6 +120,20 @@ test.describe("transactions view", () => {
     await expect(page.getByTestId("tx-form")).toBeVisible();
     await expect(page.getByTestId("tx-date")).toHaveValue("2025-02-05");
     await page.keyboard.press("Escape");
+
+    // Filters: Account and Asset type on one row, the instrument below on its own; "Clear" by the count only while set.
+    const box = async (id: string) => (await page.getByTestId(id).boundingBox())!;
+    const [acc, type, instr] = [await box("filter-account"), await box("filter-type"), await box("filter-instrument")];
+    expect(Math.abs(acc.y - type.y)).toBeLessThan(2);
+    expect(instr.y).toBeGreaterThan(acc.y + acc.height);
+    expect(instr.width).toBeGreaterThan(300);
+    await expect(page.getByTestId("filters-reset")).toHaveCount(0);
+    await page.getByTestId("filter-account").selectOption("ike");
+    await expect(page.getByTestId("filters-reset")).toHaveText("Clear");
+    expect((await box("filters-reset")).y).toBeGreaterThan(instr.y + instr.height); // on the count's line
+    await page.getByTestId("filters-reset").click();
+    await expect(rows).toHaveCount(31);
+    await expect(page.getByTestId("filters-reset")).toHaveCount(0);
   });
 
   test("a long history is drawn 200 rows at a time, the next ones as you scroll to the end", async ({ page }) => {
