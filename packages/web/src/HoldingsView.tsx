@@ -307,9 +307,7 @@ function ClosedRow({
         <InstrumentLabel code={c.code} name={c.name} />
       </td>
       <td className="left">{second}</td>
-      <td title="The most units held at once">
-        {fmtUnits(c.peakQuantity)}
-      </td>
+      <td title="The most units held at once">{fmtUnits(c.peakQuantity)}</td>
       <td>
         <span className="flag" data-testid="closed-date">
           closed {c.closedDate}
@@ -768,45 +766,48 @@ export function HoldingsView({
         <h2 className="view-title">Holdings</h2>
         <span className="view-meta">
           <span className="muted" data-testid="holdings-date">
-            {snap.data
-              ? <><span className="wide-only">Valuation </span>as of {snap.data.date}</>
-              : snap.loading
-                ? "Loading…"
-                : ""}
+            {snap.data ? (
+              <>
+                <span className="wide-only">Valuation </span>as of{" "}
+                {snap.data.date}
+              </>
+            ) : snap.loading ? (
+              "Loading…"
+            ) : (
+              ""
+            )}
           </span>
           <RefreshPrices />
         </span>
       </header>
       {snap.error && <p className="error">{snap.error}</p>}
 
-      <div
-        className="range"
-        data-testid="group-by"
-        role="group"
-        aria-label="Group by"
-      >
+      {/* One control split in two (segmented): the chosen half filled. */}
+      <div className="group-by">
+        <span className="muted">Group by</span>
         <span
-          className="muted"
-          style={{ alignSelf: "center", fontSize: "0.85rem" }}
+          className="segmented"
+          data-testid="group-by"
+          role="group"
+          aria-label="Group by"
         >
-          Group by
+          {(["account", "instrument"] as const).map((g) => (
+            <button
+              key={g}
+              type="button"
+              className={(g === "instrument") === byInstrument ? "active" : ""}
+              aria-pressed={(g === "instrument") === byInstrument}
+              onClick={() =>
+                setParams({
+                  ...params,
+                  group: g === "instrument" ? "instrument" : undefined,
+                })
+              }
+            >
+              {g === "account" ? "Account" : "Instrument"}
+            </button>
+          ))}
         </span>
-        {(["account", "instrument"] as const).map((g) => (
-          <button
-            key={g}
-            type="button"
-            className={(g === "instrument") === byInstrument ? "active" : ""}
-            aria-pressed={(g === "instrument") === byInstrument}
-            onClick={() =>
-              setParams({
-                ...params,
-                group: g === "instrument" ? "instrument" : undefined,
-              })
-            }
-          >
-            {g === "account" ? "Account" : "Instrument"}
-          </button>
-        ))}
       </div>
 
       <FilterBar

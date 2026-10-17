@@ -49,7 +49,7 @@ Changing a filter replaces the history entry, so "back" goes to the previous vie
 
 ## Holdings
 
-From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **Group by** switches between two layouts (kept in the URL):
+From the latest snapshot (`SNAP#LATEST`), one row per account and instrument. **Group by** (one control split in two, Account | Instrument, the chosen half filled) switches between two layouts (kept in the URL):
 
 - **Account** (default): described below.
 - **Instrument:** one row per instrument (by code), the second column showing the account it's held in. An instrument held in several accounts shows "▸ n accounts" with its total quantity and summed value/cost/gain/coupons; the arrow expands it into one row per account (the row itself opens the all-accounts chart). Cash comes after the instruments: complete accounts summed, "▸ n accounts" expands it (incomplete ones greyed, not summed); then the foreign cash (EUR, USD). The filters apply the same way.
