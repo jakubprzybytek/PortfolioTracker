@@ -56,9 +56,9 @@ Tests log in as `portfolio-tracker-test@albedoonline.com` with a password (allow
 
 1. **version** – next minor tag: `v0.1`, `v0.2`, … (latest `v0.*` tag + 1).
 2. **int** – type-check and unit tests, `sst deploy --stage int`, integration tests against `https://int.portfoliotracker.albedoonline.com/api`, Playwright E2E against the int site, both inside `sst shell --stage int` (they log in as the test user). The tests seed `int` with `data/instruments.json` and the sample transactions.
-3. **prod** – only if int passed: `sst deploy --stage prod`, then the version tag is pushed. The version shows in the page footer.
+3. **prod** and **test** – only if int passed, in parallel (a matrix; one failing doesn't cancel the other): `sst deploy --stage prod`, then the version tag is pushed (the version shows in the page footer); `sst deploy --stage test` (the stage holding the history import, so its code stays current). No tests run against either.
 
-AWS access uses the OIDC role in [infra/github/README.md](infra/github/README.md). Runs are serialised (`concurrency: cd`). A failed `int` stops the run: nothing reaches prod and no tag is created. Re-run failed runs from the Actions tab.
+AWS access uses the OIDC role in [infra/github/README.md](infra/github/README.md). Runs are serialised (`concurrency: cd`). A failed `int` stops the run: nothing reaches prod or test and no tag is created. Re-run failed runs from the Actions tab.
 
 Generated type declarations (`sst-env.d.ts`, root and per package) are committed: CI type-checks before deploying, so it can't rely on SST regenerating them. They change when resources are added to `sst.config.ts`; commit the regenerated files with that change.
 

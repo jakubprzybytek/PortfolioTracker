@@ -1,5 +1,5 @@
 # Continuous delivery: every push to main deploys `int`, runs the tests against it,
-# then deploys `prod` and tags the commit with the next minor version (v0.1, v0.2, …).
+# then deploys `prod` and `test` in parallel and tags the commit with the next minor version (v0.1, v0.2, …).
 
 name: CD
 
@@ -77,11 +77,16 @@ jobs:
           path: packages/web/test-results
           retention-days: 7
 
-  prod:
-    name: Deploy prod + tag
+  # prod and test deploy side by side once int passed; one failing doesn't cancel the other. Only prod tags.
+  deploy:
+    name: Deploy ${{ matrix.stage }}${{ matrix.stage == 'prod' && ' + tag' || '' }}
     needs: [version, int]
     runs-on: ubuntu-latest
-    environment: prod
+    strategy:
+      fail-fast: false
+      matrix:
+        stage: [prod, test]
+    environment: ${{ matrix.stage }}
     env:
       APP_VERSION: ${{ needs.version.outputs.version }}
     steps:
@@ -95,9 +100,10 @@ jobs:
         with:
           role-to-assume: ${{ env.AWS_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
-      - name: Deploy prod
-        run: npx sst deploy --stage prod
+      - name: Deploy ${{ matrix.stage }}
+        run: npx sst deploy --stage ${{ matrix.stage }}
       - name: Tag ${{ env.APP_VERSION }}
+        if: matrix.stage == 'prod'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

@@ -62,9 +62,9 @@ Continuous delivery (`.github/workflows/cd.yml`). Every push or merge to `main`:
 
 1. deploys **int** after the type check and unit tests,
 2. runs the **regression tests** against int: integration (API) and E2E (browser),
-3. deploys **prod** only if they all passed, and tags the commit `v0.N` (the version in the page footer).
+3. deploys **prod** only if they all passed, and tags the commit `v0.N` (the version in the page footer); **test** (the history-import stage) deploys at the same time, in parallel. A failed test deploy doesn't hold back prod or the tag.
 
-A failure at any step stops the run: nothing reaches prod. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
+A failure at any step before that stops the run: nothing reaches prod or test. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
 
 **By default, every code change goes all the way to prod.** Once a change is done and checked (type check, unit tests, deployed to dev with the integration and E2E tests passing, and a look in the browser for UI changes), commit it to `main` and push. There's no need to ask for permission for an ordinary change: CD and its tests are the gate.
 
