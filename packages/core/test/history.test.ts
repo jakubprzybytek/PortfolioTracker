@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HoldingSnapshot } from "../src/db/items.ts";
-import { assetClassOf, drawdowns, valueByClass, withZeroGaps } from "../src/valuation/history.ts";
+import { assetClassOf, drawdowns, historyPointOf, valueByClass, withZeroGaps } from "../src/valuation/history.ts";
 
 describe("assetClassOf", () => {
   it("maps instrument types onto classes; a bond ETF is bonds", () => {
@@ -64,5 +64,14 @@ describe("a position's days with gaps", () => {
     // Years out: a zero for every day, so the gap is as wide on the chart as it lasted.
     expect(withZeroGaps([p("2015-11-14", 6), p("2019-10-15", 7)])).toHaveLength(1430 + 2);
     expect(withZeroGaps([p("2020-01-01", 1), p("2020-01-03", 1)]).map((x) => x.date)).toEqual(["2020-01-01", "2020-01-02", "2020-01-03"]);
+  });
+});
+
+describe("historyPointOf", () => {
+  it("keeps what the charts use of a snapshot: date, totals, by type and by class, not the holdings", () => {
+    const holdings = [{ type: "ETF", name: "World", value: 1000 }, { type: "BOND_RETAIL", name: "EDO", value: 500 }] as HoldingSnapshot[];
+    const totals = { value: 1500, cost: 1400, gain: 100, couponsReceived: 0, cash: 50 };
+    const byType = { ETF: { value: 1000, cost: 900 }, BOND_RETAIL: { value: 500, cost: 500 } };
+    expect(historyPointOf({ date: "2026-10-14", holdings, totals, byType })).toEqual({ date: "2026-10-14", totals, byType, byClass: { SHARES: 1000, BONDS: 500, CASH: 50, OTHER: 0 } });
   });
 });

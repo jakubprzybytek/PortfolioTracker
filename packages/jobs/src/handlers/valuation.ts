@@ -7,6 +7,8 @@ import {
   addDays,
   changedPositionDays,
   firstTransactionDate,
+  historyPointChanged,
+  historyPointOf,
   toReferenceIndex,
   today,
   valuePortfolio,
@@ -78,11 +80,15 @@ async function revalue(event: ValuationEvent) {
 
     // The positions each day had before: one that's gone now (a transaction edited or deleted) loses its days too,
     // so its row chart doesn't keep stale days.
-    // The stored days also tell which come out unchanged: those aren't written again.
-    const before = new Map((await repo.querySnapshots(from, to)).map((s) => [s.date, s]));
+    // The stored days also tell which come out unchanged: those aren't written again. Their chart points likewise: an
+    // unchanged day still gets its point when it has none (days valued before points existed) or a different one.
+    const [storedSnapshots, storedPoints] = await Promise.all([repo.querySnapshots(from, to), repo.queryHistoryPoints(from, to)]);
+    const before = new Map(storedSnapshots.map((s) => [s.date, s]));
+    const pointsBefore = new Map(storedPoints.map((p) => [p.date, p]));
     let written = 0;
     let unchanged = 0;
     let removed = 0;
+    let pointsOnly = 0;
     for (let date = from; date <= to; date = addDays(date, 1)) {
       const prices = new Map<string, PriceItem>();
       for (const [isin, at] of priceAt) {
@@ -96,20 +102,30 @@ async function revalue(event: ValuationEvent) {
       }
       const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponPeriods, accounts, fx, fxHistory });
       const stored = event.force ? undefined : before.get(date);
+      const point = historyPointOf(snapshot);
+      const pointChanged = event.force || historyPointChanged(pointsBefore.get(date), point);
       if (!snapshotChanged(stored, snapshot)) {
         if (date === to) await repo.putLatestSnapshot(snapshot);
+        if (pointChanged) {
+          await repo.putDayHistory(date, [], point);
+          pointsOnly++;
+        }
         unchanged++;
         continue;
       }
       await repo.putSnapshot(snapshot, date === to);
-      // Per-position history for the Holdings row charts: only the positions whose day changed.
-      await repo.putPositionDays({ date, holdings: changedPositionDays(stored, snapshot) });
+      // Per-position history for the Holdings row charts (only the positions whose day changed) and the chart point.
+      await repo.putDayHistory(date, changedPositionDays(stored, snapshot), pointChanged ? point : undefined);
       const now = new Set(snapshot.holdings.map((h) => `${h.account}#${h.isin}`));
       const gone = (before.get(date)?.holdings ?? []).filter((h) => !now.has(`${h.account}#${h.isin}`));
       if (gone.length) removed += await repo.deletePositionDays(gone.map((h) => ({ account: h.account, isin: h.isin, date })));
       written++;
     }
-    const notes = [unchanged ? `${unchanged} days unchanged` : "", removed ? `${removed} days of positions gone removed` : ""].filter(Boolean);
+    const notes = [
+      unchanged ? `${unchanged} days unchanged` : "",
+      pointsOnly ? `${pointsOnly} of them only their chart point written` : "",
+      removed ? `${removed} days of positions gone removed` : "",
+    ].filter(Boolean);
     return { itemsWritten: written, note: `${from} → ${to} (${event.reason ?? "schedule"})${notes.map((n) => `; ${n}`).join("")}` };
   });
 }

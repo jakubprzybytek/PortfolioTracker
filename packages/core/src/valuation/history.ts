@@ -1,7 +1,7 @@
 // Pure functions for the Dashboard's history charts; no AWS imports, so the web app can import this file directly
 // (`@portfolio/core/valuation/history`).
 import { addDays } from "../dates.ts";
-import type { HoldingSnapshot, SnapshotItem } from "../db/items.ts";
+import type { HistoryPointItem, HoldingSnapshot, SnapshotItem } from "../db/items.ts";
 
 /** The big picture's asset classes, in display order. */
 export const ASSET_CLASSES = ["SHARES", "BONDS", "CASH", "OTHER"] as const;
@@ -28,6 +28,11 @@ export function valueByClass(snapshot: Pick<SnapshotItem, "holdings" | "totals">
   out.CASH += snapshot.totals.cash ?? 0;
   for (const k of ASSET_CLASSES) out[k] = Math.round(out[k] * 100) / 100;
   return out;
+}
+
+/** The day's chart point: what the history charts use of a snapshot (written by the valuation next to it). */
+export function historyPointOf(snapshot: Pick<SnapshotItem, "date" | "holdings" | "totals" | "byType">): Omit<HistoryPointItem, "PK" | "SK"> {
+  return { date: snapshot.date, totals: snapshot.totals, byType: snapshot.byType, byClass: valueByClass(snapshot) };
 }
 
 /**

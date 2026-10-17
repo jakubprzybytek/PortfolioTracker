@@ -218,6 +218,14 @@ PK = PORTFOLIO              SK = SNAP#LATEST
 Written by the valuation job: `accounts` (per account: `cash`, `incomplete`), `totals.cash` (complete accounts only), and one holding per **account and instrument** (the same bond in two accounts is two holdings), sorted by account then code. Per holding `account`, `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart, dashboard and Holdings view come from these items. Snapshots written before 2026-10-11 have no `account`; only `SNAP#LATEST` is read per holding, and every valuation run rewrites it.
 Items stay small: about 25 holdings, well under the 400 KB item limit.
 
+### History points
+
+```
+PK = HISTORY                SK = <YYYY-MM-DD>
+```
+
+`date`, `totals`, `byType`, `byClass` (value per asset class: SHARES, BONDS, CASH, OTHER): the part of a day's snapshot the Dashboard's charts use, without the holdings (~250 bytes instead of ~2–20 KB). Written by the valuation in the day's position-day batch, when the point is new or differs from the stored one: a range valued before points existed gets them from its next run over it. Read by `GET /portfolio/history` (`netDeposits` is computed there from the transactions, so it can't go stale). All 6,791 days of the `test` stage (2008→) are ~1.7 MB, two pages, where the snapshots were 13 MB and ~5 s.
+
 ### Position history
 
 ```
@@ -245,7 +253,7 @@ Each function links only the tables it needs.
 | Need | Table | Operation |
 |---|---|---|
 | Dashboard | `holdings` | `Get PORTFOLIO/SNAP#LATEST` (after "Update prices", valued with today's quotes) |
-| Portfolio value over time | `holdings` | `Query PK=PORTFOLIO, SK between SNAP#<from> and SNAP#<to>` |
+| Portfolio value over time | `holdings` | `Query PK=HISTORY, SK between <from> and <to>` |
 | Price chart for one instrument | `market` | `Query PK=INST#<isin>, SK between PX#<venue>#<from> and PX#<venue>#<to>` |
 | All instruments (jobs, UI) | `market` | `Query GSI1 GSI1PK=INSTRUMENT` |
 | Transactions of an account | `transactions` | `Query PK=ACCT#<acct>, SK begins_with TX#` |

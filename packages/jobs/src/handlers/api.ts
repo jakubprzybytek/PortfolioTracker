@@ -23,7 +23,6 @@ import {
   positionsAt,
   netDepositsByDate,
   withZeroGaps,
-  valueByClass,
   checkManualTransaction,
   isCalendarDate,
   listedTreasuryInstrument,
@@ -202,16 +201,17 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       case "GET /portfolio/history": {
         // Each day: positions, cash, their sum (`total`) and the money put in so far (`netDeposits`, fully tracked
         // accounts, other currencies at NBP D-1), so a sale kept as cash doesn't show as a drop.
-        // `byClass`: shares, bonds, cash, other (the allocation over time).
-        const [snaps, txs, accounts] = await Promise.all([repo.querySnapshots(from, to), repo.listTransactions(), repo.listAccounts()]);
+        // `byClass`: shares, bonds, cash, other (the allocation over time). Read from the days' chart points, not the
+        // snapshots (a snapshot is ~60× bigger: years of them took seconds).
+        const [points, txs, accounts] = await Promise.all([repo.queryHistoryPoints(from, to), repo.listTransactions(), repo.listAccounts()]);
         const currencies = [...new Set(txs.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => t.currency))].filter((c) => c && c !== "PLN");
         const first = txs.map((t) => t.date).sort()[0] ?? from;
         const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), to)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
         const incomplete = new Set(accounts.filter((a) => a.incomplete?.length).map((a) => a.account));
-        const deposits = netDepositsByDate(txs, snaps.map((s) => s.date), fx, incomplete);
+        const deposits = netDepositsByDate(txs, points.map((p) => p.date), fx, incomplete);
         return json(
           200,
-          snaps.map((s) => ({ date: s.date, totals: s.totals, byType: s.byType, byClass: valueByClass(s), total: Math.round((s.totals.value + (s.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(s.date) ?? 0 })),
+          points.map((p) => ({ date: p.date, totals: p.totals, byType: p.byType, byClass: p.byClass, total: Math.round((p.totals.value + (p.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(p.date) ?? 0 })),
         );
       }
       case "GET /instruments": {

@@ -1,7 +1,7 @@
 // What a revaluation has to write for a day, given what's stored: most days of a long range come out the same as
 // before, and writing them again is what a revaluation costs (DynamoDB bills writes, the snapshot is ~15–20 units).
 
-import type { HoldingSnapshot, SnapshotItem } from "../db/items.ts";
+import type { HistoryPointItem, HoldingSnapshot, SnapshotItem } from "../db/items.ts";
 
 type Snapshot = Omit<SnapshotItem, "PK" | "SK">;
 
@@ -18,6 +18,13 @@ export function snapshotChanged(stored: Snapshot | undefined, next: Snapshot): b
   const { PK: _pk, SK: _sk, computedAt: _a, ...was } = stored as SnapshotItem;
   const { computedAt: _b, ...now } = next;
   return stable(was) !== stable(now);
+}
+
+/** Whether the day's chart point differs from the stored one (none stored: it does). */
+export function historyPointChanged(stored: HistoryPointItem | undefined, next: Omit<HistoryPointItem, "PK" | "SK">): boolean {
+  if (!stored) return true;
+  const { PK: _pk, SK: _sk, ...was } = stored;
+  return stable(was) !== stable(next);
 }
 
 /** The holdings whose position day (quantity, value, cost) is new or differs from the stored snapshot's. */

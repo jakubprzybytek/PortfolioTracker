@@ -19,6 +19,7 @@ import {
   type BackfillItem,
   type CouponPeriodItem,
   type FxRateItem,
+  type HistoryPointItem,
   type InstrumentItem,
   type JobRunItem,
   type NoteItem,
@@ -371,22 +372,30 @@ export class Repository {
     });
   }
 
-  // --- position history (one item per position per day) --------------------------------------
+  // --- history (a chart point per day, one item per position per day) --------------------------
 
-  /** Writes each holding of a snapshot as that position's value on the snapshot's day (pass only the changed ones). */
-  putPositionDays(snapshot: Pick<SnapshotItem, "date" | "holdings">): Promise<number> {
-    return this.batchPut(
-      "holdings",
-      snapshot.holdings.map((h): PositionDayItem => ({
-        ...keys.positionDay(h.account, h.isin, snapshot.date),
-        account: h.account,
-        isin: h.isin,
-        date: snapshot.date,
-        quantity: h.quantity,
-        value: h.value,
-        cost: h.cost,
-      })),
-    );
+  /**
+   * A day's history in one batch: each holding passed as that position's value on the day (pass only the changed
+   * ones) and, when given, the day's chart point.
+   */
+  putDayHistory(date: IsoDate, holdings: SnapshotItem["holdings"], point?: Omit<HistoryPointItem, "PK" | "SK">): Promise<number> {
+    const positions = holdings.map((h): PositionDayItem => ({
+      ...keys.positionDay(h.account, h.isin, date),
+      account: h.account,
+      isin: h.isin,
+      date,
+      quantity: h.quantity,
+      value: h.value,
+      cost: h.cost,
+    }));
+    return this.batchPut("holdings", [...positions, ...(point ? [{ ...keys.historyPoint(point.date), ...point }] : [])]);
+  }
+
+  queryHistoryPoints(from: IsoDate, to: IsoDate): Promise<HistoryPointItem[]> {
+    return this.queryAll<HistoryPointItem>("holdings", {
+      KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
+      ExpressionAttributeValues: { ":pk": "HISTORY", ":from": from, ":to": to },
+    });
   }
 
   /** Removes days of positions (e.g. one that no longer exists after a transaction was edited or deleted). */

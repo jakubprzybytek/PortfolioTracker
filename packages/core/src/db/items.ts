@@ -261,6 +261,20 @@ export interface PositionDayItem {
   cost: number;
 }
 
+/**
+ * One day of the portfolio's history (holdings table), for the Dashboard's charts: the part of the day's snapshot they
+ * use, without its holdings (~250 bytes instead of ~15 KB), so a range of years is a few small pages.
+ */
+export interface HistoryPointItem {
+  PK: "HISTORY";
+  SK: IsoDate;
+  date: IsoDate;
+  totals: SnapshotItem["totals"];
+  byType: SnapshotItem["byType"];
+  /** Value per asset class (`valueByClass`): SHARES, BONDS, CASH, OTHER. */
+  byClass: Record<string, number>;
+}
+
 export type BackfillStatus = "pending" | "running" | "done" | "no_history" | "failed";
 
 export interface BackfillItem {
@@ -299,6 +313,7 @@ export const keys = {
   snapshot: (date: IsoDate | "LATEST") => ({ PK: "PORTFOLIO" as const, SK: `SNAP#${date}` as const }),
   backfill: (isin: string) => ({ PK: `INST#${isin}` as const, SK: "BACKFILL" as const }),
   positionDay: (account: string, isin: string, date: IsoDate) => ({ PK: `POS#${account}#${isin}` as const, SK: date }),
+  historyPoint: (date: IsoDate) => ({ PK: "HISTORY" as const, SK: date }),
   account: (account: string) => ({ PK: `ACCT#${account}` as const, SK: "META" as const }),
   note: (id: string) => ({ PK: `NOTE#${id}` as const, SK: "META" as const }),
   retailSeries: (series: string) => ({ PK: `SERIES#${series}` as const, SK: "META" as const }),

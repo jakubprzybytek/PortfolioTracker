@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { HoldingSnapshot, SnapshotItem } from "../src/db/items.ts";
-import { changedPositionDays, snapshotChanged } from "../src/valuation/unchanged.ts";
+import type { HistoryPointItem, HoldingSnapshot, SnapshotItem } from "../src/db/items.ts";
+import { changedPositionDays, historyPointChanged, snapshotChanged } from "../src/valuation/unchanged.ts";
+import { historyPointOf } from "../src/valuation/history.ts";
 
 const holding = (h: Partial<HoldingSnapshot> & Pick<HoldingSnapshot, "account" | "isin">): HoldingSnapshot =>
   ({ code: h.isin, name: h.isin, type: "BOND_RETAIL", currency: "PLN", quantity: 10, cleanPrice: null, priceDate: null, nominal: 100, accruedInterest: null,
@@ -55,5 +56,24 @@ describe("changedPositionDays", () => {
     const next = snapshot([{ ...edo, gainPct: 6 }, { ...coi, value: 1060 }, otherAccount]);
     expect(changedPositionDays(was, next).map((p) => `${p.account}#${p.isin}`)).toEqual(["a#COI0128", "b#EDO0136"]);
     expect(changedPositionDays(was, snapshot([{ ...edo, quantity: 11 }, { ...coi, cost: 999 }]))).toHaveLength(2);
+  });
+});
+
+describe("historyPointChanged", () => {
+  const h = holding({ account: "a", isin: "EDO0136" });
+  const point = historyPointOf(snapshot([h]));
+  /** As DynamoDB returns it: with its keys, keys in another order. */
+  const storedPoint = (p: typeof point): HistoryPointItem => JSON.parse(JSON.stringify({ PK: "HISTORY", SK: p.date, ...Object.fromEntries(Object.entries(p).reverse()) })) as HistoryPointItem;
+
+  it("a day without a point gets one (days valued before points existed)", () => {
+    expect(historyPointChanged(undefined, point)).toBe(true);
+  });
+
+  it("the same point is not written again, whatever the key order", () => {
+    expect(historyPointChanged(storedPoint(point), historyPointOf(snapshot([h], "2026-10-16T07:00:00.000Z")))).toBe(false);
+  });
+
+  it("a different value is", () => {
+    expect(historyPointChanged(storedPoint(point), historyPointOf(snapshot([{ ...h, value: 1100 }])))).toBe(true);
   });
 });
