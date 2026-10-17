@@ -121,6 +121,22 @@ tr.account-group td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
 tbody tr.account-group:first-child td { border-top: 0; }
 /* Transactions: rows of one date share a background, neighbouring dates alternate. */
 tr.band-b td { background: var(--band); }
+/* Transactions on a phone: a list of two-line rows (the table needs a wide screen). */
+.tx-list { list-style: none; margin: 0; padding: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; }
+.tx-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+.tx-item:last-child { border-bottom: 0; }
+.tx-item.band-b { background: var(--band); }
+.tx-item.clickable { cursor: pointer; }
+.tx-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; white-space: nowrap; }
+.tx-date { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.85em; }
+.tx-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tx-amount { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; }
+.tx-amount.pos::before { content: "\25B2"; font-size: 0.7em; margin-right: 0.3em; vertical-align: 0.1em; }
+.tx-amount.neg::before { content: "\25BC"; font-size: 0.7em; margin-right: 0.3em; vertical-align: 0.1em; }
+.tx-detail { font-size: 0.82rem; }
+.tx-detail > * { flex: none; }
+.tx-code { color: var(--fg); }
+.tx-detail .tx-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 tr.band-b:hover td { background: transparent; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--fg); border-bottom: 0; }
 td.indent { padding-left: 26px; }

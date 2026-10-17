@@ -91,6 +91,7 @@ All transactions from `GET /transactions`.
 
 - **Sorted by date, newest first** (fixed).
 - **A long history is drawn in steps:** the first 200 rows, then 200 more each time you scroll near the end (a row "n more…" marks it); a filter starts again from the first rows. A page with every row would be very tall and slow to redraw (e.g. resizing a phone emulator).
+- **On a phone** a list instead of the table, two lines a transaction: date, type · account, amount; then instrument code, quantity × price, fee and the start of the note. A row opens the form.
 - **Columns:** date, account, type, instrument (code + name), asset type, quantity, price, amount (signed: red = money out), fee, note (one line, cut short; all of it on hover, and in the form a row opens, where it's a field of several lines).
 - **Filters:** account, instrument (including "(no instrument)" for cash movements), asset type (on a phone the three share a row); "clear filters"; "n of m transactions".
 - **Rows by date:** the rows of one date share a background and the next date has the other one (white and a light grey-blue), so a day's transactions read as a block; the bands follow what the filters show.

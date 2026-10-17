@@ -103,6 +103,25 @@ test.describe("transactions view", () => {
     expect(colors[0]).not.toBe(colors[1]); // different dates (2026-09-30, 2026-06-01): visibly different
   });
 
+  test("on a phone, a list of two-line rows instead of the table; a row opens the form", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/#/transactions");
+    await expect(page.getByTestId("transactions-table")).toHaveCount(0);
+    const rows = page.getByTestId("transactions-list").getByTestId("transaction-row");
+    await expect(rows).toHaveCount(31);
+    // A buy: date, type and account, the amount; then the instrument, quantity × price.
+    const buy = rows.filter({ hasText: "2025-02-05" });
+    await expect(buy).toContainText("Buy · broker");
+    await expect(buy.getByTestId("tx-amount-cell")).toHaveText(/-15\s?900,00\s*zł/);
+    await expect(buy).toContainText("DS0432");
+    await expect(buy).toContainText("20 × 79,5");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390); // nothing sideways
+    await buy.click();
+    await expect(page.getByTestId("tx-form")).toBeVisible();
+    await expect(page.getByTestId("tx-date")).toHaveValue("2025-02-05");
+    await page.keyboard.press("Escape");
+  });
+
   test("a long history is drawn 200 rows at a time, the next ones as you scroll to the end", async ({ page }) => {
     // Made up: 450 deposits, a day apart, in two accounts.
     const long = Array.from({ length: 450 }, (_, i) => {
