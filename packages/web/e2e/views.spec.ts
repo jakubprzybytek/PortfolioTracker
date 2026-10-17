@@ -686,6 +686,12 @@ test.describe("holdings row chart", () => {
     expect(table.x + table.width).toBeLessThanOrEqual(390);
     await page.getByTestId("position-tx-toggle").click();
     await expect(page.getByTestId("holding-chart")).toBeVisible();
+    // The valuation date and "Update prices" (only its icon) on the title's row.
+    await expect(page.getByTestId("holdings-date")).toHaveText(/^as of \d{4}-\d{2}-\d{2}$/, { useInnerText: true }); // "Valuation" hidden
+    const title = (await page.locator(".view-title").boundingBox())!;
+    const update = (await page.getByTestId("refresh-prices").boundingBox())!;
+    expect(update.y).toBeLessThan(title.y + title.height);
+    expect(update.x + update.width).toBeLessThanOrEqual(390);
   });
 
   test("grouped by instrument, the group row charts the instrument across accounts", async ({ page }) => {

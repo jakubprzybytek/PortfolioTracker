@@ -373,6 +373,15 @@ button.reload:hover { background: var(--row); }
 /* "Update prices" next to the valuation date in the view headers. */
 .view-meta { display: inline-flex; align-items: center; gap: 8px; }
 .view-meta > .muted { font-size: 0.9rem; }
+@media (max-width: 720px) {
+  /* The valuation date and "Update prices" (icon only) on the title's row. */
+  .view-header { flex-wrap: nowrap; align-items: center; margin-bottom: 14px; }
+  .view-header .view-title { margin: 0; }
+  .view-meta { flex: none; gap: 6px; }
+  .view-meta > .muted { font-size: 0.8rem; }
+  .view-meta .refresh { padding: 6px; }
+  .wide-only { display: none; }
+}
 button.refresh { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--fg); font: inherit; font-size: 0.85rem; cursor: pointer; }
 button.refresh:hover:not(:disabled) { background: var(--row); }
 button.refresh:disabled { cursor: default; color: var(--faint); }

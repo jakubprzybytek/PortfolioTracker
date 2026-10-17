@@ -67,7 +67,7 @@ export function DashboardView() {
         <h2 className="view-title">Dashboard</h2>
         <span className="view-meta">
           <span className="muted" data-testid="snapshot-date">
-            {snap ? `Valuation as of ${snap.date}` : holdings.loading ? "Loading…" : holdings.error ?? ""}
+            {snap ? <><span className="wide-only">Valuation </span>as of {snap.date}</> : holdings.loading ? "Loading…" : holdings.error ?? ""}
           </span>
           <RefreshPrices />
         </span>

@@ -14,7 +14,7 @@ Parts still loading hold their space with placeholders (`Placeholders.tsx`), so 
 
 A chart reloading (another range) stays in place, dimmed with a spinner; its range buttons are disabled meanwhile, the chosen one spinning.
 
-On a phone (≤ 720 px) charts reach the screen edges: the y-axis labels (short: 57k, 1,6M) sit inside the plot, above their grid lines.
+On a phone (≤ 720 px) the valuation date ("as of …") and "Update prices" (only its icon) sit on the title's row. On a phone (≤ 720 px) charts reach the screen edges: the y-axis labels (short: 57k, 1,6M) sit inside the plot, above their grid lines.
 
 ## Navigation
 
