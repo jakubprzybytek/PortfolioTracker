@@ -150,8 +150,10 @@ Planned, not filled yet: entered by hand once a year, for gap repair (a holiday 
 ### Job runs
 
 ```
-PK = JOB#<job_name>         SK = RUN#<started_at>    status, items_written, gaps_found, errors, ttl (90 days)
+PK = JOB#<job_name>         SK = RUN#<startedAt>     job, startedAt, finishedAt, status (ok / failed), itemsWritten, note, ttl (90 days)
 ```
+
+One item per finished run, written by `runJob` (`jobs/lib/context.ts`) around each job's body: `ok` with what the job returns (`itemsWritten`, `note`), or `failed` with the error in `note` (the error is rethrown, so each Lambda retry is a run of its own). A run still going, or one cut off by a timeout, leaves no item. DynamoDB TTL deletes runs after 90 days. Read only as the latest run of a job (query newest first, limit 1): `GET /status` (the Dashboard's Jobs table and its failed-jobs banner) and the rate limit on "Update prices" (the last `live` run).
 
 ## Table `transactions`
 
