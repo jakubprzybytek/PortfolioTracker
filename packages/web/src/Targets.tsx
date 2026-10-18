@@ -108,8 +108,8 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
                   {r.target === 0 && r.value === 0 ? "–" : signedPp(r.diff)}
                   {r.status !== "WITHIN" && <span className="flag warn-soft">{r.status === "OVER" ? "over" : "under"}</span>}
                 </td>
-                <td className={r.trade > 0 ? "pos" : r.trade < 0 ? "neg" : "muted"} data-testid={`targets-${r.assetClass}-trade`}>
-                  {!showTrades || Math.abs(r.trade) < 0.5 ? "–" : `${r.trade > 0 ? "buy" : "sell"} ${fmtPln(Math.abs(r.trade))}`}
+                <td className={`trade ${r.trade > 0 ? "pos" : r.trade < 0 ? "neg" : "muted"}`} data-testid={`targets-${r.assetClass}-trade`}>
+                  {!showTrades || Math.abs(r.trade) < 0.5 ? "–" : `${r.trade > 0 ? "buy" : "sell"} ${narrow ? `${fmtNum(Math.abs(r.trade), 0)} zł` : fmtPln(Math.abs(r.trade))}`}
                 </td>
                 {!narrow && <td className="muted">{showTrades ? `${fmtNum(r.after, 1)} %` : "–"}</td>}
               </tr>

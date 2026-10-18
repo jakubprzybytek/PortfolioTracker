@@ -586,6 +586,7 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .targets table { font-size: 0.85rem; }
   .targets td, .targets th { padding: 7px 4px; }
   .targets .flag { display: none; }
+  .targets td.trade { white-space: normal; }
   .targets-controls button.link { margin-left: 0; }
 }
 .targets tr.off-band td[data-testid$="-diff"] { color: var(--neg); }
