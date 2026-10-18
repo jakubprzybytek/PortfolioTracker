@@ -567,6 +567,21 @@ describe(`API ${API}`, () => {
     expect((await get<Body>("/hold-sell")).body.saved).toBe(false);
   });
 
+  it("PUT /targets keeps the target allocation (adding up to 100 %), GET /targets returns it, reset removes it", async () => {
+    type Body = { targets: { targets: Record<string, number>; bands: Record<string, number> } | null };
+    await send("PUT", "/targets", { reset: true });
+    expect((await get<Body>("/targets")).body.targets).toBeNull();
+    const bands = { SHARES: 5, BONDS: 5, CASH: 2, OTHER: 0 };
+    expect((await send("PUT", "/targets", { targets: { SHARES: 60, BONDS: 35, CASH: 10, OTHER: 0 }, bands })).status).toBe(400);
+    const put = await send("PUT", "/targets", { targets: { SHARES: 60, BONDS: 35, CASH: 5, OTHER: 0 }, bands });
+    expect(put.status).toBe(200);
+    const { status, body } = await get<Body>("/targets");
+    expect(status).toBe(200);
+    expect(body.targets).toEqual({ targets: { SHARES: 60, BONDS: 35, CASH: 5, OTHER: 0 }, bands });
+    await send("PUT", "/targets", { reset: true });
+    expect((await get<Body>("/targets")).body.targets).toBeNull();
+  });
+
   it("rejects bad input", async () => {
     expect((await get("/instruments/not-an-isin/prices")).status).toBe(400);
     expect((await get("/nope")).status).toBe(404);

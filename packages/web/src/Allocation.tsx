@@ -1,5 +1,6 @@
 import { fmtNum, fmtPln, typeLabel } from "./format.ts";
 import { ASSET_CLASSES, valueByClass, type AssetClass } from "@portfolio/core/valuation/history";
+import type { Targets } from "@portfolio/core/targets/targets";
 import type { Snapshot } from "./types.ts";
 
 interface Slice {
@@ -72,17 +73,25 @@ export const CLASS_COLORS: Record<AssetClass, string> = { SHARES: "var(--mix-sha
 
 /**
  * The big picture in one bar: shares, bonds (incl. bond ETFs), cash and other (manually valued), as shares of positions + cash of
- * the fully tracked accounts.
+ * the fully tracked accounts. With targets set, a tick on the bar where each class would end if it were on target.
  */
-export function AssetMix({ snapshot }: { snapshot: Snapshot }) {
+export function AssetMix({ snapshot, targets }: { snapshot: Snapshot; targets?: Targets | null }) {
   const byClass = valueByClass(snapshot);
   const total = ASSET_CLASSES.reduce((s, k) => s + byClass[k], 0);
   const slices = ASSET_CLASSES.filter((k) => byClass[k] > 0).map((key) => ({ key, value: byClass[key], share: total ? byClass[key] / total : 0 }));
+  // The targets' boundaries along the bar (the classes in the bar's order), the last one (100 %) left out.
+  let edge = 0;
+  const ticks = targets ? ASSET_CLASSES.filter((k) => targets.targets[k] > 0).map((k) => ({ key: k, at: (edge += targets.targets[k]) })).filter((t) => t.at < 99.95) : [];
   return (
     <section className="asset-mix" data-testid="asset-mix" aria-label="Asset mix">
-      <div className="mix-bar" aria-hidden>
-        {slices.map((s) => (
-          <span key={s.key} className={`mix-${s.key}`} style={{ width: `${(s.share * 100).toFixed(2)}%` }} title={`${CLASS_LABELS[s.key]}: ${fmtNum(s.share * 100, 1)} %`} />
+      <div className="mix-track">
+        <div className="mix-bar" aria-hidden>
+          {slices.map((s) => (
+            <span key={s.key} className={`mix-${s.key}`} style={{ width: `${(s.share * 100).toFixed(2)}%` }} title={`${CLASS_LABELS[s.key]}: ${fmtNum(s.share * 100, 1)} %`} />
+          ))}
+        </div>
+        {ticks.map((t) => (
+          <i key={t.key} className="mix-target" style={{ left: `${t.at.toFixed(2)}%` }} title={`${CLASS_LABELS[t.key]} target ends at ${fmtNum(t.at, 1)} %`} data-testid={`mix-target-${t.key}`} />
         ))}
       </div>
       <ul className="mix-legend">

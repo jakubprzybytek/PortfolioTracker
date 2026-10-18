@@ -38,6 +38,8 @@ import {
   RETAIL_OFFER_TERMS,
   type HoldSellAssumptions,
   type RetailTerms,
+  TargetsInput,
+  type Targets,
   ASSET_CLASSES,
   defaultAssetClass,
   cpiIndicators,
@@ -125,6 +127,8 @@ async function treasurySeries(code: string): Promise<InstrumentInput | undefined
 /** A corporate bond by ISIN, or the error response. */
 /** Where the hold-or-sell assumptions are kept (settings). */
 const HOLD_SELL_SETTING = "holdSell";
+/** Where the target allocation is kept (settings). */
+const TARGETS_SETTING = "targets";
 
 /**
  * The retail series on sale on `day` (the alternatives): each kind's series of this month, or of the month before
@@ -564,6 +568,22 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
         await repo.putSetting(HOLD_SELL_SETTING, parsed.data);
         return json(200, parsed.data);
+      }
+      case "GET /targets": {
+        // The target share and band per asset class (road map 8); null until set.
+        return json(200, { targets: (await repo.getSetting<Targets>(TARGETS_SETTING)) ?? null });
+      }
+      case "PUT /targets": {
+        // The targets to keep; { reset: true } removes them.
+        const body = bodyOf(event) as Record<string, unknown> | undefined;
+        if (body?.["reset"] === true) {
+          await repo.deleteSetting(TARGETS_SETTING);
+          return json(200, { targets: null });
+        }
+        const parsed = TargetsInput.safeParse(body);
+        if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+        await repo.putSetting(TARGETS_SETTING, parsed.data);
+        return json(200, { targets: parsed.data });
       }
       case "GET /status": {
         const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];

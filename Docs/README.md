@@ -170,7 +170,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 
 ### Missing compared with the sheet
 7. ~~Update the value of a hand-valued asset~~ Done (2026-10-14): "Edit values" in its chart panel (Prices, Holdings), values listed and deletable (ui.md).
-8. **Targets and rebalancing:** target share per asset class (the sheet has them), target vs actual next to the asset mix, amount to buy or sell.
+8. ~~Targets and rebalancing~~ Done (2026-10-18): a target share and a band per class (shares, bonds, cash, other) on the Dashboard under the asset mix (ticks on its bar), target vs actual per class, and a calculator switching between "New money" (a deposit split across the classes below target, nothing sold) and "Sell and buy" (every class to its target) (ui.md, "Targets").
 9. **Closed positions:** realised gain per account (Dashboard) and, since 2026-10-16, per closed position ("Show closed" in Holdings). Still missing: the list of sales (each with its matched cost and proceeds), and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
 11. **IBKR Flex Web Service:** IBKR trades without downloading statements (needs a Flex Query and a token); mark prices for US T-bills.

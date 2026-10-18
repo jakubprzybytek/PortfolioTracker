@@ -204,12 +204,11 @@ GSI1PK = NOTE               GSI1SK = <note_id>
 PK = SETTING#<name>         SK = META
 ```
 
-`value`, `updatedAt`: choices made in the app that aren't data, e.g. `holdSell` (the Hold or sell assumptions: `cpi`, `wibor`, `nbpRate`, `alternative`, `altRate`, `commission`). Deleted to go back to the defaults. Not in the monthly backup (set again in a minute).
+`value`, `updatedAt`: choices made in the app that aren't data, e.g. `holdSell` (the Hold or sell assumptions: `cpi`, `wibor`, `nbpRate`, `alternative`, `altRate`, `commission`; deleted to go back to the defaults) and `targets` (the target allocation: `targets` and `bands` per asset class, in %; deleted by "Remove targets"). Not in the monthly backup (set again in a minute).
 
 ### Later: settings you enter
 
 ```
-PK = TARGETS                SK = <asset_class>                  target_pct                    (allocation targets, rebalancing)
 PK = MULTI#<ISIN>           SK = META                           split: { <asset_class>: pct } (multi-asset look-through)
 ```
 

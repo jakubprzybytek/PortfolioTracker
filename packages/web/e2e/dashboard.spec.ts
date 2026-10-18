@@ -145,6 +145,61 @@ test.describe("dashboard", () => {
     expect(Math.abs(sum - 100)).toBeLessThan(0.5);
   });
 
+  test("targets: set them, compare with the mix, split new money, sell and buy; then remove them", async ({ page }) => {
+    const num = (t: string) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", ".") || 0);
+    const signed = (t: string) => (t.startsWith("sell") ? -num(t) : num(t));
+    const classes = ["SHARES", "BONDS", "CASH", "OTHER"];
+    // Start without targets (a run before may have left them)
+    await expect(page.getByTestId("targets-edit")).toBeVisible();
+    if ((await page.getByTestId("targets-edit").textContent()) === "Edit targets") {
+      await page.getByTestId("targets-edit").click();
+      await page.getByTestId("targets-remove").click();
+    }
+    await expect(page.getByTestId("targets")).toContainText("No targets yet");
+    await expect(page.locator(".mix-target")).toHaveCount(0);
+
+    // The form: the targets must add up to 100 %
+    await page.getByTestId("targets-edit").click();
+    await page.getByTestId("targets-SHARES-target").fill("60");
+    await page.getByTestId("targets-BONDS-target").fill("35");
+    await page.getByTestId("targets-CASH-target").fill("4");
+    await expect(page.getByTestId("targets-sum")).toHaveText("99 %");
+    await expect(page.getByTestId("targets-save")).toBeDisabled();
+    await page.getByTestId("targets-CASH-target").fill("5");
+    await expect(page.getByTestId("targets-sum")).toHaveText("100 % ✓");
+    await page.getByTestId("targets-save").click();
+
+    // Target vs actual, a tick on the asset mix where shares' and bonds' targets end
+    await expect(page.getByTestId("targets-table")).toBeVisible();
+    await expect(page.locator(".mix-target")).toHaveCount(2);
+    await expect(page.getByTestId("targets-SHARES")).toContainText("60 %");
+    await expect(page.getByTestId("targets-mode").getByRole("button", { name: "New money" })).toHaveAttribute("aria-pressed", "true");
+    for (const k of classes) await expect(page.getByTestId(`targets-${k}-trade`)).toHaveText("–");
+
+    // New money: only buys, adding up to the amount
+    await page.getByTestId("targets-amount").fill("10 000");
+    await expect.poll(async () => (await Promise.all(classes.map((k) => page.getByTestId(`targets-${k}-trade`).textContent()))).reduce((s, t) => s + signed(t!), 0)).toBeCloseTo(10_000, 1);
+    for (const k of classes) expect(await page.getByTestId(`targets-${k}-trade`).textContent()).not.toMatch(/^sell/);
+
+    // Sell and buy: the sales pay for the buys, every class ends on target
+    await page.getByTestId("targets-mode").getByRole("button", { name: "Sell and buy" }).click();
+    await expect(page.getByTestId("targets-amount")).toHaveCount(0);
+    const trades = await Promise.all(classes.map((k) => page.getByTestId(`targets-${k}-trade`).textContent()));
+    expect(Math.abs(trades.reduce((s, t) => s + signed(t!), 0))).toBeLessThan(0.05);
+    await expect(page.getByTestId("targets-SHARES").locator("td").last()).toHaveText("60,0 %");
+
+    // On a phone the panel fits the screen
+    await page.setViewportSize({ width: 390, height: 844 });
+    const box = (await page.getByTestId("targets").boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+    expect(await page.getByTestId("targets-table").evaluate((t) => t.scrollWidth <= t.parentElement!.clientWidth + 1)).toBe(true);
+
+    // Remove them again
+    await page.getByTestId("targets-edit").click();
+    await page.getByTestId("targets-remove").click();
+    await expect(page.getByTestId("targets")).toContainText("No targets yet");
+  });
+
   test("while a new range loads: buttons disabled, the chart dimmed with a spinner", async ({ page }) => {
     await expect(page.getByTestId("portfolio-chart").locator("svg.recharts-surface")).toBeVisible();
     let release!: () => void;
