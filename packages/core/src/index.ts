@@ -13,6 +13,7 @@ export * from "./db/items.ts";
 export * from "./db/repository.ts";
 export * from "./valuation/positions.ts";
 export * from "./valuation/ledger.ts";
+export * from "./valuation/range.ts";
 export * from "./valuation/closed.ts";
 export * from "./valuation/valuePortfolio.ts";
 export * from "./valuation/priceRows.ts";

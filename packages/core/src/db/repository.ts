@@ -32,6 +32,8 @@ import {
 } from "./items.ts";
 
 const GSI1 = "GSI1";
+/** BatchWrites in flight at once (each up to 25 items). */
+const BATCH_WRITES_AT_ONCE = 4;
 
 /**
  * Table names, read on every call. A function linked to only some tables can pass getters,
@@ -66,27 +68,29 @@ export class Repository {
     await this.doc.send(new PutCommand({ TableName: this.tables[table], Item: item }));
   }
 
-  /** Writes in batches of 25, retrying unprocessed items. Returns the number of items written. */
+  /** Writes in batches of 25, a few at once, retrying unprocessed items. Returns the number of items written. */
   private batchPut(table: Table, items: object[]): Promise<number> {
     return this.batchWrite(table, items.map((Item) => ({ PutRequest: { Item } })));
   }
 
-  private batchDelete(table: Table, keys: { PK: string; SK: string }[]): Promise<number> {
-    return this.batchWrite(table, keys.map((Key) => ({ DeleteRequest: { Key } })));
-  }
-
-  private async batchWrite(table: Table, all: ({ PutRequest: { Item: object } } | { DeleteRequest: { Key: object } })[]): Promise<number> {
+  private async batchWrite(table: Table, items: ({ PutRequest: { Item: object } } | { DeleteRequest: { Key: object } })[]): Promise<number> {
     const tableName = this.tables[table];
-    const items = all;
-    for (let i = 0; i < items.length; i += 25) {
-      let requests = items.slice(i, i + 25);
+    const batches: (typeof items)[] = [];
+    for (let i = 0; i < items.length; i += 25) batches.push(items.slice(i, i + 25));
+    const send = async (batch: typeof items) => {
+      let requests = batch;
       for (let attempt = 0; requests.length > 0; attempt++) {
         if (attempt > 8) throw new Error(`BatchWrite: ${requests.length} items still unprocessed after ${attempt} attempts`);
         if (attempt > 0) await new Promise((r) => setTimeout(r, 100 * 2 ** attempt));
         const res = await this.doc.send(new BatchWriteCommand({ RequestItems: { [tableName]: requests } }));
         requests = (res.UnprocessedItems?.[tableName] ?? []) as typeof requests;
       }
-    }
+    };
+    let next = 0;
+    const worker = async () => {
+      while (next < batches.length) await send(batches[next++]!);
+    };
+    await Promise.all(Array.from({ length: Math.min(BATCH_WRITES_AT_ONCE, batches.length) }, worker));
     return items.length;
   }
 
@@ -351,16 +355,6 @@ export class Repository {
 
   // --- snapshots -------------------------------------------------------------------------------
 
-  async putSnapshot(snapshot: Omit<SnapshotItem, "PK" | "SK">, alsoLatest: boolean): Promise<void> {
-    await this.put("holdings", { ...keys.snapshot(snapshot.date), ...snapshot });
-    if (alsoLatest) await this.putLatestSnapshot(snapshot);
-  }
-
-  /** Only SNAP#LATEST (the day's own item is already up to date). */
-  async putLatestSnapshot(snapshot: Omit<SnapshotItem, "PK" | "SK">): Promise<void> {
-    await this.put("holdings", { ...keys.snapshot("LATEST"), ...snapshot });
-  }
-
   getSnapshot(date: IsoDate | "LATEST"): Promise<SnapshotItem | undefined> {
     return this.get<SnapshotItem>("holdings", keys.snapshot(date));
   }
@@ -380,20 +374,30 @@ export class Repository {
   // --- history (a chart point per day, one item per position per day) --------------------------
 
   /**
-   * A day's history in one batch: each holding passed as that position's value on the day (pass only the changed
-   * ones) and, when given, the day's chart point.
+   * What a revaluation writes for a run of days, in as few BatchWrites as possible: the changed days' snapshots (and
+   * SNAP#LATEST), each changed day's position days (pass only the holdings whose day changed) and the days of positions
+   * gone. Chart points go separately (putHistoryPoints), after these. Returns the number of items written.
    */
-  putDayHistory(date: IsoDate, holdings: SnapshotItem["holdings"], point?: Omit<HistoryPointItem, "PK" | "SK">): Promise<number> {
-    const positions = holdings.map((h): PositionDayItem => ({
-      ...keys.positionDay(h.account, h.isin, date),
-      account: h.account,
-      isin: h.isin,
-      date,
-      quantity: h.quantity,
-      value: h.value,
-      cost: h.cost,
-    }));
-    return this.batchPut("holdings", [...positions, ...(point ? [{ ...keys.historyPoint(point.date), ...point }] : [])]);
+  writeValuedDays(days: {
+    snapshots: Omit<SnapshotItem, "PK" | "SK">[];
+    latest?: Omit<SnapshotItem, "PK" | "SK">;
+    positionDays: { date: IsoDate; holdings: SnapshotItem["holdings"] }[];
+    gone: { account: string; isin: string; date: IsoDate }[];
+  }): Promise<number> {
+    const positions = days.positionDays.flatMap(({ date, holdings }) =>
+      holdings.map((h): PositionDayItem => ({ ...keys.positionDay(h.account, h.isin, date), account: h.account, isin: h.isin, date, quantity: h.quantity, value: h.value, cost: h.cost })),
+    );
+    return this.batchWrite("holdings", [
+      ...days.snapshots.map((s) => ({ PutRequest: { Item: { ...keys.snapshot(s.date), ...s } } })),
+      ...(days.latest ? [{ PutRequest: { Item: { ...keys.snapshot("LATEST"), ...days.latest } } }] : []),
+      ...positions.map((Item) => ({ PutRequest: { Item } })),
+      ...days.gone.map((d) => ({ DeleteRequest: { Key: keys.positionDay(d.account, d.isin, d.date) } })),
+    ]);
+  }
+
+  /** Chart points (`HISTORY`), batched. */
+  putHistoryPoints(points: Omit<HistoryPointItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut("holdings", points.map((p) => ({ ...keys.historyPoint(p.date), ...p })));
   }
 
   queryHistoryPoints(from: IsoDate, to: IsoDate): Promise<HistoryPointItem[]> {
@@ -401,11 +405,6 @@ export class Repository {
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
       ExpressionAttributeValues: { ":pk": "HISTORY", ":from": from, ":to": to },
     });
-  }
-
-  /** Removes days of positions (e.g. one that no longer exists after a transaction was edited or deleted). */
-  deletePositionDays(days: { account: string; isin: string; date: IsoDate }[]): Promise<number> {
-    return this.batchDelete("holdings", days.map((d) => keys.positionDay(d.account, d.isin, d.date)));
   }
 
   /** Every position day in the table (a full scan: for the one-off cleanup of days left by older versions). */

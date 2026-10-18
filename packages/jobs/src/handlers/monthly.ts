@@ -76,7 +76,7 @@ export async function handler() {
       const r = await importRetailRates(content, url);
       itemsWritten += r.series + r.refreshed;
       notes.push(`retail: ${r.series} series, ${r.refreshed} instruments refreshed`);
-      if (r.refreshed > 0) await queueValuation({ reason: "retail-rates" });
+      if (r.refreshed > 0) await queueValuation({ reason: "retail-rates", isins: r.refreshedIsins });
     } catch (err) {
       notes.push(`retail file failed: ${(err as Error).message}`);
     }

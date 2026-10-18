@@ -22,10 +22,12 @@ import {
   parseTransactionFile,
   type BondTerms,
   type InstrumentItem,
+  type IsoDate,
   type RetailTerms,
 } from "@portfolio/core";
 import { invokeAsync, queueValuation, repo, runJob } from "../lib/context.ts";
 import type { BackfillEvent } from "./backfill.ts";
+import type { ValuationEvent } from "./valuation.ts";
 
 const s3 = new S3Client({});
 
@@ -67,15 +69,15 @@ export async function importMfCalculator(content: Buffer, source: string) {
 export async function importRetailRates(content: Uint8Array, source: string) {
   const series = parseRetailRates(content);
   const stored = await repo.putRetailSeries([...series.values()], source);
-  let refreshed = 0;
+  const refreshedIsins: string[] = [];
   for (const inst of await repo.listInstruments()) {
     const terms = inst.type === "BOND_RETAIL" ? series.get(inst.code) : undefined;
     if (!terms || JSON.stringify(terms) === JSON.stringify(inst.retail)) continue;
     const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, updatedAt: _u, ...rest } = inst;
     await repo.putInstrument({ ...rest, retail: terms });
-    refreshed++;
+    refreshedIsins.push(inst.isin);
   }
-  return { series: stored, refreshed };
+  return { series: stored, refreshed: refreshedIsins.length, refreshedIsins };
 }
 
 export async function importInstruments(json: string) {
@@ -135,44 +137,56 @@ export async function importInstruments(json: string) {
 
 export async function importTransactions(json: string, source: string) {
   const rows = parseTransactionFile(json, source);
-  return { transactions: await repo.putTransactions(rows) };
+  return { transactions: await repo.putTransactions(rows), from: earliest(rows.map((r) => r.date)) };
 }
 
-export async function importKey(bucket: string, key: string): Promise<{ itemsWritten: number; note: string }> {
+const earliest = (dates: IsoDate[]): IsoDate | undefined => dates.reduce<IsoDate | undefined>((m, d) => (m === undefined || d < m ? d : m), undefined);
+
+/**
+ * What an imported file asks to revalue: from its earliest date, from the first transaction of the instruments it
+ * changed, everything (`{}`), or nothing (undefined).
+ */
+type Revalue = Pick<ValuationEvent, "from" | "isins"> | undefined;
+const fromDate = (from: IsoDate | undefined): Revalue => (from ? { from } : undefined);
+
+export async function importKey(bucket: string, key: string): Promise<{ itemsWritten: number; note: string; revalue: Revalue }> {
   const kind = key.split("/")[1];
   const content = await readObject(bucket, key);
   switch (kind) {
     case "mf-calculator": {
       const r = await importMfCalculator(content, key);
-      return { itemsWritten: r.months + 1, note: `${key}: ${r.months} months, ${r.series} series` };
+      return { itemsWritten: r.months + 1, note: `${key}: ${r.months} months, ${r.series} series`, revalue: {} };
     }
     case "prices": {
-      const n = await repo.putPrices(parseManualPrices(content.toString("utf8"), key));
-      return { itemsWritten: n, note: `${key}: ${n} prices` };
+      const prices = parseManualPrices(content.toString("utf8"), key);
+      const n = await repo.putPrices(prices);
+      return { itemsWritten: n, note: `${key}: ${n} prices`, revalue: fromDate(earliest(prices.map((p) => p.date))) };
     }
     case "coupons": {
-      const n = await repo.putCouponPeriods(parseCouponPeriods(content.toString("utf8")));
-      return { itemsWritten: n, note: `${key}: ${n} coupon periods` };
+      const periods = parseCouponPeriods(content.toString("utf8"));
+      const n = await repo.putCouponPeriods(periods);
+      return { itemsWritten: n, note: `${key}: ${n} coupon periods`, revalue: fromDate(earliest(periods.map((p) => p.start))) };
     }
     case "accounts": {
       const n = await repo.putAccounts(parseAccountsFile(content.toString("utf8")));
-      return { itemsWritten: n, note: `${key}: ${n} accounts` };
+      return { itemsWritten: n, note: `${key}: ${n} accounts`, revalue: {} };
     }
     case "mf-retail": {
       const r = await importRetailRates(content, key);
-      return { itemsWritten: r.series + r.refreshed, note: `${key}: ${r.series} series, ${r.refreshed} instruments refreshed` };
+      return { itemsWritten: r.series + r.refreshed, note: `${key}: ${r.series} series, ${r.refreshed} instruments refreshed`, revalue: r.refreshed ? { isins: r.refreshedIsins } : undefined };
     }
     case "instruments": {
       const r = await importInstruments(content.toString("utf8"));
-      return { itemsWritten: r.instruments, note: `${key}: ${r.instruments} instruments` };
+      // New instruments get valued after their backfill instead.
+      return { itemsWritten: r.instruments, note: `${key}: ${r.instruments} instruments`, revalue: undefined };
     }
     case "transactions": {
       const r = await importTransactions(content.toString("utf8"), key);
-      return { itemsWritten: r.transactions, note: `${key}: ${r.transactions} transactions` };
+      return { itemsWritten: r.transactions, note: `${key}: ${r.transactions} transactions`, revalue: fromDate(r.from) };
     }
     case "notes": {
       const n = await repo.putNotes(parseNotesFile(content.toString("utf8")));
-      return { itemsWritten: n, note: `${key}: ${n} notes` };
+      return { itemsWritten: n, note: `${key}: ${n} notes`, revalue: undefined };
     }
     default:
       throw new Error(`Unknown import kind "${kind}" in ${key}`);
@@ -183,15 +197,16 @@ export async function handler(event: S3Event) {
   return runJob("import", async () => {
     let itemsWritten = 0;
     const notes: string[] = [];
-    let revalue = false;
+    const revalue: NonNullable<Revalue>[] = [];
     for (const r of event.Records) {
       const key = decodeURIComponent(r.s3.object.key.replace(/\+/g, " "));
       const result = await importKey(r.s3.bucket.name, key);
       itemsWritten += result.itemsWritten;
       notes.push(result.note);
-      revalue ||= !key.includes("/instruments/") && !key.includes("/notes/"); // new instruments get valued after their backfill instead; notes don't count
+      if (result.revalue) revalue.push(result.revalue);
     }
-    if (revalue) await queueValuation({ reason: "import" });
+    // One request per file; the valuation merges requests waiting together into one run.
+    for (const r of revalue) await queueValuation({ reason: "import", ...r });
     return { itemsWritten, note: notes.join("; ") };
   });
 }

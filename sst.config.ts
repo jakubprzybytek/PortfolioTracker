@@ -72,9 +72,13 @@ export default $config({
       ...defaults,
       handler: "packages/jobs/src/handlers/valuation.handler",
       timeout: "15 minutes",
+      // CPU grows with memory: a full run on test (6,791 days, before the Ledger) took 77 s at 512 MB and 16 s at 2 GB, at
+      // about the same cost (GB-seconds).
+      memory: "2 GB",
       link: [...link, market, transactions, holdings, valuationQueue], // the queue link lets it receive and delete
     });
-    valuationQueue.subscribe(valuation.arn, { batch: { size: 1 } });
+    // Up to 10 requests waiting together make one run (a FIFO queue allows 10; the handler merges their ranges).
+    valuationQueue.subscribe(valuation.arn, { batch: { size: 10 } });
 
     const backfill = new sst.aws.Function("Backfill", {
       ...defaults,

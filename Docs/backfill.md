@@ -89,7 +89,7 @@ Accrued interest is computed by the valuation from each bond's coupon periods. T
 
 ### 11. Snapshots
 - Run the valuation for every trading day from the first transaction to yesterday.
-- At ~25 holdings this takes seconds; re-run whenever transactions or prices are corrected.
+- At ~25 holdings this takes seconds; re-run whenever transactions or prices are corrected. A backfill queues a revaluation of its instrument (`isins`), from that instrument's first transaction.
 
 ## Verification after backfill
 
