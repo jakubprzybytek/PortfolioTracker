@@ -76,7 +76,7 @@ Docs/
 
 ## Delivery
 
-GitHub Actions on `main`: deploy `int` → integration + E2E tests → deploy `prod` → tag `v0.N` (see the root README).
+GitHub Actions on `main`: deploy `int` → integration + E2E tests → tag `v0.N` → deploy `prod` and `test` from the tag (see the root README).
 
 | Stage | Deployed by | Data | URL |
 |---|---|---|---|

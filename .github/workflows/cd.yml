@@ -1,5 +1,5 @@
-# Continuous delivery: every push to main deploys `int`, runs the tests against it,
-# then deploys `prod` and `test` in parallel and tags the commit with the next minor version (v0.1, v0.2, …).
+# Continuous delivery: every push to main deploys `int`, runs the tests against it and tags the commit
+# with the next minor version (v0.1, v0.2, …); then `prod` and `test` deploy in parallel from that tag.
 
 name: CD
 
@@ -22,31 +22,28 @@ env:
   NODE_VERSION: "24"
 
 jobs:
-  version:
-    name: Next version
+  # One job: deploy int, run the tests against it, tag the commit. The tag marks a release that passed int.
+  int:
+    name: Deploy int + test + tag
     runs-on: ubuntu-latest
+    environment: int
     outputs:
-      version: ${{ steps.next.outputs.version }}
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
-      - id: next
+          fetch-depth: 0 # the tags, for the next version
+      # A commit that already has a tag (a re-run) keeps it; otherwise the next minor version.
+      - id: version
         run: |
+          current=$(git tag --points-at HEAD --list 'v0.*' --sort=-v:refname | head -n1)
           latest=$(git tag --list 'v0.*' --sort=-v:refname | head -n1)
-          if [ -z "$latest" ]; then next="v0.1"; else next="v0.$(( ${latest#v0.} + 1 ))"; fi
-          echo "latest=${latest:-none} next=$next"
-          echo "version=$next" >> "$GITHUB_OUTPUT"
-
-  int:
-    name: Deploy int + test
-    needs: version
-    runs-on: ubuntu-latest
-    environment: int
-    env:
-      APP_VERSION: ${{ needs.version.outputs.version }}
-    steps:
-      - uses: actions/checkout@v7
+          if [ -n "$current" ]; then version="$current"
+          elif [ -z "$latest" ]; then version="v0.1"
+          else version="v0.$(( ${latest#v0.} + 1 ))"; fi
+          echo "latest=${latest:-none} current=${current:-none} version=$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -76,11 +73,18 @@ jobs:
           name: playwright-results
           path: packages/web/test-results
           retention-days: 7
+      - name: Tag ${{ env.APP_VERSION }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$APP_VERSION" >/dev/null; then echo "$APP_VERSION already tagged"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$APP_VERSION" -m "Release $APP_VERSION"
+          git push origin "$APP_VERSION"
 
-  # prod and test deploy side by side once int passed; one failing doesn't cancel the other. Only prod tags.
+  # prod and test deploy side by side from the tag once int passed; one failing doesn't cancel the other.
   deploy:
-    name: Deploy ${{ matrix.stage }}${{ matrix.stage == 'prod' && ' + tag' || '' }}
-    needs: [version, int]
+    name: Deploy ${{ matrix.stage }}
+    needs: int
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -88,9 +92,11 @@ jobs:
         stage: [prod, test]
     environment: ${{ matrix.stage }}
     env:
-      APP_VERSION: ${{ needs.version.outputs.version }}
+      APP_VERSION: ${{ needs.int.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ needs.int.outputs.version }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -102,10 +108,3 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - name: Deploy ${{ matrix.stage }}
         run: npx sst deploy --stage ${{ matrix.stage }}
-      - name: Tag ${{ env.APP_VERSION }}
-        if: matrix.stage == 'prod'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "$APP_VERSION" -m "Release $APP_VERSION"
-          git push origin "$APP_VERSION"
