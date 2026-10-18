@@ -365,6 +365,11 @@ export class Repository {
     return this.get<SnapshotItem>("holdings", keys.snapshot(date));
   }
 
+  /** The stored snapshots of these days (batched reads); days without one are left out. */
+  getSnapshots(dates: IsoDate[]): Promise<SnapshotItem[]> {
+    return this.batchGet<SnapshotItem>("holdings", dates.map((d) => keys.snapshot(d)));
+  }
+
   querySnapshots(from: IsoDate, to: IsoDate): Promise<SnapshotItem[]> {
     return this.queryAll<SnapshotItem>("holdings", {
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",

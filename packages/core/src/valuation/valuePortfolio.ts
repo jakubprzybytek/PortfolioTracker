@@ -4,9 +4,8 @@ import { settlementDate } from "../settlement.ts";
 import type { ReferenceIndex } from "../bonds/izIndex.ts";
 import { corporateAccrued, quantityHeld, type InterestPeriod } from "../bonds/couponPeriods.ts";
 import type { AccountSnapshot, HoldingSnapshot, InstrumentItem, PriceItem, SnapshotItem, TransactionItem } from "../db/items.ts";
-import { positionsAt } from "./positions.ts";
-import { retailLotsAt, valueRetailLots } from "./retailLots.ts";
-import { cashByAccount } from "./cash.ts";
+import { Ledger } from "./ledger.ts";
+import { valueRetailLots } from "./retailLots.ts";
 import { rateOn, type FxHistory } from "./fx.ts";
 import { round2 } from "../bonds/izIndex.ts";
 
@@ -27,6 +26,11 @@ export interface ValuationContext {
   fx?: Map<string, { mid: number; date: IsoDate }>;
   /** All NBP mid rates per currency, oldest first: transactions in another currency count at the rate of the day before. */
   fxHistory?: FxHistory;
+  /**
+   * The transactions walked forward (a Ledger over `transactions` and `fxHistory`), for valuing many days in date
+   * order: each call advances it to `date`. Without one, every call replays all transactions up to `date`.
+   */
+  ledger?: Ledger;
 }
 
 const daysBetween = (a: IsoDate, b: IsoDate) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -35,7 +39,8 @@ const daysBetween = (a: IsoDate, b: IsoDate) => Math.round((Date.parse(b) - Date
 export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" | "SK"> {
   const { date, staleAfterDays = 10 } = ctx;
   const byIsin = new Map(ctx.instruments.map((i) => [i.isin, i]));
-  const positions = positionsAt(ctx.transactions, date, ctx.fxHistory);
+  const ledger = (ctx.ledger ?? new Ledger(ctx.transactions, ctx.fxHistory)).advanceTo(date);
+  const positions = ledger.positions();
   const fxOn = (currency: string) => ctx.fx?.get(currency) ?? rateOn(ctx.fxHistory, currency, date);
   const holdings: HoldingSnapshot[] = [];
 
@@ -61,7 +66,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     // Retail treasury bonds: no market price; value = Σ lots × nominal with interest (published rates).
     if (inst?.type === "BOND_RETAIL") {
       if (!inst.retail) flags.push("missing_terms");
-      const lots = retailLotsAt(ctx.transactions.filter((t) => t.account === p.account && t.isin === p.isin), date);
+      const lots = ledger.retailLots(p.account, p.isin);
       const r = inst.retail ? valueRetailLots(inst.retail, lots, date) : undefined;
       const value = r ? r.value : null;
       const gain = value === null ? null : round2(value - p.cost);
@@ -113,7 +118,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       // (IBKR bonds come here too: zero-coupon, so the clean price is the whole value.)
       if (inst.type === "BOND_CORPORATE") {
         // To the settlement day (T+2), as Catalyst quotes it.
-        corporate = corporateAccrued(ctx.couponPeriods.get(p.isin) ?? [], inst.nominal, date, p.quantity, (day) => quantityHeld(ctx.transactions, p.account, p.isin, day), settlementDate(date));
+        corporate = corporateAccrued(ctx.couponPeriods.get(p.isin) ?? [], inst.nominal, date, p.quantity, (day) => quantityHeld(ledger.transactionsOf(p.account, p.isin), p.account, p.isin, day), settlementDate(date));
         if (corporate.total !== null) accruedInterest = round2(corporate.total / p.quantity);
         else flags.push("no_coupon_rate");
       }
@@ -182,7 +187,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
   const meta = new Map((ctx.accounts ?? []).map((a) => [a.account, a]));
   const accounts: Record<string, AccountSnapshot> = {};
   let cashTotal = 0;
-  for (const [account, byCurrency] of [...cashByAccount(ctx.transactions, date)].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [account, byCurrency] of [...ledger.cashByAccount()].sort(([a], [b]) => a.localeCompare(b))) {
     const missing = meta.get(account)?.incomplete ?? [];
     const baseCurrency = meta.get(account)?.baseCurrency;
     // Each currency at the day's NBP rate; the account's cash is their sum in PLN.

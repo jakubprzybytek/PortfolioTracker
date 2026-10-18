@@ -2,6 +2,8 @@
 // Runs only from the FIFO queue (one at a time, in order). A direct invocation (the 22:30/07:30 schedules, or by hand
 // with { from, to, reason }) just queues its request, so it can't overlap a run started by an import or backfill.
 // Days that come out as stored aren't written again (writes are what a run costs); { force: true } writes them all.
+// A day's chart point keeps a fingerprint of its snapshot: a day that comes out with the same one is skipped without
+// reading its stored snapshot.
 
 import {
   addDays,
@@ -9,6 +11,7 @@ import {
   firstTransactionDate,
   historyPointChanged,
   historyPointOf,
+  Ledger,
   toReferenceIndex,
   today,
   valuePortfolio,
@@ -17,9 +20,18 @@ import {
   type IsoDate,
   type PriceItem,
   snapshotChanged,
+  snapshotFingerprint,
+  type HistoryPointItem,
+  type SnapshotItem,
 } from "@portfolio/core";
 import type { SQSEvent } from "aws-lambda";
+import { mapLimit } from "../lib/concurrency.ts";
 import { queueValuation, repo, runJob } from "../lib/context.ts";
+
+/** Days valued before their stored snapshots are read (those whose fingerprint differs, in one batch) and written. */
+const CHUNK_DAYS = 100;
+/** Instruments (prices, coupon periods) and currencies loaded at once. */
+const LOAD_CONCURRENCY = 10;
 
 export interface ValuationEvent {
   from?: IsoDate;
@@ -50,22 +62,21 @@ async function revalue(event: ValuationEvent) {
     // A change dated after today (e.g. a future transaction) touches no valued day yet.
     if (from > to) return { itemsWritten: 0, note: `${from} is after ${to}: nothing to value (${event.reason ?? "schedule"})` };
 
-    // Interest periods of corporate bonds (accrued interest).
-    const couponPeriods = new Map<string, CouponPeriodItem[]>();
-    for (const i of tracked.filter((i) => i.type === "BOND_CORPORATE")) couponPeriods.set(i.isin, await repo.listCouponPeriods(i.isin));
-
-    // Load every price once per instrument for the whole range and walk forward.
-    const priceHistory = new Map<string, PriceItem[]>();
-    for (const i of tracked) {
-      const items = await repo.queryPrices(i.isin, i.venue, "0000-00-00", to);
-      priceHistory.set(i.isin, items.sort((a, b) => a.date.localeCompare(b.date)));
-    }
-
-    // Exchange rates of the currencies instruments are priced in and money moved in, walked forward the same way;
-    // the whole history also goes to the valuation (transactions count at the rate of the day before).
+    // Every price and exchange rate of the whole range once (walked forward below), the interest periods of corporate
+    // bonds (accrued interest) and the stored chart points, several at a time. The whole FX history also goes to the
+    // valuation (transactions count at the rate of the day before).
+    const corporate = tracked.filter((i) => i.type === "BOND_CORPORATE");
     const currencies = [...new Set([...tracked.map((i) => i.currency), ...transactions.flatMap((t) => [t.currency, t.toCurrency ?? "PLN"])].filter((c) => c && c !== "PLN"))];
-    const fxHistory = new Map<string, FxRateItem[]>();
-    for (const c of currencies) fxHistory.set(c, (await repo.queryFxRates(c, "0000-00-00", to)).sort((a, b) => a.date.localeCompare(b.date)));
+    const byDate = <T extends { date: IsoDate }>(items: T[]) => items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    const [periods, prices, rates, storedPoints] = await Promise.all([
+      mapLimit(corporate, LOAD_CONCURRENCY, (i) => repo.listCouponPeriods(i.isin)),
+      mapLimit(tracked, LOAD_CONCURRENCY, async (i) => byDate(await repo.queryPrices(i.isin, i.venue, "0000-00-00", to))),
+      mapLimit(currencies, LOAD_CONCURRENCY, async (c) => byDate(await repo.queryFxRates(c, "0000-00-00", to))),
+      repo.queryHistoryPoints(from, to),
+    ]);
+    const couponPeriods = new Map<string, CouponPeriodItem[]>(corporate.map((i, n) => [i.isin, periods[n]!]));
+    const priceHistory = new Map<string, PriceItem[]>(tracked.map((i, n) => [i.isin, prices[n]!]));
+    const fxHistory = new Map<string, FxRateItem[]>(currencies.map((c, n) => [c, rates[n]!]));
 
     // Walk forward: each series keeps a cursor at its latest item on or before the day.
     const cursor = <T extends { date: IsoDate }>(items: T[]) => {
@@ -78,17 +89,52 @@ async function revalue(event: ValuationEvent) {
     const priceAt = [...priceHistory].map(([isin, items]) => [isin, cursor(items)] as const);
     const fxAt = [...fxHistory].map(([c, items]) => [c, cursor(items)] as const);
 
-    // The positions each day had before: one that's gone now (a transaction edited or deleted) loses its days too,
-    // so its row chart doesn't keep stale days.
-    // The stored days also tell which come out unchanged: those aren't written again. Their chart points likewise: an
-    // unchanged day still gets its point when it has none (days valued before points existed) or a different one.
-    const [storedSnapshots, storedPoints] = await Promise.all([repo.querySnapshots(from, to), repo.queryHistoryPoints(from, to)]);
-    const before = new Map(storedSnapshots.map((s) => [s.date, s]));
+    // Positions and cash carried from day to day instead of replaying every transaction for each.
+    const ledger = new Ledger(transactions, fxHistory);
     const pointsBefore = new Map(storedPoints.map((p) => [p.date, p]));
     let written = 0;
     let unchanged = 0;
     let removed = 0;
     let pointsOnly = 0;
+    let read = 0;
+
+    type Day = { date: IsoDate; snapshot: Omit<SnapshotItem, "PK" | "SK">; point: Omit<HistoryPointItem, "PK" | "SK"> };
+    const save = async (days: Day[]) => {
+      // A day whose stored point has the snapshot's fingerprint is unchanged. The others need the stored snapshot: to
+      // compare (a point written before fingerprints may well match), for the positions whose day changed and for the
+      // positions gone (one that's gone now, after a transaction was edited or deleted, loses its days too, so its row
+      // chart doesn't keep stale days).
+      const same = (d: Day) => !event.force && pointsBefore.get(d.date)?.fingerprint === d.point.fingerprint;
+      const toRead = days.filter((d) => !same(d)).map((d) => d.date);
+      const before = new Map((toRead.length ? await repo.getSnapshots(toRead) : []).map((s) => [s.date, s]));
+      read += before.size;
+      for (const day of days) {
+        const { date, snapshot, point } = day;
+        const was = before.get(date);
+        // An unchanged day still gets its point when it has none (days valued before points existed) or a different
+        // one (e.g. without a fingerprint yet).
+        const pointChanged = event.force || historyPointChanged(pointsBefore.get(date), point);
+        if (same(day) || (!event.force && !snapshotChanged(was, snapshot))) {
+          if (date === to) await repo.putLatestSnapshot(snapshot);
+          if (pointChanged) {
+            await repo.putDayHistory(date, [], point);
+            pointsOnly++;
+          }
+          unchanged++;
+          continue;
+        }
+        await repo.putSnapshot(snapshot, date === to);
+        // Per-position history for the Holdings row charts (only the positions whose day changed) and the chart point,
+        // after the snapshot: a point with the new fingerprint must not stand for a snapshot that wasn't written.
+        await repo.putDayHistory(date, changedPositionDays(event.force ? undefined : was, snapshot), pointChanged ? point : undefined);
+        const now = new Set(snapshot.holdings.map((h) => `${h.account}#${h.isin}`));
+        const gone = (was?.holdings ?? []).filter((h) => !now.has(`${h.account}#${h.isin}`));
+        if (gone.length) removed += await repo.deletePositionDays(gone.map((h) => ({ account: h.account, isin: h.isin, date })));
+        written++;
+      }
+    };
+
+    let days: Day[] = [];
     for (let date = from; date <= to; date = addDays(date, 1)) {
       const prices = new Map<string, PriceItem>();
       for (const [isin, at] of priceAt) {
@@ -100,31 +146,18 @@ async function revalue(event: ValuationEvent) {
         const r = at(date);
         if (r) fx.set(c, { mid: r.mid, date: r.date });
       }
-      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponPeriods, accounts, fx, fxHistory });
-      const stored = event.force ? undefined : before.get(date);
-      const point = historyPointOf(snapshot);
-      const pointChanged = event.force || historyPointChanged(pointsBefore.get(date), point);
-      if (!snapshotChanged(stored, snapshot)) {
-        if (date === to) await repo.putLatestSnapshot(snapshot);
-        if (pointChanged) {
-          await repo.putDayHistory(date, [], point);
-          pointsOnly++;
-        }
-        unchanged++;
-        continue;
+      const snapshot = valuePortfolio({ date, instruments: tracked, transactions, prices, referenceIndex, couponPeriods, accounts, fx, fxHistory, ledger });
+      days.push({ date, snapshot, point: { ...historyPointOf(snapshot), fingerprint: snapshotFingerprint(snapshot) } });
+      if (days.length === CHUNK_DAYS || date === to) {
+        await save(days);
+        days = [];
       }
-      await repo.putSnapshot(snapshot, date === to);
-      // Per-position history for the Holdings row charts (only the positions whose day changed) and the chart point.
-      await repo.putDayHistory(date, changedPositionDays(stored, snapshot), pointChanged ? point : undefined);
-      const now = new Set(snapshot.holdings.map((h) => `${h.account}#${h.isin}`));
-      const gone = (before.get(date)?.holdings ?? []).filter((h) => !now.has(`${h.account}#${h.isin}`));
-      if (gone.length) removed += await repo.deletePositionDays(gone.map((h) => ({ account: h.account, isin: h.isin, date })));
-      written++;
     }
     const notes = [
       unchanged ? `${unchanged} days unchanged` : "",
       pointsOnly ? `${pointsOnly} of them only their chart point written` : "",
       removed ? `${removed} days of positions gone removed` : "",
+      read ? `${read} stored snapshots read` : "",
     ].filter(Boolean);
     return { itemsWritten: written, note: `${from} → ${to} (${event.reason ?? "schedule"})${notes.map((n) => `; ${n}`).join("")}` };
   });

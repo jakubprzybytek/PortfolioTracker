@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HistoryPointItem, HoldingSnapshot, SnapshotItem } from "../src/db/items.ts";
-import { changedPositionDays, historyPointChanged, snapshotChanged } from "../src/valuation/unchanged.ts";
+import { canonicalJson, changedPositionDays, historyPointChanged, snapshotChanged, snapshotFingerprint } from "../src/valuation/unchanged.ts";
 import { historyPointOf } from "../src/valuation/history.ts";
 
 const holding = (h: Partial<HoldingSnapshot> & Pick<HoldingSnapshot, "account" | "isin">): HoldingSnapshot =>
@@ -75,5 +75,21 @@ describe("historyPointChanged", () => {
 
   it("a different value is", () => {
     expect(historyPointChanged(storedPoint(point), historyPointOf(snapshot([{ ...h, value: 1100 }])))).toBe(true);
+  });
+});
+
+describe("canonicalJson and snapshotFingerprint", () => {
+  it("the same whatever the key order and undefined fields; NaN as JSON writes it", () => {
+    expect(canonicalJson({ b: 1, a: [1, undefined, { d: null, c: "x" }], u: undefined })).toBe('{"a":[1,null,{"c":"x","d":null}],"b":1}');
+    expect(canonicalJson({ n: NaN })).toBe(JSON.stringify({ n: NaN }));
+  });
+
+  it("a stored snapshot has the fingerprint of the one computed again; any change gives another", () => {
+    const h = holding({ account: "a", isin: "EDO0136" });
+    const fp = snapshotFingerprint(snapshot([h]));
+    expect(fp).toMatch(/^[0-9a-f]{14}$/);
+    expect(snapshotFingerprint(stored(snapshot([h], "2026-10-16T07:00:00.000Z")))).toBe(fp);
+    expect(snapshotFingerprint(snapshot([{ ...h, value: 1050.01 }]))).not.toBe(fp);
+    expect(snapshotFingerprint(snapshot([h, holding({ account: "a", isin: "COI0128" })]))).not.toBe(fp);
   });
 });

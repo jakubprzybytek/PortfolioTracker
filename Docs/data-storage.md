@@ -224,7 +224,7 @@ Items stay small: about 25 holdings, well under the 400 KB item limit.
 PK = HISTORY                SK = <YYYY-MM-DD>
 ```
 
-`date`, `totals`, `byType`, `byClass` (value per asset class: SHARES, BONDS, CASH, OTHER): the part of a day's snapshot the Dashboard's charts use, without the holdings (~250 bytes instead of ~2–20 KB). Written by the valuation in the day's position-day batch, when the point is new or differs from the stored one: a range valued before points existed gets them from its next run over it. Read by `GET /portfolio/history` (`netDeposits` is computed there from the transactions, so it can't go stale). All 6,791 days of the `test` stage (2008→) are ~1.7 MB, two pages, where the snapshots were 13 MB and ~5 s.
+`date`, `totals`, `byType`, `byClass` (value per asset class: SHARES, BONDS, CASH, OTHER), `fingerprint` (of the day's snapshot as written: a revaluation that gets the same skips the day without reading its snapshot; ingestion.md, "Only what changed is written"): the part of a day's snapshot the Dashboard's charts use, without the holdings (~250 bytes instead of ~2–20 KB). Written by the valuation in the day's position-day batch, when the point is new or differs from the stored one: a range valued before points existed gets them from its next run over it. Read by `GET /portfolio/history` (`netDeposits` is computed there from the transactions, so it can't go stale). All 6,791 days of the `test` stage (2008→) are ~1.7 MB, two pages, where the snapshots were 13 MB and ~5 s.
 
 ### Position history
 

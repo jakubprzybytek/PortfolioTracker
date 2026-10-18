@@ -273,6 +273,8 @@ export interface HistoryPointItem {
   byType: SnapshotItem["byType"];
   /** Value per asset class (`valueByClass`): SHARES, BONDS, CASH, OTHER. */
   byClass: Record<string, number>;
+  /** `snapshotFingerprint` of the day's snapshot as written: a revaluation that gets the same skips the day unread. */
+  fingerprint?: string;
 }
 
 export type BackfillStatus = "pending" | "running" | "done" | "no_history" | "failed";
