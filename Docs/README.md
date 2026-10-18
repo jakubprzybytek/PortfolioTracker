@@ -82,6 +82,7 @@ GitHub Actions on `main`: deploy `int` → integration + E2E tests → tag `v0.N
 |---|---|---|---|
 | `prod` | CD, after `int` passes | yours (starts empty) | https://portfoliotracker.albedoonline.com |
 | `int` | CD, every push to `main` | sample data, re-seeded by the tests | https://int.portfoliotracker.albedoonline.com |
+| `test` | CD, in parallel with `prod` | the history before the app (2008–2022), imported by hand | https://test.portfoliotracker.albedoonline.com |
 | `dev` | you (`npm run dev -- --stage dev` or `npm run deploy -- --stage dev`) | sample data | https://dev.portfoliotracker.albedoonline.com |
 
 Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Router, same origin). Versions are minor tags `v0.1`, `v0.2`, …; the deployed version shows in the page footer.
@@ -124,7 +125,7 @@ Phase 1:
 - [x] Corporate bonds: not in the GPW archive; gpwcatalyst.pl lists all corporate bonds, snapshot only.
 - [x] IZ indexed nominal and accrued interest: computed with the Ministry's method; exact match with published values.
 - [x] IaC: SST v4.
-- [x] Custom domains per stage and CD (int → tests → prod → tag); first release `v0.1` on 2026-10-11.
+- [x] Custom domains per stage and CD (int → tests → prod → tag); first release `v0.1` on 2026-10-11. Since 2026-10-18: int → tests → tag, then `prod` and `test` deploy from the tag.
 
 Later phases:
 - [x] ETF source: Yahoo chart API works from Lambda for all 10 ETFs in the sheet, full daily history (data-sources.md). EODHD stays the fallback.
@@ -144,10 +145,16 @@ Later phases:
 - [x] Notes (2026-10-15): free notes in Markdown in their own view (list by last change, edit with a live preview), in the monthly backup (`notes.json`).
 - [x] Drawdown and allocation over time on the Dashboard (2026-10-15): drawdown on the time-weighted return (deposits and withdrawals don't count), shares/bonds/cash/other stacked to 100 % per day; both follow the portfolio chart's range.
 - [x] IZ nominal on the price chart (2026-10-15): an inflation-linked bond's chart also shows its indexed nominal per bond (dashed, PLN, right-hand axis), so the months of negative CPI show as dips three months later.
+- [x] Write-offs (2026-10-16): a `WRITE_OFF` transaction (the issuer defaulted, nothing came back) closes the units at 0; their cost is a realised loss, cash doesn't move.
+- [x] Closed positions (2026-10-16): "Show closed" in Holdings and Prices adds the positions and instruments held no more, greyed, with their realised gain and coupons, and charts over the time they were held (gaps between holding periods at zero).
+- [x] Finding things (2026-10-16): an "Instrument" text filter in Holdings and Prices; a position's transactions in its chart panel ("Transactions (n)"); Account first among the Transactions filters, notes on one line.
+- [x] Phones (2026-10-17): Transactions as a list of two-line rows, filters in rows of two, the valuation date and "Update prices" on the title's row, the position's transactions in place of its chart; long transaction lists drawn 200 rows at a time.
+- [x] Stage `test` (2026-10-16): the history before the app (2008–2022, accounts closed before it) converted from the history spreadsheet (`scripts/history-sheet-to-import.ts`) and imported; deployed by CD since 2026-10-17.
+- [x] Valuation speed with a long history (2026-10-17/18, measured on `test`: 6,792 days since 2008): the Dashboard charts read a ~250-byte chart point per day instead of whole snapshots ("ALL" had read 13 MB in ~5 s); the valuation walks the transactions once and compares days by fingerprint (computing all days 7.1 s → 0.3 s), writes in batches, merges requests waiting together and starts from the earliest day a change touches (a forced rewrite 182 s → 13.5 s; a run with nothing to write 77 s → ~2 s).
 
-## Outstanding work (2026-10-15)
+## Outstanding work (2026-10-18)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 7, 14, 15, 18, 21. Open: 6, 8–13, 16, 17, 19, 20, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested order: 19, 8.
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 7, 14, 15, 18, 21, 23; 9 in part. Open: 6, 8–13, 16, 17, 19, 20, 22, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested order: 22, 19, 8.
 
 ### Correctness and accuracy
 1. ~~Foreign bonds at IBKR are priced by calculation~~ Done (2026-10-14): the EUR bonds are priced from Börse Stuttgart's closes (onvista, `eod-bonds`), within 0.015 of IBKR's marks; the calculated prices had been up to 1 % off. US T-bills (none held now) stay calculated.
@@ -155,12 +162,12 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 3. ~~Corporate bonds are valued clean~~ Done (2026-10-14): coupon periods with a rate each (obligacje.pl, your coupons, or typed in); a period without a rate is flagged "no rate" and valued clean.
 4. ~~Holdings row charts after an edit or a delete~~ Done (2026-10-14): a revaluation removes the days of positions that are gone; the days left by earlier edits were cleaned up on `prod` (1,856, all from the IBKR rebuild).
 5. ~~Dashboard cards vs the chart~~ Done (2026-10-13): Total, Cash, Net deposits, Profit cards; the profit split into unrealised, realised, income, fees, currency and other; unrealised and realised per account.
-6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed. Since 2026-10-15 such a revaluation only reads (unchanged days aren't written), so what's left is the wasted run.
+6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed. Since 2026-10-15 such a revaluation only reads (unchanged days aren't written), and since 2026-10-18 it starts from that bond's first transaction, so what's left is a short wasted run.
 
 ### Missing compared with the sheet
 7. ~~Update the value of a hand-valued asset~~ Done (2026-10-14): "Edit values" in its chart panel (Prices, Holdings), values listed and deletable (ui.md).
 8. **Targets and rebalancing:** target share per asset class (the sheet has them), target vs actual next to the asset mix, amount to buy or sell.
-9. **Closed positions:** realised gain is shown as a total (Dashboard, per account); still missing: the list of closed positions and sales, and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
+9. **Closed positions:** realised gain per account (Dashboard) and, since 2026-10-16, per closed position ("Show closed" in Holdings). Still missing: the list of sales (each with its matched cost and proceeds), and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1).
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
 11. **IBKR Flex Web Service:** IBKR trades without downloading statements (needs a Flex Query and a token); mark prices for US T-bills.
 12. **More Dashboard charts:** income per year. (Drawdown and allocation over time done on 2026-10-15.)
@@ -174,6 +181,8 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
 18. ~~Monthly export of `transactions` to S3~~ Done (2026-10-14): the `Export` job backs up accounts, instruments, prices entered by hand and transactions to `exports/<date>/` on the 1st, in the import formats (data-storage.md, restore: data/README.md).
 21. ~~Responsiveness when switching views~~ Done (2026-10-15): `useApi` goes through SWR, so a view visited before shows its last data at once and refetches it in the background (placeholders only the first time); a save or a finished valuation refetches what's on screen. **Reload** in the menu frame refetches the current view without asking the server for anything new; its icon turns while any request is under way. The "Refresh" button next to the valuation date is now **Update prices**, with its own icon (ui.md).
+22. **History import to `prod`** (paused 2026-10-16 for app features): the history before the app (2008–2022) is on `test`; still to do: review its values there, then import it to `prod` so it joins prod's own transactions (the savings account continues on prod from 2022-05; prod's transactions stay as they are). Old Catalyst and treasury bonds are priced by hand, with no coupon periods (no accrued interest).
+23. ~~Valuation speed with a long history~~ Done (2026-10-18): chart points, one pass over the transactions, batched writes, merged requests (done list above).
 
 ### Beyond the sheet
 19. **Hold or sell a bond:** is a bond worth selling now rather than holding it to maturity? Once owned, what was paid doesn't matter: compare the **yield if held** (what it still pays from today: coupons and 100 % at maturity, after tax, against what selling it would bring today) with an **alternative** for the same period, after the cost of switching.
