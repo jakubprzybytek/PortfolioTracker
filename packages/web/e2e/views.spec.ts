@@ -353,7 +353,7 @@ test.describe("holdings view", () => {
     await expect(ike).toHaveCount(3);
     expect(await ike.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "EDO0935", "SAMPLE-APARTMENT"]);
     await expect(ike.first().locator("td").nth(2)).toHaveText("5");
-    await expect(ike.nth(1).locator("td").nth(1)).toHaveText("Retail bond");
+    await expect(ike.nth(1).locator("td").nth(1)).toHaveText(/^Retail bond/); // and its hold-or-sell badge
     // ibkr: the bond, then the PLN cash, then the foreign cash as cash (amount in EUR, the NBP rate as its price)
     const ibkr = await table.locator('tr[data-account="ibkr"]').evaluateAll((rows) => rows.map((r) => r.querySelector("td")!.textContent!.trim()));
     expect(ibkr).toEqual(["DE0001102523 DE Govt 0.0 Nov15'27 (sample holding)", "Cash", "Cash EUR"]);
@@ -622,7 +622,7 @@ test.describe("holdings grouped by instrument", () => {
     await expect(page).not.toHaveURL(/chart=/); // the toggle doesn't open the chart
     const dsRows = table.locator('tr[data-testid="holding-row"][data-isin="PL0000113783"]');
     await expect(dsRows).toHaveCount(2);
-    await expect(dsRows.nth(0).locator("td").nth(1)).toHaveText("└ broker");
+    await expect(dsRows.nth(0).locator("td").nth(1)).toHaveText(/^└ broker/); // and its hold-or-sell badge
     await expect(dsRows.nth(0).locator("td").nth(2)).toHaveText("20");
     await expect(dsRows.nth(1).locator("td").nth(2)).toHaveText("5");
     await page.getByTestId("expand-DS0432").click();
@@ -874,6 +874,40 @@ test.describe("show closed", () => {
     expect(pricesAsked?.searchParams.get("to")).toBe("2013-07-01");
     await page.getByTestId("price-range").getByRole("button", { name: "ALL" }).click();
     await expect.poll(() => pricesAsked?.searchParams.get("from")).toBe("2012-01-30");
+  });
+});
+
+test.describe("hold or sell", () => {
+  test("every bond kept to maturity against sold today, the assumptions on top; a row opens its breakdown; Holdings links to it", async ({ page }) => {
+    await page.goto("/#/");
+    await page.getByTestId("nav-holdsell").click();
+    await expect(page).toHaveURL(/#\/hold-sell/);
+    const rows = page.getByTestId("hs-row");
+    // The sample's bonds: DS0432 and the Bund in two accounts each, IZ0836, EDO0935, KRU0827.
+    await expect(rows).toHaveCount(7);
+    await expect(page.getByTestId("hs-cpi")).toHaveValue(/^\d+,\d{2}$/);
+    await expect(page.getByTestId("hs-alternative")).toHaveValue("retail");
+    for (const v of await rows.getByTestId("hs-verdict").allTextContents()) expect(["hold", "sell", "about the same"]).toContain(v);
+    // Most worth selling first: the differences go up.
+    const diffs = (await rows.getByTestId("hs-difference").allTextContents()).map((t) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", ".")));
+    expect(diffs).toEqual([...diffs].sort((a, b) => a - b));
+    // A row's breakdown: the sale today and the flows to maturity, the redemption last; in the URL.
+    const iz = page.locator('[data-testid="hs-row"][data-code="IZ0836"]');
+    await iz.click();
+    await expect(page).toHaveURL(/row=broker/);
+    const flows = page.getByTestId("hs-flows");
+    await expect(flows).toContainText("2036-08-25");
+    await expect(flows.locator("tbody tr").nth(-2)).toContainText("redemption");
+    await expect(page.getByTestId("hs-breakdown")).toContainText("IZ indexation at CPI");
+    await iz.click();
+    await expect(page.getByTestId("hs-breakdown")).toHaveCount(0);
+    // Holdings: a badge on bond rows, linking to the row here.
+    await page.goto("/#/holdings");
+    const badge = page.locator('[data-testid="holding-row"][data-isin="PL0000117024"]').getByTestId("hs-badge");
+    await expect(badge).toHaveText(/^(hold|sell|about the same)$/);
+    await badge.click();
+    await expect(page).toHaveURL(/#\/hold-sell\?row=broker%23PL0000117024/);
+    await expect(page.getByTestId("hs-breakdown")).toBeVisible();
   });
 });
 

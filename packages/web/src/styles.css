@@ -239,6 +239,40 @@ tr.muted td { color: var(--muted); }
 .view-title button.back { font: inherit; font-size: 1.3rem; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px 0 0; }
 .view-title button.back:hover { color: var(--fg); }
 .view-title .instrument-name { font-size: 1rem; font-weight: 400; }
+/* Hold or sell */
+.hs-intro { margin: -6px 0 12px; max-width: 70rem; font-size: 0.9rem; }
+.hs-assumptions { margin-bottom: 12px; }
+.hs-assumptions form { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; }
+.hs-field { display: flex; flex-direction: column; gap: 3px; font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+.hs-field .with-unit { display: inline-flex; align-items: center; gap: 4px; }
+.hs-field input { font: inherit; width: 4.5rem; height: 34px; box-sizing: border-box; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); }
+.hs-field select { height: 34px; }
+.hs-buttons { display: flex; gap: 8px; align-items: center; }
+.hs-buttons button.primary { font: inherit; height: 34px; padding: 0 14px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: white; cursor: pointer; }
+.hs-buttons button.link { font: inherit; border: 0; background: none; color: var(--accent); cursor: pointer; }
+.hs-offers { margin: 10px 0 0; font-size: 0.85rem; }
+.hs-assumptions .error, .hs-assumptions [role="status"] { margin: 8px 0 0; }
+td .sub { font-size: 0.8rem; }
+.flag.verdict.sell { background: var(--accent); border-color: var(--accent); color: white; }
+.flag.verdict.hold { color: var(--pos); }
+a.flag.verdict { text-decoration: none; }
+tr.hs-detail > td { background: var(--row); white-space: normal; }
+.hs-breakdown { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(20rem, 1.4fr); gap: 12px 28px; padding: 6px 4px; }
+.hs-breakdown h4 { margin: 0 0 6px; font-size: 0.9rem; }
+.hs-breakdown table.compact td, .hs-breakdown table.compact th { padding: 4px 6px; }
+.hs-notes { grid-column: 1 / -1; margin: 0; padding-left: 18px; font-size: 0.85rem; }
+.hs-skipped { font-size: 0.85rem; margin-top: 10px; }
+/* Phones: two-line rows instead of the table */
+.hs-list { list-style: none; margin: 0; padding: 0; }
+.hs-list > li { border-bottom: 1px solid var(--line); }
+.hs-list > li:last-child { border-bottom: 0; }
+.hs-list > li.selected { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.hs-item { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; padding: 9px 12px; cursor: pointer; }
+.hs-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; font-size: 0.9rem; }
+.hs-line.muted { font-size: 0.8rem; }
+.hs-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hs-list .hs-breakdown { padding: 4px 12px 12px; }
+@media (max-width: 720px) { .hs-breakdown { grid-template-columns: 1fr; min-width: 0; } .hs-breakdown > div { min-width: 0; } .hs-breakdown table.compact { font-size: 0.8rem; } .hs-breakdown table.compact td, .hs-breakdown table.compact th { white-space: normal; padding: 3px 4px; } .hs-assumptions form { gap: 8px 10px; } .hs-field input { width: 4rem; } }
 .asset-class { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
 .asset-class select { font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--fg); }
 /* Holdings chart panel: the position's transactions next to the chart (below it on phones), scrolling on their own. */

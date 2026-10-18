@@ -4,6 +4,7 @@ import { APP_VERSION, api, apiSend } from "./api.ts";
 import { currentSession, logout, type Session } from "./auth.ts";
 import { DashboardView } from "./DashboardView.tsx";
 import { HoldingsView } from "./HoldingsView.tsx";
+import { HoldSellView } from "./HoldSellView.tsx";
 import { Icon } from "./Icons.tsx";
 import { IndicatorsView } from "./IndicatorsView.tsx";
 import { InstrumentView } from "./InstrumentView.tsx";
@@ -188,6 +189,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "dashboard" && <DashboardView />}
         {route.view === "holdings" && <HoldingsView key="holdings" params={route.params} setParams={setParams} />}
         {route.view === "prices" && <PricesView key="prices" params={route.params} setParams={setParams} />}
+        {route.view === "holdsell" && <HoldSellView key="holdsell" params={route.params} setParams={setParams} />}
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}

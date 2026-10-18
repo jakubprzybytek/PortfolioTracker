@@ -7,6 +7,8 @@ const paths: Record<View | "menu" | "close" | "logout" | "clear-filters" | "relo
   holdings: "M4 6h16M4 12h16M4 18h10",
   prices: "M3 17l6-6 4 4 8-8M15 7h6v6",
   indicators: "M5 20V10M12 20V4M19 20v-7",
+  // scales: hold or sell
+  holdsell: "M12 3v18M8 21h8M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z",
   transactions: "M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3",
   notes: "M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7",
   // a cog (Feather "settings"): the instrument's settings

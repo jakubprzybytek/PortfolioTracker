@@ -323,6 +323,7 @@ export const keys = {
   historyPoint: (date: IsoDate) => ({ PK: "HISTORY" as const, SK: date }),
   account: (account: string) => ({ PK: `ACCT#${account}` as const, SK: "META" as const }),
   note: (id: string) => ({ PK: `NOTE#${id}` as const, SK: "META" as const }),
+  setting: (name: string) => ({ PK: `SETTING#${name}` as const, SK: "META" as const }),
   retailSeries: (series: string) => ({ PK: `SERIES#${series}` as const, SK: "META" as const }),
   jobRun: (job: string, startedAt: string) => ({ PK: `JOB#${job}` as const, SK: `RUN#${startedAt}` as const }),
 };

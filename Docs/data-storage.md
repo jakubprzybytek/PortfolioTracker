@@ -198,6 +198,14 @@ GSI1PK = NOTE               GSI1SK = <note_id>
 
 `id` (random), `title`, `body` (Markdown), `createdAt`, `updatedAt`. Written in the app (Notes view); `GSI1` lists them all. Your input, so here and in the monthly backup.
 
+### Settings
+
+```
+PK = SETTING#<name>         SK = META
+```
+
+`value`, `updatedAt`: choices made in the app that aren't data, e.g. `holdSell` (the Hold or sell assumptions: `cpi`, `wibor`, `nbpRate`, `alternative`, `altRate`, `commission`). Deleted to go back to the defaults. Not in the monthly backup (set again in a minute).
+
 ### Later: settings you enter
 
 ```

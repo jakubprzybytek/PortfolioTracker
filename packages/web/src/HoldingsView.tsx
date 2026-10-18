@@ -10,6 +10,7 @@ import {
 } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { InstrumentSettingsButton } from "./InstrumentView.tsx";
+import { holdSellKey, VERDICT_LABELS, type HoldSellResponse } from "./HoldSellView.tsx";
 import {
   FilterBar,
   FilterSelect,
@@ -174,6 +175,26 @@ interface InstrumentGroup {
 }
 
 /** One holding as a row; `label` is what goes in the first column (the instrument, or the account). */
+/** Hold-or-sell verdicts per position (account#isin), for the badge on bond rows. */
+const HoldSellVerdicts = createContext<ReadonlyMap<string, HoldSellResponse["rows"][number]>>(new Map());
+
+/** "hold" / "sell" / "about the same" on a bond row: a link to its row in Hold or sell. */
+function VerdictBadge({ account, isin }: { account: string; isin: string }) {
+  const r = useContext(HoldSellVerdicts).get(`${account}#${isin}`);
+  if (!r) return null;
+  return (
+    <a
+      className={`flag verdict ${r.verdict.toLowerCase()}`}
+      href={`#/hold-sell?row=${encodeURIComponent(holdSellKey(r))}`}
+      onClick={(e) => e.stopPropagation()}
+      title={`Hold or sell: kept to maturity ${r.difference >= 0 ? "brings" : "loses"} ${fmtPln(Math.abs(r.difference))} against selling today (${r.alternative.label})`}
+      data-testid="hs-badge"
+    >
+      {VERDICT_LABELS[r.verdict]}
+    </a>
+  );
+}
+
 function HoldingRow({
   h,
   label,
@@ -202,7 +223,10 @@ function HoldingRow({
       title={isForeignCash(h) ? FOREIGN_CASH_TITLE : "Show its value over time"}
     >
       <td className="left indent instrument">{label}</td>
-      <td className="left">{second ?? typeLabel(shownType(h))}</td>
+      <td className="left">
+        {second ?? typeLabel(shownType(h))}
+        <VerdictBadge account={account} isin={h.isin} />
+      </td>
       <td>{fmtQty(h)}</td>
       <PriceCell h={h} show={detail} />
       <td>{detail ? <AccruedCell h={h} /> : ""}</td>
@@ -475,6 +499,13 @@ export function HoldingsView({
   const snap = useApi<Snapshot>("/holdings", {
     closed: showClosed ? "1" : undefined,
   });
+  // Hold or sell: the verdict per bond position, as a badge on its row (only when bonds are held).
+  const holdsBonds = (snap.data?.holdings ?? []).some((h) => h.type.startsWith("BOND"));
+  const holdSell = useApi<HoldSellResponse>(holdsBonds ? "/hold-sell" : null);
+  const verdicts = useMemo(
+    () => new Map((holdSell.data?.rows ?? []).map((r) => [holdSellKey(r), r] as const)),
+    [holdSell.data],
+  );
   const all = useMemo(
     () => (snap.data?.holdings ?? []).filter((h) => h.quantity > 0),
     [snap.data],
@@ -759,6 +790,7 @@ export function HoldingsView({
 
   return (
     <NewestPrice.Provider value={newestPrice}>
+    <HoldSellVerdicts.Provider value={verdicts}>
       <header className="view-header">
         <h2 className="view-title">Holdings</h2>
         <span className="view-meta">
@@ -1121,6 +1153,7 @@ export function HoldingsView({
           </div>
         </ChartPanel>
       )}
+    </HoldSellVerdicts.Provider>
     </NewestPrice.Provider>
   );
 }

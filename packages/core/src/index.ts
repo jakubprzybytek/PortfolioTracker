@@ -38,3 +38,4 @@ export * from "./valuation/history.ts";
 export * from "./prices/pricePath.ts";
 export * from "./backup/export.ts";
 export * from "./notes/schema.ts";
+export * from "./holdsell/holdSell.ts";

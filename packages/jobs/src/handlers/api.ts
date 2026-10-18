@@ -31,6 +31,13 @@ import {
   retailInstrument,
   addDays,
   adjustForSplits,
+  DEFAULT_ASSUMPTIONS,
+  HoldSellAssumptionsInput,
+  holdOrSell,
+  offerSeriesCode,
+  RETAIL_OFFER_TERMS,
+  type HoldSellAssumptions,
+  type RetailTerms,
   ASSET_CLASSES,
   defaultAssetClass,
   cpiIndicators,
@@ -41,6 +48,7 @@ import {
   summarize,
   today,
   toReferenceIndex,
+  shiftMonth,
   valueBond,
   yearBefore,
   type FxHistory,
@@ -115,6 +123,30 @@ async function treasurySeries(code: string): Promise<InstrumentInput | undefined
 }
 
 /** A corporate bond by ISIN, or the error response. */
+/** Where the hold-or-sell assumptions are kept (settings). */
+const HOLD_SELL_SETTING = "holdSell";
+
+/**
+ * The retail series on sale on `day` (the alternatives): each kind's series of this month, or of the month before
+ * when this month's isn't in the Ministry file yet (the monthly job brings it).
+ */
+async function retailOffers(day: string): Promise<RetailTerms[]> {
+  const month = day.slice(0, 7);
+  const found = await Promise.all(
+    RETAIL_OFFER_TERMS.map(async ({ kind, months }) => {
+      for (const m of [month, shiftMonth(month, -1)]) {
+        const s = await repo.getRetailSeries(offerSeriesCode(kind, months, m));
+        if (s) {
+          const { PK: _p, SK: _s, source: _src, updatedAt: _u, ...terms } = s;
+          return terms;
+        }
+      }
+      return undefined;
+    }),
+  );
+  return found.filter((t): t is RetailTerms => !!t);
+}
+
 async function corporateBond(isin: string | undefined): Promise<{ inst: InstrumentItem } | { error: APIGatewayProxyResultV2 }> {
   if (!isin || !ISIN.test(isin)) return { error: json(400, { error: "Invalid ISIN" }) };
   const inst = await repo.getInstrument(isin);
@@ -488,6 +520,50 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         if (!existing) return json(404, { error: "No such note" });
         await repo.deleteNote(existing.id);
         return json(200, noteOf(existing));
+      }
+      case "GET /hold-sell": {
+        // Every bond position kept to maturity vs sold today (core/holdsell), with the assumptions and the offers used.
+        const [snap, instruments, txs, refIndex, saved] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments(), repo.listTransactions(), repo.listReferenceIndex(), repo.getSetting<HoldSellAssumptions>(HOLD_SELL_SETTING)]);
+        if (!snap) return json(404, { error: "No valuation yet" });
+        const day = snap.date;
+        const offers = await retailOffers(day);
+        // The NBP reference rate by default: the ROR on offer pays it (+ its margin) from its second month.
+        const ror = offers.find((o) => o.kind === "ROR");
+        const defaults: HoldSellAssumptions = { ...DEFAULT_ASSUMPTIONS, ...(ror?.rates[1] != null ? { nbpRate: ror.rates[1] - (ror.margin ?? 0) } : {}) };
+        const assumptions: HoldSellAssumptions = { ...defaults, ...saved };
+        const held = new Set(snap.holdings.map((h) => h.isin));
+        const corporate = instruments.filter((i) => i.type === "BOND_CORPORATE" && held.has(i.isin));
+        const periods = await Promise.all(corporate.map((i) => repo.listCouponPeriods(i.isin)));
+        const result = holdOrSell({
+          today: day,
+          holdings: snap.holdings,
+          instruments: new Map(instruments.map((i) => [i.isin, i])),
+          transactions: txs,
+          couponPeriods: new Map(corporate.map((i, n) => [i.isin, periods[n]!.map(periodOf)])),
+          referenceIndex: toReferenceIndex(refIndex),
+          offers,
+          assumptions,
+        });
+        return json(200, {
+          date: day,
+          assumptions,
+          defaults,
+          saved: !!saved,
+          offers: offers.map((o) => ({ series: o.series, kind: o.kind, termMonths: o.termMonths, firstRate: o.rates[0] ?? null, margin: o.margin ?? null, saleStart: o.saleStart, saleEnd: o.saleEnd })),
+          ...result,
+        });
+      }
+      case "PUT /hold-sell/assumptions": {
+        // The assumptions to keep; { reset: true } goes back to the defaults.
+        const body = bodyOf(event) as Record<string, unknown> | undefined;
+        if (body?.["reset"] === true) {
+          await repo.deleteSetting(HOLD_SELL_SETTING);
+          return json(200, { reset: true });
+        }
+        const parsed = HoldSellAssumptionsInput.safeParse(body);
+        if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+        await repo.putSetting(HOLD_SELL_SETTING, parsed.data);
+        return json(200, parsed.data);
       }
       case "GET /status": {
         const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];

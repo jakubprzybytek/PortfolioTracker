@@ -536,6 +536,37 @@ describe(`API ${API}`, () => {
     expect((await get<Note[]>("/notes")).body.some((n) => n.title.startsWith("Integration"))).toBe(false);
   });
 
+  it("GET /hold-sell compares every bond position kept to maturity with selling it today; PUT keeps the assumptions", async () => {
+    type Row = { account: string; code: string; maturity: string; taxFree: boolean; verdict: string; flows: { date: string; kind: string; amount: number }[]; sellNow: { net: number }; alternative: { label: string; series?: string; yield: number }; difference: number; holdAtMaturity: number; sellAtMaturity: number };
+    type Body = { date: string; assumptions: { cpi: number; alternative: string }; saved: boolean; offers: { series: string }[]; rows: Row[]; skipped: { code: string; reason: string }[] };
+    await send("PUT", "/hold-sell/assumptions", { reset: true });
+    const { status, body } = await get<Body>("/hold-sell");
+    expect(status).toBe(200);
+    expect(body.saved).toBe(false);
+    expect(body.assumptions.alternative).toBe("retail");
+    // Every bond of the sample: listed fixed and IZ, retail, the floating corporate, the IBKR Bund.
+    expect(body.rows.map((r) => r.code).sort()).toEqual(expect.arrayContaining(["DE0001102523", "DS0432", "EDO0935", "IZ0836", "KRU0827"]));
+    for (const r of body.rows) {
+      expect(["HOLD", "SELL", "EVEN"]).toContain(r.verdict);
+      expect(r.flows.at(-1)).toMatchObject({ kind: "redemption", date: r.maturity });
+      expect(r.sellNow.net).toBeGreaterThan(0);
+      expect(r.difference).toBeCloseTo(r.holdAtMaturity - r.sellAtMaturity, 0);
+      if (body.offers.length) expect(r.alternative.series).toBeTruthy();
+    }
+    expect(body.rows.find((r) => r.account === "ike")?.taxFree ?? true).toBe(true);
+
+    expect((await send("PUT", "/hold-sell/assumptions", { cpi: "a lot" })).status).toBe(400);
+    const put = await send("PUT", "/hold-sell/assumptions", { cpi: 0.03, wibor: 0.05, nbpRate: 0.04, alternative: "rate", altRate: 0.06 });
+    expect(put.status).toBe(200);
+    const after = (await get<Body>("/hold-sell")).body;
+    expect(after).toMatchObject({ saved: true, assumptions: { cpi: 0.03, alternative: "rate" } });
+    const ds = after.rows.find((r) => r.code === "DS0432")!;
+    expect(ds.alternative.label).toContain("6,00 %");
+    expect(ds.alternative.yield).toBeCloseTo(ds.account === "ike" ? 0.06 : 0.06 * 0.81, 6);
+    await send("PUT", "/hold-sell/assumptions", { reset: true });
+    expect((await get<Body>("/hold-sell")).body.saved).toBe(false);
+  });
+
   it("rejects bad input", async () => {
     expect((await get("/instruments/not-an-isin/prices")).status).toBe(400);
     expect((await get("/nope")).status).toBe(404);

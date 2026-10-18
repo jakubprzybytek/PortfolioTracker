@@ -54,6 +54,11 @@ export function valueBondAtSettlement(terms: BondTerms, date: IsoDate, inputs: B
   return { ...base, accruedInterest: round2(accrued), settlementDate: settle };
 }
 
+/** A period's whole coupon per bond, and the nominal it's paid on (IZ: indexed at the period's end). */
+export function couponOf(terms: BondTerms, period: CouponPeriod, inputs: BondValuationInputs = {}): BondValuation {
+  return valueIn(terms, period, period.end, inputs);
+}
+
 /** Nominal and accrued interest in `period` on `date` (`period.end` gives the whole coupon). */
 function valueIn(terms: BondTerms, period: CouponPeriod, date: IsoDate, inputs: BondValuationInputs): BondValuation {
 

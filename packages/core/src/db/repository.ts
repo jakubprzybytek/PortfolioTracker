@@ -327,6 +327,20 @@ export class Repository {
     });
   }
 
+  // --- settings (your choices, e.g. the hold-or-sell assumptions; transactions table) ----------------
+
+  async getSetting<T>(name: string): Promise<T | undefined> {
+    return (await this.get<{ value: T }>("transactions", keys.setting(name)))?.value;
+  }
+
+  putSetting<T>(name: string, value: T): Promise<void> {
+    return this.put("transactions", { ...keys.setting(name), value, updatedAt: new Date().toISOString() });
+  }
+
+  async deleteSetting(name: string): Promise<void> {
+    await this.doc.send(new DeleteCommand({ TableName: this.tables.transactions, Key: keys.setting(name) }));
+  }
+
   // --- notes ---------------------------------------------------------------------------------
 
   putNotes(notes: Omit<NoteItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {

@@ -27,6 +27,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/` | Dashboard (default) |
 | `#/holdings?group=instrument&account=…&type=…&chart=<ISIN>&chartAccount=…` | Holdings (`group` absent = by account; `chart` = the open row chart) |
 | `#/prices?type=…&chart=<ISIN>` | Prices |
+| `#/hold-sell?row=<account>#<ISIN>` | Hold or sell (`row` = the open breakdown) |
 | `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 | `#/notes?note=<id or new>` | Notes (`note` = the open note; `new` = writing one) |
@@ -86,6 +87,17 @@ One instrument's properties in one place, opened by the cog (⚙) in a chart pan
 - **Asset class** (every instrument): the class the Dashboard's asset mix and allocation over time count it in, a select. The rule's class (by type; an ETF with "bond" in its name = bonds) is marked "(rule)"; another choice sets it by hand (Prices: a "set" tag in the Class column), choosing the rule's again clears it. The instrument's days are revalued ("Recalculating the valuation…"), so the allocation over time follows for its whole history.
 - **Values** (assets valued by hand): a form to add a value per unit on a date (today by default, not in the future); below it, the values so far, newest first, each with ✕ to delete (a second click confirms). The valuation reruns from that date; meanwhile "Recalculating the valuation…" shows in the corner (after any save: transactions too) until the run finishes, then every view reloads ("Valuation updated.").
 - **Coupon periods** (corporate bonds): the bond's periods, newest first (later future periods folded): first day ("now" on the current one), end, record day, payment day, rate and who set it ("yours", "obligacje.pl", "from coupons"; "no rate" in red), coupon per bond, and your coupons for that period before tax with the number of bonds (red with the expected amount when they don't fit the rate). Actions per period: "Use 7,14 % (your coupons)" when the period has no rate (or a coupon contradicts it), "⚠ obligacje.pl shows …: use it" when the site differs, Edit (dates and the rate in %) and ✕ (a second click deletes). "Add a period" below. Every change revalues from the period's start (a toast, then "Recalculating the valuation…").
+
+## Hold or sell
+
+Is a bond worth more kept to maturity, or sold today with the money put into an alternative until the same day? What was paid doesn't matter: what the bond still pays from today against what a sale brings today, both after tax (19 % on interest and on the gain over FIFO cost; none in IKE/IKZE accounts, recognised by "IKE"/"IKZE" in the name). `core/holdsell/holdSell.ts`.
+
+- **Assumptions** (a panel on top, saved for next time; "Defaults" goes back): **CPI** from now on (IZ indexation past the last published month; EDO, COI after their first year: CPI + margin), **WIBOR** (floating corporate coupons not set yet: WIBOR + the margin in the bond's name), **NBP rate** (ROR, DOR: rate + margin; by default the rate the ROR on offer pays), the **alternative** (the retail bond on offer with the term nearest to the bond's remaining term, or a rate you type, before tax), and a sale's **commission** (blank: each account's own, the median fee of its bond trades; 0,19 % without any). The retail series on offer are listed below with their first-year rates.
+- **One row per bond position** (account × bond; most worth selling first): maturity and years left, **sell now** (the net amount today: value − commission − tax due now; retail bonds: early redemption at the Ministry, nominal + interest − its fee: TOS 1 zł, COI 2 zł, EDO 3 zł for series sold from September 2024, earlier 0,70 / 0,70 / 2 zł; ROR 0,50, DOR 0,70; capped by the interest where the Ministry's rules say so), **if held** (the annual yield of giving up that amount for the flows still to come, after tax), the **alternative** and its yield after tax (a retail bond: held to its maturity, or redeemed early at the horizon with its fee), the **difference** at maturity (kept, its payments reinvested at the alternative's yield, − sold and put into the alternative) and the verdict: **hold**, **sell**, or **about the same** (yields within 0,2 % a year).
+- **A row opens its breakdown** (`?row=`): the sale today line by line and what it grows to in the alternative; the flows to maturity (coupons, interest, the redemption) with their tax, those resting on an assumption marked *; both sides at maturity; and what the result rests on (the commission, the rates assumed, the currency).
+- **By kind:** listed treasury bonds from their terms (IZ: indexed nominal and coupons from the reference index, carried on at the assumed CPI); corporate bonds from their coupon periods (the instrument's settings); retail bonds per lot from the Ministry's rates; IBKR bonds from their name (coupon, maturity) or price path, in their currency at today's rate (against an alternative in PLN, exchange-rate moves aren't counted). Positions that can't be projected (no periods, no price) are listed below the table with the reason.
+- **On a phone:** two-line rows instead of the table, the breakdown under the row.
+- **Holdings** shows the verdict as a small badge next to a bond row's type ("hold", green; "sell", filled), linking to its row here.
 
 ## Indicators
 
@@ -148,6 +160,8 @@ Free notes in Markdown (`NotesView.tsx`), e.g. trading checklists. Not linked to
 | `GET /instruments` | instruments + backfill status |
 | `GET /instruments/{isin}/prices?from&to` | `PX#…` items; retail bonds: the daily calculated value per bond of your lots (`calculated: true`) |
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
+| `GET /hold-sell` | every bond position kept to maturity vs sold today (`core/holdsell/holdSell.ts`): `rows` (flows, sale today, yields, alternative, difference, verdict, notes), `skipped` (and why), `assumptions` (saved, else `defaults`), the retail `offers` used |
+| `PUT /hold-sell/assumptions` | `{ cpi, wibor, nbpRate, alternative: "retail" \| "rate", altRate?, commission? }` (fractions) keeps them; `{ reset: true }` goes back to the defaults |
 | `GET /prices` | held instruments: latest price + date, stale flag, price a year earlier and the change (`core/valuation/priceRows.ts`); `?closed=1` adds the instruments traded but not held (`closed`: first and last transaction dates; the year up to their last price) |
 | `GET /holdings/history?isin&account&from&to` | a position's daily value, cost and quantity (`POS#…` items); without `account`, the instrument summed over the accounts holding it (held nowhere: over the accounts that traded it); days it wasn't held in between (sold out, bought back later) are zero |
 | `GET /indicators` | one row per indicator (`core/indicators/indicators.ts`): `[{ id, name, group, unit, frequency, note, latest: { date, value }, yearAgo }]` |
