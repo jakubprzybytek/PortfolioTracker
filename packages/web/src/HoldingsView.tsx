@@ -1049,6 +1049,29 @@ export function HoldingsView({
       {chartIsin && <div style={{ height: panelHeight }} aria-hidden />}
       {chartIsin && (
         <ChartPanel
+          actions={
+            <>
+              {/* On a phone with the transactions open there's no chart: no range either. */}
+              {!txsOnly && (
+                <RangePicker
+                  value={range}
+                  onChange={setRange}
+                  busy={history.loading}
+                  testId="holding-range"
+                />
+              )}
+              <span className="chart-panel-actions-end">
+                <TransactionsButton
+                  open={showTxs}
+                  onToggle={() => setShowTxs(!showTxs)}
+                  count={
+                    positionTxs.loading ? undefined : positionTxs.rows.length
+                  }
+                />
+                <InstrumentSettingsButton isin={chartIsin} from="holdings" />
+              </span>
+            </>
+          }
           onClose={closeChart}
           onHeight={setPanelHeight}
           title={
@@ -1065,28 +1088,6 @@ export function HoldingsView({
             </>
           }
         >
-          <div className="chart-tools">
-            {txsOnly ? (
-              <span />
-            ) : (
-              <RangePicker
-                value={range}
-                onChange={setRange}
-                busy={history.loading}
-                testId="holding-range"
-              />
-            )}
-            <span className="chart-tools-end">
-              <TransactionsButton
-                open={showTxs}
-                onToggle={() => setShowTxs(!showTxs)}
-                count={
-                  positionTxs.loading ? undefined : positionTxs.rows.length
-                }
-              />
-              <InstrumentSettingsButton isin={chartIsin} from="holdings" />
-            </span>
-          </div>
           <div className="chart-with-side">
             {!txsOnly && (
               <div

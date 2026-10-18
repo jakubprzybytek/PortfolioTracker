@@ -170,6 +170,14 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
       {selected && <div style={{ height: panelHeight }} aria-hidden />}
       {selected && (
         <ChartPanel
+          actions={
+            <>
+              <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />
+              <span className="chart-panel-actions-end">
+                <InstrumentSettingsButton isin={selected} from="prices" />
+              </span>
+            </>
+          }
           onClose={closeChart}
           onHeight={setPanelHeight}
           title={
@@ -193,12 +201,6 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             </span>
           }
         >
-          <div className="chart-tools">
-            <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />
-            <span className="chart-tools-end">
-              <InstrumentSettingsButton isin={selected} from="prices" />
-            </span>
-          </div>
           <div style={{ flex: 1, minHeight: 0 }}>
             {prices.error ? (
               <p className="error">{prices.error}</p>

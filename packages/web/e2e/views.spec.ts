@@ -688,7 +688,8 @@ test.describe("holdings row chart", () => {
     await page.goto("/#/holdings");
     await page.locator('tr[data-testid="holding-row"][data-account="broker"][data-isin="PL0000113783"]').click();
     const toggle = page.getByTestId("position-tx-toggle");
-    await expect(toggle).toHaveText("Transactions (3)");
+    await expect(toggle).toHaveText("Transactions3");
+    await expect(toggle.getByTestId("position-tx-count")).toHaveText("3");
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await expect(page.getByTestId("position-tx")).toHaveCount(0);
     await toggle.click();

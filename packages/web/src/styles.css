@@ -165,9 +165,13 @@ tbody tr:last-child td { border-bottom: 0; }
 tr.selected td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .flag { display: inline-block; font-size: 0.72rem; font-weight: 500; padding: 1px 7px; border-radius: 10px; border: 1px solid var(--border); background: var(--row); color: var(--muted); margin-left: 4px; }
-.range { display: flex; gap: 6px; margin-bottom: 10px; }
-.range button { font: inherit; font-size: 0.9rem; border: 1px solid var(--border); background: var(--panel); color: var(--fg); padding: 4px 12px; border-radius: 8px; cursor: pointer; }
-.range button.active { background: var(--accent); color: white; border-color: var(--accent); }
+/* Chart range (1M / 6M / 1Y / ALL): one segmented control, as "Group by". */
+.range { display: inline-flex; flex: none; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--panel); margin-bottom: 10px; }
+.range button { font: inherit; font-size: 0.85rem; height: 28px; border: 0; background: transparent; color: var(--fg); padding: 0 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.range button + button { border-left: 1px solid var(--border); }
+.range button:hover:not(.active):not(:disabled) { background: var(--row); }
+.range button.active { background: var(--accent); color: white; }
+.range button.active + button, .range button + button.active { border-left-color: var(--accent); }
 .table-wrap { overflow-x: auto; padding: 0 4px; }
 .error { color: var(--neg); }
 .status-ok { color: var(--pos); }
@@ -194,9 +198,19 @@ tr.muted td { color: var(--muted); }
 .chart-panel-handle:hover::after { background: var(--muted); }
 .chart-panel-header { display: flex; align-items: center; gap: 12px; }
 .chart-panel-title { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chart-panel-close { border: 1px solid var(--border); background: transparent; color: var(--fg); border-radius: 8px; padding: 2px 8px; cursor: pointer; }
+/* The header row: title, the view's controls (range, toggles, ⚙), ✕; every control 30 px tall. */
+.chart-panel-header { padding: 2px 0 8px; }
+.chart-panel-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.chart-panel-actions .range { margin: 0; }
+.chart-panel-actions-end { display: flex; align-items: center; gap: 6px; }
+.chart-panel-actions-end button, .chart-panel-close { font: inherit; font-size: 0.85rem; height: 30px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); padding: 0 10px; cursor: pointer; flex: none; }
+.chart-panel-actions-end button.settings-open, .chart-panel-close { width: 30px; padding: 0; }
+.chart-panel-actions-end button.settings-open { color: var(--muted); }
+.chart-panel-actions-end button:hover:not(.active), .chart-panel-close:hover { background: var(--row); color: var(--fg); }
+.chart-panel-actions-end button.toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
+.chart-panel-actions-end .count { font-size: 0.75rem; line-height: 1.5; background: var(--row); color: var(--muted); border-radius: 9px; padding: 0 6px; }
+.chart-panel-actions-end button.active .count { background: rgba(255, 255, 255, 0.25); color: white; }
 .chart-panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.chart-panel-body .range { margin: 4px 0; }
 .group-by { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .group-by > .muted { font-size: 0.85rem; }
 /* A segmented control: one outlined button split in two, the chosen half filled. */
@@ -206,14 +220,6 @@ tr.muted td { color: var(--muted); }
 .segmented button:hover:not(.active) { background: var(--row); }
 .segmented button.active { background: var(--accent); color: white; }
 .segmented button.active + button, .segmented button + button.active { border-left-color: var(--accent); }
-/* Above a chart: the range buttons, and for an asset valued by hand its values (form + list). */
-.chart-tools { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 4px 12px; }
-.chart-tools button, .manual-values input { font: inherit; font-size: 0.85rem; padding: 4px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--fg); }
-.chart-tools button { cursor: pointer; }
-.chart-tools .manual-open { margin: 4px 0; }
-.chart-tools-end { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-left: auto; }
-.chart-tools button.settings-open { display: inline-flex; align-items: center; padding: 4px 7px; color: var(--muted); }
-.chart-tools button.settings-open:hover { color: var(--fg); }
 /* Instrument view (the cog): one panel per property. */
 .instrument-sections { display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
 .instrument-sections h3 { margin: 0 0 8px; font-size: 1rem; }
@@ -229,7 +235,6 @@ tr.muted td { color: var(--muted); }
 .view-title .instrument-name { font-size: 1rem; font-weight: 400; }
 .asset-class { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
 .asset-class select { font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--fg); }
-.chart-tools button.toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
 /* Holdings chart panel: the position's transactions next to the chart (below it on phones), scrolling on their own. */
 .chart-with-side { flex: 1; min-height: 0; display: flex; gap: 14px; }
 .chart-side { flex: 0 0 min(460px, 42%); overflow: auto; border-left: 1px solid var(--border); padding-left: 10px; }
@@ -265,6 +270,10 @@ tr.muted td { color: var(--muted); }
 tr.clickable { cursor: pointer; }
 @media (max-width: 720px) {
   .chart-panel { left: 0; padding: 0 12px 8px; }
+  .chart-panel-header { flex-wrap: wrap; row-gap: 6px; }
+  .chart-panel-title { flex-basis: calc(100% - 44px); }
+  .chart-panel-actions { order: 3; width: 100%; }
+  .chart-panel-actions-end { margin-left: auto; }
   .chart-panel-handle { margin: 0 -12px; }
 }
 td .sub { color: var(--muted); padding-left: 0.75rem; }

@@ -15,13 +15,18 @@ export function TransactionsButton({
   return (
     <button
       type="button"
-      className={`manual-open toggle${open ? " active" : ""}`}
+      className={`toggle${open ? " active" : ""}`}
       aria-pressed={open}
       onClick={onToggle}
       title="The position's transactions, next to its chart"
       data-testid="position-tx-toggle"
     >
-      Transactions{count !== undefined ? ` (${count})` : ""}
+      Transactions
+      {count !== undefined && (
+        <span className="count" data-testid="position-tx-count">
+          {count}
+        </span>
+      )}
     </button>
   );
 }

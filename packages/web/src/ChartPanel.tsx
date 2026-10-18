@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Icon } from "./Icons.tsx";
 
 const MIN_PX = 160;
 const MAX_FRACTION = 0.75;
@@ -14,9 +15,10 @@ const initialFraction = (): number => {
 /**
  * A panel docked to the bottom of the window, below the menu. A drag handle on its top edge resizes it
  * (fraction of the window height, remembered in localStorage); Escape or ✕ closes it. Reports its height
- * so the page can leave room for it.
+ * so the page can leave room for it. `actions` (range, toggles, the cog) share the title's row, before ✕; on a
+ * phone they go to a row of their own below the title.
  */
-export function ChartPanel({ title, onClose, onHeight, children }: { title: ReactNode; onClose: () => void; onHeight: (px: number) => void; children: ReactNode }) {
+export function ChartPanel({ title, actions, onClose, onHeight, children }: { title: ReactNode; actions?: ReactNode; onClose: () => void; onHeight: (px: number) => void; children: ReactNode }) {
   const [fraction, setFraction] = useState(initialFraction);
   const [viewport, setViewport] = useState(window.innerHeight);
   const dragging = useRef(false);
@@ -71,8 +73,9 @@ export function ChartPanel({ title, onClose, onHeight, children }: { title: Reac
         <div className="chart-panel-title" data-testid="chart-panel-title">
           {title}
         </div>
-        <button type="button" className="chart-panel-close" onClick={onClose} aria-label="Close the chart" data-testid="chart-panel-close">
-          ✕
+        {actions && <div className="chart-panel-actions">{actions}</div>}
+        <button type="button" className="chart-panel-close" onClick={onClose} aria-label="Close the chart" title="Close (Esc)" data-testid="chart-panel-close">
+          <Icon name="close" size={16} />
         </button>
       </header>
       <div className="chart-panel-body">{children}</div>

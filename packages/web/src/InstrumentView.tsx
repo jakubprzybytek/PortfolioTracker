@@ -25,7 +25,7 @@ export function InstrumentSettingsButton({ isin, from }: { isin: string; from: V
   return (
     <button
       type="button"
-      className="icon-only settings-open"
+      className="settings-open"
       onClick={() => {
         window.location.hash = toHash("instrument", { isin, from });
       }}
