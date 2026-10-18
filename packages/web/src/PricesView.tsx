@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CLASS_LABELS } from "./Allocation.tsx";
-import { AssetClassSelect } from "./AssetClassSelect.tsx";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, FilterText, FilterToggle, matchesText, uniqueOptions } from "./Filters.tsx";
 import { addDays, fmtNum, fmtPct, fmtTime, priceAgeTitle, rangeBefore, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
-import { ManualValues } from "./ManualValues.tsx";
-import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
+import { InstrumentSettingsButton } from "./InstrumentView.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { PriceChart } from "./PriceChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
@@ -34,8 +32,6 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const selected = params["chart"] ?? null;
   const [range, setRange] = useState<RangeKey>("1Y");
   const [panelHeight, setPanelHeight] = useState(0);
-  /** The bond whose coupon periods replace its chart in the panel. */
-  const [couponsFor, setCouponsFor] = useState<string | null>(null);
   const all = rows.data ?? [];
   const sel = all.find((r) => r.isin === selected);
   // An instrument held no more: the range counts back from a month after its last transaction (ALL: from a month before its first).
@@ -110,7 +106,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                   <InstrumentLabel code={r.code} name={r.name} />
                 </td>
                 <td className="left">{typeLabel(r.type)}</td>
-                <td className="left" title={r.assetClassSet ? "Set by hand (open the chart to change it)" : "By the rule: the type; an ETF with “bond” in its name = bonds"} data-testid="price-class">
+                <td className="left" title={r.assetClassSet ? "Set by hand (change it in the instrument's settings: the cog in its chart)" : "By the rule: the type; an ETF with “bond” in its name = bonds"} data-testid="price-class">
                   {CLASS_LABELS[r.assetClass]}
                   {r.assetClassSet && <span className="flag" data-testid="class-set">set</span>}
                 </td>
@@ -147,7 +143,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                       )}
                       {r.stale && r.priceDate && <span className="flag">stale</span>}
                       {r.manual && (
-                        <span className="flag" title="Valued by hand: open the chart for a new value">
+                        <span className="flag" title="Valued by hand: a new value in the instrument's settings (the cog in its chart)">
                           manual
                         </span>
                       )}
@@ -198,17 +194,13 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
           }
         >
           <div className="chart-tools">
-            {couponsFor === selected ? <span /> : <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />}
-            {sel?.manual && <ManualValues key={sel.isin} isin={sel.isin} code={sel.code} currency={sel.currency} />}
+            <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />
             <span className="chart-tools-end">
-              {sel && <AssetClassSelect key={sel.isin} isin={sel.isin} code={sel.code} type={sel.type} name={sel.name} value={sel.assetClass} />}
-              {sel?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === selected} onToggle={() => setCouponsFor(couponsFor === selected ? null : selected)} />}
+              <InstrumentSettingsButton isin={selected} from="prices" />
             </span>
           </div>
-          <div style={{ flex: 1, minHeight: 0, overflow: couponsFor === selected ? "auto" : undefined }}>
-            {sel?.type === "BOND_CORPORATE" && couponsFor === selected ? (
-              <CouponPeriods key={selected} isin={selected} code={sel.code} />
-            ) : prices.error ? (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            {prices.error ? (
               <p className="error">{prices.error}</p>
             ) : (
               <PriceChart

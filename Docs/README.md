@@ -150,7 +150,8 @@ Later phases:
 - [x] Finding things (2026-10-16): an "Instrument" text filter in Holdings and Prices; a position's transactions in its chart panel ("Transactions (n)"); Account first among the Transactions filters, notes on one line.
 - [x] Phones (2026-10-17): Transactions as a list of two-line rows, filters in rows of two, the valuation date and "Update prices" on the title's row, the position's transactions in place of its chart; long transaction lists drawn 200 rows at a time.
 - [x] Stage `test` (2026-10-16): the history before the app (2008–2022, accounts closed before it) converted from the history spreadsheet (`scripts/history-sheet-to-import.ts`) and imported; deployed by CD since 2026-10-17.
-- [x] Asset class per instrument (2026-10-18): set by hand in Prices or Holdings where the rule (by type, "bond" in an ETF's name) is wrong; the allocation charts follow.
+- [x] Asset class per instrument (2026-10-18): set by hand where the rule (by type, "bond" in an ETF's name) is wrong; the allocation charts follow.
+- [x] Instrument view (2026-10-18): the cog (⚙) in a chart panel (Prices, Holdings) opens one view with the instrument's properties: asset class, values entered by hand, coupon periods (until then separate buttons in the panel).
 - [x] Valuation speed with a long history (2026-10-17/18, measured on `test`: 6,792 days since 2008): the Dashboard charts read a ~250-byte chart point per day instead of whole snapshots ("ALL" had read 13 MB in ~5 s); the valuation walks the transactions once and compares days by fingerprint (computing all days 7.1 s → 0.3 s), writes in batches, merges requests waiting together and starts from the earliest day a change touches (a forced rewrite 182 s → 13.5 s; a run with nothing to write 77 s → ~2 s).
 
 ## Outstanding work (2026-10-18)
@@ -172,7 +173,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab.
 11. **IBKR Flex Web Service:** IBKR trades without downloading statements (needs a Flex Query and a token); mark prices for US T-bills.
 12. **More Dashboard charts:** income per year. (Drawdown and allocation over time done on 2026-10-15.)
-13. ~~Asset class per instrument~~ Done (2026-10-18): a "Class" column and filter in Prices and a "Class" select in the chart panels (Prices, Holdings); one class per instrument (shares, bonds, cash, other), the rule (by type, "bond" in an ETF's name) unless set by hand; a change revalues the instrument's history.
+13. ~~Asset class per instrument~~ Done (2026-10-18): a "Class" column and filter in Prices and a "Class" select in the instrument's settings (the cog in its chart panel); one class per instrument (shares, bonds, cash, other), the rule (by type, "bond" in an ETF's name) unless set by hand; a change revalues the instrument's history.
 20. **XIRR per account, per asset type and per instrument:** today XIRR is per account and for the total, from deposits and withdrawals (`core/valuation/accounts.ts`, Accounts table). Also per asset type and per instrument (Holdings rows and group rows), from the position's own cash flows: buys, sells, coupons, dividends, redemptions and fees, plus its value today; per account the same way, so it can be compared with the deposit-based figure. Closed positions keep theirs (with item 9).
 
 ### Operations and housekeeping

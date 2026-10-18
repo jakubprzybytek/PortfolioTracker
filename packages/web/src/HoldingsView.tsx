@@ -9,10 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
-import { ManualValues } from "./ManualValues.tsx";
-import { AssetClassSelect } from "./AssetClassSelect.tsx";
-import { assetClassOf } from "@portfolio/core/valuation/history";
-import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
+import { InstrumentSettingsButton } from "./InstrumentView.tsx";
 import {
   FilterBar,
   FilterSelect,
@@ -524,8 +521,6 @@ export function HoldingsView({
   const chartAccount = params["chartAccount"];
   const [range, setRange] = useState<RangeKey>("1Y");
   const [panelHeight, setPanelHeight] = useState(0);
-  /** The bond whose coupon periods replace its chart in the panel. */
-  const [couponsFor, setCouponsFor] = useState<string | null>(null);
   /** The position's transactions next to its chart (stays open from one row to the next). */
   const [showTxs, setShowTxs] = useState(false);
   const positionTxs = usePositionTransactions(chartIsin, chartAccount);
@@ -559,10 +554,10 @@ export function HoldingsView({
   );
   const isSelected = (isin: string, acct?: string) =>
     chartIsin === isin && chartAccount === acct;
-  const chartOpen = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin);
   const chartHolding:
     Pick<Holding, "isin" | "code" | "name" | "type" | "currency"> | undefined =
-    chartOpen ?? chartClosed;
+    (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin) ??
+    chartClosed;
 
   // A chart opened (e.g. from the URL) on one account of a multi-account instrument: show that row.
   useEffect(() => {
@@ -1071,7 +1066,7 @@ export function HoldingsView({
           }
         >
           <div className="chart-tools">
-            {couponsFor === chartIsin || txsOnly ? (
+            {txsOnly ? (
               <span />
             ) : (
               <RangePicker
@@ -1081,34 +1076,7 @@ export function HoldingsView({
                 testId="holding-range"
               />
             )}
-            {chartHolding?.type === "FUND_MANUAL" && (
-              <ManualValues
-                key={chartHolding.isin}
-                isin={chartHolding.isin}
-                code={chartHolding.code}
-                currency={chartHolding.currency}
-              />
-            )}
             <span className="chart-tools-end">
-              {/* Held positions only: a closed one's class is in Prices ("Show closed"). */}
-              {chartOpen && (
-                <AssetClassSelect
-                  key={chartOpen.isin}
-                  isin={chartOpen.isin}
-                  code={chartOpen.code}
-                  type={chartOpen.type}
-                  name={chartOpen.name}
-                  value={assetClassOf(chartOpen)}
-                />
-              )}
-              {chartHolding?.type === "BOND_CORPORATE" && (
-                <CouponPeriodsButton
-                  open={couponsFor === chartIsin}
-                  onToggle={() =>
-                    setCouponsFor(couponsFor === chartIsin ? null : chartIsin)
-                  }
-                />
-              )}
               <TransactionsButton
                 open={showTxs}
                 onToggle={() => setShowTxs(!showTxs)}
@@ -1116,6 +1084,7 @@ export function HoldingsView({
                   positionTxs.loading ? undefined : positionTxs.rows.length
                 }
               />
+              <InstrumentSettingsButton isin={chartIsin} from="holdings" />
             </span>
           </div>
           <div className="chart-with-side">
@@ -1125,17 +1094,9 @@ export function HoldingsView({
                   flex: 1,
                   minWidth: 0,
                   minHeight: 0,
-                  overflow: couponsFor === chartIsin ? "auto" : undefined,
                 }}
               >
-                {chartHolding?.type === "BOND_CORPORATE" &&
-                couponsFor === chartIsin ? (
-                  <CouponPeriods
-                    key={chartIsin}
-                    isin={chartIsin}
-                    code={chartHolding.code}
-                  />
-                ) : history.error ? (
+                {history.error ? (
                   <p className="error">{history.error}</p>
                 ) : (
                   <ValueChart

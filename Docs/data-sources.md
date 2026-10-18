@@ -9,7 +9,7 @@
 | Polish corporate bonds on Catalyst | fixed and floating coupons | BiznesRadar: history page + today's quote | BiznesRadar quote page (last trade, 15 min delayed) | BiznesRadar: full history per bond (~16 pages) |
 | Polish retail treasury bonds (not traded) | EDO, COI, ROD, ROR … | Calculated from terms + CPI | – | Calculated; checked against obligacjeskarbowe.pl interest tables |
 | Foreign government bonds at IBKR | Bunds, OATs, US T-bills (zero-coupon) | onvista, Börse Stuttgart close (EUR bonds); calculated where there's no quote (US T-bills, matured bonds) | onvista: Stuttgart quote, near real time | onvista daily history (Bund from 2020); calculated paths computed once on import |
-| Manually valued assets | e.g. real-estate projects | Entered by you: "Edit values" in the asset's chart panel (Prices, Holdings) | – | `imports/prices/` |
+| Manually valued assets | e.g. real-estate projects | Entered by you: its settings (the cog in its chart panel: Values) | – | `imports/prices/` |
 | Cash | savings accounts, broker cash | From transactions | – | IBKR activity statements (CSV); the sheet import for the other accounts |
 
 ## Where transactions come from

@@ -6,6 +6,7 @@ import { DashboardView } from "./DashboardView.tsx";
 import { HoldingsView } from "./HoldingsView.tsx";
 import { Icon } from "./Icons.tsx";
 import { IndicatorsView } from "./IndicatorsView.tsx";
+import { InstrumentView } from "./InstrumentView.tsx";
 import { LoginForm } from "./LoginForm.tsx";
 import { NotesView } from "./NotesView.tsx";
 import { PricesView } from "./PricesView.tsx";
@@ -160,7 +161,7 @@ function Shell({ email }: { email: string }) {
           </div>
           <div id="nav-menu" className={`nav-menu${menuOpen ? " open" : ""}`} data-testid="nav-menu">
             <ul>
-              {VIEWS.map((v) => (
+              {VIEWS.filter((v) => !v.hidden).map((v) => (
                 <li key={v.view}>
                   <a href={v.path} aria-current={route.view === v.view ? "page" : undefined} data-testid={`nav-${v.view}`} onClick={() => setMenuOpen(false)}>
                     <Icon name={v.view} />
@@ -190,6 +191,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}
+        {route.view === "instrument" && <InstrumentView key="instrument" params={route.params} />}
       </main>
       {(toast || recalc) && (
         <div className="toast" role="status">

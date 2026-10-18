@@ -485,11 +485,9 @@ test.describe("prices view", () => {
     await expect(page.getByTestId("prices-table")).toBeVisible(); // the list stays visible above
     await expect(page.getByTestId("price-title")).toContainText("close, EUR");
     await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
-    // asset class: a column (by the rule here) and a select in the panel, the rule's class marked
+    // asset class: a column (by the rule here)
     await expect(page.getByTestId("price-SPXS").getByTestId("price-class")).toHaveText("Shares");
     await expect(page.getByTestId("price-DS0432").getByTestId("price-class")).toHaveText("Bonds");
-    await expect(page.getByTestId("asset-class-select")).toHaveValue("SHARES");
-    await expect(page.getByTestId("asset-class-select").locator("option:checked")).toHaveText("Shares (rule)");
     const before = (await panel.boundingBox())!.height;
     expect(before).toBeGreaterThan(250); // a third of the 900 px window
     expect(before).toBeLessThan(350);
@@ -518,10 +516,36 @@ test.describe("prices view", () => {
     await expect(rows).toHaveCount(7);
   });
 
-  test("an asset valued by hand takes a new value from its chart panel, and the value can be deleted", async ({ page }) => {
+  test("the cog in a chart panel opens the instrument's settings (asset class); back returns to the panel", async ({ page }) => {
+    await page.goto("/#/prices?chart=IE00B3YCGJ38");
+    await expect(page.getByTestId("price-title")).toContainText("SPXS");
+    await page.getByTestId("instrument-settings").click();
+    await expect(page).toHaveURL(/#\/instrument\?isin=IE00B3YCGJ38&from=prices/);
+    await expect(page.getByTestId("instrument-title")).toContainText("SPXS");
+    await expect(page.getByTestId("instrument-facts")).toContainText("IE00B3YCGJ38");
+    await expect(page.getByTestId("asset-class-select")).toHaveValue("SHARES");
+    await expect(page.getByTestId("asset-class-select").locator("option:checked")).toHaveText("Shares (rule)");
+    // an ETF: no values by hand, no coupon periods; not in the menu
+    await expect(page.getByTestId("instrument-values")).toHaveCount(0);
+    await expect(page.getByTestId("instrument-coupons")).toHaveCount(0);
+    await expect(page.getByTestId("nav-instrument")).toHaveCount(0);
+    await page.getByTestId("instrument-back").click();
+    await expect(page).toHaveURL(/#\/prices\?chart=IE00B3YCGJ38/);
+    await expect(page.getByTestId("chart-panel")).toBeVisible();
+    // from Holdings too, and back there
+    await page.goto("/#/holdings?chart=IE00B3YCGJ38");
+    await page.getByTestId("instrument-settings").click();
+    await expect(page).toHaveURL(/from=holdings/);
+    await page.goBack();
+    await expect(page).toHaveURL(/#\/holdings\?chart=IE00B3YCGJ38/);
+    await expect(page.getByTestId("chart-panel")).toBeVisible();
+  });
+
+  test("an asset valued by hand takes a new value in its settings, and the value can be deleted", async ({ page }) => {
     await page.goto("/#/prices?chart=ZZSAMPLEAPA0");
     await expect(page.getByTestId("price-title")).toContainText("SAMPLE-APARTMENT");
-    await page.getByTestId("manual-value-open").click();
+    await page.getByTestId("instrument-settings").click();
+    await expect(page.getByTestId("instrument-title")).toContainText("SAMPLE-APARTMENT");
     const list = page.getByTestId("manual-value-list");
     await expect(list).toContainText("2026-09-30");
     // Dated before the sample's latest value, so the valuation of today doesn't change.
@@ -537,15 +561,17 @@ test.describe("prices view", () => {
     await expect(page.getByTestId("tx-toast")).toContainText("value of 2026-07-16 deleted");
     await expect(list).not.toContainText("2026-07-16");
     // A listed bond has a price source: no form.
-    await page.goto("/#/prices?chart=PL0000113783");
-    await expect(page.getByTestId("price-title")).toContainText("DS0432");
-    await expect(page.getByTestId("manual-value-open")).toHaveCount(0);
+    await page.goto("/#/instrument?isin=PL0000113783");
+    await expect(page.getByTestId("instrument-title")).toContainText("DS0432");
+    await expect(page.getByTestId("instrument-class")).toBeVisible();
+    await expect(page.getByTestId("instrument-values")).toHaveCount(0);
   });
 
-  test("a corporate bond's coupon periods replace its chart; a period is added, given a rate and deleted", async ({ page }) => {
+  test("a corporate bond's coupon periods are in its settings; a period is added, given a rate and deleted", async ({ page }) => {
     await page.goto("/#/prices?chart=PLKRK0000713");
     await expect(page.getByTestId("price-title")).toContainText("KRU0827");
-    await page.getByTestId("coupon-periods-open").click();
+    await page.getByTestId("instrument-settings").click();
+    await expect(page.getByTestId("instrument-title")).toContainText("KRU0827");
     const table = page.getByTestId("coupon-periods");
     // The sample's periods (data/coupons.sample.json), newest first; the sample coupon fits its period's rate.
     const feb = table.locator('[data-testid="coupon-period"][data-start="2026-02-12"]');
@@ -571,9 +597,6 @@ test.describe("prices view", () => {
     await added.getByTestId("coupon-delete").click();
     await expect(page.getByTestId("tx-toast")).toContainText("period from 2032-01-01 deleted");
     await expect(added).toHaveCount(0);
-    // Back to the chart.
-    await page.getByTestId("coupon-periods-open").click();
-    await expect(table).toHaveCount(0);
   });
 });
 

@@ -20,15 +20,6 @@ const SOURCE_LABELS: Record<string, string> = { manual: "yours", "obligacje.pl":
 const fmtRate = (r: number | undefined) => (r === undefined ? "–" : `${fmtNum(r * 100, 2)} %`);
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
 
-/** "Coupon periods" toggles the bond's chart panel between the chart and this table. */
-export function CouponPeriodsButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
-  return (
-    <button type="button" className="manual-open" onClick={onToggle} title="The bond's interest periods and their rates (accrued interest)" data-testid="coupon-periods-open">
-      {open ? "Chart" : "Coupon periods"}
-    </button>
-  );
-}
-
 interface Draft {
   start: string;
   end: string;

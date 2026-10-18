@@ -6,13 +6,12 @@ import { useApi } from "./useApi.ts";
 import { useTxForm } from "./txForm.ts";
 
 /**
- * Values of an asset valued by hand (no price source): "Edit values" opens a small form (date, value per unit) above the
- * chart, with the values entered so far, newest first; each can be deleted (a second click confirms). While a value is
- * saved or deleted, its button shows a spinner and the list says it's updating.
+ * Values of an asset valued by hand (no price source), in the Instrument view: a small form (date, value per unit) and
+ * the values entered so far, newest first; each can be deleted (a second click confirms). While a value is saved or
+ * deleted, its button shows a spinner and the list says it's updating.
  */
 export function ManualValues({ isin, code, currency }: { isin: string; code: string; currency: string }) {
   const { saved } = useTxForm();
-  const [open, setOpen] = useState(false);
   const [date, setDate] = useState(today());
   const [value, setValue] = useState("");
   /** What's being sent: "save", or the date of the value being deleted. */
@@ -20,7 +19,7 @@ export function ManualValues({ isin, code, currency }: { isin: string; code: str
   const busy = pending !== null;
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
-  const values = useApi<Price[]>(open ? `/instruments/${isin}/prices` : null, { from: "1900-01-01", to: today() });
+  const values = useApi<Price[]>(`/instruments/${isin}/prices`, { from: "1900-01-01", to: today() });
   // An unanswered "Delete?" goes back to ✕ after a few seconds.
   useEffect(() => {
     if (!confirm) return;
@@ -58,12 +57,6 @@ export function ManualValues({ isin, code, currency }: { isin: string; code: str
     }
   };
 
-  if (!open)
-    return (
-      <button type="button" className="manual-open" onClick={() => setOpen(true)} title="Add or delete values entered by hand" data-testid="manual-value-open">
-        Edit values
-      </button>
-    );
   const list = [...(values.data ?? [])].sort((a, b) => b.date.localeCompare(a.date));
   return (
     <div className="manual-values" data-testid="manual-values">
@@ -81,9 +74,6 @@ export function ManualValues({ isin, code, currency }: { isin: string; code: str
         <button type="submit" className="primary" disabled={busy || !date} data-testid="manual-value-save">
           {pending === "save" && <span className="spinner" aria-hidden />}
           {pending === "save" ? "Saving…" : "Save"}
-        </button>
-        <button type="button" className="icon-only" onClick={() => setOpen(false)} disabled={busy} title="Close" aria-label="Close the values" data-testid="manual-value-close">
-          ✕
         </button>
       </form>
       {error && <p className="error" data-testid="manual-value-error">{error}</p>}

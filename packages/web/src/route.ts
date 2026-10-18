@@ -3,14 +3,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type View = "dashboard" | "holdings" | "prices" | "indicators" | "transactions" | "notes";
-export const VIEWS: { view: View; label: string; path: string }[] = [
+export type View = "dashboard" | "holdings" | "prices" | "indicators" | "transactions" | "notes" | "instrument";
+/** `hidden`: not in the menu (opened from another view). */
+export const VIEWS: { view: View; label: string; path: string; hidden?: true }[] = [
   { view: "dashboard", label: "Dashboard", path: "#/" },
   { view: "holdings", label: "Holdings", path: "#/holdings" },
   { view: "prices", label: "Prices", path: "#/prices" },
   { view: "indicators", label: "Indicators", path: "#/indicators" },
   { view: "transactions", label: "Transactions", path: "#/transactions" },
   { view: "notes", label: "Notes", path: "#/notes" },
+  { view: "instrument", label: "Instrument", path: "#/instrument", hidden: true },
 ];
 
 export interface Route {
@@ -21,7 +23,7 @@ export interface Route {
 export function parseHash(hash: string): Route {
   const [path = "", query = ""] = hash.replace(/^#/, "").split("?");
   const name = path.replace(/^\/+|\/+$/g, "");
-  const view: View = name === "holdings" || name === "prices" || name === "indicators" || name === "transactions" || name === "notes" ? name : "dashboard";
+  const view: View = VIEWS.find((v) => v.view === name && v.view !== "dashboard")?.view ?? "dashboard";
   return { view, params: Object.fromEntries(new URLSearchParams(query)) };
 }
 

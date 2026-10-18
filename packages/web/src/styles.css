@@ -212,6 +212,21 @@ tr.muted td { color: var(--muted); }
 .chart-tools button { cursor: pointer; }
 .chart-tools .manual-open { margin: 4px 0; }
 .chart-tools-end { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-left: auto; }
+.chart-tools button.settings-open { display: inline-flex; align-items: center; padding: 4px 7px; color: var(--muted); }
+.chart-tools button.settings-open:hover { color: var(--fg); }
+/* Instrument view (the cog): one panel per property. */
+.instrument-sections { display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
+.instrument-sections h3 { margin: 0 0 8px; font-size: 1rem; }
+.instrument-sections .hint { margin: 0 0 8px; font-size: 0.85rem; }
+.instrument-sections .manual-list { max-height: none; }
+.instrument-sections .manual-values input, .instrument-sections .manual-values form button { font: inherit; font-size: 0.85rem; padding: 4px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--fg); }
+.instrument-sections .manual-values button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; font-size: 0.92rem; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.view-title button.back { font: inherit; font-size: 1.3rem; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px 0 0; }
+.view-title button.back:hover { color: var(--fg); }
+.view-title .instrument-name { font-size: 1rem; font-weight: 400; }
 .asset-class { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
 .asset-class select { font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--fg); }
 .chart-tools button.toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
