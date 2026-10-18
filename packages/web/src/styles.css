@@ -133,8 +133,6 @@ tr.band-b td { background: var(--band); }
 .tx-date { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.85em; }
 .tx-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tx-amount { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; }
-.tx-amount.pos::before { content: "\25B2"; font-size: 0.7em; margin-right: 0.3em; vertical-align: 0.1em; }
-.tx-amount.neg::before { content: "\25BC"; font-size: 0.7em; margin-right: 0.3em; vertical-align: 0.1em; }
 .tx-detail { font-size: 0.82rem; }
 .tx-detail > * { flex: none; }
 .tx-code { color: var(--fg); }
@@ -163,10 +161,6 @@ th:first-child, td:first-child, th.left, td.left { text-align: left; }
 th { cursor: pointer; user-select: none; color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 1px solid var(--border); padding-top: 11px; }
 tbody tr:hover { background: var(--row); }
 tbody tr:last-child td { border-bottom: 0; }
-/* Gains and losses also by shape, not only by colour. */
-td.pos::before, td.neg::before, .card .value.pos::before, .card .value.neg::before { font-size: 0.7em; margin-right: 0.3em; vertical-align: 0.1em; }
-td.pos::before, .card .value.pos::before { content: "\25B2"; }
-td.neg::before, .card .value.neg::before { content: "\25BC"; }
 /* Selected row: accent bar on the left edge + light tint (works in light and dark mode). */
 tr.selected td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }

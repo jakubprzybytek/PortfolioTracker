@@ -17,7 +17,7 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("total-xirr")).toContainText("money-weighted");
     const xirrCell = page.getByTestId("accounts-total").locator("td").nth(6);
     await expect(xirrCell).toHaveText(/%$/);
-    await expect(page.getByTestId("total-xirr").locator(".value")).toHaveText((await xirrCell.textContent())!); // the ▲ is CSS, not text
+    await expect(page.getByTestId("total-xirr").locator(".value")).toHaveText((await xirrCell.textContent())!);
     // Where the profit comes from: the parts add up to it
     await expect(page.getByTestId("profit-income")).toContainText("1 016,70 zł"); // coupons, the manual asset's income, the closed account's interest
     const num = (t: string) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", "."));
