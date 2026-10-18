@@ -439,20 +439,20 @@ test.describe("prices view", () => {
     const rows = page.getByTestId("prices-table").locator("tbody tr");
     await expect(rows).toHaveCount(7);
     expect(await rows.locator("td:first-child strong").allTextContents()).toEqual(["DE0001102523", "DS0432", "EDO0935", "IZ0836", "KRU0827", "SAMPLE-APARTMENT", "SPXS"]);
-    await expect(page.getByTestId("price-KRU0827").locator("td").nth(2)).toHaveText(/^\d+,\d{2} %$/); // corporate bond: clean, % of nominal
-    await expect(page.getByTestId("price-SPXS").locator("td").nth(2)).toHaveText(/^\d+,\d{2} EUR$/); // ETF: in its currency
+    await expect(page.getByTestId("price-KRU0827").locator("td").nth(3)).toHaveText(/^\d+,\d{2} %$/); // corporate bond: clean, % of nominal
+    await expect(page.getByTestId("price-SPXS").locator("td").nth(3)).toHaveText(/^\d+,\d{2} EUR$/); // ETF: in its currency
     const manual = page.getByTestId("price-SAMPLE-APARTMENT");
-    await expect(manual.locator("td").nth(2)).toHaveText("950,00 PLN");
-    await expect(manual.locator("td").nth(3)).toHaveText(/2026-09-30\s*manual/);
+    await expect(manual.locator("td").nth(3)).toHaveText("950,00 PLN");
+    await expect(manual.locator("td").nth(4)).toHaveText(/2026-09-30\s*manual/);
     // Retail bond: its interest rate instead of a market price, the previous year's rate in "1 year"
     const edo = page.getByTestId("price-EDO0935");
-    await expect(edo.locator("td").nth(2)).toHaveText("5,00 % p.a.");
-    await expect(edo.locator("td").nth(3)).toHaveText("calculated");
-    await expect(edo.locator("td").nth(4)).toHaveText("6,00 % before");
+    await expect(edo.locator("td").nth(3)).toHaveText("5,00 % p.a.");
+    await expect(edo.locator("td").nth(4)).toHaveText("calculated");
+    await expect(edo.locator("td").nth(5)).toHaveText("6,00 % before");
     const ds = page.getByTestId("price-DS0432");
-    await expect(ds.locator("td").nth(2)).toHaveText(/^\d+,\d{2} %$/); // clean price, % of nominal
-    await expect(ds.locator("td").nth(3)).toHaveText(/^\d{4}-\d{2}-\d{2}/);
-    await expect(ds.locator("td").nth(4)).toHaveText(/%$/);
+    await expect(ds.locator("td").nth(3)).toHaveText(/^\d+,\d{2} %$/); // clean price, % of nominal
+    await expect(ds.locator("td").nth(4)).toHaveText(/^\d{4}-\d{2}-\d{2}/);
+    await expect(ds.locator("td").nth(5)).toHaveText(/%$/);
 
     await ds.click();
     await expect(page).toHaveURL(/#\/prices\?chart=PL0000113783$/);
@@ -485,6 +485,11 @@ test.describe("prices view", () => {
     await expect(page.getByTestId("prices-table")).toBeVisible(); // the list stays visible above
     await expect(page.getByTestId("price-title")).toContainText("close, EUR");
     await expect(page.getByTestId("price-chart").locator("path.recharts-line-curve")).toHaveCount(1);
+    // asset class: a column (by the rule here) and a select in the panel, the rule's class marked
+    await expect(page.getByTestId("price-SPXS").getByTestId("price-class")).toHaveText("Shares");
+    await expect(page.getByTestId("price-DS0432").getByTestId("price-class")).toHaveText("Bonds");
+    await expect(page.getByTestId("asset-class-select")).toHaveValue("SHARES");
+    await expect(page.getByTestId("asset-class-select").locator("option:checked")).toHaveText("Shares (rule)");
     const before = (await panel.boundingBox())!.height;
     expect(before).toBeGreaterThan(250); // a third of the 900 px window
     expect(before).toBeLessThan(350);
@@ -496,6 +501,11 @@ test.describe("prices view", () => {
     await expect(page).toHaveURL(/chart=IE00B3YCGJ38/);
     await expect(page.getByTestId("filters-summary")).toHaveText("2 of 7 instruments");
     await page.getByTestId("filter-type").selectOption({ label: "ETF" });
+    await expect(rows).toHaveCount(1);
+    await page.getByTestId("filter-class").selectOption({ label: "Bonds" });
+    await expect(page.getByTestId("prices-table")).toContainText("No instruments match the filters.");
+    await expect(page).toHaveURL(/class=BONDS/);
+    await page.getByTestId("filter-class").selectOption({ label: "Shares" });
     await expect(rows).toHaveCount(1);
     await page.reload();
     await expect(rows).toHaveCount(1);
@@ -808,7 +818,7 @@ test.describe("show closed", () => {
   });
 
   test("prices: instruments held no more greyed after the others, with their last price; their chart ranges count back from the last trade", async ({ page }) => {
-    const oldRow = { isin: OLD_BOND, code: "OLD0513", name: "Old bond (made up)", type: "BOND_CORPORATE", currency: "PLN", price: 48.5, priceDate: "2013-05-30", stale: false, manual: true, yearAgo: { date: "2012-05-30", price: 97 }, change1y: -0.5, closed: { firstDate: "2012-03-01", lastDate: "2013-05-31" } };
+    const oldRow = { isin: OLD_BOND, code: "OLD0513", name: "Old bond (made up)", type: "BOND_CORPORATE", currency: "PLN", price: 48.5, priceDate: "2013-05-30", stale: false, manual: true, yearAgo: { date: "2012-05-30", price: 97 }, change1y: -0.5, closed: { firstDate: "2012-03-01", lastDate: "2013-05-31" }, assetClass: "BONDS" };
     await page.route(withClosed("/prices"), async (route) => {
       const res = await route.fetch();
       const body = (await res.json()) as { code: string; closed?: unknown }[];
@@ -828,8 +838,8 @@ test.describe("show closed", () => {
     const row = page.getByTestId("price-OLD0513");
     await expect(row).toHaveClass(/closed/);
     await expect(row.getByTestId("closed-flag")).toHaveText("closed 2013-05-31");
-    await expect(row.locator("td").nth(3)).not.toContainText("stale");
-    await expect(row.locator("td").nth(4)).toHaveText(/^[-−]50\s*%$/);
+    await expect(row.locator("td").nth(4)).not.toContainText("stale");
+    await expect(row.locator("td").nth(5)).toHaveText(/^[-−]50\s*%$/);
     const codes = await page.getByTestId("prices-table").locator("tbody tr").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
     expect(codes.at(-1)).toBe("price-OLD0513"); // after the held ones
     await expect(page.getByTestId("prices-date")).not.toContainText("2013"); // "as of" the held ones

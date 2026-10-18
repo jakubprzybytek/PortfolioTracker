@@ -26,6 +26,16 @@ describe("priceRows", () => {
     expect(row).toMatchObject({ code: "EDO0332", price: null, stale: false, rate: { current: 0.0345, previous: 0.0655 } });
   });
 
+  it("gives each row its asset class: by the rule, or set by hand (assetClassSet)", () => {
+    const etf = (isin: string, name: string, assetClass?: "OTHER") => ({ ...inst(isin, isin.slice(0, 6)), type: "ETF", name, ...(assetClass ? { assetClass } : {}) }) as InstrumentItem;
+    const rows = priceRows([inst("PL0000113783", "DS0432"), etf("IE00B3RBWM25", "Vanguard FTSE All-World"), etf("IE00B4L5Y983", "Gold", "OTHER")], new Map(), new Map(), "2026-10-11");
+    expect(rows.map((r) => [r.code, r.assetClass, r.assetClassSet])).toEqual([
+      ["DS0432", "BONDS", undefined],
+      ["IE00B3", "SHARES", undefined],
+      ["IE00B4", "OTHER", true],
+    ]);
+  });
+
   it("never marks a manual price stale and tags it", () => {
     const old = { ...px("ZZRZESZOW000", "2023-03-23", 1000), venue: "MANUAL" };
     const [row] = priceRows([{ ...inst("ZZRZESZOW000", "RZESZÓW"), type: "FUND_MANUAL", venue: "MANUAL" } as InstrumentItem], new Map([["ZZRZESZOW000", old]]), new Map(), "2026-10-11");

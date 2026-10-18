@@ -212,6 +212,8 @@ tr.muted td { color: var(--muted); }
 .chart-tools button { cursor: pointer; }
 .chart-tools .manual-open { margin: 4px 0; }
 .chart-tools-end { display: flex; flex-wrap: wrap; gap: 4px 8px; margin-left: auto; }
+.asset-class { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+.asset-class select { font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--fg); }
 .chart-tools button.toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
 /* Holdings chart panel: the position's transactions next to the chart (below it on phones), scrolling on their own. */
 .chart-with-side { flex: 1; min-height: 0; display: flex; gap: 14px; }

@@ -1,7 +1,7 @@
 // Pure functions for the Dashboard's history charts; no AWS imports, so the web app can import this file directly
 // (`@portfolio/core/valuation/history`).
 import { addDays } from "../dates.ts";
-import type { HistoryPointItem, HoldingSnapshot, SnapshotItem } from "../db/items.ts";
+import type { HistoryPointItem, SnapshotItem } from "../db/items.ts";
 
 /** The big picture's asset classes, in display order. */
 export const ASSET_CLASSES = ["SHARES", "BONDS", "CASH", "OTHER"] as const;
@@ -18,8 +18,11 @@ const CLASS_OF_TYPE: Record<string, AssetClass> = {
   FUND_MANUAL: "OTHER",
 };
 
-/** An ETF holding bonds ("… Corporate Bond UCITS ETF") counts as bonds; other ETFs as shares. */
-export const assetClassOf = (h: Pick<HoldingSnapshot, "type" | "name">): AssetClass => (h.type === "ETF" && /\bbond/i.test(h.name) ? "BONDS" : (CLASS_OF_TYPE[h.type] ?? "OTHER"));
+/** The rule: by type; an ETF holding bonds ("… Corporate Bond UCITS ETF") counts as bonds, other ETFs as shares. */
+export const defaultAssetClass = (i: { type: string; name: string }): AssetClass => (i.type === "ETF" && /\bbond/i.test(i.name) ? "BONDS" : (CLASS_OF_TYPE[i.type] ?? "OTHER"));
+
+/** An instrument's or holding's class: the one set by hand (`assetClass`), or else the rule. */
+export const assetClassOf = (i: { type: string; name: string; assetClass?: AssetClass | undefined }): AssetClass => i.assetClass ?? defaultAssetClass(i);
 
 /** One day's value per asset class: positions of every account plus the cash of the fully tracked ones (as the totals). */
 export function valueByClass(snapshot: Pick<SnapshotItem, "holdings" | "totals">): Record<AssetClass, number> {

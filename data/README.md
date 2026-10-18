@@ -27,6 +27,8 @@ Foreign government bonds at IBKR, quoted (EUR Bunds, OATs …): `"type": "BOND_I
 
 ETF instruments: `"type": "ETF"`, `currency` of the listing, `venue` (`XAMS`, `XETR` …), `"sourceIds": { "yahoo": "VWRL.AS" }` and any `splits` (`[{ "date": "2025-12-15", "ratio": 100 }]`). Importing one loads its full price history from Yahoo and the NBP rates of its currency; recording a new split later reloads the history.
 
+Any instrument may have an `assetClass` (`SHARES`, `BONDS`, `CASH`, `OTHER`) for the Dashboard's allocation, when the rule (by type; an ETF with "bond" in its name = bonds) gets it wrong. Usually set in the app (Prices, the chart panel's "Class"); the monthly export keeps it.
+
 `transactions.sample.json` (with `instruments.sample.json`, `prices.sample.json`, `coupons.sample.json` and `accounts.sample.json`) is **made-up data** for trying the app out.
 
 ## Restoring from a backup

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CLASS_LABELS } from "./Allocation.tsx";
+import { AssetClassSelect } from "./AssetClassSelect.tsx";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, FilterText, FilterToggle, matchesText, uniqueOptions } from "./Filters.tsx";
 import { addDays, fmtNum, fmtPct, fmtTime, priceAgeTitle, rangeBefore, rangeFrom, signClass, today, typeLabel, type RangeKey } from "./format.ts";
@@ -18,7 +20,7 @@ const fmtPrice = (r: PriceRow) =>
   r.rate ? `${fmtNum(r.rate.current * 100)} % p.a.` : r.price === null ? "–" : r.type.startsWith("BOND") ? `${fmtNum(r.price)} %` : `${fmtNum(r.price)} ${r.currency}`;
 
 /**
- * Held instruments: latest price, its date, change over a year. Filter by asset type and free text (name or code). Clicking a row shows its price
+ * Held instruments: asset class, latest price, its date, change over a year. Filter by asset type, class and free text (name or code). Clicking a row shows its price
  * chart in a resizable panel docked to the bottom (as in Holdings); the open chart and the filter are in the URL.
  * "Show closed" (shared with Holdings while the app is open) adds the instruments traded but held no more, greyed, after the others: their last price
  * and the year up to it; their chart ranges count back from a month after the last transaction (ALL: from a month before the first).
@@ -27,6 +29,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const [showClosed, setShowClosed] = useShowClosed();
   const rows = useApi<PriceRow[]>("/prices", { closed: showClosed ? "1" : undefined });
   const type = params["type"] ?? "";
+  const cls = params["class"] ?? "";
   const text = params["q"] ?? "";
   const selected = params["chart"] ?? null;
   const [range, setRange] = useState<RangeKey>("1Y");
@@ -41,9 +44,10 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, span && spanEnd ? { from: rangeBefore(range, spanEnd, addDays(span.firstDate, -31)), to: spanEnd } : { from: rangeFrom(range), to: today() });
   const txs = useApi<Transaction[]>(selected ? `/instruments/${selected}/transactions` : null);
   // Held ones by code, then the closed ones by code.
-  const shown = all.filter((r) => (!type || r.type === type) && matchesText(text, r)).sort((a, b) => Number(!!a.closed) - Number(!!b.closed) || a.code.localeCompare(b.code));
+  const shown = all.filter((r) => (!type || r.type === type) && (!cls || r.assetClass === cls) && matchesText(text, r)).sort((a, b) => Number(!!a.closed) - Number(!!b.closed) || a.code.localeCompare(b.code));
   const closedCount = shown.filter((r) => r.closed).length;
   const types = useMemo(() => uniqueOptions(all, (r) => ({ value: r.type, label: typeLabel(r.type) })), [all]);
+  const classes = useMemo(() => uniqueOptions(all, (r) => ({ value: r.assetClass, label: CLASS_LABELS[r.assetClass] })), [all]);
   const newest = all.filter((r) => !r.closed).map((r) => r.priceDate).filter((d): d is string => !!d).sort().at(-1);
   const closeChart = useCallback(() => setParams({ ...params, chart: undefined }), [params, setParams]);
 
@@ -70,11 +74,12 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
       {rows.error && <p className="error">{rows.error}</p>}
 
       <FilterBar
-        active={!!(type || text)}
+        active={!!(type || cls || text)}
         onReset={() => setParams({ chart: selected ?? undefined })}
         summary={rows.loading ? "Loading…" : `${shown.length - closedCount} of ${all.filter((r) => !r.closed).length} instruments${showClosed ? ` + ${closedCount} closed` : ""}`}
       >
         <FilterSelect label="Asset type" value={type} options={types} onChange={(v) => setParams({ ...params, type: v || undefined })} testId="filter-type" />
+        <FilterSelect label="Class" value={cls} options={classes} onChange={(v) => setParams({ ...params, class: v || undefined })} testId="filter-class" width="8rem" />
         <FilterText label="Instrument" value={text} onChange={(v) => setParams({ ...params, q: v || undefined })} testId="filter-text" />
         <FilterToggle label="Show closed" checked={showClosed} onChange={setShowClosed} testId="show-closed" title="Also the instruments traded but held no more" />
       </FilterBar>
@@ -85,13 +90,14 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             <tr>
               <th className="left">Instrument</th>
               <th className="left">Type</th>
+              <th className="left">Class</th>
               <th>Price</th>
               <th>Price date</th>
               <th>1 year</th>
             </tr>
           </thead>
           <tbody>
-            {!rows.data && rows.loading && <SkeletonRows rows={8} cols={5} />}
+            {!rows.data && rows.loading && <SkeletonRows rows={8} cols={6} />}
             {shown.map((r) => (
               <tr
                 key={r.isin}
@@ -104,6 +110,10 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                   <InstrumentLabel code={r.code} name={r.name} />
                 </td>
                 <td className="left">{typeLabel(r.type)}</td>
+                <td className="left" title={r.assetClassSet ? "Set by hand (open the chart to change it)" : "By the rule: the type; an ETF with “bond” in its name = bonds"} data-testid="price-class">
+                  {CLASS_LABELS[r.assetClass]}
+                  {r.assetClassSet && <span className="flag" data-testid="class-set">set</span>}
+                </td>
                 <td>{fmtPrice(r)}</td>
                 {r.closed ? (
                   <>
@@ -151,7 +161,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
             ))}
             {!rows.loading && shown.length === 0 && (
               <tr>
-                <td className="left muted" colSpan={5}>
+                <td className="left muted" colSpan={6}>
                   {all.length === 0 ? "Nothing held yet." : "No instruments match the filters."}
                 </td>
               </tr>
@@ -190,7 +200,10 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
           <div className="chart-tools">
             {couponsFor === selected ? <span /> : <RangePicker value={range} onChange={setRange} busy={prices.loading} testId="price-range" />}
             {sel?.manual && <ManualValues key={sel.isin} isin={sel.isin} code={sel.code} currency={sel.currency} />}
-            {sel?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === selected} onToggle={() => setCouponsFor(couponsFor === selected ? null : selected)} />}
+            <span className="chart-tools-end">
+              {sel && <AssetClassSelect key={sel.isin} isin={sel.isin} code={sel.code} type={sel.type} name={sel.name} value={sel.assetClass} />}
+              {sel?.type === "BOND_CORPORATE" && <CouponPeriodsButton open={couponsFor === selected} onToggle={() => setCouponsFor(couponsFor === selected ? null : selected)} />}
+            </span>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflow: couponsFor === selected ? "auto" : undefined }}>
             {sel?.type === "BOND_CORPORATE" && couponsFor === selected ? (

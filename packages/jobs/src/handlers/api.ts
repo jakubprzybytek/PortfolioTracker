@@ -31,6 +31,8 @@ import {
   retailInstrument,
   addDays,
   adjustForSplits,
+  ASSET_CLASSES,
+  defaultAssetClass,
   cpiIndicators,
   fxCurrencyOf,
   fxIndicator,
@@ -272,6 +274,23 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         await repo.deletePrice(isin, "MANUAL", date);
         await queueValuation({ reason: "value deleted", from: date });
         return json(200, { isin, date });
+      }
+      case "PUT /instruments/{isin}/asset-class": {
+        // { assetClass }: the class set by hand; the rule's class (or null) clears it. The instrument's days are
+        // revalued from its first transaction, so the allocation charts follow.
+        if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
+        const inst = await repo.getInstrument(isin);
+        if (!inst) return json(404, { error: "Unknown instrument" });
+        const body = bodyOf(event) as { assetClass?: unknown } | undefined;
+        const wanted = body?.assetClass ?? null;
+        if (wanted !== null && !ASSET_CLASSES.includes(wanted as (typeof ASSET_CLASSES)[number])) return json(400, { error: `assetClass: one of ${ASSET_CLASSES.join(", ")} (or null: the rule)` });
+        const rule = defaultAssetClass(inst);
+        const assetClass = wanted === null || wanted === rule ? undefined : (wanted as (typeof ASSET_CLASSES)[number]);
+        if (assetClass === inst.assetClass) return json(200, { isin, assetClass: assetClass ?? rule, set: !!assetClass });
+        const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _gs, updatedAt: _u, assetClass: _a, ...rest } = inst;
+        await repo.putInstrument({ ...rest, ...(assetClass ? { assetClass } : {}) });
+        await queueValuation({ reason: "asset class changed", isins: [isin] });
+        return json(200, { isin, assetClass: assetClass ?? rule, set: !!assetClass });
       }
       case "GET /instruments/{isin}/coupons": {
         // The bond's periods (oldest first), with the coupons you received matched to them: the rate each implies and

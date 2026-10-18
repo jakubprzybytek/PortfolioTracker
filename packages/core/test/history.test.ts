@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HoldingSnapshot } from "../src/db/items.ts";
-import { assetClassOf, drawdowns, historyPointOf, valueByClass, withZeroGaps } from "../src/valuation/history.ts";
+import { assetClassOf, defaultAssetClass, drawdowns, historyPointOf, valueByClass, withZeroGaps } from "../src/valuation/history.ts";
 
 describe("assetClassOf", () => {
   it("maps instrument types onto classes; a bond ETF is bonds", () => {
@@ -10,6 +10,12 @@ describe("assetClassOf", () => {
     expect(assetClassOf({ type: "CURRENCY", name: "EUR cash" })).toBe("CASH");
     expect(assetClassOf({ type: "FUND_MANUAL", name: "Fund" })).toBe("OTHER");
   });
+
+  it("takes the class set by hand over the rule", () => {
+    expect(assetClassOf({ type: "ETF", name: "Physical Gold ETC", assetClass: "OTHER" })).toBe("OTHER");
+    expect(assetClassOf({ type: "FUND_MANUAL", name: "Bond fund", assetClass: "BONDS" })).toBe("BONDS");
+    expect(defaultAssetClass({ type: "ETF", name: "iShares Euro Corporate Bond UCITS ETF" })).toBe("BONDS");
+  });
 });
 
 describe("valueByClass", () => {
@@ -18,6 +24,9 @@ describe("valueByClass", () => {
     const holdings = [h("ETF", "World", 1000), h("ETF", "Global Bond", 300), h("BOND_LISTED", "DS", 200.005), h("FUND_MANUAL", "X", null)];
     expect(valueByClass({ holdings, totals: { value: 1500, cost: 0, gain: 0, couponsReceived: 0, cash: 50 } })).toEqual({ SHARES: 1000, BONDS: 500.01, CASH: 50, OTHER: 0 });
     expect(valueByClass({ holdings: [], totals: { value: 0, cost: 0, gain: 0, couponsReceived: 0 } }).CASH).toBe(0); // older snapshots: no cash
+    // a holding's class set by hand
+    const gold = { ...h("ETF", "Gold ETC", 400), assetClass: "OTHER" } as HoldingSnapshot;
+    expect(valueByClass({ holdings: [gold], totals: { value: 400, cost: 0, gain: 0, couponsReceived: 0 } })).toMatchObject({ SHARES: 0, OTHER: 400 });
   });
 });
 

@@ -12,6 +12,7 @@ import type { S3Event } from "aws-lambda";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Resource } from "sst";
 import {
+  defaultAssetClass,
   parseAccountsFile,
   parseCouponPeriods,
   parseInstrumentFile,
@@ -114,6 +115,7 @@ export async function importInstruments(json: string) {
       ...(i.nominal ? { nominal: i.nominal } : {}),
       ...(i.pricePath?.length ? { pricePath: [...i.pricePath].sort((x, y) => x.date.localeCompare(y.date)) } : {}),
       ...(i.splits?.length ? { splits: [...i.splits].sort((x, y) => x.date.localeCompare(y.date)) } : {}),
+      ...(i.assetClass && i.assetClass !== defaultAssetClass(i) ? { assetClass: i.assetClass } : {}),
     };
     const before = await repo.getInstrument(i.isin);
     await repo.putInstrument(item);

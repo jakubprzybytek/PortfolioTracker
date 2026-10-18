@@ -59,6 +59,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       cost: p.cost,
       couponsReceived: round2(p.couponsReceived),
       ...(p.costNative ? { costNative: p.costNative } : {}),
+      ...(inst?.assetClass ? { assetClass: inst.assetClass } : {}),
     };
     if (!inst) flags.push("unknown_instrument");
     if (Number.isNaN(p.cost)) flags.push("no_fx");

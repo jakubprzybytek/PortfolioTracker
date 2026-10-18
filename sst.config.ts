@@ -264,6 +264,7 @@ export default $config({
     api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
     api.route("POST /instruments/{isin}/prices", apiHandler, auth);
     api.route("DELETE /instruments/{isin}/prices/{date}", apiHandler, auth);
+    api.route("PUT /instruments/{isin}/asset-class", apiHandler, auth);
     api.route("GET /instruments/{isin}/coupons", apiHandler, auth);
     api.route("POST /instruments/{isin}/coupons", apiHandler, auth);
     api.route("PUT /instruments/{isin}/coupons/{start}", apiHandler, auth);

@@ -5,6 +5,7 @@
 import type { IsoDate } from "../dates.ts";
 import type { InstrumentItem, PriceItem } from "../db/items.ts";
 import { splitFactorAfter } from "../prices/splits.ts";
+import { assetClassOf, type AssetClass } from "./history.ts";
 
 export interface PriceRow {
   isin: string;
@@ -29,6 +30,9 @@ export interface PriceRow {
   closed?: { firstDate: IsoDate; lastDate: IsoDate };
   /** Retail bonds: annual rate now and in the previous period (instead of a price). */
   rate?: { current: number; previous: number | null };
+  /** Asset class (`assetClassOf`); `assetClassSet`: set by hand, not the rule. */
+  assetClass: AssetClass;
+  assetClassSet?: true;
 }
 
 const daysBetween = (a: IsoDate, b: IsoDate) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -43,9 +47,10 @@ export function priceRows(
 ): PriceRow[] {
   return instruments
     .map((i): PriceRow => {
+      const cls = { assetClass: assetClassOf(i), ...(i.assetClass ? { assetClassSet: true as const } : {}) };
       if (i.type === "BOND_RETAIL") {
         const rate = rates.get(i.isin);
-        return { isin: i.isin, code: i.code, name: i.name, type: i.type, currency: i.currency, price: null, priceDate: null, stale: false, yearAgo: null, change1y: null, ...(rate ? { rate } : {}) };
+        return { isin: i.isin, code: i.code, name: i.name, type: i.type, currency: i.currency, price: null, priceDate: null, stale: false, yearAgo: null, change1y: null, ...(rate ? { rate } : {}), ...cls };
       }
       const now = latest.get(i.isin);
       const raw = yearAgo.get(i.isin);
@@ -66,6 +71,7 @@ export function priceRows(
         ...(i.venue === "CALC" ? { calculated: true } : {}),
         yearAgo: then ? { date: then.date, price: then.close } : null,
         change1y: now && then && then.close ? Math.round((now.close / then.close - 1) * 10_000) / 10_000 : null,
+        ...cls,
       };
     })
     .sort((a, b) => a.code.localeCompare(b.code));

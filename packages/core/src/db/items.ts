@@ -3,6 +3,7 @@
 import type { IsoDate } from "../dates.ts";
 import type { BondTerms } from "../bonds/terms.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
+import type { AssetClass } from "../valuation/history.ts";
 
 export type InstrumentType = "BOND_LISTED" | "BOND_CORPORATE" | "BOND_RETAIL" | "ETF" | "BOND_IBKR" | "FUND_MANUAL" | "CURRENCY" | "CASH";
 
@@ -32,6 +33,8 @@ export interface InstrumentItem {
   pricePath?: { date: IsoDate; price: number }[];
   /** Share splits: from `date` on, one unit became `ratio` units (prices stored as traded, not adjusted). */
   splits?: Split[];
+  /** Asset class set by hand, when it differs from the rule (`assetClassOf`: by type, an ETF with "bond" in its name = bonds). */
+  assetClass?: AssetClass;
   updatedAt: string;
 }
 
@@ -225,6 +228,8 @@ export interface HoldingSnapshot {
   fx?: { rate: number; date: IsoDate };
   /** Bought in another currency than PLN: the cost in that currency (gain there = value at today's price − this). */
   costNative?: { amount: number; currency: string };
+  /** The instrument's asset class set by hand (none: the rule, `assetClassOf`). */
+  assetClass?: AssetClass;
 }
 
 /** An account's cash, and whether all of its assets are tracked (`incomplete` lists what isn't yet). */

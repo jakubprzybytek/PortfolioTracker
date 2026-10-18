@@ -10,6 +10,8 @@ import {
 } from "react";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { ManualValues } from "./ManualValues.tsx";
+import { AssetClassSelect } from "./AssetClassSelect.tsx";
+import { assetClassOf } from "@portfolio/core/valuation/history";
 import { CouponPeriods, CouponPeriodsButton } from "./CouponPeriods.tsx";
 import {
   FilterBar,
@@ -557,10 +559,10 @@ export function HoldingsView({
   );
   const isSelected = (isin: string, acct?: string) =>
     chartIsin === isin && chartAccount === acct;
+  const chartOpen = (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin);
   const chartHolding:
     Pick<Holding, "isin" | "code" | "name" | "type" | "currency"> | undefined =
-    (snap.data?.holdings ?? []).find((h) => h.isin === chartIsin) ??
-    chartClosed;
+    chartOpen ?? chartClosed;
 
   // A chart opened (e.g. from the URL) on one account of a multi-account instrument: show that row.
   useEffect(() => {
@@ -1088,6 +1090,17 @@ export function HoldingsView({
               />
             )}
             <span className="chart-tools-end">
+              {/* Held positions only: a closed one's class is in Prices ("Show closed"). */}
+              {chartOpen && (
+                <AssetClassSelect
+                  key={chartOpen.isin}
+                  isin={chartOpen.isin}
+                  code={chartOpen.code}
+                  type={chartOpen.type}
+                  name={chartOpen.name}
+                  value={assetClassOf(chartOpen)}
+                />
+              )}
               {chartHolding?.type === "BOND_CORPORATE" && (
                 <CouponPeriodsButton
                   open={couponsFor === chartIsin}

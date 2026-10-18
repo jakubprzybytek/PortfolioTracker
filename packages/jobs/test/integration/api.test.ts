@@ -424,6 +424,28 @@ describe(`API ${API}`, () => {
     expect((await send("DELETE", `/instruments/${DS}/prices/2026-07-15`)).status).toBe(400);
   });
 
+  it("PUT /instruments/{isin}/asset-class sets an instrument's class by hand (revalued), and the rule's class clears it", async () => {
+    type Row = { isin: string; assetClass: string; assetClassSet?: boolean };
+    const spxsHolding = async () => (await get<SnapshotItem>("/holdings")).body.holdings.find((h) => h.isin === SPXS);
+    expect((await send("PUT", `/instruments/${SPXS}/asset-class`, { assetClass: "GOLD" })).status).toBe(400);
+    expect((await send("PUT", `/instruments/ZZNOSUCHONE0/asset-class`, { assetClass: "OTHER" })).status).toBe(404);
+    expect((await get<Row[]>("/prices")).body.find((r) => r.isin === SPXS)).toMatchObject({ assetClass: "SHARES" });
+
+    const set = await send<{ assetClass: string; set: boolean }>("PUT", `/instruments/${SPXS}/asset-class`, { assetClass: "OTHER" });
+    expect(set.body).toEqual({ isin: SPXS, assetClass: "OTHER", set: true });
+    expect((await get<Row[]>("/prices")).body.find((r) => r.isin === SPXS)).toMatchObject({ assetClass: "OTHER", assetClassSet: true });
+    // The valuation writes it into the holding, and the allocation over time counts the ETF as other.
+    await waitFor(async () => ((await spxsHolding())?.assetClass === "OTHER" ? true : undefined), 180_000);
+    const day = (await get<SnapshotItem>("/holdings")).body.date;
+    const [point] = (await get<{ byClass: Record<string, number> }[]>(`/portfolio/history?from=${day}&to=${day}`)).body;
+    expect(point!.byClass["OTHER"]).toBeGreaterThanOrEqual((await spxsHolding())!.value! - 0.01);
+
+    // The rule's class again: no longer set by hand.
+    expect((await send<{ set: boolean }>("PUT", `/instruments/${SPXS}/asset-class`, { assetClass: "SHARES" })).body).toMatchObject({ assetClass: "SHARES", set: false });
+    expect((await get<Row[]>("/prices")).body.find((r) => r.isin === SPXS)).not.toHaveProperty("assetClassSet");
+    await waitFor(async () => ((await spxsHolding())?.assetClass === undefined ? true : undefined), 180_000);
+  });
+
   it("GET/POST/PUT/DELETE /instruments/{isin}/coupons list a corporate bond's periods with the coupons received, and change them", async () => {
     const list = async () => (await get<{ nominal: number; periods: { start: string; end: string; rate?: number; rateSource?: string; datesSource: string }[]; coupons: { start: string; checks: { gross: number; quantity: number; mismatch?: boolean; taxAssumed: boolean }[]; suggestedRate?: number }[] }>(`/instruments/${KRU}/coupons`)).body;
     const before = await list();
