@@ -1,8 +1,9 @@
+import { Icon } from "./Icons.tsx";
 import { fmtMoney, fmtNum, signClass, TX_TYPE_LABELS } from "./format.ts";
 import type { Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
-/** "Transactions": shows or hides the position's transactions next to its chart. */
+/** "Transactions": shows or hides the position's transactions next to its chart (an icon on the smallest screens). */
 export function TransactionsButton({
   open,
   onToggle,
@@ -19,9 +20,12 @@ export function TransactionsButton({
       aria-pressed={open}
       onClick={onToggle}
       title="The position's transactions, next to its chart"
+      aria-label={`Transactions${count !== undefined ? ` (${count})` : ""}`}
       data-testid="position-tx-toggle"
     >
-      Transactions
+      {/* On the smallest screens the menu's Transactions icon instead of the word. */}
+      <Icon name="transactions" size={16} className="tx-toggle-icon" />
+      <span className="tx-toggle-label">Transactions</span>
       {count !== undefined && (
         <span className="count" data-testid="position-tx-count">
           {count}
