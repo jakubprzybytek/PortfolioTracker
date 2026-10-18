@@ -152,6 +152,7 @@ Later phases:
 - [x] Stage `test` (2026-10-16): the history before the app (2008–2022, accounts closed before it) converted from the history spreadsheet (`scripts/history-sheet-to-import.ts`) and imported; deployed by CD since 2026-10-17.
 - [x] Asset class per instrument (2026-10-18): set by hand where the rule (by type, "bond" in an ETF's name) is wrong; the allocation charts follow.
 - [x] Instrument view (2026-10-18): the cog (⚙) in a chart panel (Prices, Holdings) opens one view with the instrument's properties: asset class, values entered by hand, coupon periods (until then separate buttons in the panel).
+- [x] Chart panel controls (2026-10-18): one row with the title (range as a segmented control, as "Group by", everywhere; Transactions with a count badge, an icon up to 480 px; ⚙; ✕), all the same height; on a phone the controls on the row below the title.
 - [x] Valuation speed with a long history (2026-10-17/18, measured on `test`: 6,792 days since 2008): the Dashboard charts read a ~250-byte chart point per day instead of whole snapshots ("ALL" had read 13 MB in ~5 s); the valuation walks the transactions once and compares days by fingerprint (computing all days 7.1 s → 0.3 s), writes in batches, merges requests waiting together and starts from the earliest day a change touches (a forced rewrite 182 s → 13.5 s; a run with nothing to write 77 s → ~2 s).
 
 ## Outstanding work (2026-10-18)
