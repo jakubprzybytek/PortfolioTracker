@@ -20,6 +20,8 @@ import {
   accountSummaries,
   closedPositions,
   formerInstruments,
+  pitYears,
+  salesOf,
   positionsAt,
   netDepositsByDate,
   withZeroGaps,
@@ -227,6 +229,12 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
         const positions = positionsAt(txs, today(), await fxHistoryOf(txs, today()));
         return json(200, { ...snap, closed: closedPositions(positions.values(), instruments) });
+      }
+      case "GET /sales": {
+        // Every sale, redemption and write-off with its FIFO pairs (newest first), and per year the PIT-38 summary.
+        const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
+        const sales = salesOf(positionsAt(txs, today(), await fxHistoryOf(txs, today())).values(), instruments);
+        return json(200, { sales, years: pitYears(sales) });
       }
       case "GET /accounts": {
         // Per account (latest snapshot): net deposits, value, cash, profit, income, costs, XIRR; total of the complete ones.

@@ -40,3 +40,4 @@ export * from "./backup/export.ts";
 export * from "./notes/schema.ts";
 export * from "./holdsell/holdSell.ts";
 export * from "./targets/targets.ts";
+export * from "./valuation/sales.ts";

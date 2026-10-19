@@ -293,6 +293,12 @@ describe(`API ${API}`, () => {
     expect(prices.body.some((r) => r.closed)).toBe(false);
   });
 
+  it("GET /sales: none in the sample (ibkr's EUR spent on a bond is foreign cash, not a sale), so no PIT-38 years", async () => {
+    const { status, body } = await get<{ sales: unknown[]; years: unknown[] }>("/sales");
+    expect(status).toBe(200);
+    expect(body).toEqual({ sales: [], years: [] });
+  });
+
   it("GET /instruments/{isin}/prices: an ETF's prices are stored as traded and charted on today's share basis", async () => {
     const inst = (await get<(InstrumentOut & { splits?: unknown; sourceIds?: unknown })[]>("/instruments")).body.find((i) => i.isin === SPXS)!;
     expect(inst).toMatchObject({ code: "SPXS", splits: [{ date: "2025-12-15", ratio: 100 }], sourceIds: { yahoo: "SPXS.AS" }, backfill: { status: "done" } });

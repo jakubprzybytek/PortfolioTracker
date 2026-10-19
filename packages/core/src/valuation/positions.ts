@@ -15,14 +15,26 @@ export interface Lot {
   currency: string;
 }
 
+/** The part of a disposal taken from one buy (FIFO): its units and what they cost, PLN, the buy's fee included. */
+export interface RealisationPair {
+  buyDate: IsoDate;
+  quantity: number;
+  cost: number;
+}
+
 /** One sale (or redemption) matched against the oldest lots: what it brought in and what those units cost. */
 export interface Realisation {
+  /** The transaction. */
+  id: string;
+  type: "SELL" | "REDEMPTION" | "WRITE_OFF";
   date: IsoDate;
   quantity: number;
   /** Cash received, net of the fee (PLN; in another currency at NBP D-1). */
   proceeds: number;
   /** Cost of the units sold (FIFO), PLN. */
   cost: number;
+  /** The buys it was matched against, oldest first; their costs add up to `cost`. */
+  pairs: RealisationPair[];
 }
 
 export interface Position {

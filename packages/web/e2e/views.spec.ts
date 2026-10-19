@@ -1021,3 +1021,88 @@ test.describe("notes view", () => {
     await expect(page.getByTestId("note-item").filter({ hasText: title })).toHaveCount(0);
   });
 });
+
+// The sample has no sales: the API's answer is made up (one sale across two buys, a redemption in an IKE, a write-off).
+const salesResponse = {
+  sales: [
+    { id: "s3", type: "WRITE_OFF", account: "old-broker", isin: "PLZZOLDBOND1", code: "OLD0513", name: "Old bond (made up)", instrumentType: "BOND_CORPORATE", date: "2026-02-01", quantity: 3, proceeds: 0, cost: 300, gain: -300, gainPct: -100, pit: false, notPit: "write-off", pairs: [{ buyDate: "2024-02-01", quantity: 3, cost: 300, proceeds: 0, gain: -300, days: 731 }] },
+    {
+      id: "s1",
+      type: "SELL",
+      account: "broker",
+      isin: "PL0000113783",
+      code: "DS0432",
+      name: "DS0432",
+      instrumentType: "BOND_LISTED",
+      date: "2025-05-15",
+      quantity: 100,
+      proceeds: 10300,
+      cost: 9958,
+      gain: 342,
+      gainPct: 3.43,
+      pit: true,
+      pairs: [
+        { buyDate: "2023-03-10", quantity: 60, cost: 5910, proceeds: 6180, gain: 270, days: 797 },
+        { buyDate: "2024-06-02", quantity: 40, cost: 4048, proceeds: 4120, gain: 72, days: 347 },
+      ],
+    },
+    { id: "s2", type: "REDEMPTION", account: "ike", isin: "PL0000113783", code: "DS0432", name: "DS0432", instrumentType: "BOND_LISTED", date: "2025-02-05", quantity: 5, proceeds: 520, cost: 500, gain: 20, gainPct: 4, pit: false, notPit: "IKE/IKZE", pairs: [{ buyDate: "2024-01-05", quantity: 5, cost: 500, proceeds: 520, gain: 20, days: 397 }] },
+  ],
+  years: [{ year: 2025, count: 1, proceeds: 10300, cost: 9958, gain: 342 }],
+};
+
+test.describe("sales", () => {
+  test("the PIT-38 summary per year; sales newest first, folding out into their FIFO buys; filters in the URL", async ({ page }) => {
+    await page.route("**/sales", async (route) => {
+      const res = await route.fetch();
+      expect(await res.json()).toEqual({ sales: [], years: [] }); // the sample's own: none
+      await route.fulfill({ response: res, json: salesResponse });
+    });
+    await page.goto("/");
+    await page.getByTestId("nav-sales").click();
+    await expect(page).toHaveURL(/#\/sales$/);
+    await expect(page.getByRole("heading", { name: "Sales", level: 2 })).toBeVisible();
+
+    const pit = page.getByTestId("pit-row");
+    await expect(pit).toHaveCount(1);
+    await expect(pit.locator("td").first()).toHaveText("2025");
+    await expect(page.getByTestId("pit-gain")).toHaveText("342,00 zł");
+
+    const rows = page.getByTestId("sale-row");
+    await expect(rows).toHaveCount(3);
+    expect(await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute("data-id")))).toEqual(["s3", "s1", "s2"]);
+    await expect(page.getByTestId("filters-summary")).toHaveText("3 of 3 sales · gain 62,00 zł");
+    await expect(page.getByTestId("sale-not-pit")).toHaveText(["write-off", "IKE/IKZE"]);
+
+    // A sale across two buys folds out into them, with the days each was held.
+    await expect(page.getByTestId("sale-pair")).toHaveCount(0);
+    await page.locator('[data-testid="sale-row"][data-id="s1"]').click();
+    await expect(page).toHaveURL(/sale=s1/);
+    const pairs = page.getByTestId("sale-pair");
+    await expect(pairs).toHaveCount(2);
+    await expect(pairs.first()).toContainText("bought 2023-03-10");
+    await expect(pairs.first()).toContainText("797 days");
+    await expect(pairs.nth(1)).toContainText("4 048,00 zł");
+
+    // A year in the summary filters the list.
+    await pit.click();
+    await expect(page).toHaveURL(/year=2025/);
+    await expect(rows).toHaveCount(2);
+    await page.getByTestId("filter-account").selectOption("ike");
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByTestId("filters-summary")).toHaveText("1 of 3 sales · gain 20,00 zł");
+    await page.getByTestId("filters-reset").click();
+    await expect(rows).toHaveCount(3);
+  });
+
+  test("on a phone: two-line rows, the pairs listed under the sale", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.route("**/sales", (route) => route.fulfill({ json: salesResponse }));
+    await page.goto("/#/sales");
+    const row = page.locator('[data-testid="sale-row"][data-id="s1"]');
+    await expect(row).toContainText("2025-05-15 · broker · sale of 100");
+    await row.getByRole("button").click();
+    await expect(page.getByTestId("sale-pair")).toHaveCount(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+});

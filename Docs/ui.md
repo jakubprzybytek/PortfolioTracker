@@ -28,6 +28,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/holdings?group=instrument&account=…&type=…&chart=<ISIN>&chartAccount=…` | Holdings (`group` absent = by account; `chart` = the open row chart) |
 | `#/prices?type=…&chart=<ISIN>` | Prices |
 | `#/hold-sell?row=<account>#<ISIN>` | Hold or sell (`row` = the open breakdown) |
+| `#/sales?year=…&account=…&q=…&sale=<transaction id>` | Sales (`sale` = the one folded out) |
 | `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 | `#/notes?note=<id or new>` | Notes (`note` = the open note; `new` = writing one) |
@@ -99,6 +100,15 @@ Is a bond worth more kept to maturity, or sold today with the money put into an 
 - **On a phone:** two-line rows instead of the table, the breakdown under the row.
 - **Holdings** shows the verdict as a small badge next to a bond row's type ("hold", green; "sell", filled), linking to its row here.
 
+## Sales
+
+Every sale, redemption and write-off (road map 9), from `GET /sales`, in PLN (another currency at NBP D-1, as for tax).
+
+- **PIT-38** panel on top: per year (newest first) the number of sales, proceeds (net of fees), costs (FIFO, the buys' fees included) and profit. It counts sales and redemptions outside IKE/IKZE; not write-offs (no disposal for tax) nor retail bonds (their interest is taxed at source when they're redeemed). Foreign cash isn't a position, so its exchanges are in neither list. Clicking a year filters the list to it.
+- **List**, newest first: instrument and account, date and kind (sale, redemption, write-off), units, proceeds, cost, gain and its %, days held (one buy) or "n buys". A disposal kept out of PIT-38 has a small tag saying why. Filters: year, account, instrument text; the count and the gain of what's shown; a total row.
+- **A row folds out** into the buys FIFO matched it against ("└ bought 2023-03-10"): units, their share of the proceeds (by units; the last takes the rounding remainder), their cost, gain and %, days held. The pairs add up to the sale to the grosz.
+- **Phone:** two-line rows (instrument and gain; date, account, kind and units; proceeds for cost), the buys listed under the open one.
+
 ## Indicators
 
 Economic indicators from data already stored (no extra source), same layout as Prices.
@@ -160,6 +170,7 @@ Free notes in Markdown (`NotesView.tsx`), e.g. trading checklists. Not linked to
 | `GET /instruments` | instruments + backfill status |
 | `GET /instruments/{isin}/prices?from&to` | `PX#…` items; retail bonds: the daily calculated value per bond of your lots (`calculated: true`) |
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
+| `GET /sales` | `sales`: every disposal with its FIFO `pairs` (buy date, units, cost, proceeds, gain, days), `pit` and why not (`notPit`); `years`: the PIT-38 summary (`core/valuation/sales.ts`) |
 | `GET /hold-sell` | every bond position kept to maturity vs sold today (`core/holdsell/holdSell.ts`): `rows` (flows, sale today, yields, alternative, difference, verdict, notes), `skipped` (and why), `assumptions` (saved, else `defaults`), the retail `offers` used |
 | `GET /targets` | `{ targets }`: `{ targets, bands }` (per class, %), or `null` until set |
 | `PUT /targets` | `{ targets: { SHARES, BONDS, CASH, OTHER }, bands: { … } }` (%, the targets adding up to 100) keeps them; `{ reset: true }` removes them |

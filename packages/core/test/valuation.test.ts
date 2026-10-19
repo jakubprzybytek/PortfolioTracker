@@ -41,7 +41,7 @@ describe("positionsAt", () => {
       { date: "2025-01-10", quantity: 5, cost: 4005, costNative: 4005, currency: "PLN" },
       { date: "2025-03-10", quantity: 10, cost: 8210, costNative: 8210, currency: "PLN" },
     ]);
-    expect(p.realised).toEqual([{ date: "2025-06-01", quantity: 5, proceeds: 4150, cost: 4005 }]);
+    expect(p.realised).toEqual([{ id: "4", type: "SELL", date: "2025-06-01", quantity: 5, proceeds: 4150, cost: 4005, pairs: [{ buyDate: "2025-01-10", quantity: 5, cost: 4005 }] }]);
     expect(p.couponsReceived).toBe(350);
     expect(positionsAt(txs, "2025-02-01").get(positionKey("a", "PL0000113783"))!.quantity).toBe(10);
     expect(positionsAt(txs, "2024-12-31").size).toBe(0);
@@ -57,7 +57,10 @@ describe("positionsAt", () => {
     const p = positionsAt(txs, "2025-12-31").get(positionKey("a", "IE00B3YCGJ38"))!;
     // 200 units of lot 1 (2000) + 100 of lot 2 (1500) sold; 100 of lot 2 left
     expect(p).toMatchObject({ quantity: 100, cost: 1500, lots: [{ date: "2025-02-10", quantity: 100, cost: 1500 }] });
-    expect(p.realised).toEqual([{ date: "2025-04-10", quantity: 300, proceeds: 4000, cost: 3500 }]);
+    expect(p.realised).toEqual([
+      // The sale takes the first buy's 200 (after the split) and 100 of the second's, each at its own cost per unit.
+      { id: "4", type: "SELL", date: "2025-04-10", quantity: 300, proceeds: 4000, cost: 3500, pairs: [{ buyDate: "2025-01-10", quantity: 200, cost: 2000 }, { buyDate: "2025-02-10", quantity: 100, cost: 1500 }] },
+    ]);
   });
 
   it("a write-off closes the bonds at 0: their remaining cost is a realised loss, cash doesn't move", () => {
@@ -69,7 +72,9 @@ describe("positionsAt", () => {
     ];
     const p = positionsAt(txs, "2013-12-31").get(positionKey("a", "PLGANT000204"))!;
     expect(p).toMatchObject({ quantity: 0, cost: 0, couponsReceived: 161.7 });
-    expect(p.realised).toEqual([{ date: "2013-05-31", quantity: 7, proceeds: 0, cost: 7017.5 }]);
+    expect(p.realised).toEqual([
+      { id: "4", type: "WRITE_OFF", date: "2013-05-31", quantity: 7, proceeds: 0, cost: 7017.5, pairs: [{ buyDate: "2012-03-01", quantity: 4, cost: 4010 }, { buyDate: "2012-05-04", quantity: 3, cost: 3007.5 }] },
+    ]);
     // Held until the write-off
     expect(positionsAt(txs, "2013-05-30").get(positionKey("a", "PLGANT000204"))!.quantity).toBe(7);
     expect(parseTransactionFile(JSON.stringify([{ date: "2013-05-31", account: "a", type: "WRITE_OFF", isin: "PLGANT000204", quantity: 7, amount: 0 }]), "t")[0]!.type).toBe("WRITE_OFF");

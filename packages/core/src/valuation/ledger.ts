@@ -7,7 +7,7 @@ import type { TransactionItem } from "../db/items.ts";
 import { round2 } from "../bonds/izIndex.ts";
 import { cashEffects } from "./cash.ts";
 import { toPlnD1, type FxHistory } from "./fx.ts";
-import { positionKey, type Position } from "./positions.ts";
+import { positionKey, type Position, type RealisationPair } from "./positions.ts";
 import type { RetailLot } from "./retailLots.ts";
 
 const EPS = 1e-9;
@@ -72,18 +72,30 @@ export class Ledger {
         let left = Math.min(qty, p.lots.reduce((n, l) => n + l.quantity, 0));
         const sold = left;
         let cost = 0;
+        const pairs: RealisationPair[] = [];
         while (left > EPS && p.lots.length > 0) {
           const lot = p.lots[0]!;
           const take = Math.min(left, lot.quantity);
           const part = lot.cost * (take / lot.quantity);
           cost += part;
+          pairs.push({ buyDate: lot.date, quantity: take, cost: part });
           lot.cost -= part;
           lot.costNative -= lot.costNative * (take / lot.quantity);
           lot.quantity -= take;
           left -= take;
           if (lot.quantity <= EPS) p.lots.shift();
         }
-        if (sold > 0) p.realised.push({ date: t.date, quantity: sold, proceeds: round2(pln(t.amount)), cost: round2(cost) });
+        if (sold > 0) {
+          // Each pair's cost to the grosz; the last takes the rounding remainder, so they add up to the sale's cost.
+          const total = round2(cost);
+          let rest = total;
+          pairs.forEach((x, i) => {
+            x.cost = i === pairs.length - 1 ? round2(rest) : round2(x.cost);
+            x.quantity = Math.round(x.quantity * 1e6) / 1e6;
+            rest -= x.cost;
+          });
+          p.realised.push({ id: t.id, type: t.type, date: t.date, quantity: sold, proceeds: round2(pln(t.amount)), cost: total, pairs });
+        }
         break;
       }
       case "SPLIT":
