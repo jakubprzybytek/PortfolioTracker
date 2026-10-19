@@ -565,8 +565,20 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .note-editor textarea { min-height: 260px; }
 }
 
-/* Targets and rebalancing (Dashboard, under the asset mix). */
-.targets { padding: 14px 16px; }
+/* Targets in the asset mix: the legend as aligned rows (share, target, difference, value), two per line; "Rebalance" and
+   "Edit targets" under it; the calculator or the form folds out below a line. */
+.mix-legend.with-targets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 32px; }
+.mix-legend.with-targets li { display: grid; grid-template-columns: 5.5rem 3.8rem 4.4rem 5.2rem auto; justify-content: start; gap: 12px; align-items: baseline; }
+.mix-legend.with-targets li > :not(.mix-name) { text-align: right; }
+.mix-legend .mix-name { display: inline-flex; align-items: center; gap: 6px; }
+/* Without targets "Set targets" ends the legend's line; with them the legend takes the width and the links go below. */
+.mix-foot { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 20px; }
+.mix-foot .mix-legend { flex: 1 1 auto; }
+.mix-foot .mix-legend.with-targets { flex-basis: 100%; }
+.mix-actions { display: flex; flex: 1 1 auto; justify-content: space-between; align-items: center; gap: 16px; font-size: 0.9rem; }
+.mix-foot .mix-legend.with-targets + .mix-actions { margin-top: 6px; }
+.mix-actions button.link:only-child { margin-left: auto; }
+.asset-mix .targets { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 .targets-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 8px; }
 .targets-amount { display: inline-flex; align-items: center; gap: 4px; }
 .targets-amount input, .targets-inputs input { font: inherit; width: 7rem; height: 32px; box-sizing: border-box; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); text-align: right; }
@@ -574,31 +586,22 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
 .targets-inputs .with-unit { display: inline-flex; align-items: center; gap: 4px; }
 .targets-inputs { width: auto; margin-bottom: 8px; }
 .targets-inputs td, .targets-inputs th { padding: 5px 10px; }
-.targets-summary { font-size: 0.9rem; }
-.targets-summary.off { color: var(--neg); }
-.targets-heading { display: flex; align-items: baseline; gap: 8px; }
-.targets-heading .chart-legend { margin-left: 0; }
-.targets-heading button.link { margin-left: auto; font-size: 0.92rem; font-weight: 400; }
+.targets table[data-testid="targets-table"] { width: auto; min-width: 50%; }
 .targets td .sub { display: block; font-size: 0.8em; }
-.targets .table-wrap.flat { border: 0; box-shadow: none; border-radius: 0; }
 .targets .hint { margin: 8px 0 0; font-size: 0.88rem; }
-.targets-empty { margin: 0; }
-.flag.warn-soft { color: var(--neg); border-color: color-mix(in srgb, var(--neg) 40%, transparent); background: transparent; }
 @media (max-width: 720px) {
-  .targets { padding: 12px; }
+  /* One class per line, the value in the tooltip. */
+  .mix-legend.with-targets { grid-template-columns: 1fr; gap: 4px; }
+  .mix-legend.with-targets li { grid-template-columns: 1fr 3.6rem 4.2rem 4.8rem; gap: 6px; }
+  .mix-legend.with-targets .mix-value { display: none; }
   .targets table { font-size: 0.85rem; }
-  .targets td, .targets th { padding: 7px 4px; }
-  .targets .flag { display: none; }
   /* Fixed columns that wrap: the table can't get wider than the screen, whatever the font. */
-  .targets table { table-layout: fixed; width: 100%; }
-  .targets td, .targets th { white-space: normal; }
-  .targets th:nth-child(1) { width: 30%; }
-  .targets th:nth-child(2) { width: 22%; }
-  .targets th:nth-child(3) { width: 23%; }
+  .targets table[data-testid="targets-table"] { table-layout: fixed; width: 100%; }
+  .targets td, .targets th { padding: 7px 4px; white-space: normal; }
+  .targets th:nth-child(1) { width: 36%; }
   .targets-controls { flex-wrap: nowrap; gap: 8px; }
   .targets-controls .segmented button { padding: 4px 10px; font-size: 0.85rem; white-space: nowrap; }
   .targets-controls .segmented { flex-shrink: 0; }
   .targets-amount { flex: 1; min-width: 0; }
   .targets-amount input { width: 100%; min-width: 0; }
 }
-.targets tr.off-band td[data-testid$="-diff"] { color: var(--neg); }

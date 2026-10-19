@@ -145,21 +145,23 @@ test.describe("dashboard", () => {
     expect(Math.abs(sum - 100)).toBeLessThan(0.5);
   });
 
-  test("targets: set them, compare with the mix, split new money, sell and buy; then remove them", async ({ page }) => {
+  test("targets in the asset mix: set them, the legend compares, Rebalance folds out new money and sell and buy; then remove them", async ({ page }) => {
     const num = (t: string) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", ".") || 0);
     const signed = (t: string) => (t.startsWith("sell") ? -num(t) : num(t));
     const classes = ["SHARES", "BONDS", "CASH", "OTHER"];
+    const edit = page.getByTestId("targets-edit");
     // Start without targets (a run before may have left them)
-    await expect(page.getByTestId("targets-edit")).toBeVisible();
-    if ((await page.getByTestId("targets-edit").textContent()) === "Edit targets") {
-      await page.getByTestId("targets-edit").click();
+    await expect(edit).toBeVisible();
+    if ((await edit.textContent()) === "Edit targets") {
+      await edit.click();
       await page.getByTestId("targets-remove").click();
     }
-    await expect(page.getByTestId("targets")).toContainText("No targets yet");
+    await expect(edit).toHaveText("Set targets");
     await expect(page.locator(".mix-target")).toHaveCount(0);
+    await expect(page.getByTestId("targets-rebalance")).toHaveCount(0);
 
-    // The form: the targets must add up to 100 %
-    await page.getByTestId("targets-edit").click();
+    // The form, in the panel: the targets must add up to 100 %
+    await edit.click();
     await page.getByTestId("targets-SHARES-target").fill("60");
     await page.getByTestId("targets-BONDS-target").fill("35");
     await page.getByTestId("targets-CASH-target").fill("4");
@@ -169,12 +171,23 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("targets-sum")).toHaveText("100 % ✓");
     await page.getByTestId("targets-save").click();
 
-    // Target vs actual, a tick on the asset mix where shares' and bonds' targets end
-    await expect(page.getByTestId("targets-table")).toBeVisible();
+    // The legend: each class's share, its target and the difference; ticks on the bar where shares' and bonds' targets end
+    await expect(page.getByTestId("asset-mix-SHARES-target")).toHaveText("of 60 %");
+    await expect(page.getByTestId("asset-mix-SHARES-diff")).toHaveText(/^[+−]\d+,\d\spp$/);
     await expect(page.locator(".mix-target")).toHaveCount(2);
-    await expect(page.getByTestId("targets-SHARES")).toContainText("60 %");
+    const shares = await page.getByTestId("asset-mix").locator("li strong").allTextContents();
+    expect(Math.abs(shares.reduce((s, t) => s + num(t), 0) - 100)).toBeLessThan(0.5);
+
+    // Rebalance folds out (closed until opened, then remembered)
+    const toggle = page.getByTestId("targets-rebalance");
+    if ((await toggle.getAttribute("aria-expanded")) === "true") await toggle.click();
+    await expect(page.getByTestId("targets")).toHaveCount(0);
+    await toggle.click();
+    await expect(page.getByTestId("targets-table")).toBeVisible();
     await expect(page.getByTestId("targets-mode").getByRole("button", { name: "New money" })).toHaveAttribute("aria-pressed", "true");
     for (const k of classes) await expect(page.getByTestId(`targets-${k}-trade`)).toHaveText("–");
+    await page.reload();
+    await expect(page.getByTestId("targets-table")).toBeVisible();
 
     // New money: only buys, adding up to the amount
     await page.getByTestId("targets-amount").fill("10 000");
@@ -186,24 +199,27 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("targets-amount")).toHaveCount(0);
     const trades = await Promise.all(classes.map((k) => page.getByTestId(`targets-${k}-trade`).textContent()));
     expect(Math.abs(trades.reduce((s, t) => s + signed(t!), 0))).toBeLessThan(0.05);
-    await expect(page.getByTestId("targets-SHARES").locator("td").last()).toHaveText("60,0 %");
+    await expect(page.getByTestId("targets-SHARES-after")).toHaveText("60,0 %of 60 %");
 
-    // On a phone the panel fits the screen, also in a wide font (Linux's DejaVu Sans is much wider than Segoe UI)
+    // On a phone the panel fits the screen, also in a wide font (Linux's DejaVu Sans is much wider than Segoe UI); one
+    // class per legend line; the switch and the amount share one row
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addStyleTag({ content: "* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; }" });
-    const box = (await page.getByTestId("targets").boundingBox())!;
+    const box = (await page.getByTestId("asset-mix").boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(390);
+    expect(await page.getByTestId("asset-mix").evaluate((p) => p.scrollWidth <= p.clientWidth + 1)).toBe(true);
     expect(await page.getByTestId("targets-table").evaluate((t) => t.scrollWidth <= t.parentElement!.clientWidth + 1)).toBe(true);
-    // The switch and the amount share one row; the target sits under the actual share
+    const [a, b] = [(await page.getByTestId("asset-mix-SHARES").boundingBox())!, (await page.getByTestId("asset-mix-BONDS").boundingBox())!];
+    expect(b.y).toBeGreaterThan(a.y + a.height - 1);
     await page.getByTestId("targets-mode").getByRole("button", { name: "New money" }).click();
     const [mode, amount] = [(await page.getByTestId("targets-mode").boundingBox())!, (await page.getByTestId("targets-amount").boundingBox())!];
     expect(Math.abs(mode.y + mode.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(4);
-    await expect(page.getByTestId("targets-SHARES")).toContainText("of 60 %");
 
     // Remove them again
     await page.getByTestId("targets-edit").click();
     await page.getByTestId("targets-remove").click();
-    await expect(page.getByTestId("targets")).toContainText("No targets yet");
+    await expect(page.getByTestId("targets-edit")).toHaveText("Set targets");
+    await expect(page.getByTestId("asset-mix-SHARES-target")).toHaveCount(0);
   });
 
   test("while a new range loads: buttons disabled, the chart dimmed with a spinner", async ({ page }) => {

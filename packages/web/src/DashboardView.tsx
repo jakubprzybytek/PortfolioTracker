@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fmtPct, fmtPln, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
 import { AccountsTable, type AccountsResponse } from "./AccountsTable.tsx";
-import { Allocation, AssetMix, CLASS_LABELS } from "./Allocation.tsx";
+import { Allocation, CLASS_LABELS } from "./Allocation.tsx";
 import { AllocationChart, DrawdownChart } from "./HistoryCharts.tsx";
 import { Skeleton, SkeletonRows } from "./Placeholders.tsx";
 import { PortfolioChart } from "./PortfolioChart.tsx";
@@ -9,7 +9,7 @@ import { RangePicker } from "./RangePicker.tsx";
 import type { AccountSummary, HistoryPoint, Snapshot, Status } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
-import { TargetsPanel, type TargetsResponse } from "./Targets.tsx";
+import { AssetMixPanel } from "./Targets.tsx";
 
 function Card({ label, value, className, testId, note, loading }: { label: string; value: string; className?: string; testId: string; note?: string; loading: boolean }) {
   return (
@@ -52,7 +52,6 @@ export function DashboardView() {
   const history = useApi<HistoryPoint[]>("/portfolio/history", { from: rangeFrom(range), to: today() });
   const status = useApi<Status>("/status");
   const summaries = useApi<AccountsResponse>("/accounts");
-  const targets = useApi<TargetsResponse>("/targets");
   const sum = summaries.data?.total;
   const sumLoading = !summaries.data && summaries.loading;
 
@@ -109,9 +108,7 @@ export function DashboardView() {
       </section>
       <ProfitBreakdown summary={sum} loading={sumLoading} />
 
-      {snap ? <AssetMix snapshot={snap} targets={targets.data?.targets} /> : holdings.loading && <div className="asset-mix"><Skeleton height={14} testId="asset-mix-skeleton" /></div>}
-
-      <TargetsPanel snapshot={snap} />
+      {snap ? <AssetMixPanel snapshot={snap} /> : holdings.loading && <div className="asset-mix"><Skeleton height={14} testId="asset-mix-skeleton" /></div>}
 
       <h2>
         Portfolio value <span className="muted chart-legend">positions + cash; dashed: net deposits</span>
