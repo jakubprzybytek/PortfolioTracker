@@ -188,8 +188,9 @@ test.describe("dashboard", () => {
     expect(Math.abs(trades.reduce((s, t) => s + signed(t!), 0))).toBeLessThan(0.05);
     await expect(page.getByTestId("targets-SHARES").locator("td").last()).toHaveText("60,0 %");
 
-    // On a phone the panel fits the screen
+    // On a phone the panel fits the screen, also in a wide font (Linux's DejaVu Sans is much wider than Segoe UI)
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.addStyleTag({ content: "* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; }" });
     const box = (await page.getByTestId("targets").boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(390);
     expect(await page.getByTestId("targets-table").evaluate((t) => t.scrollWidth <= t.parentElement!.clientWidth + 1)).toBe(true);

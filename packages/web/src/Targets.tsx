@@ -19,7 +19,8 @@ const numText = (v: number) => fmtNum(v, v % 1 ? 1 : 0).replace(/\s/g, "");
 const draftOf = (t: Targets | null): Draft =>
   Object.fromEntries(ASSET_CLASSES.map((k) => [k, { target: t ? numText(t.targets[k]) : "", band: t ? numText(t.bands[k]) : k === "CASH" ? "2" : "5" }])) as Draft;
 const sumOf = (d: Draft) => ASSET_CLASSES.reduce((s, k) => s + (parseNum(d[k].target) ?? 0), 0);
-const signedPp = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmtNum(Math.abs(v), 1)} pp`;
+const sign = (v: number) => (v > 0 ? "+" : v < 0 ? "−" : "");
+const signedPp = (v: number) => `${sign(v)}${fmtNum(Math.abs(v), 1)} pp`;
 
 /**
  * Targets and rebalancing (road map 8), under the asset mix: per class the actual share against its target and band,
@@ -85,11 +86,15 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
           <thead>
             <tr>
               <th>Class</th>
-              <th>Actual</th>
+              {/* On a phone the units go to the headers, so the cells stay short. */}
+              <th>{narrow ? "Now %" : "Actual"}</th>
               {!narrow && <th>Value</th>}
-              <th>Target</th>
-              <th>Diff</th>
-              <th title={mode === "NEW_MONEY" ? "Where the new money goes" : "What to sell and buy to be on target"}>{mode === "NEW_MONEY" ? "Buy" : "Buy / sell"}</th>
+              <th>{narrow ? "Target %" : "Target"}</th>
+              <th>{narrow ? "Diff pp" : "Diff"}</th>
+              <th title={mode === "NEW_MONEY" ? "Where the new money goes" : "What to sell and buy to be on target"}>
+                {mode === "NEW_MONEY" ? "Buy" : "Buy / sell"}
+                {narrow && " zł"}
+              </th>
               {!narrow && <th title="Share after the trades">After</th>}
             </tr>
           </thead>
@@ -99,17 +104,17 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
                 <td>
                   <i className={`mix-dot mix-${r.assetClass}`} aria-hidden /> {CLASS_LABELS[r.assetClass]}
                 </td>
-                <td>{fmtNum(r.actual, 1)} %</td>
+                <td>{fmtNum(r.actual, 1)}{!narrow && " %"}</td>
                 {!narrow && <td className="muted">{fmtPln(r.value)}</td>}
                 <td title={`band ± ${fmtNum(saved.bands[r.assetClass], 1)} pp`}>
-                  {fmtNum(r.target, r.target % 1 ? 1 : 0)} %{!narrow && <span className="muted"> ± {fmtNum(saved.bands[r.assetClass], saved.bands[r.assetClass] % 1 ? 1 : 0)}</span>}
+                  {fmtNum(r.target, r.target % 1 ? 1 : 0)}{!narrow && " %"}{!narrow && <span className="muted"> ± {fmtNum(saved.bands[r.assetClass], saved.bands[r.assetClass] % 1 ? 1 : 0)}</span>}
                 </td>
                 <td data-testid={`targets-${r.assetClass}-diff`}>
-                  {r.target === 0 && r.value === 0 ? "–" : signedPp(r.diff)}
+                  {r.target === 0 && r.value === 0 ? "–" : narrow ? `${sign(r.diff)}${fmtNum(Math.abs(r.diff), 1)}` : signedPp(r.diff)}
                   {r.status !== "WITHIN" && <span className="flag warn-soft">{r.status === "OVER" ? "over" : "under"}</span>}
                 </td>
                 <td className={`trade ${r.trade > 0 ? "pos" : r.trade < 0 ? "neg" : "muted"}`} data-testid={`targets-${r.assetClass}-trade`}>
-                  {!showTrades || Math.abs(r.trade) < 0.5 ? "–" : `${r.trade > 0 ? "buy" : "sell"} ${narrow ? `${fmtNum(Math.abs(r.trade), 0)} zł` : fmtPln(Math.abs(r.trade))}`}
+                  {!showTrades || Math.abs(r.trade) < 0.5 ? "–" : narrow ? `${sign(r.trade)}${fmtNum(Math.abs(r.trade), 0)}` : `${r.trade > 0 ? "buy" : "sell"} ${fmtPln(Math.abs(r.trade))}`}
                 </td>
                 {!narrow && <td className="muted">{showTrades ? `${fmtNum(r.after, 1)} %` : "–"}</td>}
               </tr>

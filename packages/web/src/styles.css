@@ -586,7 +586,12 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .targets table { font-size: 0.85rem; }
   .targets td, .targets th { padding: 7px 4px; }
   .targets .flag { display: none; }
-  .targets td.trade { white-space: normal; }
+  /* Fixed columns that wrap: the table can't get wider than the screen, whatever the font. */
+  .targets table { table-layout: fixed; width: 100%; }
+  .targets td, .targets th { white-space: normal; }
+  .targets th:nth-child(1) { width: 26%; }
+  .targets th:nth-child(2), .targets th:nth-child(3) { width: 16%; }
+  .targets th:nth-child(4) { width: 19%; }
   .targets-controls button.link { margin-left: 0; }
 }
 .targets tr.off-band td[data-testid$="-diff"] { color: var(--neg); }
