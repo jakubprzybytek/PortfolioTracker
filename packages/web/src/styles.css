@@ -576,7 +576,10 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
 .targets-inputs td, .targets-inputs th { padding: 5px 10px; }
 .targets-summary { font-size: 0.9rem; }
 .targets-summary.off { color: var(--neg); }
-.targets-controls button.link { margin-left: auto; }
+.targets-heading { display: flex; align-items: baseline; gap: 8px; }
+.targets-heading .chart-legend { margin-left: 0; }
+.targets-heading button.link { margin-left: auto; font-size: 0.92rem; font-weight: 400; }
+.targets td .sub { display: block; font-size: 0.8em; }
 .targets .table-wrap.flat { border: 0; box-shadow: none; border-radius: 0; }
 .targets .hint { margin: 8px 0 0; font-size: 0.88rem; }
 .targets-empty { margin: 0; }
@@ -589,9 +592,13 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   /* Fixed columns that wrap: the table can't get wider than the screen, whatever the font. */
   .targets table { table-layout: fixed; width: 100%; }
   .targets td, .targets th { white-space: normal; }
-  .targets th:nth-child(1) { width: 26%; }
-  .targets th:nth-child(2), .targets th:nth-child(3) { width: 16%; }
-  .targets th:nth-child(4) { width: 19%; }
-  .targets-controls button.link { margin-left: 0; }
+  .targets th:nth-child(1) { width: 30%; }
+  .targets th:nth-child(2) { width: 22%; }
+  .targets th:nth-child(3) { width: 23%; }
+  .targets-controls { flex-wrap: nowrap; gap: 8px; }
+  .targets-controls .segmented button { padding: 4px 10px; font-size: 0.85rem; white-space: nowrap; }
+  .targets-controls .segmented { flex-shrink: 0; }
+  .targets-amount { flex: 1; min-width: 0; }
+  .targets-amount input { width: 100%; min-width: 0; }
 }
 .targets tr.off-band td[data-testid$="-diff"] { color: var(--neg); }

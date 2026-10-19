@@ -194,6 +194,11 @@ test.describe("dashboard", () => {
     const box = (await page.getByTestId("targets").boundingBox())!;
     expect(box.x + box.width).toBeLessThanOrEqual(390);
     expect(await page.getByTestId("targets-table").evaluate((t) => t.scrollWidth <= t.parentElement!.clientWidth + 1)).toBe(true);
+    // The switch and the amount share one row; the target sits under the actual share
+    await page.getByTestId("targets-mode").getByRole("button", { name: "New money" }).click();
+    const [mode, amount] = [(await page.getByTestId("targets-mode").boundingBox())!, (await page.getByTestId("targets-amount").boundingBox())!];
+    expect(Math.abs(mode.y + mode.height / 2 - (amount.y + amount.height / 2))).toBeLessThan(4);
+    await expect(page.getByTestId("targets-SHARES")).toContainText("of 60 %");
 
     // Remove them again
     await page.getByTestId("targets-edit").click();

@@ -111,9 +111,6 @@ export function DashboardView() {
 
       {snap ? <AssetMix snapshot={snap} targets={targets.data?.targets} /> : holdings.loading && <div className="asset-mix"><Skeleton height={14} testId="asset-mix-skeleton" /></div>}
 
-      <h2>
-        Targets <span className="muted chart-legend">target vs actual per class; what to buy or sell</span>
-      </h2>
       <TargetsPanel snapshot={snap} />
 
       <h2>

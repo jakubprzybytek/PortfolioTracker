@@ -20,7 +20,7 @@ const draftOf = (t: Targets | null): Draft =>
   Object.fromEntries(ASSET_CLASSES.map((k) => [k, { target: t ? numText(t.targets[k]) : "", band: t ? numText(t.bands[k]) : k === "CASH" ? "2" : "5" }])) as Draft;
 const sumOf = (d: Draft) => ASSET_CLASSES.reduce((s, k) => s + (parseNum(d[k].target) ?? 0), 0);
 const sign = (v: number) => (v > 0 ? "+" : v < 0 ? "−" : "");
-const signedPp = (v: number) => `${sign(v)}${fmtNum(Math.abs(v), 1)} pp`;
+const signedPp = (v: number) => `${sign(v)}${fmtNum(Math.abs(v), 1)} pp`;
 
 /**
  * Targets and rebalancing (road map 8), under the asset mix: per class the actual share against its target and band,
@@ -35,11 +35,28 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
   const [amount, setAmount] = useState("");
   const narrow = useNarrow();
 
+  const heading = (
+    <h2 className="targets-heading">
+      Targets <span className="muted chart-legend wide-only">target vs actual per class; what to buy or sell</span>
+      {saved && !editing && (
+        <button type="button" className="link" onClick={() => setEditing(true)} data-testid="targets-edit">
+          Edit targets
+        </button>
+      )}
+    </h2>
+  );
   if (!res.data || !snapshot) {
-    return res.error ? <p className="error">{res.error}</p> : <section className="panel targets"><Skeleton height={120} testId="targets-skeleton" /></section>;
+    return (
+      <>
+        {heading}
+        {res.error ? <p className="error">{res.error}</p> : <section className="panel targets"><Skeleton height={120} testId="targets-skeleton" /></section>}
+      </>
+    );
   }
   if (editing || !saved) {
     return (
+      <>
+      {heading}
       <TargetsForm
         saved={saved}
         editing={editing}
@@ -49,6 +66,7 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
           setEditing(false);
         }}
       />
+      </>
     );
   }
 
@@ -58,6 +76,8 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
   const showTrades = mode === "SELL_AND_BUY" || (money !== undefined && money > 0);
   const off = rows.filter((r) => r.status !== "WITHIN").length;
   return (
+    <>
+    {heading}
     <section className="panel targets" data-testid="targets">
       <div className="targets-controls">
         <span className="segmented" role="group" aria-label="Calculator" data-testid="targets-mode">
@@ -73,12 +93,11 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
             <span className="muted">zł</span>
           </label>
         )}
-        <span className={`muted targets-summary ${off ? "off" : ""}`} data-testid="targets-summary">
-          {off ? `${off} ${off > 1 ? "classes" : "class"} outside the band` : "All within their bands"}
-        </span>
-        <button type="button" className="link" onClick={() => setEditing(true)} data-testid="targets-edit">
-          Edit targets
-        </button>
+        {!narrow && (
+          <span className={`muted targets-summary ${off ? "off" : ""}`} data-testid="targets-summary">
+            {off ? `${off} ${off > 1 ? "classes" : "class"} outside the band` : "All within their bands"}
+          </span>
+        )}
       </div>
       {badAmount && <p className="error">The amount needs a number above 0.</p>}
       <div className="table-wrap flat">
@@ -86,14 +105,13 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
           <thead>
             <tr>
               <th>Class</th>
-              {/* On a phone the units go to the headers, so the cells stay short. */}
-              <th>{narrow ? "Now %" : "Actual"}</th>
+              {/* On a phone four columns: the target under the actual share, the trade in whole złoty. */}
+              <th>{narrow ? "Now" : "Actual"}</th>
               {!narrow && <th>Value</th>}
-              <th>{narrow ? "Target %" : "Target"}</th>
-              <th>{narrow ? "Diff pp" : "Diff"}</th>
+              {!narrow && <th>Target</th>}
+              <th>Diff</th>
               <th title={mode === "NEW_MONEY" ? "Where the new money goes" : "What to sell and buy to be on target"}>
-                {mode === "NEW_MONEY" ? "Buy" : "Buy / sell"}
-                {narrow && " zł"}
+                {narrow ? (mode === "NEW_MONEY" ? "Buy zł" : "Trade zł") : mode === "NEW_MONEY" ? "Buy" : "Buy / sell"}
               </th>
               {!narrow && <th title="Share after the trades">After</th>}
             </tr>
@@ -104,13 +122,18 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
                 <td>
                   <i className={`mix-dot mix-${r.assetClass}`} aria-hidden /> {CLASS_LABELS[r.assetClass]}
                 </td>
-                <td>{fmtNum(r.actual, 1)}{!narrow && " %"}</td>
-                {!narrow && <td className="muted">{fmtPln(r.value)}</td>}
-                <td title={`band ± ${fmtNum(saved.bands[r.assetClass], 1)} pp`}>
-                  {fmtNum(r.target, r.target % 1 ? 1 : 0)}{!narrow && " %"}{!narrow && <span className="muted"> ± {fmtNum(saved.bands[r.assetClass], saved.bands[r.assetClass] % 1 ? 1 : 0)}</span>}
+                <td>
+                  {fmtNum(r.actual, 1)} %
+                  {narrow && <span className="sub muted">of {fmtNum(r.target, r.target % 1 ? 1 : 0)} %</span>}
                 </td>
+                {!narrow && <td className="muted">{fmtPln(r.value)}</td>}
+                {!narrow && (
+                  <td title={`band ± ${fmtNum(saved.bands[r.assetClass], 1)} pp`}>
+                    {fmtNum(r.target, r.target % 1 ? 1 : 0)} %<span className="muted"> ± {fmtNum(saved.bands[r.assetClass], saved.bands[r.assetClass] % 1 ? 1 : 0)}</span>
+                  </td>
+                )}
                 <td data-testid={`targets-${r.assetClass}-diff`}>
-                  {r.target === 0 && r.value === 0 ? "–" : narrow ? `${sign(r.diff)}${fmtNum(Math.abs(r.diff), 1)}` : signedPp(r.diff)}
+                  {r.target === 0 && r.value === 0 ? "–" : signedPp(r.diff)}
                   {r.status !== "WITHIN" && <span className="flag warn-soft">{r.status === "OVER" ? "over" : "under"}</span>}
                 </td>
                 <td className={`trade ${r.trade > 0 ? "pos" : r.trade < 0 ? "neg" : "muted"}`} data-testid={`targets-${r.assetClass}-trade`}>
@@ -125,6 +148,7 @@ export function TargetsPanel({ snapshot }: { snapshot?: Snapshot }) {
       {mode === "NEW_MONEY" && !showTrades && <p className="muted hint">Type the amount you're putting in: it goes to the classes furthest below their target first, nothing is sold.</p>}
       {mode === "SELL_AND_BUY" && <p className="muted hint">Every class to its target; the sales pay for the buys. Before tax and commission.</p>}
     </section>
+    </>
   );
 }
 
