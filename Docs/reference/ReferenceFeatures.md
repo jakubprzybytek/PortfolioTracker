@@ -242,4 +242,5 @@ GUS monthly CPI CSV (stat.gov.pl, Poland, since 1982) in five bases: previous mo
 | `Inflacja` | Monthly GUS job (the same CSV; previous month = 100 only) |
 | Daily `Historia` snapshot | Daily snapshots in the `holdings` table; the sheet's "don't record a broken day" guard matches the data quality rules |
 | Manual prices | Manually valued assets |
-| Not planned yet | Transaction form (transfers, foreign-cash companion transactions, ticker normalisation), target allocation and rebalancing, XIRR (total and per account), drawdown, multi-asset look-through, benchmarks, closed-position report (FIFO pairs), dividends per year, issue checker |
+| Done since (road map in ../README.md) | Transaction form, target allocation and rebalancing (the Dashboard's asset mix, 2026-10-18), XIRR (total and per account), drawdown, realised gain per closed position |
+| Not done yet | Multi-asset look-through, benchmarks, the list of sales (FIFO pairs), dividends per year, issue checker |

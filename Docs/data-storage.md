@@ -5,7 +5,7 @@ Three DynamoDB tables, all on-demand capacity, plus an S3 bucket used only as a 
 | Table | Contents | Written by | Can be rebuilt? |
 |---|---|---|---|
 | `market` | Instruments, daily prices (incl. today's refreshed quotes), events, coupon periods of corporate bonds, retail-bond rates, CPI, FX, calendar, backfill status, job runs | Scheduled jobs, backfill, import (instruments) | Yes: re-fetch, or reprocess the S3 archive (the only source for past Catalyst snapshots) |
-| `transactions` | Accounts, transactions; later also allocation targets and multi-asset splits | You: the app's form, file imports (the sheet once, IBKR statements) | **No.** This is the only data that exists nowhere else (IBKR's can be rebuilt from its statements) |
+| `transactions` | Accounts, transactions, notes, settings (the Hold or sell assumptions, allocation targets); later also multi-asset splits | You: the app's form, file imports (the sheet once, IBKR statements) | **No.** This is the only data that exists nowhere else (IBKR's can be rebuilt from its statements) |
 | `holdings` | Daily portfolio snapshots | Valuation job only | Yes: recompute from `transactions` + `market` |
 
 ## Why three tables
