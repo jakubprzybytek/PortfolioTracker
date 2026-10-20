@@ -239,6 +239,13 @@ export default $config({
     // against the local dev server call API Gateway cross-origin, never on prod.
     const api = new sst.aws.ApiGatewayV2("Api", {
       cors: { allowOrigins: [`https://${domain}`, ...(testing ? ["http://localhost:5173"] : [])], allowHeaders: ["authorization", "content-type"] },
+      // A ceiling per route (the account's default is 10,000 requests/s): bounds what a flood can cost, mainly on the
+      // feed, the one route without a login. The app's own bursts (a view's few requests, the E2E tests) stay well below.
+      transform: {
+        stage: (args) => {
+          args.defaultRouteSettings = { throttlingRateLimit: 20, throttlingBurstLimit: 40 };
+        },
+      },
     });
     // API Gateway accepts only this pool's tokens issued to our clients; the Lambda checks the group.
     const authorizer = api.addAuthorizer({
@@ -264,6 +271,9 @@ export default $config({
     api.route("PUT /hold-sell/assumptions", apiHandler, auth);
     api.route("GET /targets", apiHandler, auth);
     api.route("GET /sales", apiHandler, auth);
+    api.route("GET /cash-flows", apiHandler, auth);
+    api.route("POST /feed-token", apiHandler, auth);
+    api.route("DELETE /feed-token", apiHandler, auth);
     api.route("PUT /targets", apiHandler, auth);
     api.route("GET /instruments/{isin}/prices", apiHandler, auth);
     api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
@@ -291,6 +301,23 @@ export default $config({
     api.route("POST /notes", apiHandler, auth);
     api.route("PUT /notes/{id}", apiHandler, auth);
     api.route("DELETE /notes/{id}", apiHandler, auth);
+
+    // The spreadsheet feed (IMPORTDATA can't log in): its own token instead of Cognito, checked by the function. Not
+    // linked, since a link grants every action on a table: it reads the transactions (GSI1) and FX rates, and may only
+    // write `lastUsedAt` into the token's own item (Docs/ui.md, "Cash flows"; nfr-analysis.md, "Security").
+    const sameKey = (key: string) => [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: [key] }];
+    api.route("GET /feeds/cash-flows.csv", {
+      ...defaults,
+      handler: "packages/jobs/src/handlers/feed.handler",
+      timeout: "30 seconds",
+      link: [],
+      environment: { MARKET_TABLE: market.name, TRANSACTIONS_TABLE: transactions.name },
+      permissions: [
+        { actions: ["dynamodb:Query"], resources: [$interpolate`${transactions.arn}/index/GSI1`] },
+        { actions: ["dynamodb:GetItem", "dynamodb:UpdateItem"], resources: [transactions.arn], conditions: sameKey("SETTING#feedToken") },
+        { actions: ["dynamodb:Query"], resources: [market.arn], conditions: sameKey("FX#*") },
+      ],
+    });
 
     const router = new sst.aws.Router("Router", { domain });
     router.route("/api", api.url, { rewrite: { regex: "^/api/(.*)$", to: "/$1" } });

@@ -610,4 +610,56 @@ describe(`API ${API}`, () => {
     expect(again.status).toBe(429);
     expect(again.body.retryAt > new Date().toISOString()).toBe(true);
   });
+
+  it("GET /cash-flows: deposits and withdrawals per account and month of a year, in PLN (EUR at NBP D-1)", async () => {
+    expect((await get("/cash-flows", { auth: false })).status).toBe(401);
+    expect((await get("/cash-flows?year=25")).status).toBe(400);
+    const { status, body } = await get<{ year: number; accounts: { account: string; net: number[]; totals: { deposits: number; withdrawals: number; net: number } }[]; total: { net: number[] }; years: number[] }>("/cash-flows?year=2025");
+    expect(status).toBe(200);
+    expect(body.year).toBe(2025);
+    expect(body.years.slice(-1)).toEqual([2025]);
+    const of = (a: string) => body.accounts.find((x) => x.account === a);
+    // In use in 2025, by name; "etf" and "bonds" got their first money in 2026.
+    expect(body.accounts.map((a) => a.account).filter((a) => !a.startsWith("api-") && !a.startsWith("e2e"))).toEqual(["broker", "closed", "eur", "foreign", "ibkr", "ike"]);
+    expect(of("broker")!.net[1]).toBe(30000);
+    expect(of("closed")!.net).toEqual([0, 0, 1000, 0, 0, 0, -1020, 0, 0, 0, 0, 0]);
+    expect(of("closed")!.totals).toEqual({ deposits: 1000, withdrawals: 1020, net: -20 });
+    const eurDec = of("eur")!.net[11]!; // 100 EUR at the NBP mid of 2025-11-28
+    expect(eurDec).toBeGreaterThan(400);
+    expect(eurDec).toBeLessThan(450);
+    expect(body.total.net[1]).toBe(30000);
+  });
+
+  it("the spreadsheet feed: a token made in the app reads the CSV; wrong, missing, replaced and revoked tokens get a bare 404", async () => {
+    const feed = async (query: string) => {
+      const res = await fetch(`${API}/feeds/cash-flows.csv${query}`);
+      return { status: res.status, type: res.headers.get("content-type"), cache: res.headers.get("cache-control"), text: await res.text() };
+    };
+    const made = await send<{ token: string; createdAt: string }>("POST", "/feed-token");
+    expect(made.status).toBe(201);
+    expect(made.body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const state = await get<{ feed: { createdAt: string; lastUsedAt: string | null } | null }>("/cash-flows?year=2025");
+    expect(state.body.feed).toEqual({ createdAt: made.body.createdAt, lastUsedAt: null });
+    expect(JSON.stringify(state.body)).not.toContain(made.body.token);
+
+    const ok = await feed(`?year=2025&token=${made.body.token}`);
+    expect(ok).toMatchObject({ status: 200, type: "text/csv; charset=utf-8", cache: "no-store" });
+    const lines = ok.text.trimEnd().split("\r\n");
+    expect(lines[0]).toBe("Podsumowanie,styczeń,luty,marzec,kwiecień,maj,czerwiec,lipiec,sierpień,wrzesień,październik,listopad,grudzień,");
+    expect(lines[1]).toMatch(/^Bilans wpływów,,30000,/);
+    expect(lines).toContain("closed,0,0,1000,0,0,0,-1020,0,0,0,0,0,-20");
+    expect((await get<{ feed: { lastUsedAt: string | null } }>("/cash-flows")).body.feed?.lastUsedAt).not.toBeNull();
+
+    for (const q of ["?year=2025", `?year=2025&token=${made.body.token.slice(1)}`, `?year=2025&token=${"A".repeat(43)}`]) expect(await feed(q)).toMatchObject({ status: 404, text: "Not found" });
+    expect((await feed(`?year=x&token=${made.body.token}`)).status).toBe(400);
+
+    // A new token replaces the old one at once.
+    const next = await send<{ token: string }>("POST", "/feed-token");
+    expect((await feed(`?year=2025&token=${made.body.token}`)).status).toBe(404);
+    expect((await feed(`?year=2025&token=${next.body.token}`)).status).toBe(200);
+    // Revoked: nothing reads it.
+    expect((await send("DELETE", "/feed-token")).status).toBe(200);
+    expect((await feed(`?year=2025&token=${next.body.token}`)).status).toBe(404);
+    expect((await get<{ feed: unknown }>("/cash-flows")).body.feed).toBeNull();
+  });
 });

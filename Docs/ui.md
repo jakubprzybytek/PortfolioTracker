@@ -29,6 +29,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/prices?type=…&chart=<ISIN>` | Prices |
 | `#/hold-sell?row=<account>#<ISIN>` | Hold or sell (`row` = the open breakdown) |
 | `#/sales?year=…&account=…&q=…&sale=<transaction id>` | Sales (`sale` = the one folded out) |
+| `#/cash-flows?year=…&account=…` | Cash flows (`year` absent = this year; `account` = the row folded out) |
 | `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?instrument=<ISIN or none>&account=…&type=…` | Transactions |
 | `#/notes?note=<id or new>` | Notes (`note` = the open note; `new` = writing one) |
@@ -109,6 +110,15 @@ Every sale, redemption and write-off (road map 9), from `GET /sales`, in PLN (an
 - **A row folds out** into the buys FIFO matched it against ("└ bought 2023-03-10"): units, their share of the proceeds (by units; the last takes the rounding remainder), their cost, gain and %, days held. The pairs add up to the sale to the grosz.
 - **Phone:** two-line rows (instrument and gain; date, account, kind and units; proceeds for cost), the buys listed under the open one.
 
+## Cash flows
+
+Money paid into and taken out of each account per month of a year (the reference sheet's "Wpłaty/wypłaty <year>" tab), from `GET /cash-flows?year=`, in PLN (another currency at NBP D-1, as net deposits; `core/cashflows/cashFlows.ts`). Transfers between your own accounts count on both sides, as in net deposits.
+
+- **Table:** one row per account with deposits or withdrawals up to the year's end and still in use in it (a transaction in the year or later), by name; the balance (deposits − withdrawals) per month in whole złoty (the exact amount in the tooltip; an empty cell for nothing), the year's in the last column; a "Total" row. A row folds out into "└ deposits" and "└ withdrawals". The year picker lists the years with any deposit or withdrawal.
+- **Phone:** two-line rows (account and the year's balance; in and out), "Total" first; the open one lists the months with money in or out.
+- **Spreadsheet link:** the same figures as CSV for a spreadsheet (`IMPORTDATA`), so a sheet that used to read the tab with `IMPORTRANGE` reads the app instead. "Create link" makes a token and shows the formula once, with "Copy" (for the year shown; another year: change `year=` in it). After that the panel says when the link was made and last used; "Create new link" replaces it and "Revoke" removes it, each after asking (the spreadsheet using the old link gets nothing from then on). Anyone with the link reads these figures (only these), so the spreadsheet holding it should be shared with care.
+- **The CSV** (`GET /feeds/cash-flows.csv?year=&token=`, UTF-8, comma-separated, dot decimals) is laid out as the tab's summary (B1:O11): `Podsumowanie` and the twelve Polish month names; `Bilans wpływów`: every account's balance per month (empty for a month with none) and the year's; then one row per account, its balance per month and the year's. No class columns (the tab's Akcje/Obligacje/Inne/Gotówka split was fixed per account by hand).
+
 ## Indicators
 
 Economic indicators from data already stored (no extra source), same layout as Prices.
@@ -171,6 +181,10 @@ Free notes in Markdown (`NotesView.tsx`), e.g. trading checklists. Not linked to
 | `GET /instruments/{isin}/prices?from&to` | `PX#…` items; retail bonds: the daily calculated value per bond of your lots (`calculated: true`) |
 | `GET /instruments/{isin}/transactions` | transactions of that ISIN |
 | `GET /sales` | `sales`: every disposal with its FIFO `pairs` (buy date, units, cost, proceeds, gain, days), `pit` and why not (`notPit`); `years`: the PIT-38 summary (`core/valuation/sales.ts`) |
+| `GET /cash-flows?year=` | deposits, withdrawals and their balance per account and month of the year (`core/cashflows/cashFlows.ts`): `accounts`, `total`, `years` (with any), `missingRates` (a foreign-currency flow without an NBP rate), `feed`: the spreadsheet link's `{ createdAt, lastUsedAt }` or `null` |
+| `POST /feed-token` | a new spreadsheet-link token, replacing any before it: 201 `{ token, createdAt }`, the only time the token is returned |
+| `DELETE /feed-token` | revokes the link |
+| `GET /feeds/cash-flows.csv?year=&token=` | **no login** (function `feed`, not `api`): the year's cash flows as CSV (see "Cash flows"); a missing, wrong or revoked token gets a bare 404 |
 | `GET /hold-sell` | every bond position kept to maturity vs sold today (`core/holdsell/holdSell.ts`): `rows` (flows, sale today, yields, alternative, difference, verdict, notes), `skipped` (and why), `assumptions` (saved, else `defaults`), the retail `offers` used |
 | `GET /targets` | `{ targets }`: `{ targets, bands }` (per class, %), or `null` until set |
 | `PUT /targets` | `{ targets: { SHARES, BONDS, CASH, OTHER }, bands: { … } }` (%, the targets adding up to 100) keeps them; `{ reset: true }` removes them |
@@ -202,7 +216,7 @@ The UI loads all transactions and filters them in the browser; at a few hundred 
 
 ## Access
 
-Login with Cognito; everything under `/api` needs it. The site's files are public (they hold no data); until you're logged in the app shows its own login form, on the stage's own domain (no redirect to a Cognito page).
+Login with Cognito; everything under `/api` needs it, except the spreadsheet feed (`/api/feeds/cash-flows.csv`, below). The site's files are public (they hold no data); until you're logged in the app shows its own login form, on the stage's own domain (no redirect to a Cognito page).
 
 - **User pool:** the existing `AlbedoUserPool` (`eu-west-1_IVai0KEAA`), shared with other apps. SST only references it (`CognitoUserPool.get`) and adds clients; it never changes or deletes the pool. A pool can have only one custom domain, which is why the login isn't a hosted page per stage.
 - **Login form** (`packages/web/src/LoginForm.tsx`, Amplify v6 `aws-amplify/auth`): email + password with **SRP** (the password never leaves the browser); a first-login "choose a new password" step for admin-created users; "Forgot password?" emails a code and sets a new password. Wrong email and wrong password give the same message.
@@ -218,3 +232,5 @@ Login with Cognito; everything under `/api` needs it. The site's files are publi
   The test user's password is stored in the `int`/`dev` secrets; keeping it out of `portfolio-tracker` means it can log in to the `prod` site but gets no data there. Per-stage groups: `accessGroups()` in `packages/jobs/src/lib/access.ts`. Members are added with the AWS CLI (README, "Login").
 - **In the browser:** Amplify keeps the tokens in localStorage and renews them with the refresh token; the view you were on (`#/…`) stays in the URL while the login form shows. A 401 from the API or a failed renewal logs you out locally and shows the form. "Log out" (in the menu) clears the tokens.
 - MFA is off in the pool (a pool-wide setting shared with the other apps).
+
+- **The spreadsheet feed** (`GET /feeds/cash-flows.csv`): `IMPORTDATA` can't log in, so this one route has no Cognito authorizer and checks a token of its own (`packages/jobs/src/lib/feedToken.ts`): 32 random bytes made by `POST /feed-token` and shown once; only their SHA-256 is stored (setting `feedToken` with `createdAt`, `lastUsedAt`), compared in constant time. One token at a time: a new one replaces the old at once, `DELETE /feed-token` revokes it. Missing, wrong and revoked tokens get the same bare 404. It serves only the cash-flow totals per account and month. Its function (`handlers/feed.ts`) isn't linked to the tables (a link grants every action): IAM lets it query the transactions' GSI1 and the `FX#…` rates, and get and update only the `SETTING#feedToken` item (to note `lastUsedAt`, at most hourly). The token is never logged; API Gateway's access log has the path without the query string. Every route is throttled at 20 requests/s (burst 40), which bounds what a flood can cost.

@@ -615,3 +615,16 @@ tr.sale-pair td { background: var(--row); color: var(--muted); font-size: 0.85re
 tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .sale-pairs { list-style: none; margin: 0; padding: 0 12px 10px 24px; }
 .sale-pairs > li { display: flex; flex-direction: column; gap: 1px; padding: 5px 0; border-top: 1px dashed var(--line); font-size: 0.85rem; }
+/* Cash flows: accounts × months, the spreadsheet link under it */
+.cf-year { display: flex; align-items: baseline; gap: 6px; font-size: 0.9rem; }
+.cf-year select { font: inherit; padding: 3px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg); }
+.cf-table td, .cf-table th { white-space: nowrap; }
+.cf-table td:first-child { white-space: normal; min-width: 9rem; }
+.hs-list > li.cf-total { border-bottom: 2px solid var(--fg); }
+.cf-feed { margin-top: 14px; }
+.cf-feed h3 { font-size: 0.8rem; font-weight: 600; margin: 0 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.cf-feed p { margin: 6px 0; font-size: 0.9rem; max-width: 70rem; }
+.cf-formula { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.cf-formula input { flex: 1; min-width: 0; font: 0.85rem ui-monospace, monospace; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--row); color: var(--fg); }
+.cf-formula p { flex-basis: 100%; margin: 0; font-size: 0.8rem; }
+.cf-buttons { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; font-size: 0.9rem; }

@@ -12,6 +12,7 @@ import { LoginForm } from "./LoginForm.tsx";
 import { NotesView } from "./NotesView.tsx";
 import { PricesView } from "./PricesView.tsx";
 import { SalesView } from "./SalesView.tsx";
+import { CashFlowsView } from "./CashFlowsView.tsx";
 import { useRoute, VIEWS } from "./route.ts";
 import { TransactionForm } from "./TransactionForm.tsx";
 import { TransactionsView } from "./TransactionsView.tsx";
@@ -192,6 +193,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "prices" && <PricesView key="prices" params={route.params} setParams={setParams} />}
         {route.view === "holdsell" && <HoldSellView key="holdsell" params={route.params} setParams={setParams} />}
         {route.view === "sales" && <SalesView key="sales" params={route.params} setParams={setParams} />}
+        {route.view === "cashflows" && <CashFlowsView key="cashflows" params={route.params} setParams={setParams} />}
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}

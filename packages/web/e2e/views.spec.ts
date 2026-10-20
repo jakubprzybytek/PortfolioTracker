@@ -1106,3 +1106,63 @@ test.describe("sales", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });
+
+test.describe("cash flows", () => {
+  test("deposits and withdrawals per account and month of a year; a row folds out; the year in the URL", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("nav-cashflows").click();
+    await expect(page).toHaveURL(/#\/cash-flows$/);
+    await expect(page.getByRole("heading", { name: "Cash flows", level: 2 })).toBeVisible();
+
+    await page.getByTestId("cf-year").selectOption("2025");
+    await expect(page).toHaveURL(/year=2025/);
+    const closed = page.locator('[data-testid="cf-row"][data-account="closed"]');
+    await expect(closed.getByTestId("cf-year-net")).toHaveText("-20");
+    await expect(page.locator('[data-testid="cf-row"][data-account="etf"]')).toHaveCount(0); // its first money came in 2026
+    await expect(page.getByTestId("cf-total")).toBeVisible();
+
+    await closed.click();
+    await expect(page).toHaveURL(/account=closed/);
+    await expect(page.getByTestId("cf-deposits")).toContainText("1 000");
+    await expect(page.getByTestId("cf-withdrawals")).toContainText("1 020");
+  });
+
+  test("the spreadsheet link: made in the app, shown once as an IMPORTDATA formula, revoked after asking", async ({ page }) => {
+    await page.goto("/#/cash-flows?year=2025");
+    const state = page.getByTestId("cf-feed-state");
+    await expect(state).toBeVisible();
+    // A link left by an earlier run: revoke it first.
+    if (await page.getByTestId("cf-revoke").isVisible()) {
+      await page.getByTestId("cf-revoke").click();
+      await page.getByTestId("cf-confirm").click();
+    }
+    await expect(state).toHaveText("No link.");
+
+    await page.getByTestId("cf-create").click();
+    const formula = page.getByTestId("cf-formula");
+    await expect(formula).toHaveValue(/^=IMPORTDATA\("https?:\/\/.+\/feeds\/cash-flows\.csv\?year=2025&token=[A-Za-z0-9_-]{43}"\)$/);
+    await expect(state).toContainText("not used yet");
+    const url = /IMPORTDATA\("(.+)"\)/.exec(await formula.inputValue())![1]!;
+    const csv = await page.request.get(url);
+    expect(csv.status()).toBe(200);
+    expect(await csv.text()).toContain("closed,0,0,1000,0,0,0,-1020,0,0,0,0,0,-20");
+
+    // Revoking asks first; then the link reads nothing.
+    await page.getByTestId("cf-revoke").click();
+    await expect(page.getByTestId("cf-confirm")).toHaveText("Revoke");
+    await page.getByTestId("cf-confirm").click();
+    await expect(state).toHaveText("No link.");
+    await expect(formula).toHaveCount(0);
+    expect((await page.request.get(url)).status()).toBe(404);
+  });
+
+  test("on a phone: two-line rows, the months under the open one", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto("/#/cash-flows?year=2025");
+    const closed = page.locator('[data-testid="cf-row"][data-account="closed"]');
+    await expect(closed).toContainText("in 1 000,00 zł");
+    await closed.getByRole("button").click();
+    await expect(page.getByTestId("cf-months").locator("li")).toHaveCount(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+});

@@ -63,6 +63,8 @@ Scale is tiny (hundreds of transactions, ~30 positions), so nothing here is urge
 
 **As built:** SRP login, no client secret, no hosted UI or OAuth flows, `preventUserExistenceErrors`, token revocation, 1 h access tokens, `USER_PASSWORD_AUTH` only off prod; API Gateway JWT authorizer with `audiences: [webClient.id]`; group check on every call (`access.ts`); the test user kept out of the prod group; zod validation of every write body; ISIN regex on path parameters; IAM per function through links; S3 public access blocked; the account number kept out of the public repo; OIDC (no long-lived keys); `npm audit` clean; `xlsx` vendored from SheetJS's CDN (the npm `xlsx` 0.18 line has unpatched CVEs).
 
+**Since (2026-10-20): one route without a login.** `GET /api/feeds/cash-flows.csv` serves the cash flows per account and month to a spreadsheet (`IMPORTDATA` can't log in). It's guarded by a 256-bit token made in the app, stored only as a SHA-256 and compared in constant time; a wrong, missing or revoked token gets a bare 404; its function can only read the transactions and FX rates and write its own token item's `lastUsedAt` (IAM by leading key, not a link); every route is throttled at 20 requests/s, burst 40 (ui.md, "Access"). The token travels in the URL: it's in the spreadsheet's formula (anyone the sheet is shared with can read the feed) and in Google's fetches, not in our logs (API Gateway logs the path only). Rotating it is one click in the app.
+
 **Gaps**
 
 - **Error leakage:** the API's `catch` returns `err.message` for any exception (table names, zod internals). Return a generic 500 and log the detail. Related: `bodyOf` throws on malformed JSON → 500 instead of 400.

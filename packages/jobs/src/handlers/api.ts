@@ -1,6 +1,6 @@
 // HTTP API for the UI (see Docs/ui.md). Reads, plus adding/editing/deleting transactions and adding instruments
 // (the "Add transaction" form), new values of hand-valued assets, corporate bonds' coupon periods, and notes. Every route needs a Cognito login (checked by API Gateway) in one of the stage's
-// access groups (checked here).
+// access groups (checked here). The one route without a login, the spreadsheet feed, is a function of its own (feed.ts).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import { Resource } from "sst";
@@ -22,6 +22,7 @@ import {
   formerInstruments,
   pitYears,
   salesOf,
+  cashFlows,
   positionsAt,
   netDepositsByDate,
   withZeroGaps,
@@ -65,6 +66,7 @@ import {
 } from "@portfolio/core";
 import { FX_CURRENCIES } from "./fx.ts";
 import { hasAnyGroup } from "../lib/access.ts";
+import { FEED_TOKEN_SETTING, newFeedToken, type FeedToken } from "../lib/feedToken.ts";
 import { invokeAsync, queueValuation, repo } from "../lib/context.ts";
 import { importInstruments, mfTermsByCode } from "./import.ts";
 
@@ -229,6 +231,24 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
         const positions = positionsAt(txs, today(), await fxHistoryOf(txs, today()));
         return json(200, { ...snap, closed: closedPositions(positions.values(), instruments) });
+      }
+      case "GET /cash-flows": {
+        // Deposits and withdrawals per account and month of `?year=` (default this year), and the spreadsheet feed's state.
+        const year = q["year"] ?? today().slice(0, 4);
+        if (!/^\d{4}$/.test(year)) return json(400, { error: "year: four digits" });
+        const [txs, token] = await Promise.all([repo.listTransactions(), repo.getSetting<FeedToken>(FEED_TOKEN_SETTING)]);
+        const report = cashFlows(txs, Number(year), await fxHistoryOf(txs, today()));
+        return json(200, { ...report, feed: token ? { createdAt: token.createdAt, lastUsedAt: token.lastUsedAt ?? null } : null });
+      }
+      case "POST /feed-token": {
+        // A new token for the feed, replacing any before it (that one stops working at once); returned only here.
+        const { token, stored } = newFeedToken();
+        await repo.putSetting(FEED_TOKEN_SETTING, stored);
+        return json(201, { token, createdAt: stored.createdAt });
+      }
+      case "DELETE /feed-token": {
+        await repo.deleteSetting(FEED_TOKEN_SETTING);
+        return json(200, { feed: null });
       }
       case "GET /sales": {
         // Every sale, redemption and write-off with its FIFO pairs (newest first), and per year the PIT-38 summary.

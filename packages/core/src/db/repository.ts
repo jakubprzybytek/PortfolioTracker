@@ -8,6 +8,7 @@ import {
   PutCommand,
   QueryCommand,
   ScanCommand,
+  UpdateCommand,
   type QueryCommandInput,
   type ScanCommandInput,
 } from "@aws-sdk/lib-dynamodb";
@@ -335,6 +336,24 @@ export class Repository {
 
   putSetting<T>(name: string, value: T): Promise<void> {
     return this.put("transactions", { ...keys.setting(name), value, updatedAt: new Date().toISOString() });
+  }
+
+  /** Sets one field of a stored setting's value; does nothing when the setting isn't there (deleted meanwhile). */
+  async setSettingField(name: string, field: string, value: unknown): Promise<void> {
+    try {
+      await this.doc.send(
+        new UpdateCommand({
+          TableName: this.tables.transactions,
+          Key: keys.setting(name),
+          UpdateExpression: "SET #v.#f = :x",
+          ConditionExpression: "attribute_exists(PK)",
+          ExpressionAttributeNames: { "#v": "value", "#f": field },
+          ExpressionAttributeValues: { ":x": value },
+        }),
+      );
+    } catch (e) {
+      if ((e as Error).name !== "ConditionalCheckFailedException") throw e;
+    }
   }
 
   async deleteSetting(name: string): Promise<void> {

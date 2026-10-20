@@ -204,7 +204,7 @@ GSI1PK = NOTE               GSI1SK = <note_id>
 PK = SETTING#<name>         SK = META
 ```
 
-`value`, `updatedAt`: choices made in the app that aren't data, e.g. `holdSell` (the Hold or sell assumptions: `cpi`, `wibor`, `nbpRate`, `alternative`, `altRate`, `commission`; deleted to go back to the defaults) and `targets` (the target allocation: `targets` and `bands` per asset class, in %; deleted by "Remove targets"). Not in the monthly backup (set again in a minute).
+`value`, `updatedAt`: choices made in the app that aren't data, e.g. `holdSell` (the Hold or sell assumptions: `cpi`, `wibor`, `nbpRate`, `alternative`, `altRate`, `commission`; deleted to go back to the defaults) and `targets` (the target allocation: `targets` and `bands` per asset class, in %; deleted by "Remove targets") and `feedToken` (the spreadsheet link: `hash` (SHA-256 of the token, never the token), `createdAt`, `lastUsedAt`; replaced by "Create new link", deleted by "Revoke"; ui.md, "Access"). Not in the monthly backup (set again in a minute).
 
 ### Later: settings you enter
 
@@ -244,7 +244,7 @@ PK = POS#<account>#<isin>   SK = <YYYY-MM-DD>
 
 ## Access per function
 
-Each function links only the tables it needs.
+Each function links only the tables it needs. The spreadsheet feed isn't linked at all (a link grants every action on a table): it gets the table names in its environment and IAM statements limited to the keys it reads (`dynamodb:LeadingKeys`).
 
 | Function | `market` | `transactions` | `holdings` |
 |---|---|---|---|
@@ -255,6 +255,7 @@ Each function links only the tables it needs.
 | `Import` | read/write (instruments, reference index) | read/write | — |
 | `Valuation` | read (writes its job run) | read | write |
 | `Api` | read | read/write (transactions, notes) | read |
+| `feed` (the spreadsheet feed, no login) | query `FX#…` only | query GSI1; get/update `SETTING#feedToken` only | — |
 
 ## Access patterns
 

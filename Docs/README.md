@@ -159,7 +159,7 @@ Later phases:
 
 ## Outstanding work (2026-10-18)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 7, 8, 9, 13, 14, 15, 18, 19, 21, 23; 20 in part (XIRR per account and total). Open: 6, 10–12, 16, 17, 20, 22, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested order: 22, 20.
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 7, 8, 9, 13, 14, 15, 18, 19, 21, 23, 24; 20 in part (XIRR per account and total). Open: 6, 10–12, 16, 17, 20, 22, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested order: 22, 20.
 
 ### Correctness and accuracy
 1. ~~Foreign bonds at IBKR are priced by calculation~~ Done (2026-10-14): the EUR bonds are priced from Börse Stuttgart's closes (onvista, `eod-bonds`), within 0.015 of IBKR's marks; the calculated prices had been up to 1 % off. US T-bills (none held now) stay calculated.
@@ -177,6 +177,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 11. **IBKR Flex Web Service:** IBKR trades without downloading statements (needs a Flex Query and a token); mark prices for US T-bills.
 12. **More Dashboard charts:** income per year. (Drawdown and allocation over time done on 2026-10-15.)
 13. ~~Asset class per instrument~~ Done (2026-10-18): a "Class" column and filter in Prices and a "Class" select in the instrument's settings (the cog in its chart panel); one class per instrument (shares, bonds, cash, other), the rule (by type, "bond" in an ETF's name) unless set by hand; a change revalues the instrument's history.
+24. ~~Cash flows and the spreadsheet feed~~ Done (2026-10-20): a **Cash flows** view (the sheet's "Wpłaty/wypłaty" tab): deposits, withdrawals and their balance per account and month of a year, in PLN at NBP D-1; and a link (`IMPORTDATA`) that serves the same figures as CSV, laid out as the tab's summary, to the spreadsheet that imported the tab. The link's token is made, replaced and revoked in the app (ui.md, "Cash flows" and "Access"). Not carried over: the tab's per-account class split and the IKE/IKZE limits.
 20. **XIRR per account, per asset type and per instrument:** today XIRR is per account and for the total, from deposits and withdrawals (`core/valuation/accounts.ts`, Accounts table). Also per asset type and per instrument (Holdings rows and group rows), from the position's own cash flows: buys, sells, coupons, dividends, redemptions and fees, plus its value today; per account the same way, so it can be compared with the deposit-based figure. Closed positions keep theirs (with item 9).
 
 ### Operations and housekeeping
