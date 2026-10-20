@@ -610,6 +610,7 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
 .pit h3 { font-size: 0.8rem; font-weight: 600; margin: 0 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .pit table { width: auto; min-width: min(34rem, 100%); }
 .pit-note { margin: 8px 0 0; font-size: 0.8rem; }
+@media (max-width: 720px) { .pit { padding: 10px 12px; } .pit table { width: 100%; min-width: 0; } .pit table td, .pit table th { padding: 6px 4px; } .pit td .sub { padding-left: 0; } }
 td .caret { color: var(--muted); font-size: 0.8rem; }
 tr.sale-pair td { background: var(--row); color: var(--muted); font-size: 0.85rem; }
 tr.sale-pair td:first-child { padding-left: 1.6rem; }

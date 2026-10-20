@@ -1099,6 +1099,9 @@ test.describe("sales", () => {
     await page.setViewportSize({ width: 390, height: 800 });
     await page.route("**/sales", (route) => route.fulfill({ json: salesResponse }));
     await page.goto("/#/sales");
+    const pit = page.getByTestId("pit-row");
+    await expect(pit).toContainText("costs");
+    expect(await page.getByTestId("pit").evaluate((p) => p.scrollWidth <= p.clientWidth)).toBe(true); // three columns, costs under proceeds
     const row = page.locator('[data-testid="sale-row"][data-id="s1"]');
     await expect(row).toContainText("2025-05-15 · broker · sale of 100");
     await row.getByRole("button").click();

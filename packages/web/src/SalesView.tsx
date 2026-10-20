@@ -58,12 +58,12 @@ export function SalesView({ params, setParams }: { params: Record<string, string
                 <th className="left">Year</th>
                 {!narrow && <th>Sales</th>}
                 <th title="Przychód: what they brought in, net of fees">Proceeds</th>
-                <th title="Koszty: what the units cost, fees included">Costs</th>
+                {!narrow && <th title="Koszty: what the units cost, fees included">Costs</th>}
                 <th title="Dochód (or strata): proceeds − costs">Profit</th>
               </tr>
             </thead>
             <tbody>
-              {!d && data.loading && <SkeletonRows rows={2} cols={narrow ? 4 : 5} />}
+              {!d && data.loading && <SkeletonRows rows={2} cols={narrow ? 3 : 5} />}
               {d?.years.map((y) => (
                 <tr key={y.year} className={`clickable${year === String(y.year) ? " selected" : ""}`} onClick={() => set({ year: year === String(y.year) ? undefined : String(y.year) })} data-testid="pit-row" data-year={y.year}>
                   <td className="left">
@@ -71,8 +71,11 @@ export function SalesView({ params, setParams }: { params: Record<string, string
                     {narrow && <div className="sub muted">{y.count} {y.count === 1 ? "sale" : "sales"}</div>}
                   </td>
                   {!narrow && <td>{y.count}</td>}
-                  <td>{fmtPln(y.proceeds)}</td>
-                  <td>{fmtPln(y.cost)}</td>
+                  <td>
+                    {fmtPln(y.proceeds)}
+                    {narrow && <div className="sub muted">costs {fmtPln(y.cost)}</div>}
+                  </td>
+                  {!narrow && <td>{fmtPln(y.cost)}</td>}
                   <td className={signClass(y.gain)} data-testid="pit-gain">
                     {fmtPln(y.gain)}
                   </td>
