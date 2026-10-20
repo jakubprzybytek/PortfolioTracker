@@ -251,11 +251,13 @@ function FeedPanel({ year, feed, onChange }: { year: string; feed: CashFlowsResp
         </p>
       )}
       {made && (
-        <div className="cf-formula">
-          <input readOnly value={formula} onFocus={(e) => e.target.select()} aria-label="IMPORTDATA formula" data-testid="cf-formula" />
-          <button type="button" className="primary" onClick={() => void copy()} data-testid="cf-copy">
-            {copied ? "Copied" : "Copy"}
-          </button>
+        <div className="cf-made">
+          <div className="cf-formula">
+            <input readOnly value={formula} onFocus={(e) => e.target.select()} aria-label="IMPORTDATA formula" data-testid="cf-formula" />
+            <button type="button" className="primary" onClick={() => void copy()} data-testid="cf-copy">
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
           <p className="muted">Shown only now: the app keeps only a fingerprint of it. For {year}; change the year in the formula for another.</p>
         </div>
       )}
