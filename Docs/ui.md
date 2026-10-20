@@ -105,10 +105,10 @@ Is a bond worth more kept to maturity, or sold today with the money put into an 
 
 Every sale, redemption and write-off (road map 9), from `GET /sales`, in PLN (another currency at NBP D-1, as for tax).
 
-- **PIT-38** panel on top: per year (newest first) the number of sales, proceeds (net of fees), costs (FIFO, the buys' fees included) and profit. It counts sales and redemptions outside IKE/IKZE; not write-offs (no disposal for tax) nor retail bonds (their interest is taxed at source when they're redeemed). Foreign cash isn't a position, so its exchanges are in neither list. Clicking a year filters the list to it.
+- **PIT-38** panel on top: per year (newest first) the number of sales, proceeds (net of fees), costs (FIFO, the buys' fees included) and profit. It counts sales and redemptions outside IKE/IKZE; not write-offs (no disposal for tax) nor retail bonds (their interest is taxed at source when they're redeemed). Foreign cash isn't a position, so its exchanges are in neither list. Clicking a year filters the list to it. The panel is as wide as its table, the note wrapping under it.
 - **List**, newest first: instrument and account, date and kind (sale, redemption, write-off), units, proceeds, cost, gain and its %, days held (one buy) or "n buys". A disposal kept out of PIT-38 has a small tag saying why. Filters: year, account, instrument text; the count and the gain of what's shown; a total row.
 - **A row folds out** into the buys FIFO matched it against ("└ bought 2023-03-10"): units, their share of the proceeds (by units; the last takes the rounding remainder), their cost, gain and %, days held. The pairs add up to the sale to the grosz.
-- **Phone:** two-line rows (instrument and gain; date, account, kind and units; proceeds for cost), the buys listed under the open one.
+- **Phone:** the PIT-38 table in three columns (year with the count under it, proceeds with the costs under them, profit) across the panel; two-line rows (instrument and gain; date, account, kind and units; proceeds for cost), the buys listed under the open one.
 
 ## Cash flows
 
