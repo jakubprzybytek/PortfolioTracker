@@ -23,6 +23,7 @@ import {
   pitYears,
   salesOf,
   cashFlows,
+  positionFlows,
   positionsAt,
   netDepositsByDate,
   withZeroGaps,
@@ -224,13 +225,16 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
   try {
     switch (route) {
       case "GET /holdings": {
+        // `flows`: each position's own cash flows to the snapshot's day (PLN, NBP D-1), for the XIRR of any row or group.
         // `?closed=1`: also the positions held no more (`closed`: realised gain, coupons, open and close dates).
-        const snap = await repo.getSnapshot("LATEST");
+        const [snap, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listTransactions()]);
         if (!snap) return json(404, { error: "No valuation yet" });
-        if (q["closed"] !== "1") return json(200, snap);
-        const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
-        const positions = positionsAt(txs, today(), await fxHistoryOf(txs, today()));
-        return json(200, { ...snap, closed: closedPositions(positions.values(), instruments) });
+        const fx = await fxHistoryOf(txs, today());
+        const flows = positionFlows(txs, snap.date, fx);
+        if (q["closed"] !== "1") return json(200, { ...snap, flows });
+        const instruments = await repo.listInstruments();
+        const positions = positionsAt(txs, today(), fx);
+        return json(200, { ...snap, flows, closed: closedPositions(positions.values(), instruments) });
       }
       case "GET /cash-flows": {
         // Deposits and withdrawals per account and month of `?year=` (default this year), and the spreadsheet feed's state.

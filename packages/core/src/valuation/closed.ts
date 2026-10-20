@@ -1,5 +1,6 @@
 import type { IsoDate } from "../dates.ts";
 import type { InstrumentItem, TransactionItem } from "../db/items.ts";
+import type { AssetClass } from "./history.ts";
 import type { Position } from "./positions.ts";
 
 /** A position sold, redeemed or written off in full: what it brought in against what it cost (FIFO). */
@@ -27,6 +28,8 @@ export interface ClosedPosition {
   /** The gain against the most it held at once (peakCost). */
   gainPct: number | null;
   couponsReceived: number;
+  /** The instrument's asset class set by hand (none: the rule, `assetClassOf`). */
+  assetClass?: AssetClass;
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
@@ -62,6 +65,7 @@ export function closedPositions(positions: Iterable<Position>, instruments: Inst
       gain,
       gainPct: p.peakCost ? round2((gain / p.peakCost) * 100) : null,
       couponsReceived: round2(p.couponsReceived),
+      ...(inst?.assetClass ? { assetClass: inst.assetClass } : {}),
     });
   }
   return out.sort((a, b) => a.account.localeCompare(b.account) || a.code.localeCompare(b.code));

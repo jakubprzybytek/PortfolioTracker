@@ -8,6 +8,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  ASSET_CLASSES,
+  assetClassOf,
+  type AssetClass,
+} from "@portfolio/core/valuation/history";
+import { positionsXirr } from "@portfolio/core/valuation/xirr";
+import { CLASS_LABELS } from "./Allocation.tsx";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { InstrumentSettingsButton } from "./InstrumentView.tsx";
 import { holdSellKey, VERDICT_LABELS, type HoldSellResponse } from "./HoldSellView.tsx";
@@ -50,6 +57,8 @@ import {
   usePositionTransactions,
 } from "./PositionTransactions.tsx";
 
+const GROUP_LABELS = { account: "Account", instrument: "Instrument", class: "Class" };
+
 /** Snapshots written before holdings carried their account have none. */
 const accountOf = (h: Holding) => h.account ?? "–";
 
@@ -76,7 +85,22 @@ const add = (a: Sums, b: Sums): Sums => ({
   couponsReceived: a.couponsReceived + b.couponsReceived,
 });
 
-function SumCells({ s }: { s: Sums }) {
+const CLOSED_XIRR_TITLE =
+  "Money-weighted annual return over the time it was held: its buys, sales, redemptions, coupons and dividends, PLN at NBP D-1 (written off: −100 %). None under 30 days held.";
+const XIRR_TITLE =
+  "Money-weighted annual return of the positions' own cash flows (buys, sales, coupons, dividends, fees) and their value today, PLN at NBP D-1; cash left out (with cash: the Dashboard's Accounts table). None under 30 days held.";
+
+/** XIRR (a fraction) as a cell; `undefined`: an empty cell (rows without one, e.g. cash). */
+function XirrCell({ x, title = XIRR_TITLE }: { x: number | null | undefined; title?: string }) {
+  if (x === undefined) return <td></td>;
+  return (
+    <td className={signClass(x)} title={title} data-testid="xirr">
+      {x === null ? "–" : fmtPct(x * 100)}
+    </td>
+  );
+}
+
+function SumCells({ s, xirr }: { s: Sums; xirr?: number | null }) {
   const pct = s.cost ? (s.gain / s.cost) * 100 : null;
   return (
     <>
@@ -84,6 +108,7 @@ function SumCells({ s }: { s: Sums }) {
       <td>{fmtPln(s.cost)}</td>
       <td className={signClass(s.gain)}>{fmtPln(s.gain)}</td>
       <td className={signClass(pct)}>{fmtPct(pct)}</td>
+      <XirrCell x={xirr} />
       <td>{fmtPln(s.couponsReceived)}</td>
     </>
   );
@@ -174,6 +199,16 @@ interface InstrumentGroup {
   sums: Sums;
 }
 
+/** By class: the positions of one asset class; cash: also each account's cash. */
+interface ClassGroup {
+  cls: AssetClass;
+  holdings: Holding[];
+  /** The accounts whose cash is shown (cash only). */
+  cash: Group[];
+  closed: ClosedPosition[];
+  sums: Sums;
+}
+
 /** One holding as a row; `label` is what goes in the first column (the instrument, or the account). */
 /** Hold-or-sell verdicts per position (account#isin), for the badge on bond rows. */
 const HoldSellVerdicts = createContext<ReadonlyMap<string, HoldSellResponse["rows"][number]>>(new Map());
@@ -203,6 +238,7 @@ function HoldingRow({
   detail,
   selected,
   onSelect,
+  xirr,
 }: {
   h: Holding;
   label: ReactNode;
@@ -212,6 +248,8 @@ function HoldingRow({
   detail: boolean;
   selected: boolean;
   onSelect: () => void;
+  /** None for foreign cash. */
+  xirr?: number | null;
 }) {
   return (
     <tr
@@ -242,6 +280,7 @@ function HoldingRow({
       </td>
       <td className={signClass(h.gain)}>{fmtPln(h.gain)}</td>
       <td className={signClass(h.gainPct)}>{fmtPct(h.gainPct)}</td>
+      <XirrCell x={xirr} />
       <td>{fmtPln(h.couponsReceived)}</td>
     </tr>
   );
@@ -277,9 +316,11 @@ const byClosedDate = (a: ClosedPosition, b: ClosedPosition) =>
 function ClosedHeader({
   closed,
   testId,
+  xirr,
 }: {
   closed: ClosedPosition[];
   testId: string;
+  xirr?: number | null;
 }) {
   const gain = closed.reduce((n, c) => n + c.gain, 0);
   return (
@@ -295,6 +336,7 @@ function ClosedHeader({
       <td></td>
       <td className={signClass(gain)}>{fmtPln(gain)}</td>
       <td></td>
+      <XirrCell x={xirr} title={CLOSED_XIRR_TITLE} />
       <td>{fmtPln(closed.reduce((n, c) => n + c.couponsReceived, 0))}</td>
     </tr>
   );
@@ -310,12 +352,14 @@ function ClosedRow({
   indent,
   selected,
   onSelect,
+  xirr,
 }: {
   c: ClosedPosition;
   second: ReactNode;
   indent: boolean;
   selected: boolean;
   onSelect: () => void;
+  xirr?: number | null;
 }) {
   return (
     <tr
@@ -348,6 +392,7 @@ function ClosedRow({
         {fmtPln(c.gain)}
       </td>
       <td className={signClass(c.gainPct)}>{fmtPct(c.gainPct)}</td>
+      <XirrCell x={xirr} title={CLOSED_XIRR_TITLE} />
       <td>{fmtPln(c.couponsReceived)}</td>
     </tr>
   );
@@ -435,7 +480,7 @@ function CashRow({
       >
         {fmtPln(line.value)}
       </td>
-      <td colSpan={4}></td>
+      <td colSpan={5}></td>
     </tr>
   );
 }
@@ -520,6 +565,24 @@ export function HoldingsView({
     [all],
   );
   const accounts = useMemo(() => snap.data?.accounts ?? {}, [snap.data]);
+  /**
+   * XIRR of a set of rows: their positions' own cash flows together, plus their value on the valuation day (closed
+   * ones: none). Foreign cash and positions without a value are left out.
+   */
+  const xirrOf = useCallback(
+    (holdings: Holding[], closed: ClosedPosition[] = []): number | null | undefined => {
+      // Nothing but cash: no XIRR (an empty cell).
+      if (closed.length === 0 && holdings.every(isForeignCash)) return undefined;
+      const flows = snap.data?.flows ?? {};
+      const valued = holdings.filter((h) => !isForeignCash(h) && h.value !== null);
+      return positionsXirr(
+        [...valued, ...closed].map((p) => flows[`${p.account}|${p.isin}`] ?? []),
+        valued.reduce((n, h) => n + h.value!, 0),
+        snap.data?.date ?? today(),
+      );
+    },
+    [snap.data],
+  );
   const { account = "", type = "", q: text = "" } = params;
   const closedAll = useMemo(
     () => (showClosed ? (snap.data?.closed ?? []) : []),
@@ -538,6 +601,7 @@ export function HoldingsView({
     [closedAll, account, type, text],
   );
   const byInstrument = params["group"] === "instrument";
+  const byClass = params["group"] === "class";
   // By instrument: instruments (ISIN, or "cash") expanded into their accounts.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggle = (key: string) =>
@@ -702,9 +766,36 @@ export function HoldingsView({
     [],
     cashRows.reduce((s, g) => s + (g.incomplete.length ? 0 : g.cash!), 0),
   );
+
+  // By class: the same filtered rows, regrouped into shares, bonds, cash (the accounts' cash and foreign cash), other.
+  const classGroups = useMemo((): ClassGroup[] => {
+    const holdings = groups.flatMap((g) => g.holdings);
+    const cashGroups = groups.filter((g) => g.cash !== null);
+    return ASSET_CLASSES.map((cls): ClassGroup => {
+      const hs = holdings
+        .filter((h) => assetClassOf(h) === cls)
+        .sort((a, b) => byCode(a, b) || accountOf(a).localeCompare(accountOf(b)));
+      const cash = cls === "CASH" ? cashGroups : [];
+      return {
+        cls,
+        holdings: hs,
+        cash,
+        closed: closedShown.filter((c) => assetClassOf(c) === cls),
+        sums: sums(
+          hs,
+          cash.reduce((n, g) => n + (g.incomplete.length ? 0 : g.cash!), 0),
+        ),
+      };
+    }).filter(
+      (g) => g.holdings.length > 0 || g.cash.length > 0 || g.closed.length > 0,
+    );
+  }, [groups, closedShown]);
+
   const groupCount = byInstrument
     ? instrumentGroups.length + (cashRows.length ? 1 : 0)
-    : groups.length;
+    : byClass
+      ? classGroups.length
+      : groups.length;
 
   /** By instrument: one instrument (or foreign currency) with its accounts. */
   const renderInstrument = (g: InstrumentGroup) => {
@@ -734,7 +825,10 @@ export function HoldingsView({
           <td>
             <AccruedCell h={only} />
           </td>
-          <SumCells s={g.sums} />
+          <SumCells
+            s={g.sums}
+            xirr={xirrOf(g.holdings)}
+          />
         </tr>
       );
     return (
@@ -764,7 +858,10 @@ export function HoldingsView({
           <td>
             <AccruedCell h={g.first} />
           </td>
-          <SumCells s={g.sums} />
+          <SumCells
+            s={g.sums}
+            xirr={xirrOf(g.holdings)}
+          />
         </tr>
         {open &&
           g.holdings.map((h) => (
@@ -777,8 +874,94 @@ export function HoldingsView({
               detail={false}
               selected={isSelected(g.isin, accountOf(h))}
               onSelect={() => select(g.isin, accountOf(h))}
+              xirr={xirrOf([h])}
             />
           ))}
+      </Fragment>
+    );
+  };
+
+  /** By class: the class's header, its positions, cash (the accounts' cash, then foreign cash), its closed positions. */
+  const renderClass = (g: ClassGroup) => {
+    const positions = g.holdings.filter((h) => !isForeignCash(h));
+    return (
+      <Fragment key={g.cls}>
+        <tr className="group account-group" data-testid={`class-${g.cls}`}>
+          <td className="left" colSpan={5}>
+            {CLASS_LABELS[g.cls]}{" "}
+            <span className="muted">
+              ·{" "}
+              {g.holdings.length +
+                g.cash.reduce((n, c) => n + c.cashLines.length, 0)}
+            </span>
+          </td>
+          <SumCells
+            s={g.sums}
+            xirr={xirrOf(positions)}
+          />
+        </tr>
+        {positions.map((h) => (
+          <HoldingRow
+            key={`${accountOf(h)}/${h.isin}`}
+            h={h}
+            account={accountOf(h)}
+            detail
+            selected={isSelected(h.isin, accountOf(h))}
+            onSelect={() => select(h.isin, accountOf(h))}
+            label={labelOf(h)}
+            second={accountOf(h)}
+            xirr={xirrOf([h])}
+          />
+        ))}
+        {g.cash.flatMap((c) =>
+          c.cashLines.map((line) => (
+            <CashRow
+              key={`${c.name}/${line.currency ?? "PLN"}`}
+              account={c.name}
+              line={line}
+              incomplete={c.incomplete.length > 0}
+              label={<strong>Cash</strong>}
+              second={
+                <>
+                  {c.name}{" "}
+                  {c.incomplete.length > 0 && (
+                    <IncompleteFlag what={c.incomplete} />
+                  )}
+                </>
+              }
+            />
+          )),
+        )}
+        {g.holdings.filter(isForeignCash).map((h) => (
+          <HoldingRow
+            key={`${accountOf(h)}/${h.isin}`}
+            h={h}
+            account={accountOf(h)}
+            detail
+            selected={isSelected(h.isin, accountOf(h))}
+            onSelect={() => select(h.isin, accountOf(h))}
+            label={labelOf(h)}
+            second={accountOf(h)}
+          />
+        ))}
+        {g.closed.length > 0 && (
+          <ClosedHeader
+            closed={g.closed}
+            testId={`closed-class-${g.cls}`}
+            xirr={xirrOf([], g.closed)}
+          />
+        )}
+        {g.closed.map((c) => (
+          <ClosedRow
+            key={`closed/${c.account}/${c.isin}`}
+            c={c}
+            second={c.account}
+            indent
+            selected={isSelected(c.isin, c.account)}
+            onSelect={() => select(c.isin, c.account)}
+            xirr={xirrOf([], [c])}
+          />
+        ))}
       </Fragment>
     );
   };
@@ -820,22 +1003,25 @@ export function HoldingsView({
           role="group"
           aria-label="Group by"
         >
-          {(["account", "instrument"] as const).map((g) => (
-            <button
-              key={g}
-              type="button"
-              className={(g === "instrument") === byInstrument ? "active" : ""}
-              aria-pressed={(g === "instrument") === byInstrument}
-              onClick={() =>
-                setParams({
-                  ...params,
-                  group: g === "instrument" ? "instrument" : undefined,
-                })
-              }
-            >
-              {g === "account" ? "Account" : "Instrument"}
-            </button>
-          ))}
+          {(["account", "instrument", "class"] as const).map((g) => {
+            const active = g === (params["group"] ?? "account");
+            return (
+              <button
+                key={g}
+                type="button"
+                className={active ? "active" : ""}
+                aria-pressed={active}
+                onClick={() =>
+                  setParams({
+                    ...params,
+                    group: g === "account" ? undefined : g,
+                  })
+                }
+              >
+                {GROUP_LABELS[g]}
+              </button>
+            );
+          })}
         </span>
       </div>
 
@@ -881,12 +1067,12 @@ export function HoldingsView({
       </FilterBar>
 
       <div className="table-wrap">
-        <table data-testid="holdings-by-account" className="static">
+        <table data-testid="holdings-by-account" className="static holdings">
           <thead>
             <tr>
               <th className="left">Instrument ▲</th>
               <th className="left">
-                {byInstrument ? "Account" : "Asset type"}
+                {byInstrument || byClass ? "Account" : "Asset type"}
               </th>
               <th>Qty</th>
               <th title="Bonds: % of nominal; others in their currency">
@@ -897,11 +1083,12 @@ export function HoldingsView({
               <th>Cost</th>
               <th>Gain</th>
               <th>Gain %</th>
+              <th title={XIRR_TITLE}>XIRR</th>
               <th>Coupons</th>
             </tr>
           </thead>
           <tbody>
-            {!snap.data && snap.loading && <SkeletonRows rows={10} cols={10} />}
+            {!snap.data && snap.loading && <SkeletonRows rows={10} cols={11} />}
             {byInstrument && instrumentRows.map(renderInstrument)}
             {byInstrument && cashRows.length === 1 && (
               <>
@@ -942,7 +1129,7 @@ export function HoldingsView({
                   <td title="Accounts whose assets are all tracked (incomplete ones are greyed when expanded)">
                     {fmtPln(cashSums.value)}
                   </td>
-                  <td colSpan={4}></td>
+                  <td colSpan={5}></td>
                 </tr>
                 {expanded.has("cash") &&
                   cashRows.flatMap((g) =>
@@ -972,6 +1159,7 @@ export function HoldingsView({
                 <ClosedHeader
                   closed={closedShown}
                   testId="closed-instruments"
+                  xirr={xirrOf([], closedShown)}
                 />
                 {closedShown.map((c) => (
                   <ClosedRow
@@ -981,11 +1169,14 @@ export function HoldingsView({
                     indent={false}
                     selected={isSelected(c.isin, c.account)}
                     onSelect={() => select(c.isin, c.account)}
+                    xirr={xirrOf([], [c])}
                   />
                 ))}
               </>
             )}
+            {byClass && classGroups.map(renderClass)}
             {!byInstrument &&
+              !byClass &&
               groups.map((g) => (
                 <Fragment key={g.name}>
                   <tr
@@ -999,7 +1190,7 @@ export function HoldingsView({
                         <IncompleteFlag what={g.incomplete} />
                       )}
                     </td>
-                    <SumCells s={g.sums} />
+                    <SumCells s={g.sums} xirr={xirrOf(g.holdings)} />
                   </tr>
                   {g.holdings
                     .filter((h) => !isForeignCash(h))
@@ -1012,6 +1203,7 @@ export function HoldingsView({
                         selected={isSelected(h.isin, g.name)}
                         onSelect={() => select(h.isin, g.name)}
                         label={labelOf(h)}
+                        xirr={xirrOf([h])}
                       />
                     ))}
                   {g.cashLines.map((line) => (
@@ -1038,6 +1230,7 @@ export function HoldingsView({
                     <ClosedHeader
                       closed={g.closed}
                       testId={`closed-${g.name}`}
+                      xirr={xirrOf([], g.closed)}
                     />
                   )}
                   {g.closed.map((c) => (
@@ -1048,6 +1241,7 @@ export function HoldingsView({
                       indent
                       selected={isSelected(c.isin, g.name)}
                       onSelect={() => select(c.isin, g.name)}
+                      xirr={xirrOf([], [c])}
                     />
                   ))}
                 </Fragment>
@@ -1062,12 +1256,15 @@ export function HoldingsView({
                     </span>
                   )}
                 </td>
-                <SumCells s={total} />
+                <SumCells
+                  s={total}
+                  xirr={xirrOf(groups.flatMap((g) => g.holdings))}
+                />
               </tr>
             )}
             {!snap.loading && groups.length === 0 && (
               <tr>
-                <td className="left muted" colSpan={10}>
+                <td className="left muted" colSpan={11}>
                   {all.length === 0
                     ? "No open positions. Import transactions to get started (see data/README.md)."
                     : "No holdings match the filters."}

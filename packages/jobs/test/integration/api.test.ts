@@ -178,6 +178,18 @@ describe(`API ${API}`, () => {
     expect(snap.totals.value).toBeCloseTo(snap.holdings.reduce((s, h) => s + h.value!, 0), 1);
   });
 
+  it("GET /holdings gives each position's own cash flows (PLN, one a day) for its XIRR", async () => {
+    const r = await get<SnapshotItem & { flows: Record<string, [string, number][]> }>("/holdings");
+    expect(r.status).toBe(200);
+    // DS0432 at broker: bought with its fee, two coupons; at IKE the same bond is its own position.
+    expect(r.body.flows["broker|PL0000113783"]).toEqual([["2025-02-05", -15931.8], ["2025-04-28", 350], ["2026-04-27", 350]]);
+    expect(r.body.flows["ike|PL0000113783"]).toEqual([["2026-05-15", -4013.01]]);
+    // The hand-valued asset: its buy and the income booked on it.
+    expect(r.body.flows["ike|ZZSAMPLEAPA0"]).toEqual([["2026-06-01", -900], ["2026-09-30", 12.5]]);
+    // Every held position has flows, its first one a buy.
+    for (const h of r.body.holdings) expect(r.body.flows[`${h.account}|${h.isin}`]![0]![1]).toBeLessThan(0);
+  });
+
   it("GET /accounts gives each account's net deposits, value, profit, income, costs and XIRR; the total skips incomplete ones", async () => {
     type Row = { account: string; incomplete?: string[]; closed?: true; lastDate: string; netDeposits: number; positions: number; cash: number; total: number; profit: number; income: number; costs: number; xirr: number | null };
     const { status, body } = await get<{ date: string; accounts: Row[]; total: Row }>("/accounts");

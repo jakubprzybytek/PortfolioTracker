@@ -649,6 +649,49 @@ test.describe("holdings grouped by instrument", () => {
   });
 });
 
+test.describe("holdings XIRR and grouped by class", () => {
+  test("XIRR per position, account, instrument and the total, from the positions' own flows (cash left out); by class: shares, bonds, cash, other", async ({ page }) => {
+    await page.goto("/#/holdings");
+    const table = page.getByTestId("holdings-by-account");
+    await expect(table.locator("th").nth(9)).toHaveText("XIRR");
+    await expect(table.locator("th").nth(9)).toHaveAttribute("title", /cash left out/);
+    const pct = /^[-−+]?\d[\d\s]*(,\d+)?\s*%$/;
+    const apartment = table.locator('tr[data-testid="holding-row"][data-account="ike"][data-isin="ZZSAMPLEAPA0"]');
+    await expect(apartment.getByTestId("xirr")).toHaveText(pct);
+    await expect(apartment.getByTestId("xirr")).toHaveText(/^\+/); // worth 950 + 12,50 income for 900
+    for (const id of ["account-broker", "account-ike", "holdings-total"]) await expect(page.getByTestId(id).getByTestId("xirr")).toHaveText(pct);
+    await expect(page.getByTestId("cash-row").first().getByTestId("xirr")).toHaveCount(0); // cash has none
+    await expect(table.locator('tr[data-testid="holding-row"][data-account="ibkr"]').filter({ hasText: "Cash" }).getByTestId("xirr")).toHaveCount(0); // foreign cash neither
+
+    // Filtered to one account, the total is that account's
+    await page.getByTestId("filter-account").selectOption("ike");
+    await expect(page.getByTestId("holdings-total")).toHaveCount(0); // one group: no total row
+    const ikeXirr = await page.getByTestId("account-ike").getByTestId("xirr").textContent();
+    await page.getByTestId("group-by").getByRole("button", { name: "Instrument" }).click();
+    await expect(page.getByTestId("holdings-total").getByTestId("xirr")).toHaveText(ikeXirr!);
+    await page.getByTestId("filters-reset").click();
+
+    // By class: one group per class in the asset mix's order; cash holds the accounts' cash and foreign cash, no XIRR
+    await page.getByTestId("group-by").getByRole("button", { name: "Class" }).click();
+    await expect(page).toHaveURL(/group=class/);
+    await expect(page.getByTestId("class-BONDS")).toBeVisible();
+    const order = await table.locator('tr[data-testid^="class-"]').evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
+    expect(order).toEqual(["class-SHARES", "class-BONDS", "class-CASH", "class-OTHER"]);
+    await expect(table.locator("th").nth(1)).toHaveText("Account");
+    await expect(page.getByTestId("class-SHARES")).toContainText("Shares · 1");
+    await expect(page.getByTestId("class-BONDS").getByTestId("xirr")).toHaveText(pct);
+    await expect(page.getByTestId("class-CASH").getByTestId("xirr")).toHaveCount(0);
+    await expect(page.getByTestId("cash-row")).toHaveCount(9); // every account's cash, eur one per currency
+    const spxs = table.locator('tr[data-testid="holding-row"][data-account="foreign"]');
+    await expect(spxs.locator("td").nth(1)).toHaveText("foreign");
+    // The class total is the same as the account total
+    await page.getByTestId("group-by").getByRole("button", { name: "Account" }).click();
+    const byAccount = await page.getByTestId("holdings-total").locator("td").nth(1).textContent();
+    await page.getByTestId("group-by").getByRole("button", { name: "Class" }).click();
+    await expect(page.getByTestId("holdings-total").locator("td").nth(1)).toHaveText(byAccount!);
+  });
+});
+
 test.describe("holdings row chart", () => {
   test("clicking a row docks its value chart at the bottom; resizable, remembered, closable", async ({ page }) => {
     await page.goto("/#/holdings");
@@ -773,7 +816,9 @@ test.describe("show closed", () => {
       const res = await route.fetch();
       const body = await res.json();
       expect(body.closed).toEqual([]); // the sample's own: none
-      await route.fulfill({ response: res, json: { ...body, closed: [closedPosition] } });
+      // Its flows: bought for 700, written off (nothing came back).
+      const flows = { ...body.flows, [`old-broker|${OLD_BOND}`]: [["2012-03-01", -700], ["2013-05-31", 0]] };
+      await route.fulfill({ response: res, json: { ...body, flows, closed: [closedPosition] } });
     });
     let historyAsked: URL | undefined;
     await page.route(
@@ -803,7 +848,9 @@ test.describe("show closed", () => {
     await expect(row.locator("td").nth(2)).toHaveText("7");
     await expect(row.locator("td").nth(6)).toHaveText("700,00 zł");
     await expect(row.locator("td").nth(7)).toHaveText(/^[-−]700,00\s*zł$/);
-    await expect(row.locator("td").nth(9)).toHaveText("50,00 zł");
+    await expect(row.getByTestId("xirr")).toHaveText(/^[-−]100(,0+)?\s*%$/); // written off
+    await expect(page.getByTestId("closed-old-broker").getByTestId("xirr")).toHaveText(/^[-−]100(,0+)?\s*%$/);
+    await expect(row.locator("td").nth(10)).toHaveText("50,00 zł");
     // The account with only a closed position is a group of its own, after the others; the total is unchanged.
     const groups = await page.getByTestId("holdings-by-account").locator("tr.account-group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
     expect(groups.at(-2)).toBe("account-ike");
@@ -830,6 +877,10 @@ test.describe("show closed", () => {
     await expect(page.getByTestId("closed-row")).toHaveCount(0);
     await page.getByTestId("filters-reset").click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true"); // the toggle isn't a filter: it stays
+    // Grouped by class: at the end of its class.
+    await page.getByTestId("group-by").getByRole("button", { name: "Class" }).click();
+    await expect(page.getByTestId("closed-class-BONDS")).toContainText("Closed · 1");
+    await expect(row.locator("td").nth(1)).toHaveText("old-broker");
 
     // One switch for Holdings and Prices while the app is open; a reload resets it.
     await page.getByTestId("nav-prices").click();

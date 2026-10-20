@@ -146,6 +146,10 @@ td.note { max-width: 18rem; overflow: hidden; text-overflow: ellipsis; }
 /* Instrument: one line; a long name is cut with "…" (the full name in its tooltip). */
 /* The column takes the width the others leave (max-width: 0 + width: 100%), so names are cut only as much as needed. */
 td.instrument { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; width: 100%; min-width: 12rem; }
+/* Holdings: eleven columns; tighter, so a wide screen shows them all. */
+table.holdings th, table.holdings td { padding-left: 6px; padding-right: 6px; }
+table.holdings td.instrument { min-width: 9rem; }
+table.holdings td.indent { padding-left: 22px; }
 h2 { font-size: 1.15rem; margin: 28px 0 10px; letter-spacing: -0.01em; }
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }

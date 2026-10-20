@@ -6,6 +6,9 @@ import type { SnapshotItem, TransactionItem } from "../db/items.ts";
 import { round2 } from "../bonds/izIndex.ts";
 import { rateD1, rateOn, type FxHistory } from "./fx.ts";
 import { positionsAt } from "./positions.ts";
+import { xirr, type CashFlow } from "./xirr.ts";
+
+export { xirr, type CashFlow } from "./xirr.ts";
 
 export interface AccountSummary {
   account: string;
@@ -46,40 +49,6 @@ export interface AccountSummary {
    * the rest at the NBP rate of the day before; the total at today's rate.
    */
   base?: { currency: string; netDeposits: number; total: number; profit: number; xirr: number | null };
-}
-
-export interface CashFlow {
-  date: IsoDate;
-  /** Into the portfolio negative (you pay in), out of it positive. */
-  amount: number;
-}
-
-const DAY = 86_400_000;
-
-/**
- * Annual rate r with Σ amount × (1 + r)^(−days/365) = 0, by bisection. Needs flows of both signs; returns null
- * otherwise or when no rate in (−99 %, +1000 %) solves it.
- */
-export function xirr(flows: CashFlow[]): number | null {
-  const fs = flows.filter((f) => f.amount !== 0);
-  if (!fs.some((f) => f.amount > 0) || !fs.some((f) => f.amount < 0)) return null;
-  const t0 = Math.min(...fs.map((f) => Date.parse(f.date)));
-  const years = fs.map((f) => (Date.parse(f.date) - t0) / DAY / 365);
-  const npv = (r: number) => fs.reduce((s, f, i) => s + f.amount / (1 + r) ** years[i]!, 0);
-  let lo = -0.99;
-  let hi = 10;
-  let fLo = npv(lo);
-  if (fLo * npv(hi) > 0) return null;
-  for (let i = 0; i < 200 && hi - lo > 1e-10; i++) {
-    const mid = (lo + hi) / 2;
-    const fMid = npv(mid);
-    if (fLo * fMid <= 0) hi = mid;
-    else {
-      lo = mid;
-      fLo = fMid;
-    }
-  }
-  return Number(((lo + hi) / 2).toFixed(6));
 }
 
 const INCOME = new Set<TransactionItem["type"]>(["COUPON", "INTEREST", "DIVIDEND"]);
