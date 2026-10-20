@@ -606,11 +606,11 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .targets-amount input { width: 100%; min-width: 0; }
 }
 /* Sales: the PIT-38 summary per year, sale rows folding out into their FIFO pairs */
-.pit { margin-bottom: 14px; padding: 12px 16px; }
+.pit { margin-bottom: 14px; padding: 12px 16px; width: fit-content; max-width: 100%; }
 .pit h3 { font-size: 0.8rem; font-weight: 600; margin: 0 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .pit table { width: auto; min-width: min(34rem, 100%); }
-.pit-note { margin: 8px 0 0; font-size: 0.8rem; }
-@media (max-width: 720px) { .pit { padding: 10px 12px; } .pit table { width: 100%; min-width: 0; } .pit table td, .pit table th { padding: 6px 4px; } .pit td .sub { padding-left: 0; } }
+.pit-note { margin: 8px 0 0; font-size: 0.8rem; width: 0; min-width: 100%; } /* wraps to the table's width rather than widening the panel */
+@media (max-width: 720px) { .pit { padding: 10px 12px; width: auto; } .pit table { width: 100%; min-width: 0; } .pit table td, .pit table th { padding: 6px 4px; } .pit td .sub { padding-left: 0; } }
 td .caret { color: var(--muted); font-size: 0.8rem; }
 tr.sale-pair td { background: var(--row); color: var(--muted); font-size: 0.85rem; }
 tr.sale-pair td:first-child { padding-left: 1.6rem; }
