@@ -57,7 +57,7 @@ import {
   usePositionTransactions,
 } from "./PositionTransactions.tsx";
 
-const GROUP_LABELS = { account: "Account", instrument: "Instrument", class: "Class" };
+const GROUP_LABELS = { account: "Account", class: "Class", instrument: "Instrument" };
 
 /** Snapshots written before holdings carried their account have none. */
 const accountOf = (h: Holding) => h.account ?? "–";
@@ -1003,7 +1003,7 @@ export function HoldingsView({
           role="group"
           aria-label="Group by"
         >
-          {(["account", "instrument", "class"] as const).map((g) => {
+          {(["account", "class", "instrument"] as const).map((g) => {
             const active = g === (params["group"] ?? "account");
             return (
               <button
