@@ -641,7 +641,7 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .returns tr.partial td:first-child { font-style: italic; }
 .returns tfoot td { border-top: 2px solid var(--border); font-weight: 600; }
 .returns sup { font-size: 0.7em; font-weight: 400; }
-@media (max-width: 720px) { .returns table td, .returns table th { padding: 6px 6px; } }
+@media (max-width: 720px) { .returns table { font-size: 0.88rem; } .returns table td, .returns table th { padding: 6px 4px; } .returns td .sub { white-space: normal; } }
 /* A chart's key above its plot (Returns: return, inflation, real; growth of 100 zł). */
 .chart-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
 .chart-key-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }

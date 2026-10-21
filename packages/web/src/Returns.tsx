@@ -45,15 +45,17 @@ const monthName = new Intl.DateTimeFormat("en-GB", {
 const fmtMonth = (m: string) => monthName.format(new Date(`${m}-15T00:00:00Z`));
 
 /** The year's label: "2026 so far", "2022 from 1 Mar". */
-function yearLabel(y: PeriodReturn): { label: string; sub?: string } {
+function yearLabel(y: PeriodReturn, narrow: boolean): { label: string; sub?: string } {
   if (!y.partial) return { label: String(y.year) };
+  // On a phone without the year: it's on the line above.
+  const day = (d: string) => (narrow ? d.slice(5) : d);
   if (y.startValue === 0)
-    return { label: String(y.year), sub: `from ${y.from}` };
-  return { label: String(y.year), sub: `to ${y.to}` };
+    return { label: String(y.year), sub: `from ${day(y.from)}` };
+  return { label: String(y.year), sub: `to ${day(y.to)}` };
 }
 
 /** Inflation, marked "≈" when partly compounded from the monthly figures, with the last month of CPI when it ends early. */
-function Inflation({ r }: { r: PeriodReturn }) {
+function Inflation({ r, short = false }: { r: PeriodReturn; short?: boolean }) {
   const early = r.cpiThrough && r.to.slice(0, 7) !== r.cpiThrough;
   return (
     <span
@@ -61,7 +63,7 @@ function Inflation({ r }: { r: PeriodReturn }) {
     >
       {r.cpiExact || r.inflation === null ? "" : "≈ "}
       {pct(r.inflation)}
-      {early && (
+      {early && !short && (
         <sup className="muted">
           {NBSP}to {r.cpiThrough!.slice(5)}
         </sup>
@@ -133,7 +135,7 @@ export function YearsTable({
             </tr>
           )}
           {data?.years.map((y) => {
-            const { label, sub } = yearLabel(y);
+            const { label, sub } = yearLabel(y, narrow);
             return (
               <tr
                 key={y.year}
@@ -155,7 +157,7 @@ export function YearsTable({
                   {pct(y.twr)}
                   {narrow && (
                     <div className="sub muted">
-                      inflation <Inflation r={y} />
+                      infl. <Inflation r={y} short />
                     </div>
                   )}
                 </td>
@@ -185,7 +187,7 @@ export function YearsTable({
               <td className="left">
                 All
                 <div className="sub muted">
-                  a year, since {t.from.slice(0, 7)}
+                  {narrow ? "a year" : `a year, since ${t.from.slice(0, 7)}`}
                 </div>
               </td>
               {!narrow && <td>–</td>}
@@ -198,7 +200,7 @@ export function YearsTable({
                 {pct(t.twrPerYear)}
                 {narrow && (
                   <div className="sub muted">
-                    inflation {pct(t.inflationPerYear)}
+                    infl. {pct(t.inflationPerYear)}
                   </div>
                 )}
               </td>

@@ -355,7 +355,7 @@ test.describe("on a phone", () => {
     const table = page.getByTestId("years-table");
     await expect(page.getByTestId("years-row").first()).toBeVisible();
     await expect(table.locator("thead th")).toHaveCount(3);
-    await expect(page.getByTestId("years-row").first().getByTestId("years-twr")).toContainText("inflation");
+    await expect(page.getByTestId("years-row").first().getByTestId("years-twr")).toContainText("infl.");
     const wrap = page.getByTestId("years");
     expect(await wrap.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   });
