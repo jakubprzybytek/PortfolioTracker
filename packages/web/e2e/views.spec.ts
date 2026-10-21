@@ -970,6 +970,16 @@ test.describe("indicators view", () => {
     await expect(mom).toContainText("Inflation, month on month");
     await expect(mom.locator("td").nth(2)).toHaveText(/^\d{4}-\d{2}$/); // the latest month
     await expect(page.getByTestId("indicator-cpi-index")).toContainText("CPI reference index");
+    // GUS's own inflation figures, first: 12 months, per year, since December
+    await expect(page.getByTestId("indicator-group-Inflation").locator("xpath=following-sibling::tr[1]")).toHaveAttribute("data-testid", "indicator-cpi-yoy");
+    await expect(page.getByTestId("indicator-cpi-yoy").locator("td").nth(1)).toHaveText(/^-?\d+,\d %$/);
+    const annual = page.getByTestId("indicator-cpi-annual");
+    await expect(annual).toContainText("Inflation per year");
+    await expect(annual.locator("td").nth(2)).toHaveText(/^\d{4}$/); // the latest whole year
+    await annual.click();
+    await expect(page.getByTestId("indicator-chart")).toHaveAttribute("data-points", "5"); // 5Y: five years
+    await expect(page.getByTestId("indicator-chart").locator(".recharts-bar-rectangle").first()).toBeVisible();
+    await expect(page.getByTestId("indicator-cpi-ytd")).toContainText("Inflation since December");
 
     await mom.click();
     await expect(page).toHaveURL(/#\/indicators\?chart=cpi-mom$/);

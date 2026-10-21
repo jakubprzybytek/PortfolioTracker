@@ -87,6 +87,12 @@ const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
  * bonds, cash, other (the allocation over time). Read from the days' chart points, not the snapshots (a snapshot is
  * ~60× bigger: years of them took seconds).
  */
+/** The Inflation group of the Indicators view, from the stored CPI (`cpiIndicators`). */
+async function inflationIndicators() {
+  const [months, yoy, ytd] = await Promise.all([repo.listReferenceIndex(), repo.listGusCpi("CPI_YOY"), repo.listGusCpi("CPI_YTD")]);
+  return cpiIndicators(months, { yoy, ytd });
+}
+
 async function portfolioHistory(from: string, to: string) {
   const [points, txs, accounts] = await Promise.all([repo.queryHistoryPoints(from, to), repo.listTransactions(), repo.listAccounts()]);
   const currencies = [...new Set(txs.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => t.currency))].filter((c) => c && c !== "PLN");
@@ -405,7 +411,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       }
       case "GET /indicators": {
         // One row per indicator: latest value and the one a year earlier (series via /indicators/{id}).
-        const cpi = cpiIndicators(await repo.listReferenceIndex()).map((i) => summarize(i, i.points));
+        const cpi = (await inflationIndicators()).map((i) => summarize(i, i.points));
         const fx = await Promise.all(
           FX_CURRENCIES.map(async (c): Promise<IndicatorSummary> => {
             const last = await repo.latestFxRate(c, today());
@@ -425,8 +431,10 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
           return json(200, rates.map((r) => ({ date: r.date, value: r.mid })));
         }
         if (!CPI_INDICATORS.some((i) => i.id === id)) return json(404, { error: `No indicator ${id}` });
-        const series = cpiIndicators(await repo.listReferenceIndex()).find((i) => i.id === id)!;
-        return json(200, series.points.filter((p) => p.date >= from.slice(0, 7) && p.date <= to.slice(0, 7)));
+        const series = (await inflationIndicators()).find((i) => i.id === id)!;
+        // Compared by month (by year for a yearly one).
+        const n = series.frequency === "yearly" ? 4 : 7;
+        return json(200, series.points.filter((p) => p.date >= from.slice(0, n) && p.date <= to.slice(0, n)));
       }
       case "POST /prices/refresh": {
         // "Refresh prices": starts the Live job (today's quotes, then a revaluation of today). At most one every few

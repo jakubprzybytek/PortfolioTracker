@@ -10,7 +10,7 @@ describe("cpiIndicators", () => {
   ];
 
   it("gives CPI m/m in % and the reference index, oldest first", () => {
-    const [mom, index] = cpiIndicators(months);
+    const [, , , mom, index] = cpiIndicators(months);
     expect(mom!.id).toBe("cpi-mom");
     expect(mom!.unit).toBe("%");
     expect(mom!.points).toEqual([
@@ -20,6 +20,34 @@ describe("cpiIndicators", () => {
     ]);
     expect(index!.id).toBe("cpi-index");
     expect(index!.points.map((p) => p.value)).toEqual([212.91798, 214.62133, 215.26519]);
+  });
+
+  it("12 months, per year and since December from GUS's figures as published, in %", () => {
+    const yoy = [
+      { month: "2026-09", value: 104.1 },
+      { month: "2026-08", value: 103.4 },
+    ];
+    const ytd = [
+      { month: "2024-12", value: 104.7 },
+      { month: "2025-11", value: 102.2 },
+      { month: "2025-12", value: 102.4 },
+      { month: "2026-09", value: 103.7 },
+    ];
+    const [y, annual, since] = cpiIndicators(months, { yoy, ytd });
+    expect(y).toMatchObject({ id: "cpi-yoy", unit: "%", frequency: "monthly" });
+    expect(y!.points).toEqual([
+      { date: "2026-08", value: 3.4 },
+      { date: "2026-09", value: 4.1 },
+    ]);
+    // A year's inflation is December's since-December figure: December on December.
+    expect(annual).toMatchObject({ id: "cpi-annual", frequency: "yearly" });
+    expect(annual!.points).toEqual([
+      { date: "2024", value: 4.7 },
+      { date: "2025", value: 2.4 },
+    ]);
+    expect(since!.points.at(-1)).toEqual({ date: "2026-09", value: 3.7 });
+    // a year earlier, by year for the yearly one
+    expect(summarize(annual!, annual!.points).yearAgo).toEqual({ date: "2024", value: 4.7 });
   });
 
   it("is empty without data", () => {
@@ -43,7 +71,7 @@ describe("summarize / fxIndicator", () => {
   });
 
   it("works on monthly points too, and without data", () => {
-    const [mom] = cpiIndicators([
+    const [, , , mom] = cpiIndicators([
       { month: "2025-08", wr: 0, w: 208.73 },
       { month: "2026-08", wr: 0.003, w: 215.26519 },
     ]);

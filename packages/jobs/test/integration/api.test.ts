@@ -374,13 +374,19 @@ describe(`API ${API}`, () => {
     const { status, body } = await get<{ id: string; group: string; unit: string; latest: { date: string; value: number } | null; yearAgo: { date: string; value: number } | null }[]>("/indicators");
     expect(status).toBe(200);
     expect(body.map((i) => [i.id, i.group, i.unit])).toEqual([
+      ["cpi-yoy", "Inflation", "%"],
+      ["cpi-annual", "Inflation", "%"],
+      ["cpi-ytd", "Inflation", "%"],
       ["cpi-mom", "Inflation", "%"],
       ["cpi-index", "Inflation", "index"],
       ["fx-eur", "Exchange rates", "PLN"],
       ["fx-usd", "Exchange rates", "PLN"],
     ]);
+    for (const cpi of body.slice(0, 5)) expect(cpi.latest!.date >= "2025").toBe(true);
     expect(body[0]!.latest!.date >= "2026-08").toBe(true);
-    for (const fx of body.slice(2)) {
+    // a year's inflation: its year a year earlier
+    expect(body[1]!.yearAgo!.date).toBe(String(Number(body[1]!.latest!.date) - 1));
+    for (const fx of body.slice(5)) {
       expect(fx.latest!.value).toBeGreaterThan(3);
       expect(fx.latest!.value).toBeLessThan(6);
       expect(fx.yearAgo!.date <= `${Number(fx.latest!.date.slice(0, 4)) - 1}${fx.latest!.date.slice(4)}`).toBe(true);
@@ -391,6 +397,15 @@ describe(`API ${API}`, () => {
     const mom = (await get<{ date: string; value: number }[]>("/indicators/cpi-mom?from=2003-01-01&to=2026-08-31")).body;
     expect(mom[0]).toEqual({ date: "2003-07", value: -0.4 }); // the index starts in July 2003
     expect(mom.find((p) => p.date === "2026-08")).toEqual({ date: "2026-08", value: 0.3 });
+    // GUS's own figures: 12 months, per year (December on December, by year), since December
+    expect((await get<{ date: string; value: number }[]>("/indicators/cpi-yoy?from=2026-08-01&to=2026-08-31")).body).toEqual([{ date: "2026-08", value: 3.4 }]);
+    expect((await get<{ date: string; value: number }[]>("/indicators/cpi-annual?from=2022-01-01&to=2025-12-31")).body).toEqual([
+      { date: "2022", value: 16.6 },
+      { date: "2023", value: 6.2 },
+      { date: "2024", value: 4.7 },
+      { date: "2025", value: 2.4 },
+    ]);
+    expect((await get<{ date: string; value: number }[]>("/indicators/cpi-ytd?from=2026-08-01&to=2026-08-31")).body).toEqual([{ date: "2026-08", value: 3 }]);
     const index = (await get<{ date: string; value: number }[]>("/indicators/cpi-index?from=2026-08-01&to=2026-08-31")).body;
     expect(index).toEqual([{ date: "2026-08", value: 215.26519 }]);
     const eur = (await get<{ date: string; value: number }[]>("/indicators/fx-eur?from=2002-01-01&to=2002-01-10")).body;

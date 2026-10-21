@@ -128,9 +128,9 @@ Money paid into and taken out of each account per month of a year (the reference
 
 Economic indicators from data already stored (no extra source), same layout as Prices.
 
-- **Groups:** *Inflation*: month on month (CPI, previous month = 100, from `CPI_REF.wr`) and the CPI reference index (`CPI_REF.w`, June 2003 = 100, the index behind IZ indexation). *Exchange rates*: EUR/PLN and USD/PLN, NBP mid rates (`FX#…`), daily since 2002. Columns: latest value, its date, the value a year earlier. Hover a row for what it is.
+- **Groups:** *Inflation*: GUS's own figures first, as published: **12 months** (same month of the previous year = 100, `CPI_YOY`: the inflation usually quoted), **per year** (December on December: December's since-December figure, one bar per year; what the Dashboard's returns by year compare with) and **since December** (December of the previous year = 100, `CPI_YTD`: the year so far); then month on month (CPI, previous month = 100, from `CPI_REF.wr`) and the CPI reference index (`CPI_REF.w`, June 2003 = 100, the index behind IZ indexation). *Exchange rates*: EUR/PLN and USD/PLN, NBP mid rates (`FX#…`), daily since 2002. Columns: latest value, its date, the value a year earlier. Hover a row for what it is.
 - **Click a row:** its chart opens below: monthly bars around zero for the % series, a line for the index and the rates; ranges 1Y / 5Y (default) / 10Y / ALL. Monthly series count back from their latest month (1Y = 12 bars). Chart and range are in the URL.
-- **No 12-month inflation:** compounding the one-decimal monthly figures misses GUS's published y/y by up to ~0.3 pp, so that needs GUS's own y/y series (in the CSV the `monthly` job already downloads, not stored yet).
+- **12 months and per year are GUS's own figures**, not compounded from the one-decimal monthly ones (that misses GUS's y/y by up to ~0.3 pp). Yearly series count back by years (5Y = the last five years) and compare with the year before.
 
 ## Transactions
 
@@ -198,7 +198,7 @@ Free notes in Markdown (`NotesView.tsx`), e.g. trading checklists. Not linked to
 | `GET /prices` | held instruments: latest price + date, stale flag, price a year earlier and the change (`core/valuation/priceRows.ts`); `?closed=1` adds the instruments traded but not held (`closed`: first and last transaction dates; the year up to their last price) |
 | `GET /holdings/history?isin&account&from&to` | a position's daily value, cost and quantity (`POS#…` items); without `account`, the instrument summed over the accounts holding it (held nowhere: over the accounts that traded it); days it wasn't held in between (sold out, bought back later) are zero |
 | `GET /indicators` | one row per indicator (`core/indicators/indicators.ts`): `[{ id, name, group, unit, frequency, note, latest: { date, value }, yearAgo }]` |
-| `GET /indicators/{id}?from&to` | one series, oldest first: `[{ date, value }]` (`cpi-mom`, `cpi-index`: by month; `fx-eur`, `fx-usd`: daily) |
+| `GET /indicators/{id}?from&to` | one series, oldest first: `[{ date, value }]` (`cpi-yoy`, `cpi-ytd`, `cpi-mom`, `cpi-index`: by month; `cpi-annual`: by year, `date` "YYYY"; `fx-eur`, `fx-usd`: daily) |
 | `GET /transactions` | all transactions, newest first, each with `instrument: { code, name, type }` or `null` |
 | `GET /status` | last run of each job |
 | `GET /notes` | all notes, the last changed first: `[{ id, title, body, createdAt, updatedAt }]` (`body` is Markdown) |

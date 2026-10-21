@@ -22,10 +22,11 @@ const fmtValue = (i: Pick<IndicatorSummary, "unit">, v: number | undefined) =>
 
 /**
  * First date of the range. Monthly indicators lag by a month or two, so they count back from their latest month
- * (1Y = the last 12 months); daily ones from today.
+ * (1Y = the last 12 months), yearly ones from their latest year (5Y = the last 5 years); daily ones from today.
  */
 function rangeStart(years: number | null, i: IndicatorSummary | undefined): string {
-  if (years === null) return "1990-01-01";
+  if (years === null) return "1980-01-01";
+  if (i?.frequency === "yearly" && i.latest) return `${Number(i.latest.date) - years + 1}-01-01`;
   if (i?.frequency === "monthly" && i.latest) {
     const [y, m] = i.latest.date.split("-").map(Number) as [number, number];
     const k = y * 12 + (m - 1) - (years * 12 - 1);
@@ -137,7 +138,10 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
   };
   // Percent: whole-percent axis around zero (Recharts' own steps come out as 1.1, 2.2 …).
   const values = points.map((p) => p.value);
-  const pctDomain = indicator.unit === "%" ? [Math.min(0, Math.floor(Math.min(...values))), Math.max(0, Math.ceil(Math.max(...values)))] : undefined;
+  // A round step giving at most ~8 ticks: 1 % for a few percent, 100 % for the hyperinflation of 1989–90 (ALL).
+  const span = Math.max(0, Math.max(...values)) - Math.min(0, Math.min(...values));
+  const step = [1, 2, 5, 10, 20, 50, 100, 200].find((s) => span / s <= 8) ?? 500;
+  const pctDomain = indicator.unit === "%" ? [Math.min(0, Math.floor(Math.min(...values) / step) * step), Math.max(0, Math.ceil(Math.max(...values) / step) * step)] : undefined;
   const axes = (
     <>
       <CartesianGrid stroke="var(--border)" vertical={false} />
@@ -146,8 +150,8 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
         {...(narrow ? narrowYAxis : { width: 56, tick: { fontSize: 11 } })}
         stroke="var(--muted)"
         domain={pctDomain ?? ["auto", "auto"]}
-        ticks={pctDomain && Array.from({ length: pctDomain[1]! - pctDomain[0]! + 1 }, (_, k) => pctDomain[0]! + k)}
-        tickFormatter={(v: number) => fmtNum(v, indicator.unit === "%" ? 1 : indicator.unit === "PLN" ? 2 : 0)}
+        ticks={pctDomain && Array.from({ length: (pctDomain[1]! - pctDomain[0]!) / step + 1 }, (_, k) => pctDomain[0]! + k * step)}
+        tickFormatter={(v: number) => fmtNum(v, indicator.unit === "PLN" ? 2 : 0)}
       />
     </>
   );
