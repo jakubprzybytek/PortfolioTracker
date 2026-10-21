@@ -46,53 +46,23 @@ test.describe("dashboard", () => {
     await expect(chart.locator("svg.recharts-surface")).toBeVisible();
   });
 
-  test("renders the drawdown and the allocation over time, following the range", async ({ page }) => {
-    const dd = page.getByTestId("drawdown-chart");
-    await expect(dd.locator("path.recharts-area-area")).toHaveCount(1);
-    const alloc = page.getByTestId("allocation-chart");
-    await expect(alloc.locator("path.recharts-area-area").first()).toBeVisible();
-    expect(await alloc.locator("path.recharts-area-area").count()).toBeGreaterThanOrEqual(3); // shares, bonds, cash (and other)
-    await page.getByTestId("portfolio-range").getByRole("button", { name: "ALL" }).click();
-    await expect(page.getByTestId("portfolio-range")).toHaveAttribute("aria-busy", "false");
-    await expect(dd.locator("path.recharts-area-area")).toHaveCount(1);
-    // side by side on a computer, at the same height
-    const [a, b] = [(await dd.boundingBox())!, (await alloc.boundingBox())!];
-    expect(Math.abs(a.y - b.y)).toBeLessThan(2);
-    expect(b.x).toBeGreaterThan(a.x + a.width);
-    // y axis of the drawdown: from 0 % down, nothing above it
-    const ticks = dd.locator(".recharts-yAxis-tick-labels text");
-    await expect(ticks.first()).toBeVisible();
-    const labels = (await ticks.allTextContents()).map((t) => t.replace(/\s/g, " "));
-    expect(labels).toContain("0 %");
-    expect(labels.every((t) => t === "0 %" || /^[-−]/.test(t))).toBe(true);
-  });
-
-  test("returns by year against inflation: the table, the bars per year and the growth of 100 zł", async ({ page }) => {
-    const rows = page.getByTestId("years-row");
-    await expect(rows.first()).toBeVisible();
-    // Newest first; the sample starts in February 2025: that year and the year so far are parts of a year.
-    await expect(rows.last()).toHaveAttribute("data-year", "2025");
-    await expect(rows.last()).toContainText("from 2025-02-03");
-    await expect(rows.first()).toHaveClass(/partial/);
-    for (const id of ["years-twr", "years-inflation", "years-real", "years-xirr"]) await expect(rows.last().getByTestId(id)).toHaveText(/\d %/);
-    await expect(page.getByTestId("years-total")).toContainText("a year, since 2025-02");
-    // One pair of bars per year, the real return as a dot
-    const bars = page.getByTestId("years-chart");
-    expect(await bars.locator(".recharts-bar-rectangle").count()).toBe(2 * (await rows.count()));
-    await expect(bars.locator(".recharts-scatter circle").first()).toBeVisible();
-    // Growth of 100 zł: two lines from 100 at the start of the range
-    const growth = page.getByTestId("growth-chart");
-    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(2);
-    await expect(page.getByTestId("returns-pair").locator(".chart-key").last()).toContainText("Inflation (CPI)");
-    await page.getByTestId("portfolio-range").getByRole("button", { name: "ALL" }).click();
-    await expect(page.getByTestId("portfolio-range")).toHaveAttribute("aria-busy", "false");
-    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(2);
-  });
-
-  test("shows totals, chart and jobs only (holdings and prices have their own views)", async ({ page }) => {
+  test("shows where things stand now: the history charts, returns by year and jobs have their own views", async ({ page }) => {
     await expect(page.getByTestId("total-all")).toBeVisible();
-    await expect(page.getByTestId("holdings-table")).toHaveCount(0);
-    await expect(page.getByTestId("price-chart")).toHaveCount(0);
+    await expect(page.getByTestId("portfolio-chart")).toBeVisible();
+    for (const id of ["holdings-table", "price-chart", "drawdown-chart", "allocation-chart", "years-table", "growth-chart", "jobs-table"]) await expect(page.getByTestId(id)).toHaveCount(0);
+  });
+
+  test("the year's return card: time-weighted, against inflation; it opens Performance", async ({ page }) => {
+    const card = page.getByTestId("year-return");
+    await expect(card.locator(".label")).toHaveText(/^\d{4}( so far)?$/);
+    await expect(card.locator(".value")).toHaveText(/\d %$/);
+    await expect(card.locator(".note")).toContainText("inflation");
+    const value = await card.locator(".value").textContent();
+    await card.click();
+    await expect(page).toHaveURL(/#\/performance$/);
+    await expect(page.getByTestId("nav-performance")).toHaveAttribute("aria-current", "page");
+    // The same figure as the table's newest row
+    await expect(page.getByTestId("years-row").first().getByTestId("years-twr")).toContainText(value!);
   });
 
   test("lists the accounts with net deposits, profit and XIRR; the incomplete one greyed and outside the total", async ({ page }) => {
@@ -137,7 +107,7 @@ test.describe("dashboard", () => {
       await route.continue();
     });
     await page.goto("/");
-    await expect(page.getByTestId("chart-skeleton")).toHaveCount(5); // value, drawdown, allocation over time, return and inflation, growth of 100 zł
+    await expect(page.getByTestId("chart-skeleton")).toHaveCount(1); // the value (the rest is in Performance)
     const box = await page.getByTestId("chart-skeleton").first().boundingBox();
     expect(box!.height).toBe(260);
     release();
@@ -254,7 +224,7 @@ test.describe("dashboard", () => {
     });
     const range = page.getByTestId("portfolio-range");
     await range.getByRole("button", { name: "ALL" }).click();
-    await expect(page.getByTestId("chart-busy")).toHaveCount(4); // the four charts share the range (value, drawdown, allocation, growth of 100 zł)
+    await expect(page.getByTestId("chart-busy")).toHaveCount(1);
     await expect(range.getByRole("button", { name: "1M" })).toBeDisabled();
     await expect(range).toHaveAttribute("aria-busy", "true");
     release();
@@ -287,7 +257,9 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("tx-toast")).toHaveText("Prices were refreshed less than 5 minutes ago.");
   });
 
-  test("lists job runs", async ({ page }) => {
+  test("job runs are on the Status page, linked from the menu", async ({ page }) => {
+    await page.getByTestId("nav-status").click();
+    await expect(page).toHaveURL(/#\/status$/);
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
     await expect(rows).toHaveCount(9);
     await expect(page.getByTestId("jobs-table")).toContainText("valuation");
@@ -348,15 +320,5 @@ test.describe("on a phone", () => {
     const frame = await chart.boundingBox();
     expect(plot!.x - frame!.x).toBeLessThan(4); // no column for the axis labels: they sit inside the plot
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  });
-
-  test("returns by year: three columns that fit the screen, inflation under the return", async ({ page }) => {
-    await page.goto("/");
-    const table = page.getByTestId("years-table");
-    await expect(page.getByTestId("years-row").first()).toBeVisible();
-    await expect(table.locator("thead th")).toHaveCount(3);
-    await expect(page.getByTestId("years-row").first().getByTestId("years-twr")).toContainText("infl.");
-    const wrap = page.getByTestId("years");
-    expect(await wrap.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   });
 });

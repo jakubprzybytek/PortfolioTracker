@@ -1,23 +1,31 @@
 import { useState } from "react";
 import { fmtPct, fmtPln, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
 import { AccountsTable, type AccountsResponse } from "./AccountsTable.tsx";
-import { Allocation, CLASS_LABELS } from "./Allocation.tsx";
-import { AllocationChart, DrawdownChart } from "./HistoryCharts.tsx";
-import { Skeleton, SkeletonRows } from "./Placeholders.tsx";
+import { Allocation } from "./Allocation.tsx";
+import { Skeleton } from "./Placeholders.tsx";
 import { PortfolioChart } from "./PortfolioChart.tsx";
 import { RangePicker } from "./RangePicker.tsx";
 import type { AccountSummary, HistoryPoint, Snapshot, Status } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
 import { AssetMixPanel } from "./Targets.tsx";
-import { GrowthChart, YearsChart, YearsTable, type YearsResponse } from "./Returns.tsx";
+import type { YearsResponse } from "./Returns.tsx";
 
-function Card({ label, value, className, testId, note, loading }: { label: string; value: string; className?: string; testId: string; note?: string; loading: boolean }) {
-  return (
-    <div className="card" data-testid={testId}>
+function Card({ label, value, className, testId, note, loading, href }: { label: string; value: string; className?: string; testId: string; note?: string; loading: boolean; href?: string }) {
+  const body = (
+    <>
       <div className="label">{label}</div>
       <div className={`value ${className ?? ""}`}>{loading ? <span className="skeleton-bar" /> : value}</div>
       {note && <div className="note muted">{note}</div>}
+    </>
+  );
+  return href ? (
+    <a className="card link-card" href={href} data-testid={testId}>
+      {body}
+    </a>
+  ) : (
+    <div className="card" data-testid={testId}>
+      {body}
     </div>
   );
 }
@@ -55,6 +63,11 @@ export function DashboardView() {
   const summaries = useApi<AccountsResponse>("/accounts");
   const years = useApi<YearsResponse>("/portfolio/years");
   const sum = summaries.data?.total;
+  // The latest year (the year so far) from the returns by year; the rest is in the Performance view.
+  const thisYear = years.data?.years[0];
+  const yearsLoading = !years.data && years.loading;
+  // CPI comes a month or two later: "to Sep" when it stops before the year's last day.
+  const cpiEarly = thisYear?.cpiThrough && thisYear.cpiThrough !== thisYear.to.slice(0, 7) ? new Date(`${thisYear.cpiThrough}-15`).toLocaleString("en-GB", { month: "short" }) : null;
   const sumLoading = !summaries.data && summaries.loading;
 
   const snap = holdings.data;
@@ -83,7 +96,7 @@ export function DashboardView() {
       )}
       {failedJobs.length > 0 && (
         <p className="error" data-testid="job-errors">
-          Failed jobs: {failedJobs.map(([name, j]) => `${name} (${j?.finishedAt?.slice(0, 16)}): ${j?.note ?? ""}`).join("; ")}
+          Failed jobs: {failedJobs.map(([name, j]) => `${name} (${j?.finishedAt?.slice(0, 16)}): ${j?.note ?? ""}`).join("; ")} · <a href="#/status">Status</a>
         </p>
       )}
 
@@ -107,6 +120,15 @@ export function DashboardView() {
           testId="total-xirr"
           note={sum ? `a year, money-weighted, since ${sum.firstDate}` : undefined}
         />
+        <Card
+          loading={yearsLoading}
+          label={thisYear ? `${thisYear.year}${thisYear.partial && thisYear.to.slice(0, 4) === today().slice(0, 4) ? " so far" : ""}` : "This year"}
+          value={thisYear?.twr != null ? fmtPct(thisYear.twr * 100) : "–"}
+          className={signClass(thisYear?.twr)}
+          testId="year-return"
+          href="#/performance"
+          note={thisYear?.inflation != null ? `inflation ${fmtPct(thisYear.inflation * 100)}${cpiEarly ? ` (to ${cpiEarly})` : ""}, real ${fmtPct((thisYear.real ?? 0) * 100)}` : "time-weighted; by year in Performance"}
+        />
       </section>
       <ProfitBreakdown summary={sum} loading={sumLoading} />
 
@@ -120,86 +142,11 @@ export function DashboardView() {
         {history.error ? <p className="error">{history.error}</p> : <PortfolioChart history={history.data ?? []} loading={history.loading} />}
       </section>
 
-      <div className="chart-pair" data-testid="chart-pair">
-        <div>
-          <h2>
-            Drawdown <span className="muted chart-legend">below the best so far in the range; deposits don't count</span>
-          </h2>
-          <section className="panel">
-            {history.error ? <p className="error">{history.error}</p> : <DrawdownChart history={history.data ?? []} loading={history.loading} />}
-          </section>
-        </div>
-        <div>
-          <h2>
-            Allocation over time{" "}
-            <span className="muted chart-legend">
-              {(["SHARES", "BONDS", "CASH", "OTHER"] as const).map((k) => (
-                <span key={k} className="legend-item">
-                  <i className={`mix-dot mix-${k}`} aria-hidden /> {CLASS_LABELS[k]}
-                </span>
-              ))}
-            </span>
-          </h2>
-          <section className="panel">
-            {history.error ? <p className="error">{history.error}</p> : <AllocationChart history={history.data ?? []} loading={history.loading} />}
-          </section>
-        </div>
-      </div>
-
-      <h2>
-        Returns by year <span className="muted chart-legend">time-weighted (deposits don't count) against inflation, CPI December on December</span>
-      </h2>
-      {years.error ? <p className="error">{years.error}</p> : <YearsTable data={years.data} loading={years.loading} />}
-
-      <div className="chart-pair" data-testid="returns-pair">
-        <div>
-          <h2>
-            Return and inflation <span className="muted chart-legend">per year; the dot: real return; * part of a year</span>
-          </h2>
-          <section className="panel">{years.error ? <p className="error">{years.error}</p> : <YearsChart data={years.data} loading={years.loading} />}</section>
-        </div>
-        <div>
-          <h2>
-            Growth of 100 zł <span className="muted chart-legend">from the start of the range, against what CPI says it needs to be</span>
-          </h2>
-          <section className="panel">
-            {history.error ? <p className="error">{history.error}</p> : <GrowthChart history={history.data ?? []} cpi={years.data?.cpi} loading={history.loading || (!years.data && years.loading)} />}
-          </section>
-        </div>
-      </div>
-
       <h2>Accounts</h2>
       <AccountsTable data={summaries} />
 
       <h2>Allocation</h2>
       {snap ? <Allocation snapshot={snap} /> : holdings.loading && <Skeleton height={230} testId="allocation-skeleton" />}
-
-      <h2>Jobs</h2>
-      <div className="table-wrap">
-        <table data-testid="jobs-table">
-          <thead>
-            <tr>
-              <th className="left">Job</th>
-              <th className="left">Last run</th>
-              <th className="left">Status</th>
-              <th className="left">Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!status.data && status.loading && <SkeletonRows rows={9} cols={4} />}
-            {Object.entries(status.data?.jobs ?? {}).map(([name, j]) => (
-              <tr key={name}>
-                <td className="left">{name}</td>
-                <td className="left muted">{j?.finishedAt?.replace("T", " ").slice(0, 16) ?? "never"}</td>
-                <td className={`left ${j?.status === "failed" ? "status-failed" : j ? "status-ok" : "muted"}`}>{j?.status ?? "–"}</td>
-                <td className="left muted" style={{ whiteSpace: "normal", maxWidth: 600 }}>
-                  {j?.note ?? ""}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
     </>
   );
 }

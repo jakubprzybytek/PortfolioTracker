@@ -44,7 +44,7 @@ export const CPI_INDICATORS: IndicatorInfo[] = [
     group: "Inflation",
     unit: "%",
     frequency: "yearly",
-    note: "CPI, December on December (GUS): how much prices rose over each calendar year; the Dashboard's returns by year compare with it",
+    note: "CPI, December on December (GUS): how much prices rose over each calendar year; Performance's returns by year compare with it",
   },
   {
     id: "cpi-ytd",

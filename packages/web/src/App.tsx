@@ -10,8 +10,10 @@ import { IndicatorsView } from "./IndicatorsView.tsx";
 import { InstrumentView } from "./InstrumentView.tsx";
 import { LoginForm } from "./LoginForm.tsx";
 import { NotesView } from "./NotesView.tsx";
+import { PerformanceView } from "./PerformanceView.tsx";
 import { PricesView } from "./PricesView.tsx";
 import { SalesView } from "./SalesView.tsx";
+import { StatusView } from "./StatusView.tsx";
 import { CashFlowsView } from "./CashFlowsView.tsx";
 import { useRoute, VIEWS } from "./route.ts";
 import { TransactionForm } from "./TransactionForm.tsx";
@@ -181,7 +183,12 @@ function Shell({ email }: { email: string }) {
                 <Icon name="logout" size={16} />
                 Log out
               </button>
-              <div data-testid="version">Portfolio Tracker {APP_VERSION}</div>
+              <div data-testid="version">
+                Portfolio Tracker {APP_VERSION} ·{" "}
+                <a href="#/status" data-testid="nav-status" onClick={() => setMenuOpen(false)}>
+                  status
+                </a>
+              </div>
             </footer>
           </div>
         </div>
@@ -189,6 +196,7 @@ function Shell({ email }: { email: string }) {
       </nav>
       <main>
         {route.view === "dashboard" && <DashboardView />}
+        {route.view === "performance" && <PerformanceView key="performance" params={route.params} setParams={setParams} />}
         {route.view === "holdings" && <HoldingsView key="holdings" params={route.params} setParams={setParams} />}
         {route.view === "prices" && <PricesView key="prices" params={route.params} setParams={setParams} />}
         {route.view === "holdsell" && <HoldSellView key="holdsell" params={route.params} setParams={setParams} />}
@@ -198,6 +206,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}
         {route.view === "instrument" && <InstrumentView key="instrument" params={route.params} />}
+        {route.view === "status" && <StatusView />}
       </main>
       {(toast || recalc) && (
         <div className="toast" role="status">
