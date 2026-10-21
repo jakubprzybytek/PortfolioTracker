@@ -27,6 +27,7 @@ import {
   type PositionDayItem,
   type PriceItem,
   type ReferenceIndexItem,
+  type CpiYtdItem,
   type RetailSeriesItem,
   type SnapshotItem,
   type TransactionItem,
@@ -210,6 +211,21 @@ export class Repository {
     return this.queryAll<ReferenceIndexItem>("market", {
       KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: { ":pk": "CPI_REF" },
+    });
+  }
+
+  // --- CPI, December of the previous year = 100 (yearly returns against inflation) ---------------
+
+  putCpiYtd(months: { month: string; value: number }[], source: string): Promise<number> {
+    const updatedAt = new Date().toISOString();
+    const items: CpiYtdItem[] = months.map((m) => ({ ...keys.cpiYtd(m.month), ...m, source, updatedAt }));
+    return this.batchPut("market", items);
+  }
+
+  listCpiYtd(): Promise<CpiYtdItem[]> {
+    return this.queryAll<CpiYtdItem>("market", {
+      KeyConditionExpression: "PK = :pk",
+      ExpressionAttributeValues: { ":pk": "CPI_YTD" },
     });
   }
 

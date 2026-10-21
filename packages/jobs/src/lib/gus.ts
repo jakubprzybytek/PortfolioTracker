@@ -2,12 +2,14 @@
 // (the same file the reference spreadsheet uses). No API key. The file name changes with updates, so the
 // link is found on the page. Windows-1250, ";"-separated, columns:
 // Nazwa zmiennej;Jednostka terytorialna;Sposób prezentacji;Rok;Miesiąc;Wartość;Flaga
-// Each month has five rows (bases); we use "Poprzedni miesiąc = 100". Months not published yet have an empty value.
+// Each month has five rows (bases); we use "Poprzedni miesiąc = 100" (IZ indexation) and "Grudzień poprzedniego
+// roku = 100" (yearly returns against inflation). Months not published yet have an empty value.
 
 const PAGE =
   "https://stat.gov.pl/obszary-tematyczne/ceny-handel/wskazniki-cen/wskazniki-cen-towarow-i-uslug-konsumpcyjnych-pot-inflacja-/miesieczne-wskazniki-cen-towarow-i-uslug-konsumpcyjnych-od-1982-roku/";
 const HEADERS = { "User-Agent": "portfolio-tracker (personal use)" };
 const MONTH_ON_MONTH = "poprzedni miesiąc = 100";
+const SINCE_DECEMBER = "grudzień poprzedniego roku = 100";
 
 /** The CSV's path on stat.gov.pl, e.g. "/download/gfx/…/miesiecznewskaznikicen…_8.csv", or undefined. */
 export function findCpiCsvLink(html: string): string | undefined {
@@ -17,14 +19,23 @@ export function findCpiCsvLink(html: string): string | undefined {
 
 /** CPI m/m per "YYYY-MM" as a fraction (100.3 → 0.003), oldest first; months without a value are left out. */
 export function parseCpiCsv(text: string): { month: string; wr: number }[] {
-  const out: { month: string; wr: number }[] = [];
+  // One decimal from GUS: (v − 100) / 100, rounded to drop float noise.
+  return rowsOf(text, MONTH_ON_MONTH).map((r) => ({ month: r.month, wr: Math.round((r.value - 100) * 10) / 1000 }));
+}
+
+/** CPI with December of the previous year = 100 per "YYYY-MM" (e.g. 102.4), oldest first; December's is the year's inflation. */
+export function parseCpiYtdCsv(text: string): { month: string; value: number }[] {
+  return rowsOf(text, SINCE_DECEMBER);
+}
+
+function rowsOf(text: string, wanted: string): { month: string; value: number }[] {
+  const out: { month: string; value: number }[] = [];
   for (const line of text.split(/\r?\n/)) {
     const [, , basis, year, month, value] = line.split(";");
-    if (basis?.trim().toLowerCase() !== MONTH_ON_MONTH || !value?.trim()) continue;
+    if (basis?.trim().toLowerCase() !== wanted || !value?.trim()) continue;
     const v = Number(value.replace(",", "."));
     if (!/^\d{4}$/.test(year!) || !(Number(month) >= 1 && Number(month) <= 12) || !Number.isFinite(v)) continue;
-    // One decimal from GUS: (v − 100) / 100, rounded to drop float noise.
-    out.push({ month: `${year}-${month!.padStart(2, "0")}`, wr: Math.round((v - 100) * 10) / 1000 });
+    out.push({ month: `${year}-${month!.padStart(2, "0")}`, value: v });
   }
   return out.sort((a, b) => a.month.localeCompare(b.month));
 }

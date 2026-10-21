@@ -67,6 +67,28 @@ test.describe("dashboard", () => {
     expect(labels.every((t) => t === "0 %" || /^[-−]/.test(t))).toBe(true);
   });
 
+  test("returns by year against inflation: the table, the bars per year and the growth of 100 zł", async ({ page }) => {
+    const rows = page.getByTestId("years-row");
+    await expect(rows.first()).toBeVisible();
+    // Newest first; the sample starts in February 2025: that year and the year so far are parts of a year.
+    await expect(rows.last()).toHaveAttribute("data-year", "2025");
+    await expect(rows.last()).toContainText("from 2025-02-03");
+    await expect(rows.first()).toHaveClass(/partial/);
+    for (const id of ["years-twr", "years-inflation", "years-real", "years-xirr"]) await expect(rows.last().getByTestId(id)).toHaveText(/\d %/);
+    await expect(page.getByTestId("years-total")).toContainText("a year, since 2025-02");
+    // One pair of bars per year, the real return as a dot
+    const bars = page.getByTestId("years-chart");
+    expect(await bars.locator(".recharts-bar-rectangle").count()).toBe(2 * (await rows.count()));
+    await expect(bars.locator(".recharts-scatter circle").first()).toBeVisible();
+    // Growth of 100 zł: two lines from 100 at the start of the range
+    const growth = page.getByTestId("growth-chart");
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(2);
+    await expect(page.getByTestId("returns-pair").locator(".chart-key").last()).toContainText("Inflation (CPI)");
+    await page.getByTestId("portfolio-range").getByRole("button", { name: "ALL" }).click();
+    await expect(page.getByTestId("portfolio-range")).toHaveAttribute("aria-busy", "false");
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(2);
+  });
+
   test("shows totals, chart and jobs only (holdings and prices have their own views)", async ({ page }) => {
     await expect(page.getByTestId("total-all")).toBeVisible();
     await expect(page.getByTestId("holdings-table")).toHaveCount(0);
@@ -110,12 +132,12 @@ test.describe("dashboard", () => {
     // Hold the API back: the placeholders show, then the real content replaces them.
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    await page.route("**/portfolio/history**", async (route) => {
+    await page.route(/\/portfolio\/(history|years)/, async (route) => {
       await gate;
       await route.continue();
     });
     await page.goto("/");
-    await expect(page.getByTestId("chart-skeleton")).toHaveCount(3); // value, drawdown, allocation over time
+    await expect(page.getByTestId("chart-skeleton")).toHaveCount(5); // value, drawdown, allocation over time, return and inflation, growth of 100 zł
     const box = await page.getByTestId("chart-skeleton").first().boundingBox();
     expect(box!.height).toBe(260);
     release();
@@ -232,7 +254,7 @@ test.describe("dashboard", () => {
     });
     const range = page.getByTestId("portfolio-range");
     await range.getByRole("button", { name: "ALL" }).click();
-    await expect(page.getByTestId("chart-busy")).toHaveCount(3); // the three charts share the range
+    await expect(page.getByTestId("chart-busy")).toHaveCount(4); // the four charts share the range (value, drawdown, allocation, growth of 100 zł)
     await expect(range.getByRole("button", { name: "1M" })).toBeDisabled();
     await expect(range).toHaveAttribute("aria-busy", "true");
     release();
@@ -326,5 +348,15 @@ test.describe("on a phone", () => {
     const frame = await chart.boundingBox();
     expect(plot!.x - frame!.x).toBeLessThan(4); // no column for the axis labels: they sit inside the plot
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  });
+
+  test("returns by year: three columns that fit the screen, inflation under the return", async ({ page }) => {
+    await page.goto("/");
+    const table = page.getByTestId("years-table");
+    await expect(page.getByTestId("years-row").first()).toBeVisible();
+    await expect(table.locator("thead th")).toHaveCount(3);
+    await expect(page.getByTestId("years-row").first().getByTestId("years-twr")).toContainText("inflation");
+    const wrap = page.getByTestId("years");
+    expect(await wrap.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   });
 });

@@ -39,6 +39,17 @@ export function historyPointOf(snapshot: Pick<SnapshotItem, "date" | "holdings" 
 }
 
 /**
+ * One day's growth on the time-weighted return: (total − money put in that day) / the day before's total, so money put
+ * in or taken out (the change of `netDeposits`) is neither a gain nor a loss. Undefined when it can't be measured
+ * (nothing the day before, or a result that isn't a positive number).
+ */
+export function dayFactor(prev: { total: number; netDeposits: number }, p: { total: number; netDeposits: number }): number | undefined {
+  if (!(prev.total > 0)) return undefined;
+  const r = (p.total - (p.netDeposits - prev.netDeposits)) / prev.total;
+  return Number.isFinite(r) && r > 0 ? r : undefined;
+}
+
+/**
  * Drawdown per day: how far the portfolio is below its best so far, as a fraction (0 at a new high, −0.12 = 12 % below).
  * Measured on the time-weighted return, not on the value itself, so money put in or taken out (the change of
  * `netDeposits`) is neither a gain nor a loss: a withdrawal isn't a drawdown. A day's return is
@@ -49,10 +60,7 @@ export function drawdowns(points: { date: string; total: number; netDeposits: nu
   let peak = 1;
   let prev: (typeof points)[number] | undefined;
   return points.map((p) => {
-    if (prev && prev.total > 0) {
-      const r = (p.total - (p.netDeposits - prev.netDeposits)) / prev.total;
-      if (Number.isFinite(r) && r > 0) index *= r;
-    }
+    if (prev) index *= dayFactor(prev, p) ?? 1;
     prev = p;
     peak = Math.max(peak, index);
     return { date: p.date, drawdown: Math.round((index / peak - 1) * 1e6) / 1e6 };

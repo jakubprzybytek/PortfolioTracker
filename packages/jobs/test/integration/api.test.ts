@@ -242,6 +242,34 @@ describe(`API ${API}`, () => {
     expect(byClass.SHARES + byClass.BONDS + byClass.CASH + byClass.OTHER).toBeCloseTo(body[2]!.total, 1);
   });
 
+  it("GET /portfolio/years gives each year's return against inflation, and the whole history's", async () => {
+    type Period = { year: number | null; from: string; to: string; partial: boolean; startValue: number; netDeposits: number; endValue: number; profit: number; twr: number | null; xirr: number | null; inflation: number | null; real: number | null; cpiThrough: string | null };
+    const { status, body } = await get<{ years: Period[]; total: Period & { twrPerYear: number | null }; cpi: { month: string; level: number }[] }>("/portfolio/years");
+    expect(status).toBe(200);
+    // The sample starts on 2025-02-03: 2025 from then (part of a year), then the years after it, newest first.
+    const [first, ...rest] = [...body.years].reverse();
+    expect(first).toMatchObject({ year: 2025, from: "2025-02-03", partial: true, startValue: 0 });
+    expect(body.years[0]!.partial).toBe(true); // the year so far
+    let chained = 1;
+    let prev = first!;
+    for (const y of [first!, ...rest]) {
+      if (y !== first) expect(y).toMatchObject({ from: `${y.year! - 1}-12-31`, startValue: prev.endValue });
+      expect(y.profit).toBeCloseTo(y.endValue - y.startValue - y.netDeposits, 1);
+      expect(y.twr).not.toBeNull();
+      expect(y.inflation).not.toBeNull(); // CPI since 2003 (the IZ reference index), GUS's since-December figures where there
+      expect(y.real!).toBeCloseTo((1 + y.twr!) / (1 + y.inflation!) - 1, 4);
+      chained *= 1 + y.twr!;
+      prev = y;
+    }
+    // The years chain into the whole history; its XIRR is the Dashboard's (deposits, withdrawals and today's total).
+    expect(body.total).toMatchObject({ year: null, from: "2025-02-03", startValue: 0, endValue: body.years[0]!.endValue });
+    expect(1 + body.total.twr!).toBeCloseTo(chained, 4);
+    const accounts = (await get<{ total: { xirr: number | null } }>("/accounts")).body;
+    expect(body.total.xirr!).toBeCloseTo(accounts.total.xirr!, 2);
+    // CPI levels from the month before the first day, for the growth of 100 zł chart
+    expect(body.cpi[0]!.month).toBe("2025-01");
+  });
+
   it("GET /instruments/{isin}/transactions filters by ISIN", async () => {
     const { status, body } = await get<{ isin: string; type: string }[]>(`/instruments/${DS}/transactions`);
     expect(status).toBe(200);

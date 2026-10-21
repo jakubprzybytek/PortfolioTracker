@@ -1,4 +1,4 @@
-// Monthly job: extend the IZ reference index with the latest GUS CPI m/m, cross-check the current month's
+// Monthly job: extend the IZ reference index with the latest GUS CPI m/m (and keep GUS CPI since December), cross-check the current month's
 // index ratio against the Ministry of Finance page, and refresh the retail-bond rates from the Ministry file.
 
 import { buildReferenceIndex, indexRatioAt, shiftMonth, toReferenceIndex, today } from "@portfolio/core";
@@ -6,7 +6,7 @@ import { Resource } from "sst";
 import { archiveRaw, queueValuation, repo, runJob } from "../lib/context.ts";
 import { fetchRetailFile } from "../lib/mfRetail.ts";
 import { importRetailRates } from "./import.ts";
-import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv } from "../lib/gus.ts";
+import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv, parseCpiYtdCsv } from "../lib/gus.ts";
 import { fetchMfIndexRatios } from "../lib/mfPage.ts";
 
 export async function handler() {
@@ -22,31 +22,37 @@ export async function handler() {
     // 1. Append missing months from the GUS CPI file (CPI for month M is published around the 15th of M+1).
     // Append only: stored months are never overwritten. January matters here: the MF index keeps GUS's first
     // (preliminary) January figure, while the GUS file later shows the revised one.
+    // GUS's CPI since December (yearly returns against inflation) is kept as GUS has it now: new or changed months.
     const wanted: string[] = [];
     for (let m = shiftMonth(last, 1); m < today().slice(0, 7); m = shiftMonth(m, 1)) wanted.push(m);
-    if (wanted.length > 0) {
-      try {
-        const { url, content } = await fetchGusCpiFile();
-        await archiveRaw("gus-cpi", today(), "cpi-monthly.csv", content);
-        // Only consecutive months after the last stored one: the index is a chain.
-        const published = new Map(parseCpiCsv(decodeCpiCsv(content)).map((r) => [r.month, r.wr]));
-        const fetched: { month: string; wr: number }[] = [];
-        for (const month of wanted) {
-          const wr = published.get(month);
-          if (wr === undefined) break;
-          fetched.push({ month, wr });
-        }
-        if (fetched.length > 0) {
-          const rebuilt = buildReferenceIndex([...months, ...fetched]);
-          const newOnes = rebuilt.filter((m) => fetched.some((f) => f.month === m.month));
-          itemsWritten += await repo.putReferenceIndex(newOnes, url);
-          notes.push(`added ${newOnes.map((m) => `${m.month}=${m.w}`).join(", ")}`);
-        }
-        const missing = wanted.slice(fetched.length);
-        if (missing.length > 0) notes.push(`GUS has no CPI yet for ${missing.join(", ")}`);
-      } catch (err) {
-        notes.push(`GUS CPI failed: ${(err as Error).message}`);
+    try {
+      const { url, content } = await fetchGusCpiFile();
+      await archiveRaw("gus-cpi", today(), "cpi-monthly.csv", content);
+      const text = decodeCpiCsv(content);
+      const storedYtd = new Map((await repo.listCpiYtd()).map((m) => [m.month, m.value]));
+      const changedYtd = parseCpiYtdCsv(text).filter((m) => storedYtd.get(m.month) !== m.value);
+      if (changedYtd.length > 0) {
+        itemsWritten += await repo.putCpiYtd(changedYtd, url);
+        notes.push(`CPI since December: ${changedYtd.length} months written, to ${changedYtd.at(-1)!.month}`);
       }
+      // Only consecutive months after the last stored one: the index is a chain.
+      const published = new Map(parseCpiCsv(text).map((r) => [r.month, r.wr]));
+      const fetched: { month: string; wr: number }[] = [];
+      for (const month of wanted) {
+        const wr = published.get(month);
+        if (wr === undefined) break;
+        fetched.push({ month, wr });
+      }
+      if (fetched.length > 0) {
+        const rebuilt = buildReferenceIndex([...months, ...fetched]);
+        const newOnes = rebuilt.filter((m) => fetched.some((f) => f.month === m.month));
+        itemsWritten += await repo.putReferenceIndex(newOnes, url);
+        notes.push(`added ${newOnes.map((m) => `${m.month}=${m.w}`).join(", ")}`);
+      }
+      const missing = wanted.slice(fetched.length);
+      if (missing.length > 0) notes.push(`GUS has no CPI yet for ${missing.join(", ")}`);
+    } catch (err) {
+      notes.push(`GUS CPI failed: ${(err as Error).message}`);
     }
 
     // 2. Cross-check against the MF published ratios for IZ bonds we track.

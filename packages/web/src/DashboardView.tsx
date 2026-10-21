@@ -10,6 +10,7 @@ import type { AccountSummary, HistoryPoint, Snapshot, Status } from "./types.ts"
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
 import { AssetMixPanel } from "./Targets.tsx";
+import { GrowthChart, YearsChart, YearsTable, type YearsResponse } from "./Returns.tsx";
 
 function Card({ label, value, className, testId, note, loading }: { label: string; value: string; className?: string; testId: string; note?: string; loading: boolean }) {
   return (
@@ -52,6 +53,7 @@ export function DashboardView() {
   const history = useApi<HistoryPoint[]>("/portfolio/history", { from: rangeFrom(range), to: today() });
   const status = useApi<Status>("/status");
   const summaries = useApi<AccountsResponse>("/accounts");
+  const years = useApi<YearsResponse>("/portfolio/years");
   const sum = summaries.data?.total;
   const sumLoading = !summaries.data && summaries.loading;
 
@@ -140,6 +142,28 @@ export function DashboardView() {
           </h2>
           <section className="panel">
             {history.error ? <p className="error">{history.error}</p> : <AllocationChart history={history.data ?? []} loading={history.loading} />}
+          </section>
+        </div>
+      </div>
+
+      <h2>
+        Returns by year <span className="muted chart-legend">time-weighted (deposits don't count) against inflation, CPI December on December</span>
+      </h2>
+      {years.error ? <p className="error">{years.error}</p> : <YearsTable data={years.data} loading={years.loading} />}
+
+      <div className="chart-pair" data-testid="returns-pair">
+        <div>
+          <h2>
+            Return and inflation <span className="muted chart-legend">per year; the dot: real return; * part of a year</span>
+          </h2>
+          <section className="panel">{years.error ? <p className="error">{years.error}</p> : <YearsChart data={years.data} loading={years.loading} />}</section>
+        </div>
+        <div>
+          <h2>
+            Growth of 100 zł <span className="muted chart-legend">from the start of the range, against what CPI says it needs to be</span>
+          </h2>
+          <section className="panel">
+            {history.error ? <p className="error">{history.error}</p> : <GrowthChart history={history.data ?? []} cpi={years.data?.cpi} loading={history.loading || (!years.data && years.loading)} />}
           </section>
         </div>
       </div>

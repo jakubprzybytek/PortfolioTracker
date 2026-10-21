@@ -266,6 +266,7 @@ export default $config({
     };
     api.route("GET /holdings", apiHandler, auth);
     api.route("GET /portfolio/history", apiHandler, auth);
+    api.route("GET /portfolio/years", apiHandler, auth);
     api.route("GET /instruments", apiHandler, auth);
     api.route("GET /hold-sell", apiHandler, auth);
     api.route("PUT /hold-sell/assumptions", apiHandler, auth);

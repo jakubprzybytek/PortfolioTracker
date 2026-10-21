@@ -87,6 +87,16 @@ export interface ReferenceIndexItem {
   updatedAt: string;
 }
 
+/** GUS CPI with December of the previous year = 100 (e.g. 102.4): prices since the year began; December's is the year's inflation. */
+export interface CpiYtdItem {
+  PK: "CPI_YTD";
+  SK: string; // "YYYY-MM"
+  month: string;
+  value: number;
+  source: string;
+  updatedAt: string;
+}
+
 /** NBP table A mid rate: PLN per unit of `currency` on `date` (business days only). */
 export interface FxRateItem {
   PK: `FX#${string}`;
@@ -314,6 +324,7 @@ export const keys = {
   price: (isin: string, venue: string, date: IsoDate) => ({ PK: `INST#${isin}` as const, SK: `PX#${venue}#${date}` as const }),
   pricePrefix: (isin: string, venue: string) => ({ PK: `INST#${isin}` as const, SK: `PX#${venue}#` as const }),
   referenceIndex: (month: string) => ({ PK: "CPI_REF" as const, SK: month }),
+  cpiYtd: (month: string) => ({ PK: "CPI_YTD" as const, SK: month }),
   fxRate: (currency: string, date: IsoDate) => ({ PK: `FX#${currency}` as const, SK: date }),
   couponPeriod: (isin: string, start: IsoDate) => ({ PK: `INST#${isin}` as const, SK: `COUPON#${start}` as const }),
   transaction: (account: string, date: IsoDate, id: string) => ({ PK: `ACCT#${account}` as const, SK: `TX#${date}#${id}` as const }),

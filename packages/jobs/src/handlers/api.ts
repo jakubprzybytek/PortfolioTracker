@@ -47,6 +47,8 @@ import {
   ASSET_CLASSES,
   defaultAssetClass,
   cpiIndicators,
+  cpiLevels,
+  yearlyReturns,
   fxCurrencyOf,
   fxIndicator,
   priceRows,
@@ -78,6 +80,22 @@ const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({
 });
 
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
+
+/**
+ * Each day in [from, to]: positions, cash, their sum (`total`) and the money put in so far (`netDeposits`, fully
+ * tracked accounts, other currencies at NBP D-1), so a sale kept as cash doesn't show as a drop. `byClass`: shares,
+ * bonds, cash, other (the allocation over time). Read from the days' chart points, not the snapshots (a snapshot is
+ * ~60× bigger: years of them took seconds).
+ */
+async function portfolioHistory(from: string, to: string) {
+  const [points, txs, accounts] = await Promise.all([repo.queryHistoryPoints(from, to), repo.listTransactions(), repo.listAccounts()]);
+  const currencies = [...new Set(txs.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => t.currency))].filter((c) => c && c !== "PLN");
+  const first = txs.map((t) => t.date).sort()[0] ?? from;
+  const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), to)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
+  const incomplete = new Set(accounts.filter((a) => a.incomplete?.length).map((a) => a.account));
+  const deposits = netDepositsByDate(txs, points.map((p) => p.date), fx, incomplete);
+  return points.map((p) => ({ date: p.date, totals: p.totals, byType: p.byType, byClass: p.byClass, total: Math.round((p.totals.value + (p.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(p.date) ?? 0 }));
+}
 /** "Refresh prices" at most this often. */
 const REFRESH_EVERY_MS = 5 * 60_000;
 
@@ -268,21 +286,16 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const fx = await fxHistoryOf(txs, snap.date, Object.values(snap.accounts ?? {}).map((a) => a.baseCurrency ?? "PLN"));
         return json(200, { date: snap.date, ...accountSummaries(snap, txs, fx) });
       }
-      case "GET /portfolio/history": {
-        // Each day: positions, cash, their sum (`total`) and the money put in so far (`netDeposits`, fully tracked
-        // accounts, other currencies at NBP D-1), so a sale kept as cash doesn't show as a drop.
-        // `byClass`: shares, bonds, cash, other (the allocation over time). Read from the days' chart points, not the
-        // snapshots (a snapshot is ~60× bigger: years of them took seconds).
-        const [points, txs, accounts] = await Promise.all([repo.queryHistoryPoints(from, to), repo.listTransactions(), repo.listAccounts()]);
-        const currencies = [...new Set(txs.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => t.currency))].filter((c) => c && c !== "PLN");
-        const first = txs.map((t) => t.date).sort()[0] ?? from;
-        const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), to)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
-        const incomplete = new Set(accounts.filter((a) => a.incomplete?.length).map((a) => a.account));
-        const deposits = netDepositsByDate(txs, points.map((p) => p.date), fx, incomplete);
-        return json(
-          200,
-          points.map((p) => ({ date: p.date, totals: p.totals, byType: p.byType, byClass: p.byClass, total: Math.round((p.totals.value + (p.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(p.date) ?? 0 })),
-        );
+      case "GET /portfolio/history":
+        return json(200, await portfolioHistory(from, to));
+      case "GET /portfolio/years": {
+        // Per calendar year and over the whole history: start and end value, money put in, profit, time-weighted and
+        // money-weighted return, inflation over the same days (CPI: GUS since December, else the monthly chain) and the
+        // real return; plus the CPI levels from the first day on, for the growth of 100 zł chart (`growthOf100`).
+        const [points, ytd, mom] = await Promise.all([portfolioHistory("2000-01-01", today()), repo.listCpiYtd(), repo.listReferenceIndex()]);
+        const levels = cpiLevels(ytd, mom);
+        const start = points[0] ? shiftMonth(points[0].date.slice(0, 7), -1) : "9999-12";
+        return json(200, { ...yearlyReturns(points, levels), cpi: levels.filter((l) => l.month >= start) });
       }
       case "GET /instruments": {
         const items = (await repo.listInstruments()).filter((i) => i.isin !== "MF-TERMS");

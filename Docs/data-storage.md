@@ -137,6 +137,7 @@ Every series of the Ministry retail-bond file (~990 items): `isin`, `kind`, `ter
 ```
 PK = CPI                    SK = <YYYY-MM>          value, source, published_at
 PK = CPI_REF                SK = <YYYY-MM>          wr (CPI m/m, e.g. 0.003), w (reference index, 5 dp)   (IZ indexation, see data-sources.md)
+PK = CPI_YTD                SK = <YYYY-MM>          value (CPI, December of the previous year = 100, e.g. 102.4), source, updatedAt   (Returns by year: December's is the year's inflation; GUS since 1987, kept as GUS has it now)
 PK = FX#<CCY>               SK = <YYYY-MM-DD>       mid, table_no, source        (NBP table A, PLN per unit)
 ```
 

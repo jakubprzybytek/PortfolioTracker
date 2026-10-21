@@ -33,7 +33,7 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 | `eod-ibkr` (later, not built) | 07:00 (next day) | IBKR Flex statement for the previous day | transactions, cash |
 | `eod-gpw-recheck` | 07:15 (next day) | re-runs `eod-gpw` for D-1 | overwrites, sets `status = final` |
 | `valuation` | 07:30 (next day) | DynamoDB only | final snapshot for D-1 |
-| `monthly` | 16th, 10:00, retry daily until success (any day) | GUS CPI (monthly CSV); new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `SERIES#…/RATE#…` |
+| `monthly` | 16th, 10:00, retry daily until success (any day) | GUS CPI (monthly CSV: m/m and since December); new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `CPI_YTD/<month>`, `SERIES#…/RATE#…` |
 
 The jobs group into a few short windows a day. With DynamoDB this doesn't matter for cost; it keeps the schedule easy to follow.
 

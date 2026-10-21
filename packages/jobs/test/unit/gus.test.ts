@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decodeCpiCsv, findCpiCsvLink, parseCpiCsv } from "../../src/lib/gus.ts";
+import { decodeCpiCsv, findCpiCsvLink, parseCpiCsv, parseCpiYtdCsv } from "../../src/lib/gus.ts";
 
 describe("findCpiCsvLink", () => {
   it("finds the monthly CPI CSV on the GUS page", () => {
@@ -28,5 +28,15 @@ describe("parseCpiCsv", () => {
 
   it("skips months GUS hasn't published yet (empty value)", () => {
     expect(rows.some((r) => r.month === "2026-09")).toBe(false);
+  });
+});
+
+describe("parseCpiYtdCsv", () => {
+  const rows = parseCpiYtdCsv(decodeCpiCsv(readFileSync(new URL("../fixtures/gus-cpi-excerpt.csv", import.meta.url))));
+
+  it("reads the December of the previous year = 100 rows as GUS has them, oldest first", () => {
+    expect(rows[0]).toEqual({ month: "2025-12", value: 102.4 }); // 2025's inflation, December on December
+    expect(rows.find((r) => r.month === "2026-08")).toEqual({ month: "2026-08", value: 103 });
+    expect(rows.at(-1)!.month).toBe("2026-08"); // later months not published yet
   });
 });
