@@ -130,7 +130,7 @@ Economic indicators from data already stored (no extra source), same layout as P
 
 - **Groups:** *Inflation*: GUS's own figures first, as published: **12 months** (same month of the previous year = 100, `CPI_YOY`: the inflation usually quoted), **per year** (December on December: December's since-December figure, one bar per year; what the Dashboard's returns by year compare with) and **since December** (December of the previous year = 100, `CPI_YTD`: the year so far); then month on month (CPI, previous month = 100, from `CPI_REF.wr`) and the CPI reference index (`CPI_REF.w`, June 2003 = 100, the index behind IZ indexation). *Exchange rates*: EUR/PLN and USD/PLN, NBP mid rates (`FX#…`), daily since 2002. Columns: latest value, its date, the value a year earlier. Hover a row for what it is.
 - **Click a row:** its chart opens below: monthly bars around zero for the % series, a line for the index and the rates; ranges 1Y / 5Y (default) / 10Y / ALL. Monthly series count back from their latest month (1Y = 12 bars). Chart and range are in the URL.
-- **12 months and per year are GUS's own figures**, not compounded from the one-decimal monthly ones (that misses GUS's y/y by up to ~0.3 pp). Yearly series count back by years (5Y = the last five years) and compare with the year before.
+- **12 months and per year are GUS's own figures**, not compounded from the one-decimal monthly ones (that misses GUS's y/y by up to ~0.3 pp). Yearly series count back by years (5Y = the last five years) and compare with the year before. GUS's figures are kept from 2000 on (the `monthly` job stores nothing older and deletes what was), so ALL isn't dwarfed by the 1989–90 hyperinflation (640 % a year).
 
 ## Transactions
 

@@ -9,6 +9,12 @@ import { importRetailRates } from "./import.ts";
 import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv, parseCpiYoyCsv, parseCpiYtdCsv } from "../lib/gus.ts";
 import { fetchMfIndexRatios } from "../lib/mfPage.ts";
 
+/**
+ * GUS's CPI is kept from here on: the years before (the 1989–90 hyperinflation, 640 % a year) would dwarf everything
+ * since on the Indicators charts, and the portfolio's history starts later anyway.
+ */
+const GUS_CPI_FROM = "2000-01";
+
 export async function handler() {
   return runJob("monthly", async () => {
     const stored = await repo.listReferenceIndex();
@@ -23,7 +29,7 @@ export async function handler() {
     // Append only: stored months are never overwritten. January matters here: the MF index keeps GUS's first
     // (preliminary) January figure, while the GUS file later shows the revised one.
     // GUS's CPI since December and year on year (returns by year, Indicators) are kept as GUS has them now: new or
-    // changed months.
+    // changed months, from GUS_CPI_FROM on (older ones, stored before, are deleted).
     const wanted: string[] = [];
     for (let m = shiftMonth(last, 1); m < today().slice(0, 7); m = shiftMonth(m, 1)) wanted.push(m);
     try {
@@ -35,7 +41,12 @@ export async function handler() {
         ["CPI_YOY", "year on year", parseCpiYoyCsv],
       ] as const) {
         const stored = new Map((await repo.listGusCpi(series)).map((m) => [m.month, m.value]));
-        const changed = parse(text).filter((m) => stored.get(m.month) !== m.value);
+        const old = [...stored.keys()].filter((m) => m < GUS_CPI_FROM);
+        if (old.length > 0) {
+          await repo.deleteGusCpi(series, old);
+          notes.push(`CPI ${label}: ${old.length} months before ${GUS_CPI_FROM} deleted`);
+        }
+        const changed = parse(text).filter((m) => m.month >= GUS_CPI_FROM && stored.get(m.month) !== m.value);
         if (changed.length === 0) continue;
         itemsWritten += await repo.putGusCpi(series, changed, url);
         notes.push(`CPI ${label}: ${changed.length} months written, to ${changed.at(-1)!.month}`);

@@ -223,6 +223,10 @@ export class Repository {
     return this.batchPut("market", items);
   }
 
+  deleteGusCpi(series: GusCpiSeries, months: string[]): Promise<number> {
+    return this.batchWrite("market", months.map((m) => ({ DeleteRequest: { Key: keys.gusCpi(series, m) } })));
+  }
+
   listGusCpi(series: GusCpiSeries): Promise<GusCpiItem[]> {
     return this.queryAll<GusCpiItem>("market", {
       KeyConditionExpression: "PK = :pk",
