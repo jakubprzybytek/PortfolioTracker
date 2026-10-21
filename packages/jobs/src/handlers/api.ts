@@ -292,7 +292,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         // Per calendar year and over the whole history: start and end value, money put in, profit, time-weighted and
         // money-weighted return, inflation over the same days (CPI: GUS since December, else the monthly chain) and the
         // real return; plus the CPI levels from the first day on, for the growth of 100 zł chart (`growthOf100`).
-        const [points, ytd, mom] = await Promise.all([portfolioHistory("2000-01-01", today()), repo.listCpiYtd(), repo.listReferenceIndex()]);
+        const [points, ytd, mom] = await Promise.all([portfolioHistory("2000-01-01", today()), repo.listGusCpi("CPI_YTD"), repo.listReferenceIndex()]);
         const levels = cpiLevels(ytd, mom);
         const start = points[0] ? shiftMonth(points[0].date.slice(0, 7), -1) : "9999-12";
         return json(200, { ...yearlyReturns(points, levels), cpi: levels.filter((l) => l.month >= start) });

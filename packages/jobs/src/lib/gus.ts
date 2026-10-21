@@ -2,14 +2,16 @@
 // (the same file the reference spreadsheet uses). No API key. The file name changes with updates, so the
 // link is found on the page. Windows-1250, ";"-separated, columns:
 // Nazwa zmiennej;Jednostka terytorialna;Sposób prezentacji;Rok;Miesiąc;Wartość;Flaga
-// Each month has five rows (bases); we use "Poprzedni miesiąc = 100" (IZ indexation) and "Grudzień poprzedniego
-// roku = 100" (yearly returns against inflation). Months not published yet have an empty value.
+// Each month has five rows (bases); we use "Poprzedni miesiąc = 100" (IZ indexation), "Grudzień poprzedniego
+// roku = 100" (returns by year against inflation, Indicators) and "Analogiczny miesiąc poprzedniego roku = 100"
+// (12-month inflation, Indicators). Months not published yet have an empty value.
 
 const PAGE =
   "https://stat.gov.pl/obszary-tematyczne/ceny-handel/wskazniki-cen/wskazniki-cen-towarow-i-uslug-konsumpcyjnych-pot-inflacja-/miesieczne-wskazniki-cen-towarow-i-uslug-konsumpcyjnych-od-1982-roku/";
 const HEADERS = { "User-Agent": "portfolio-tracker (personal use)" };
 const MONTH_ON_MONTH = "poprzedni miesiąc = 100";
 const SINCE_DECEMBER = "grudzień poprzedniego roku = 100";
+const YEAR_ON_YEAR = "analogiczny miesiąc poprzedniego roku = 100";
 
 /** The CSV's path on stat.gov.pl, e.g. "/download/gfx/…/miesiecznewskaznikicen…_8.csv", or undefined. */
 export function findCpiCsvLink(html: string): string | undefined {
@@ -26,6 +28,11 @@ export function parseCpiCsv(text: string): { month: string; wr: number }[] {
 /** CPI with December of the previous year = 100 per "YYYY-MM" (e.g. 102.4), oldest first; December's is the year's inflation. */
 export function parseCpiYtdCsv(text: string): { month: string; value: number }[] {
   return rowsOf(text, SINCE_DECEMBER);
+}
+
+/** CPI with the same month of the previous year = 100 per "YYYY-MM" (e.g. 104.1: 12-month inflation 4.1 %), oldest first. */
+export function parseCpiYoyCsv(text: string): { month: string; value: number }[] {
+  return rowsOf(text, YEAR_ON_YEAR);
 }
 
 function rowsOf(text: string, wanted: string): { month: string; value: number }[] {

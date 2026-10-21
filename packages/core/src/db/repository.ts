@@ -27,7 +27,8 @@ import {
   type PositionDayItem,
   type PriceItem,
   type ReferenceIndexItem,
-  type CpiYtdItem,
+  type GusCpiItem,
+  type GusCpiSeries,
   type RetailSeriesItem,
   type SnapshotItem,
   type TransactionItem,
@@ -214,18 +215,18 @@ export class Repository {
     });
   }
 
-  // --- CPI, December of the previous year = 100 (yearly returns against inflation) ---------------
+  // --- GUS CPI as published: since December (returns by year, Indicators), year on year (Indicators) ---
 
-  putCpiYtd(months: { month: string; value: number }[], source: string): Promise<number> {
+  putGusCpi(series: GusCpiSeries, months: { month: string; value: number }[], source: string): Promise<number> {
     const updatedAt = new Date().toISOString();
-    const items: CpiYtdItem[] = months.map((m) => ({ ...keys.cpiYtd(m.month), ...m, source, updatedAt }));
+    const items: GusCpiItem[] = months.map((m) => ({ ...keys.gusCpi(series, m.month), ...m, source, updatedAt }));
     return this.batchPut("market", items);
   }
 
-  listCpiYtd(): Promise<CpiYtdItem[]> {
-    return this.queryAll<CpiYtdItem>("market", {
+  listGusCpi(series: GusCpiSeries): Promise<GusCpiItem[]> {
+    return this.queryAll<GusCpiItem>("market", {
       KeyConditionExpression: "PK = :pk",
-      ExpressionAttributeValues: { ":pk": "CPI_YTD" },
+      ExpressionAttributeValues: { ":pk": series },
     });
   }
 

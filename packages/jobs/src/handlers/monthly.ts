@@ -1,4 +1,4 @@
-// Monthly job: extend the IZ reference index with the latest GUS CPI m/m (and keep GUS CPI since December), cross-check the current month's
+// Monthly job: extend the IZ reference index with the latest GUS CPI m/m (and keep GUS CPI since December and year on year), cross-check the current month's
 // index ratio against the Ministry of Finance page, and refresh the retail-bond rates from the Ministry file.
 
 import { buildReferenceIndex, indexRatioAt, shiftMonth, toReferenceIndex, today } from "@portfolio/core";
@@ -6,7 +6,7 @@ import { Resource } from "sst";
 import { archiveRaw, queueValuation, repo, runJob } from "../lib/context.ts";
 import { fetchRetailFile } from "../lib/mfRetail.ts";
 import { importRetailRates } from "./import.ts";
-import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv, parseCpiYtdCsv } from "../lib/gus.ts";
+import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv, parseCpiYoyCsv, parseCpiYtdCsv } from "../lib/gus.ts";
 import { fetchMfIndexRatios } from "../lib/mfPage.ts";
 
 export async function handler() {
@@ -22,18 +22,23 @@ export async function handler() {
     // 1. Append missing months from the GUS CPI file (CPI for month M is published around the 15th of M+1).
     // Append only: stored months are never overwritten. January matters here: the MF index keeps GUS's first
     // (preliminary) January figure, while the GUS file later shows the revised one.
-    // GUS's CPI since December (yearly returns against inflation) is kept as GUS has it now: new or changed months.
+    // GUS's CPI since December and year on year (returns by year, Indicators) are kept as GUS has them now: new or
+    // changed months.
     const wanted: string[] = [];
     for (let m = shiftMonth(last, 1); m < today().slice(0, 7); m = shiftMonth(m, 1)) wanted.push(m);
     try {
       const { url, content } = await fetchGusCpiFile();
       await archiveRaw("gus-cpi", today(), "cpi-monthly.csv", content);
       const text = decodeCpiCsv(content);
-      const storedYtd = new Map((await repo.listCpiYtd()).map((m) => [m.month, m.value]));
-      const changedYtd = parseCpiYtdCsv(text).filter((m) => storedYtd.get(m.month) !== m.value);
-      if (changedYtd.length > 0) {
-        itemsWritten += await repo.putCpiYtd(changedYtd, url);
-        notes.push(`CPI since December: ${changedYtd.length} months written, to ${changedYtd.at(-1)!.month}`);
+      for (const [series, label, parse] of [
+        ["CPI_YTD", "since December", parseCpiYtdCsv],
+        ["CPI_YOY", "year on year", parseCpiYoyCsv],
+      ] as const) {
+        const stored = new Map((await repo.listGusCpi(series)).map((m) => [m.month, m.value]));
+        const changed = parse(text).filter((m) => stored.get(m.month) !== m.value);
+        if (changed.length === 0) continue;
+        itemsWritten += await repo.putGusCpi(series, changed, url);
+        notes.push(`CPI ${label}: ${changed.length} months written, to ${changed.at(-1)!.month}`);
       }
       // Only consecutive months after the last stored one: the index is a chain.
       const published = new Map(parseCpiCsv(text).map((r) => [r.month, r.wr]));
