@@ -29,6 +29,9 @@ const PAGE = 200;
  * list of two-line rows instead of the table: date, type, account and amount; then instrument, quantity × price, fee
  * and the note's start.
  */
+/** A retail bond bought on one day whose interest starts on another (issued later, a rollover): said in the date's tooltip. */
+const interestNote = (t: TransactionRow): string | undefined => (t.valueDate && t.valueDate !== t.date ? `Interest from ${t.valueDate}` : undefined);
+
 export function TransactionsView({
   params,
   setParams,
@@ -174,7 +177,10 @@ export function TransactionsView({
               onClick={() => form.open(t)}
             >
               <div className="tx-line">
-                <span className="tx-date">{t.date}</span>
+                <span className="tx-date" title={interestNote(t)}>
+                  {t.date}
+                  {interestNote(t) && <span className="faint"> *</span>}
+                </span>
                 <span className="tx-what">
                   {TX_TYPE_LABELS[t.type] ?? t.type}{" "}
                   <span className="muted">· {t.account}</span>
@@ -268,7 +274,10 @@ export function TransactionsView({
                   onClick={() => form.open(t)}
                   title="Edit or delete"
                 >
-                  <td className="left">{t.date}</td>
+                  <td className="left" title={interestNote(t)}>
+                    {t.date}
+                    {interestNote(t) && <span className="faint" data-testid="tx-interest-mark"> *</span>}
+                  </td>
                   <td className="left">{t.account}</td>
                   <td className="left">{TX_TYPE_LABELS[t.type] ?? t.type}</td>
                   <td className="left instrument">

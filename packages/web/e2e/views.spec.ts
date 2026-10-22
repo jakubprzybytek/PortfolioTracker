@@ -274,6 +274,55 @@ test.describe("adding transactions", () => {
     await expect(row).toHaveCount(0);
   });
 
+  test("a retail bond buy has 'Interest from': it follows the date until set, and editing the row keeps it", async ({ page }) => {
+    // Dated far ahead in its own account, as above.
+    await page.goto("/#/transactions");
+    await expect(page.getByTestId("transaction-row").first()).toBeVisible();
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-type").selectOption("BUY");
+    await page.getByTestId("tx-instrument").selectOption({ label: "DS0432 · Obligacje skarbowe DS0432 (stałe 1,75 %)" });
+    await expect(page.getByTestId("tx-interest-from")).toHaveCount(0); // a listed bond: its coupon periods decide
+    await page.getByTestId("tx-instrument").selectOption("PL0000118402"); // EDO0935
+    const from = page.getByTestId("tx-interest-from");
+    await page.getByTestId("tx-date").fill("2099-03-15");
+    await expect(from).toHaveValue("2099-03-15");
+    await page.getByTestId("tx-date").fill("2099-03-14");
+    await expect(from).toHaveValue("2099-03-14"); // follows the date
+    await from.fill("2099-03-16");
+    await page.getByTestId("tx-date").fill("2099-03-15");
+    await expect(from).toHaveValue("2099-03-16"); // set by hand: stays
+    await page.getByTestId("tx-account").selectOption("__new_account__");
+    await page.getByTestId("tx-new-account").fill("e2e-interest");
+    await page.getByTestId("tx-quantity").fill("5");
+    await page.getByTestId("tx-save").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("Transaction added.");
+
+    const row = page.locator('tr[data-testid="transaction-row"]').filter({ hasText: "e2e-interest" });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator("td").first()).toHaveAttribute("title", "Interest from 2099-03-16");
+    await expect(row.getByTestId("tx-interest-mark")).toBeVisible();
+
+    // Editing only the note keeps the interest start (it used to be reset to the date).
+    await row.click();
+    await expect(page.getByTestId("tx-interest-from")).toHaveValue("2099-03-16");
+    await page.getByTestId("tx-note").fill("E2E interest start");
+    await page.getByTestId("tx-save").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("Transaction updated.");
+    await expect(row.locator("td").first()).toHaveAttribute("title", "Interest from 2099-03-16");
+
+    // Back to the date: no mark.
+    await row.click();
+    await page.getByTestId("tx-interest-from").fill("2099-03-15");
+    await page.getByTestId("tx-save").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("Transaction updated.");
+    await expect(row.getByTestId("tx-interest-mark")).toHaveCount(0);
+
+    await row.click();
+    await page.getByTestId("tx-delete").click();
+    await page.getByTestId("tx-delete-confirm").click();
+    await expect(row).toHaveCount(0);
+  });
+
   test("suggests a bond buy's amount and finds a new treasury series by code; the server's objections show", async ({ page }) => {
     await page.goto("/#/transactions");
     await page.getByTestId("tx-add").click();

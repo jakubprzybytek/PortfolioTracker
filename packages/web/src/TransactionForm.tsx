@@ -80,6 +80,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const [toAmount, setToAmount] = useState(str(editing?.toAmount));
   const [toCurrency, setToCurrency] = useState(editing?.toCurrency ?? "");
   const [note, setNote] = useState(editing?.note ?? "");
+  // A retail bond's interest start (valueDate): empty = the buy's date, so it follows the date until set by hand.
+  const [interestFrom, setInterestFrom] = useState(editing?.valueDate && editing.valueDate !== editing.date ? editing.valueDate : "");
   // A new instrument, added on save.
   const [kind, setKind] = useState<NewKind>("treasury");
   const [fields, setFields] = useState({ code: "", isin: "", ticker: "", name: "", currency: "EUR", nominal: "1000" });
@@ -101,6 +103,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
 
   const list = useMemo(() => [...(instruments.data ?? [])].sort((a, b) => Number(b.active) - Number(a.active) || a.code.localeCompare(b.code)), [instruments.data]);
   const inst = list.find((i) => i.isin === isin);
+  const retailBuy = inst?.type === "BOND_RETAIL" && type === "BUY";
   const needsInstrument = NEEDS_INSTRUMENT.has(type);
   // Default currency: in an account kept in several currencies (IBKR), a trade in the instrument's currency and the
   // rest in the account's own; elsewhere PLN.
@@ -194,7 +197,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
         ...(type === "SPLIT" ? { ratio: parseNum(ratio) } : {}),
         amount: signed ?? 0,
         ...(f ? { fee: f } : {}),
-        ...(inst?.type === "BOND_RETAIL" && type === "BUY" ? { valueDate: date } : {}),
+        ...(retailBuy ? { valueDate: interestFrom || date } : {}),
         ...(type === "EXCHANGE" ? { toAmount: got, toCurrency: otherCur } : {}),
         currency: cur,
         ...(note.trim() ? { note: note.trim() } : {}),
@@ -356,6 +359,11 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} data-testid="tx-price" />
               </Field>
             </>
+          )}
+          {retailBuy && (
+            <Field label="Interest from" hint={interestFrom ? "Differs from the date: the bonds were issued later (or a rollover)" : "The date, unless the bonds were issued later"}>
+              <input type="date" value={interestFrom || date} onChange={(e) => setInterestFrom(e.target.value === date ? "" : e.target.value)} required data-testid="tx-interest-from" />
+            </Field>
           )}
           {foreign && HAS_QUANTITY.has(type) && (
             <Field label={`Rate, PLN per ${inst!.currency}`} hint="Your broker's rate (prefilled: NBP)">
