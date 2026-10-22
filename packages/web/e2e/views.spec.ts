@@ -121,19 +121,37 @@ test.describe("transactions view", () => {
     await expect(page.getByTestId("tx-date")).toHaveValue("2025-02-05");
     await page.keyboard.press("Escape");
 
-    // Filters: Account and Asset type on one row, the instrument below on its own; "Clear" by the count only while set.
+    // Filters: the search and a "Filters" button on one line; the dropdowns fold out below (two a row, the instrument
+    // on its own); "Clear" by the count only while something is set.
     const box = async (id: string) => (await page.getByTestId(id).boundingBox())!;
-    const [acc, type, instr] = [await box("filter-account"), await box("filter-type"), await box("filter-instrument")];
-    expect(Math.abs(acc.y - type.y)).toBeLessThan(2);
-    expect(instr.y).toBeGreaterThan(acc.y + acc.height);
+    const [search, toggle] = [await box("filter-text"), await box("filters-toggle")];
+    expect(Math.abs(search.y + search.height / 2 - (toggle.y + toggle.height / 2))).toBeLessThan(3);
+    await expect(page.getByTestId("filter-account")).toHaveCount(0);
+    await page.getByTestId("filters-toggle").click();
+    const [acc, txType, type, instr] = [await box("filter-account"), await box("filter-tx-type"), await box("filter-type"), await box("filter-instrument")];
+    expect(Math.abs(acc.y - txType.y)).toBeLessThan(2);
+    expect(type.y).toBeGreaterThan(acc.y + acc.height);
+    expect(instr.y).toBeGreaterThan(type.y + type.height - 1);
     expect(instr.width).toBeGreaterThan(300);
     await expect(page.getByTestId("filters-reset")).toHaveCount(0);
     await page.getByTestId("filter-account").selectOption("ike");
     await expect(page.getByTestId("filters-reset")).toHaveText("Clear");
-    expect((await box("filters-reset")).y).toBeGreaterThan(instr.y + instr.height); // on the count's line
+    await page.getByTestId("filters-toggle").click(); // folded again: the button says how many are set
+    await expect(page.getByTestId("filters-panel")).toHaveCount(0);
+    await expect(page.getByTestId("filters-toggle")).toHaveText("Filters · 1");
+    expect((await box("filters-reset")).y).toBeGreaterThan(search.y + search.height); // on the count's line
     await page.getByTestId("filters-reset").click();
     await expect(rows).toHaveCount(31);
     await expect(page.getByTestId("filters-reset")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+    // Scrolled: the filters stay under the top bar; month rows in the list too.
+    await expect(page.getByTestId("transactions-list").getByTestId("month-row").first()).toHaveText(/^September 2026\s*1$/);
+    await page.evaluate(() => window.scrollTo(0, 1500));
+    const bar = (await page.locator(".sidebar").boundingBox())!;
+    const tools = (await box("tx-toolbar"))!;
+    expect(Math.abs(tools.y - (bar.y + bar.height))).toBeLessThan(3);
+    expect(tools.height).toBeLessThan(100); // two short lines, not the whole set of dropdowns
   });
 
   test("a long history is drawn 200 rows at a time, the next ones as you scroll to the end", async ({ page }) => {
@@ -165,8 +183,8 @@ test.describe("transactions view", () => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
     await expect(rows).toHaveCount(31);
-    // Account first.
-    expect(await page.locator(".filters select").evaluateAll((ss) => ss.map((s) => s.getAttribute("data-testid")))).toEqual(["filter-account", "filter-instrument", "filter-type"]);
+    // Account first, the search last.
+    expect(await page.locator(".filters select, .filters input").evaluateAll((ss) => ss.map((s) => s.getAttribute("data-testid")))).toEqual(["filter-account", "filter-tx-type", "filter-instrument", "filter-type", "filter-text"]);
 
     await page.getByTestId("filter-instrument").selectOption({ label: "DS0432" });
     await expect(rows).toHaveCount(4); // broker: buy + 2 coupons, ike: buy
@@ -187,6 +205,79 @@ test.describe("transactions view", () => {
     await page.getByTestId("filter-account").selectOption("eur");
     const exchange = rows.filter({ hasText: "Currency exchange" }).filter({ hasText: "2025-11-03" });
     await expect(exchange.getByTestId("tx-amount-cell")).toHaveText(/^-4\s?300,00\s*zł\s*→\s*1\s?000,00 EUR$/);
+  });
+
+  test("filters by transaction type and free text (instrument, ISIN, account, type, note), kept in the URL", async ({ page }) => {
+    await page.goto("/#/transactions");
+    const rows = page.getByTestId("transaction-row");
+    await expect(rows).toHaveCount(31);
+    await page.getByTestId("filter-tx-type").selectOption({ label: "Buy" });
+    await expect(rows).toHaveCount(10);
+    await expect(page).toHaveURL(/tx=BUY/);
+    await page.getByTestId("filter-tx-type").selectOption("");
+    await page.getByTestId("filter-text").fill("ds0432"); // the code, any case
+    await expect(rows).toHaveCount(4);
+    await page.getByTestId("filter-tx-type").selectOption({ label: "Coupon" });
+    await expect(rows).toHaveCount(2);
+    await expect(page).toHaveURL(/q=ds0432/);
+    await page.reload();
+    await expect(rows).toHaveCount(2);
+    await page.getByTestId("filters-reset").click();
+    await page.getByTestId("filter-text").fill("broker's rate"); // a note
+    await expect(rows).toHaveCount(2);
+    await page.getByTestId("filter-text").fill("nothing like this");
+    await expect(rows).toHaveCount(0);
+    await expect(page.getByTestId("transactions-table")).toContainText("No transactions match the filters.");
+  });
+
+  test("a row per month; the filters and the header stay at the top while scrolling; tinted rows keep their divider", async ({ page }) => {
+    await page.goto("/#/transactions");
+    const rows = page.getByTestId("transaction-row");
+    await expect(rows).toHaveCount(31);
+    const months = page.getByTestId("transactions-table").getByTestId("month-row");
+    await expect(months).toHaveCount(16);
+    await expect(months.first()).toHaveText(/^September 2026\s*· 1$/);
+    await expect(months.nth(2)).toHaveText(/^May 2026\s*· 3$/);
+    // The month row comes right before its first transaction.
+    const kinds = await page.locator("[data-testid=transactions-table] tbody tr").evaluateAll((trs) => trs.slice(0, 4).map((tr) => tr.getAttribute("data-testid")));
+    expect(kinds).toEqual(["month-row", "transaction-row", "month-row", "transaction-row"]);
+
+    // A divider between rows of one date on the tint: not the colour of the tint itself.
+    const band = page.locator("tr.band-b[data-testid=transaction-row] td").first();
+    const [line, fill] = await band.evaluate((td) => [getComputedStyle(td).borderBottomColor, getComputedStyle(td).backgroundColor]);
+    expect(line).not.toBe(fill);
+
+    // Scrolled down: the filters at the top edge, the header right under them.
+    await page.setViewportSize({ width: 1280, height: 500 });
+    await page.evaluate(() => window.scrollTo(0, 1200));
+    const tools = (await page.getByTestId("tx-toolbar").boundingBox())!;
+    const head = (await page.locator("[data-testid=transactions-table] thead th").first().boundingBox())!;
+    expect(Math.abs(tools.y)).toBeLessThan(2);
+    expect(Math.abs(head.y - (tools.y + tools.height))).toBeLessThan(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
+  });
+
+  test("a wide screen gets a wider list; a narrower one drops the least needed columns, then becomes a list, instead of scrolling sideways", async ({ page }) => {
+    await page.setViewportSize({ width: 1900, height: 900 });
+    await page.goto("/#/transactions");
+    await expect(page.getByTestId("transaction-row")).toHaveCount(31);
+    expect((await page.getByTestId("transactions-table").boundingBox())!.width).toBeGreaterThan(1450);
+    await expect(page.locator("thead th.col-asset")).toBeVisible();
+    // Never wider than its box (it would be cut: the box doesn't scroll, so the header can stick).
+    for (const width of [1900, 1440, 1280, 1160]) {
+      await page.setViewportSize({ width, height: 900 });
+      const fits = await page.getByTestId("transactions-table").evaluate((t) => t.offsetWidth <= t.parentElement!.clientWidth + 1);
+      expect(fits, `at ${width} px`).toBe(true);
+    }
+    await page.setViewportSize({ width: 1200, height: 900 });
+    await expect(page.locator("thead th.col-asset")).toBeHidden();
+    await expect(page.locator("thead th.col-note")).toBeHidden();
+    // Narrower still: the list of two-line rows, as on a phone (the filters stay as on a computer).
+    await page.setViewportSize({ width: 1000, height: 900 });
+    await expect(page.getByTestId("transactions-table")).toHaveCount(0);
+    await expect(page.getByTestId("transactions-list").getByTestId("transaction-row")).toHaveCount(31);
+    await expect(page.getByTestId("filter-account")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1000);
   });
 });
 

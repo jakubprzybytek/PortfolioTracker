@@ -5,13 +5,18 @@ const QUERY = "(max-width: 720px)";
 
 /** True on a phone-sized screen; follows rotation and window resizes. */
 export function useNarrow(): boolean {
-  const [narrow, setNarrow] = useState(() => window.matchMedia(QUERY).matches);
+  return useMedia(QUERY);
+}
+
+/** Whether a media query matches now; follows rotation and window resizes. */
+export function useMedia(query: string): boolean {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches);
   useEffect(() => {
-    const m = window.matchMedia(QUERY);
+    const m = window.matchMedia(query);
     const onChange = () => setNarrow(m.matches);
     m.addEventListener("change", onChange);
     return () => m.removeEventListener("change", onChange);
-  }, []);
+  }, [query]);
   return narrow;
 }
 

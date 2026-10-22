@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Icon } from "./Icons.tsx";
 import { useNarrow } from "./useNarrow.ts";
 
@@ -42,18 +42,52 @@ export function FilterText({ label, value, onChange, testId, placeholder = "Name
 
 const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").replace(/Ł/g, "L").toLowerCase();
 /** Whether an instrument matches the free-text filter (empty: everything). */
-export const matchesText = (text: string, i: { code: string; name: string }) => !text.trim() || fold(`${i.code} ${i.name}`).includes(fold(text.trim()));
+export const matchesText = (text: string, i: { code: string; name: string }) => matchesAny(text, i.code, i.name);
+/** Whether any of the fields contains the free text (case and Polish accents ignored; empty text: everything). */
+export const matchesAny = (text: string, ...fields: (string | undefined)[]) => !text.trim() || fold(fields.filter(Boolean).join(" ")).includes(fold(text.trim()));
 
 /**
  * The filters, a Reset button and the "n of m" count. On a phone Reset is a "Clear" link at the end of the count's line,
  * shown only while a filter is set, so the filters get the whole width.
+ *
+ * `search` (a FilterText) goes last on a computer. With `compact`, a phone shows only the search and a "Filters" button
+ * (with how many dropdowns are set, `activeCount`) that folds the dropdowns out: the bar stays two short lines, so it
+ * can stay on screen while the list scrolls.
  */
-export function FilterBar({ children, active, onReset, summary }: { children: ReactNode; active: boolean; onReset: () => void; summary: string }) {
+export function FilterBar({ children, active, onReset, summary, search, compact = false, activeCount = 0 }: { children: ReactNode; active: boolean; onReset: () => void; summary: string; search?: ReactNode; compact?: boolean; activeCount?: number }) {
   const narrow = useNarrow();
+  const [open, setOpen] = useState(false);
+  if (narrow && compact)
+    return (
+      <div className="filters compact" data-testid="filters">
+        <div className="filters-top">
+          {search}
+          <button type="button" className={`filters-toggle${activeCount ? " active" : ""}`} aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="filters-toggle">
+            <Icon name="filter" size={14} /> Filters{activeCount ? ` · ${activeCount}` : ""}
+          </button>
+        </div>
+        {open && (
+          <div className="filters-panel" data-testid="filters-panel">
+            {children}
+          </div>
+        )}
+        <div className="filters-foot">
+          <span className="muted filters-summary" data-testid="filters-summary">
+            {summary}
+          </span>
+          {active && (
+            <button type="button" className="clear" onClick={onReset} title="Clear filters" data-testid="filters-reset">
+              <Icon name="clear-filters" size={14} /> Clear
+            </button>
+          )}
+        </div>
+      </div>
+    );
   if (narrow)
     return (
       <div className="filters" data-testid="filters">
         {children}
+        {search}
         <div className="filters-foot">
           <span className="muted filters-summary" data-testid="filters-summary">
             {summary}
@@ -69,6 +103,7 @@ export function FilterBar({ children, active, onReset, summary }: { children: Re
   return (
     <div className="filters" data-testid="filters">
       {children}
+      {search}
       <button type="button" className="reset" onClick={onReset} disabled={!active} title="Clear filters" aria-label="Clear filters" data-testid="filters-reset">
         <Icon name="clear-filters" size={16} />
       </button>

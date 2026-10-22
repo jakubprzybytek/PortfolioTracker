@@ -13,6 +13,7 @@
   --neg: #b91c1c;
   --row: #fafbfc;
   --band: #f1f4f8;
+  --band-line: #dde2e9; /* row dividers on the band tint */
   --cpi: #d97706; /* inflation in charts (amber against the accent's blue) */
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
@@ -35,6 +36,7 @@
     --neg: #f87171;
     --row: #1b2029;
     --band: #212733;
+    --band-line: #2f3746;
     --cpi: #e08a0b;
     --shadow: none;
   }
@@ -111,6 +113,15 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
   .filter > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .filters select { width: 100%; padding: 6px 4px 6px 8px; font-size: 0.85rem; }
   .filter.wide { flex-basis: 100%; order: 1; }
+  .filters.compact { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 6px; }
+  .filters.compact .filters-top { display: flex; gap: 6px; align-items: center; }
+  .filters.compact .filter.text { flex: 1 1 auto; }
+  .filters.compact button.filters-toggle { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 10px; font-size: 0.85rem; }
+  .filters.compact button.filters-toggle.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .filters.compact .filters-panel { display: flex; flex-wrap: wrap; gap: 6px; }
+  .filters.compact .filters-panel .filter { flex: 1 1 40%; }
+  .filters.compact .filters-panel .filter.wide { flex-basis: 100%; }
+  .filters.compact .filters-foot { min-height: 20px; }
   .filters-foot { order: 2; flex-basis: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
   .filters-summary { font-size: 0.8rem; }
   .filters button.clear { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; border: 0; background: none; color: var(--accent); font-size: 0.8rem; font-weight: 600; }
@@ -125,9 +136,32 @@ tr.account-group td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
 tbody tr.account-group:first-child td { border-top: 0; }
 /* Transactions: rows of one date share a background, neighbouring dates alternate. */
 tr.band-b td { background: var(--band); }
+.tx-table-wrap tbody tr td { border-bottom-color: var(--band-line); }
+/* Transactions: a row per month above its transactions (as the year rows of a statement). */
+tr.month td { background: var(--bg); color: var(--muted); font-weight: 600; font-size: 0.8rem; letter-spacing: 0.02em; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+tbody tr.month:not(:first-child) td { border-top: 1px solid var(--border); }
+tr.month:hover td { background: var(--bg); }
+td.tx-account { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
+/* The filters and the table's header stay at the top while the list scrolls (under the phone's top bar: --sticky-top;
+   the header under the filters: --bar-h, both measured). The table doesn't scroll sideways (a scrolling box would hold
+   its header): on narrower screens the least needed columns go instead (asset type, then fee and note: in the form). */
+.tx-toolbar { position: sticky; top: var(--sticky-top, 0px); z-index: 15; background: var(--bg); padding-top: 10px; margin-top: -10px; }
+.tx-toolbar .filters { margin-bottom: 0; padding-bottom: 12px; }
+.tx-table-wrap { overflow: clip; }
+.tx-table-wrap thead th { position: sticky; top: calc(var(--sticky-top, 0px) + var(--bar-h, 0px)); z-index: 10; background: var(--panel); box-shadow: inset 0 -1px 0 var(--border); }
+/* Instrument and note share what the other columns leave (3 : 2), so the table fits its box instead of being cut;
+   below 1150 px the view is a list, up to 1250 px fee and note go (they're in the form), up to 1440 px asset type. */
+.tx-table-wrap td.instrument { min-width: 8rem; width: 60%; }
+.tx-table-wrap td.note { max-width: 0; min-width: 6rem; width: 40%; }
+@media (max-width: 1440px) { .tx-table-wrap .col-asset { display: none; } }
+@media (max-width: 1250px) { .tx-table-wrap .col-fee, .tx-table-wrap .col-note { display: none; } }
+/* A wide screen gets a wider list (the other views keep their width). */
+main:has(> .tx-view) { max-width: 1760px; }
+.tx-month { display: flex; justify-content: space-between; padding: 6px 12px; background: var(--bg); color: var(--muted); font-weight: 600; font-size: 0.8rem; border-bottom: 1px solid var(--border); }
+.tx-month:not(:first-child) { border-top: 1px solid var(--border); }
 /* Transactions on a phone: a list of two-line rows (the table needs a wide screen). */
 .tx-list { list-style: none; margin: 0; padding: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; }
-.tx-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+.tx-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-bottom: 1px solid var(--band-line); font-size: 0.9rem; }
 .tx-item:last-child { border-bottom: 0; }
 .tx-item.band-b { background: var(--band); }
 .tx-item.clickable { cursor: pointer; }

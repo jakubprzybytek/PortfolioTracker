@@ -1,5 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { FilterBar, FilterSelect, uniqueOptions } from "./Filters.tsx";
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import {
+  FilterBar,
+  FilterSelect,
+  FilterText,
+  matchesAny,
+  uniqueOptions,
+} from "./Filters.tsx";
 import {
   TX_TYPE_LABELS,
   fmtInt,
@@ -11,7 +24,7 @@ import {
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { useTxForm } from "./txForm.ts";
-import { useNarrow } from "./useNarrow.ts";
+import { useMedia, useNarrow } from "./useNarrow.ts";
 import type { TransactionRow } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -21,16 +34,30 @@ const assetType = (t: TransactionRow) => t.instrument?.type ?? "CASH";
 /** Rows drawn at first, and added each time the list's end comes near: a long history stays a short page. */
 const PAGE = 200;
 
+const monthName = new Intl.DateTimeFormat("en-GB", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+/** "2026-10" → "October 2026". */
+const monthLabel = (month: string) =>
+  monthName.format(new Date(`${month}-15T00:00:00Z`));
+
 /**
- * All transactions, newest first (the API sorts), filtered by account, instrument and asset type. "Add transaction"
+ * All transactions, newest first (the API sorts), filtered by account, type, instrument, asset type and free text
+ * (instrument code or name, ISIN, account, type, note), with a row per month above its transactions. "Add transaction"
  * opens the form; a row opens it to edit (or delete) that transaction. Notes show as a one-line excerpt (all of it on
  * hover and in the form). A long list is drawn 200 rows at a time, the next ones as you scroll near its end (a page
  * with every row of a long history is very tall: slow to redraw, e.g. on every width while resizing). On a phone it's a
  * list of two-line rows instead of the table: date, type, account and amount; then instrument, quantity × price, fee
- * and the note's start.
+ * and the note's start. The filters and the table's header stay at the top while the list scrolls; on a phone the
+ * filters fold into a search and a "Filters" button, so they take two short lines there.
  */
 /** A retail bond bought on one day whose interest starts on another (issued later, a rollover): said in the date's tooltip. */
-const interestNote = (t: TransactionRow): string | undefined => (t.valueDate && t.valueDate !== t.date ? `Interest from ${t.valueDate}` : undefined);
+const interestNote = (t: TransactionRow): string | undefined =>
+  t.valueDate && t.valueDate !== t.date
+    ? `Interest from ${t.valueDate}`
+    : undefined;
 
 export function TransactionsView({
   params,
@@ -42,7 +69,7 @@ export function TransactionsView({
   const txs = useApi<TransactionRow[]>("/transactions");
   const form = useTxForm();
   const all = txs.data ?? [];
-  const { instrument = "", account = "", type = "" } = params;
+  const { instrument = "", account = "", type = "", tx = "", q = "" } = params;
 
   const options = useMemo(
     () => ({
@@ -59,6 +86,10 @@ export function TransactionsView({
         value: assetType(t),
         label: typeLabel(assetType(t)),
       })),
+      tx: uniqueOptions(all, (t) => ({
+        value: t.type,
+        label: TX_TYPE_LABELS[t.type] ?? t.type,
+      })),
     }),
     [all],
   );
@@ -70,10 +101,29 @@ export function TransactionsView({
           (!instrument ||
             (instrument === NO_INSTRUMENT ? !t.isin : t.isin === instrument)) &&
           (!account || t.account === account) &&
-          (!type || assetType(t) === type),
+          (!type || assetType(t) === type) &&
+          (!tx || t.type === tx) &&
+          matchesAny(
+            q,
+            t.instrument?.code,
+            t.instrument?.name,
+            t.isin,
+            t.account,
+            TX_TYPE_LABELS[t.type] ?? t.type,
+            t.note,
+          ),
       ),
-    [all, instrument, account, type],
+    [all, instrument, account, type, tx, q],
   );
+  // Transactions per month (as shown, after the filters), for the month rows.
+  const perMonth = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of rows)
+      m.set(t.date.slice(0, 7), (m.get(t.date.slice(0, 7)) ?? 0) + 1);
+    return m;
+  }, [rows]);
+  const monthStarts = (i: number) =>
+    i === 0 || rows[i]!.date.slice(0, 7) !== rows[i - 1]!.date.slice(0, 7);
   // Rows of one date share a background; the next date switches to the other one (as shown, after the filters).
   const bands = useMemo(() => {
     let band: "a" | "b" = "b";
@@ -90,8 +140,28 @@ export function TransactionsView({
 
   // Drawn so far; back to the first rows when the filters change.
   const [limit, setLimit] = useState(PAGE);
-  useEffect(() => setLimit(PAGE), [instrument, account, type]);
+  useEffect(() => setLimit(PAGE), [instrument, account, type, tx, q]);
   const narrow = useNarrow();
+  // The table needs a wide screen: below it (a phone, a narrow window), a list of two-line rows.
+  const list = useMedia("(max-width: 1150px)");
+
+  // The toolbar (filters) sticks to the top, under the phone's top bar; the table's header sticks under it.
+  const toolbar = useRef<HTMLDivElement | null>(null);
+  const [sticky, setSticky] = useState({ top: 0, bar: 0 });
+  useEffect(() => {
+    const bar = toolbar.current;
+    const topbar = document.querySelector<HTMLElement>(".sidebar");
+    const measure = () =>
+      setSticky({
+        top: narrow && topbar ? topbar.offsetHeight : 0,
+        bar: bar?.offsetHeight ?? 0,
+      });
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (bar) ro.observe(bar);
+    if (topbar) ro.observe(topbar);
+    return () => ro.disconnect();
+  }, [narrow]);
   const more = useRef<HTMLElement | null>(null);
   const moreRef = (el: HTMLElement | null) => {
     more.current = el;
@@ -106,54 +176,84 @@ export function TransactionsView({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [limit, rows.length, narrow]);
+  }, [limit, rows.length, list]);
 
   const set = (key: string) => (value: string) =>
     setParams({ ...params, [key]: value || undefined });
 
   return (
-    <>
+    <div
+      className="tx-view"
+      style={
+        {
+          "--sticky-top": `${sticky.top}px`,
+          "--bar-h": `${sticky.bar}px`,
+        } as CSSProperties
+      }
+    >
       <header className="view-header">
         <h2 className="view-title">Transactions</h2>
       </header>
       {txs.error && <p className="error">{txs.error}</p>}
 
-      <FilterBar
-        active={!!(instrument || account || type)}
-        onReset={() => setParams({})}
-        summary={
-          txs.loading
-            ? "Loading…"
-            : `${rows.length} of ${all.length} transactions`
-        }
-      >
-        <FilterSelect
-          label="Account"
-          value={account}
-          options={options.account}
-          onChange={set("account")}
-          testId="filter-account"
-          width="13rem"
-        />
-        <FilterSelect
-          label="Instrument"
-          value={instrument}
-          options={options.instrument}
-          onChange={set("instrument")}
-          testId="filter-instrument"
-          width="16rem"
-          wide
-        />
-        <FilterSelect
-          label="Asset type"
-          value={type}
-          options={options.type}
-          onChange={set("type")}
-          testId="filter-type"
-        />
-      </FilterBar>
+      <div className="tx-toolbar" ref={toolbar} data-testid="tx-toolbar">
+        <FilterBar
+          compact
+          activeCount={[instrument, account, type, tx].filter(Boolean).length}
+          search={
+            <FilterText
+              label="Search"
+              value={q}
+              onChange={set("q")}
+              testId="filter-text"
+              placeholder="Instrument, note, account…"
+              width="14rem"
+            />
+          }
+          active={!!(instrument || account || type || tx || q)}
+          onReset={() => setParams({})}
+          summary={
+            txs.loading
+              ? "Loading…"
+              : `${rows.length} of ${all.length} transactions`
+          }
+        >
+          <FilterSelect
+            label="Account"
+            value={account}
+            options={options.account}
+            onChange={set("account")}
+            testId="filter-account"
+            width="12rem"
+          />
+          <FilterSelect
+            label="Type"
+            value={tx}
+            options={options.tx}
+            onChange={set("tx")}
+            testId="filter-tx-type"
+            width="10rem"
+          />
+          <FilterSelect
+            label="Instrument"
+            value={instrument}
+            options={options.instrument}
+            onChange={set("instrument")}
+            testId="filter-instrument"
+            width="14rem"
+            wide
+          />
+          <FilterSelect
+            label="Asset type"
+            value={type}
+            options={options.type}
+            onChange={set("type")}
+            testId="filter-type"
+          />
+        </FilterBar>
+      </div>
 
-      {narrow ? (
+      {list ? (
         <ul className="tx-list" data-testid="transactions-list">
           {!txs.data &&
             txs.loading &&
@@ -169,65 +269,74 @@ export function TransactionsView({
               </li>
             ))}
           {rows.slice(0, limit).map((t, i) => (
-            <li
-              key={`${t.account}/${t.id}`}
-              data-testid="transaction-row"
-              data-id={t.id}
-              className={`tx-item clickable band-${bands[i]}`}
-              onClick={() => form.open(t)}
-            >
-              <div className="tx-line">
-                <span className="tx-date" title={interestNote(t)}>
-                  {t.date}
-                  {interestNote(t) && <span className="faint"> *</span>}
-                </span>
-                <span className="tx-what">
-                  {TX_TYPE_LABELS[t.type] ?? t.type}{" "}
-                  <span className="muted">· {t.account}</span>
-                </span>
-                <span
-                  className={`tx-amount ${t.type === "EXCHANGE" ? "" : signClass(t.amount)}`}
-                  data-testid="tx-amount-cell"
-                >
-                  {t.type === "EXCHANGE" ? (
-                    <>
-                      {fmtMoney(t.amount, t.currency)}{" "}
-                      <span className="faint">→</span>{" "}
-                      {fmtMoney(t.toAmount, t.toCurrency ?? t.currency)}
-                    </>
-                  ) : (
-                    fmtMoney(t.amount, t.currency)
-                  )}
-                </span>
-              </div>
-              {(t.instrument || t.isin || t.note || t.fee) && (
-                <div className="tx-line tx-detail muted">
-                  {(t.instrument || t.isin) && (
-                    <strong className="tx-code">
-                      {t.instrument?.code ?? t.isin}
-                    </strong>
-                  )}
-                  {t.quantity !== undefined && (
-                    <span>
-                      {fmtInt(t.quantity)}
-                      {t.price !== undefined && ` × ${fmtNum(t.price)}`}
-                    </span>
-                  )}
-                  {t.fee ? (
-                    <span>fee {fmtMoney(t.fee, t.currency)}</span>
-                  ) : null}
-                  {t.note && (
-                    <span
-                      className="tx-note"
-                      title={t.note}
-                      data-testid="tx-note-cell"
-                    >
-                      {t.note}
-                    </span>
-                  )}
-                </div>
+            <Fragment key={`${t.account}/${t.id}`}>
+              {monthStarts(i) && (
+                <li className="tx-month" data-testid="month-row">
+                  <span>{monthLabel(t.date.slice(0, 7))}</span>
+                  <span className="faint">
+                    {perMonth.get(t.date.slice(0, 7))}
+                  </span>
+                </li>
               )}
-            </li>
+              <li
+                data-testid="transaction-row"
+                data-id={t.id}
+                className={`tx-item clickable band-${bands[i]}`}
+                onClick={() => form.open(t)}
+              >
+                <div className="tx-line">
+                  <span className="tx-date" title={interestNote(t)}>
+                    {t.date}
+                    {interestNote(t) && <span className="faint"> *</span>}
+                  </span>
+                  <span className="tx-what">
+                    {TX_TYPE_LABELS[t.type] ?? t.type}{" "}
+                    <span className="muted">· {t.account}</span>
+                  </span>
+                  <span
+                    className={`tx-amount ${t.type === "EXCHANGE" ? "" : signClass(t.amount)}`}
+                    data-testid="tx-amount-cell"
+                  >
+                    {t.type === "EXCHANGE" ? (
+                      <>
+                        {fmtMoney(t.amount, t.currency)}{" "}
+                        <span className="faint">→</span>{" "}
+                        {fmtMoney(t.toAmount, t.toCurrency ?? t.currency)}
+                      </>
+                    ) : (
+                      fmtMoney(t.amount, t.currency)
+                    )}
+                  </span>
+                </div>
+                {(t.instrument || t.isin || t.note || t.fee) && (
+                  <div className="tx-line tx-detail muted">
+                    {(t.instrument || t.isin) && (
+                      <strong className="tx-code">
+                        {t.instrument?.code ?? t.isin}
+                      </strong>
+                    )}
+                    {t.quantity !== undefined && (
+                      <span>
+                        {fmtInt(t.quantity)}
+                        {t.price !== undefined && ` × ${fmtNum(t.price)}`}
+                      </span>
+                    )}
+                    {t.fee ? (
+                      <span>fee {fmtMoney(t.fee, t.currency)}</span>
+                    ) : null}
+                    {t.note && (
+                      <span
+                        className="tx-note"
+                        title={t.note}
+                        data-testid="tx-note-cell"
+                      >
+                        {t.note}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </li>
+            </Fragment>
           ))}
           {rows.length > limit && (
             <li
@@ -247,75 +356,101 @@ export function TransactionsView({
           )}
         </ul>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap tx-table-wrap">
           <table data-testid="transactions-table" className="static">
             <thead>
               <tr>
-                <th className="left">Date ▼</th>
-                <th className="left">Account</th>
-                <th className="left">Type</th>
+                <th className="left col-date">Date ▼</th>
+                <th className="left col-account">Account</th>
+                <th className="left col-type">Type</th>
                 <th className="left">Instrument</th>
-                <th className="left">Asset type</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Amount</th>
-                <th>Fee</th>
-                <th className="left">Note</th>
+                <th className="left col-asset">Asset type</th>
+                <th className="col-qty">Qty</th>
+                <th className="col-price">Price</th>
+                <th className="col-amount">Amount</th>
+                <th className="col-fee">Fee</th>
+                <th className="left col-note">Note</th>
               </tr>
             </thead>
             <tbody>
               {!txs.data && txs.loading && <SkeletonRows rows={12} cols={10} />}
               {rows.slice(0, limit).map((t, i) => (
-                <tr
-                  key={`${t.account}/${t.id}`}
-                  data-testid="transaction-row"
-                  data-id={t.id}
-                  className={`clickable band-${bands[i]}`}
-                  onClick={() => form.open(t)}
-                  title="Edit or delete"
-                >
-                  <td className="left" title={interestNote(t)}>
-                    {t.date}
-                    {interestNote(t) && <span className="faint" data-testid="tx-interest-mark"> *</span>}
-                  </td>
-                  <td className="left">{t.account}</td>
-                  <td className="left">{TX_TYPE_LABELS[t.type] ?? t.type}</td>
-                  <td className="left instrument">
-                    {t.instrument ? (
-                      <InstrumentLabel
-                        code={t.instrument.code}
-                        name={t.instrument.name}
-                      />
-                    ) : (
-                      <span className="muted">{t.isin ?? "–"}</span>
-                    )}
-                  </td>
-                  <td className="left">{typeLabel(assetType(t))}</td>
-                  <td>{t.quantity === undefined ? "–" : fmtInt(t.quantity)}</td>
-                  <td>{t.price === undefined ? "–" : fmtNum(t.price)}</td>
-                  <td
-                    className={t.type === "EXCHANGE" ? "" : signClass(t.amount)}
-                    data-testid="tx-amount-cell"
+                <Fragment key={`${t.account}/${t.id}`}>
+                  {monthStarts(i) && (
+                    <tr className="month" data-testid="month-row">
+                      <td className="left" colSpan={10}>
+                        {monthLabel(t.date.slice(0, 7))}{" "}
+                        <span className="faint">
+                          · {perMonth.get(t.date.slice(0, 7))}
+                        </span>
+                      </td>
+                    </tr>
+                  )}
+                  <tr
+                    data-testid="transaction-row"
+                    data-id={t.id}
+                    className={`clickable band-${bands[i]}`}
+                    onClick={() => form.open(t)}
+                    title="Edit or delete"
                   >
-                    {t.type === "EXCHANGE" ? (
-                      <>
-                        {fmtMoney(t.amount, t.currency)}{" "}
-                        <span className="faint">→</span>{" "}
-                        {fmtMoney(t.toAmount, t.toCurrency ?? t.currency)}
-                      </>
-                    ) : (
-                      fmtMoney(t.amount, t.currency)
-                    )}
-                  </td>
-                  <td>{t.fee ? fmtMoney(t.fee, t.currency) : "–"}</td>
-                  <td
-                    className="left muted note"
-                    title={t.note}
-                    data-testid="tx-note-cell"
-                  >
-                    {t.note ?? ""}
-                  </td>
-                </tr>
+                    <td className="left" title={interestNote(t)}>
+                      {t.date}
+                      {interestNote(t) && (
+                        <span className="faint" data-testid="tx-interest-mark">
+                          {" "}
+                          *
+                        </span>
+                      )}
+                    </td>
+                    <td className="left tx-account" title={t.account}>
+                      {t.account}
+                    </td>
+                    <td className="left">{TX_TYPE_LABELS[t.type] ?? t.type}</td>
+                    <td className="left instrument">
+                      {t.instrument ? (
+                        <InstrumentLabel
+                          code={t.instrument.code}
+                          name={t.instrument.name}
+                        />
+                      ) : (
+                        <span className="muted">{t.isin ?? "–"}</span>
+                      )}
+                    </td>
+                    <td className="left col-asset">
+                      {typeLabel(assetType(t))}
+                    </td>
+                    <td>
+                      {t.quantity === undefined ? "–" : fmtInt(t.quantity)}
+                    </td>
+                    <td>{t.price === undefined ? "–" : fmtNum(t.price)}</td>
+                    <td
+                      className={
+                        t.type === "EXCHANGE" ? "" : signClass(t.amount)
+                      }
+                      data-testid="tx-amount-cell"
+                    >
+                      {t.type === "EXCHANGE" ? (
+                        <>
+                          {fmtMoney(t.amount, t.currency)}{" "}
+                          <span className="faint">→</span>{" "}
+                          {fmtMoney(t.toAmount, t.toCurrency ?? t.currency)}
+                        </>
+                      ) : (
+                        fmtMoney(t.amount, t.currency)
+                      )}
+                    </td>
+                    <td className="col-fee">
+                      {t.fee ? fmtMoney(t.fee, t.currency) : "–"}
+                    </td>
+                    <td
+                      className="left muted note col-note"
+                      title={t.note}
+                      data-testid="tx-note-cell"
+                    >
+                      {t.note ?? ""}
+                    </td>
+                  </tr>
+                </Fragment>
               ))}
               {rows.length > limit && (
                 <tr ref={moreRef} data-testid="transactions-more">
@@ -337,6 +472,6 @@ export function TransactionsView({
           </table>
         </div>
       )}
-    </>
+    </div>
   );
 }
