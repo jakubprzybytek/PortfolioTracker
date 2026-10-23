@@ -140,6 +140,7 @@ PK = CPI_REF                SK = <YYYY-MM>          wr (CPI m/m, e.g. 0.003), w 
 PK = CPI_YTD                SK = <YYYY-MM>          value (CPI, December of the previous year = 100, e.g. 102.4), source, updatedAt   (Returns by year: December's is the year's inflation; GUS from 2000, kept as GUS has it now)
 PK = CPI_YOY                SK = <YYYY-MM>          value (CPI, same month of the previous year = 100, e.g. 104.1), source, updatedAt   (Indicators: 12-month inflation; GUS from 2000, kept as GUS has it now)
 PK = FX#<CCY>               SK = <YYYY-MM-DD>       mid, table_no, source        (NBP table A, PLN per unit)
+PK = BENCH#<id>             SK = <YYYY-MM-DD>       id, close, currency, source, fetchedAt   (benchmarks of the Performance view: WIG, MSCI_WORLD; the close in its own currency, PLN at NBP when read)
 ```
 
 ### Exchange calendar
@@ -250,7 +251,7 @@ Each function links only the tables it needs. The spreadsheet feed isn't linked 
 
 | Function | `market` | `transactions` | `holdings` |
 |---|---|---|---|
-| `EodGpw`, `RecheckGpw`, `EodEtf`, `EodCatalyst`, `EodBonds` (and their rechecks), `Live`, `Coupons`, `Monthly` | read/write | — | — |
+| `EodGpw`, `RecheckGpw`, `EodEtf`, `EodCatalyst`, `EodBonds`, `Benchmarks` (and their rechecks), `Live`, `Coupons`, `Monthly` | read/write | — | — |
 | `Fx` | read/write | read | — |
 | `Export` | read | read | — |
 | `Backfill` | read/write | — | — |

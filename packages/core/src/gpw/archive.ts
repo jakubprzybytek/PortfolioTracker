@@ -12,6 +12,7 @@ export const GpwInstrumentType = {
   shares: "10",
   treasuryBonds: "13", // "obligacje skarbowe"
   etf: "241",
+  indices: "1",
 } as const;
 
 // Browser-like headers; the server is picky about clients.

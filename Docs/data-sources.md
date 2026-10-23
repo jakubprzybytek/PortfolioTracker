@@ -46,6 +46,7 @@ Transactions are the only data the app can't fetch or rebuild (data-storage.md).
 ### GPW archive – treasury bonds on the exchange
 - **URL:** `https://www.gpw.pl/archiwum-notowan?fetch=1&type=13&instrument=<CODE>&date=&show_x=Pokaż+wyniki`. Per instrument it returns one XLS with the **full daily history** since listing (verified 2026-10-10 in `poc/gpw-history`). With `instrument=` empty and `date=dd-mm-yyyy` it returns **one XLS for that day with all treasury bonds** (same columns). There's no "last N" or range option.
 - **Data:** ISIN, OHLC (clean, % of nominal), change, volume, number of trades, turnover (thousand PLN), "Cena nominalna".
+- **Indices** (`type=1`, used for the WIG benchmark since 2026-10-23): every GPW index, by name (`instrument=WIG`): WIG since 1991-04-16, WIG20TR, mWIG40TR, sWIG80TR since 2017. Same columns; volume 0.
 - **"Cena nominalna" is unreliable for IZ bonds:** since 2025-09-29 it's mostly 1000 instead of the indexed nominal. It's rounded to whole PLN and taken at the **settlement date (T+2 business days)**, not the session date. Compute the IZ indexed nominal instead (see below); use GPW's column only as a sanity check.
 
 ### IZ bonds – indexed nominal and accrued interest (verified 2026-10-10)

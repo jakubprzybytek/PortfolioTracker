@@ -46,6 +46,8 @@ import {
   type Targets,
   ASSET_CLASSES,
   defaultAssetClass,
+  BENCHMARKS,
+  benchmarkInPln,
   cpiIndicators,
   cpiLevels,
   yearlyReturns,
@@ -102,6 +104,20 @@ async function portfolioHistory(from: string, to: string) {
   const deposits = netDepositsByDate(txs, points.map((p) => p.date), fx, incomplete);
   return points.map((p) => ({ date: p.date, totals: p.totals, byType: p.byType, byClass: p.byClass, total: Math.round((p.totals.value + (p.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(p.date) ?? 0 }));
 }
+/**
+ * Each benchmark's daily value in PLN from a fortnight before `first` (the first day valued), for the growth of 100 zł
+ * and the returns by year. Without a first day: none.
+ */
+async function benchmarkSeries(first: string | undefined) {
+  if (!first) return [];
+  const from = addDays(first, -14);
+  const currencies = [...new Set(BENCHMARKS.map((b) => b.currency))].filter((c) => c !== "PLN");
+  const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(from, -14), today())).sort((a, b) => a.date.localeCompare(b.date))] as const)));
+  return Promise.all(
+    BENCHMARKS.map(async (b) => ({ id: b.id, label: b.label, note: b.note, points: benchmarkInPln(await repo.queryBenchmarkPrices(b.id, from, today()), b.currency, fx) })),
+  );
+}
+
 /** "Refresh prices" at most this often. */
 const REFRESH_EVERY_MS = 5 * 60_000;
 
@@ -301,7 +317,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const [points, ytd, mom] = await Promise.all([portfolioHistory("2000-01-01", today()), repo.listGusCpi("CPI_YTD"), repo.listReferenceIndex()]);
         const levels = cpiLevels(ytd, mom);
         const start = points[0] ? shiftMonth(points[0].date.slice(0, 7), -1) : "9999-12";
-        return json(200, { ...yearlyReturns(points, levels), cpi: levels.filter((l) => l.month >= start) });
+        return json(200, { ...yearlyReturns(points, levels), cpi: levels.filter((l) => l.month >= start), benchmarks: await benchmarkSeries(points[0]?.date) });
       }
       case "GET /instruments": {
         const items = (await repo.listInstruments()).filter((i) => i.isin !== "MF-TERMS");
@@ -639,7 +655,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, { targets: parsed.data });
       }
       case "GET /status": {
-        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];
+        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "benchmarks", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];
         const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.latestJobRun(j)) ?? null])));
         return json(200, { now: new Date().toISOString(), jobs: runs });
       }

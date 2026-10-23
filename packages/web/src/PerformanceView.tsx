@@ -23,7 +23,7 @@ export function PerformanceView({ params, setParams }: { params: Record<string, 
       </header>
 
       <h2>
-        Returns by year <span className="muted chart-legend">time-weighted (deposits don't count) against inflation, CPI December on December</span>
+        Returns by year <span className="muted chart-legend">time-weighted (deposits don't count) against inflation, CPI December on December, and the benchmarks over the same days</span>
       </h2>
       {years.error ? <p className="error">{years.error}</p> : <YearsTable data={years.data} loading={years.loading} />}
 
@@ -36,10 +36,10 @@ export function PerformanceView({ params, setParams }: { params: Record<string, 
         </div>
         <div>
           <h2>
-            Growth of 100 zł <span className="muted chart-legend">from the start of the range, against what CPI says it needs to be</span>
+            Growth of 100 zł <span className="muted chart-legend">from the start of the range, against the benchmarks and CPI</span>
           </h2>
           <section className="panel">
-            {history.error ? <p className="error">{history.error}</p> : <GrowthChart history={history.data ?? []} cpi={years.data?.cpi} loading={history.loading || (!years.data && years.loading)} />}
+            {history.error ? <p className="error">{history.error}</p> : <GrowthChart history={history.data ?? []} cpi={years.data?.cpi} benchmarks={years.data?.benchmarks} loading={history.loading || (!years.data && years.loading)} />}
           </section>
         </div>
       </div>

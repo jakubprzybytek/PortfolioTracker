@@ -1,4 +1,22 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+type Bench = { id: string; label: string; note: string; points: { date: string; value: number }[] };
+
+/** Replaces the benchmarks in `GET /portfolio/years` (the stage may not have fetched any yet), made from the first day valued. */
+async function withBenchmarks(page: Page, make: (first: string) => Bench[]) {
+  await page.route(/\/portfolio\/years/, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({ response, json: { ...body, benchmarks: make(body.total?.from ?? "2025-02-03") } });
+  });
+}
+
+/** A value per day from `from` to today, growing `perDay` a day. */
+function series(from: string, start: number, perDay: number) {
+  const points: { date: string; value: number }[] = [];
+  for (let d = new Date(`${from}T00:00:00Z`), v = start; d <= new Date(); d.setUTCDate(d.getUTCDate() + 1), v *= 1 + perDay) points.push({ date: d.toISOString().slice(0, 10), value: v });
+  return points;
+}
 
 // Runs against the dev stage data: data/instruments.json + data/transactions.sample.json imported.
 
@@ -41,6 +59,8 @@ test.describe("performance", () => {
   });
 
   test("returns by year against inflation: the table, the bars per year and the growth of 100 zł", async ({ page }) => {
+    await withBenchmarks(page, () => []);
+    await page.reload();
     const rows = page.getByTestId("years-row");
     await expect(rows.first()).toBeVisible();
     // Newest first; the sample starts in February 2025: that year and the year so far are parts of a year.
@@ -53,13 +73,45 @@ test.describe("performance", () => {
     const bars = page.getByTestId("years-chart");
     expect(await bars.locator(".recharts-bar-rectangle").count()).toBe(2 * (await rows.count()));
     await expect(bars.locator(".recharts-scatter circle").first()).toBeVisible();
-    // Growth of 100 zł: two lines from 100 at the start of the range
+    // Growth of 100 zł: the portfolio, CPI and CPI + 2 % from 100 at the start of the range
     const growth = page.getByTestId("growth-chart");
-    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(2);
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(3);
+    await expect(page.getByTestId("returns-pair").locator(".chart-key").last()).toContainText("Inflation +2 %");
     await expect(page.getByTestId("returns-pair").locator(".chart-key").last()).toContainText("Inflation (CPI)");
     await page.getByTestId("performance-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
-    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(2);
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(3);
+  });
+
+  test("benchmarks: a line each on the growth of 100 zł and a column each in the returns by year", async ({ page }) => {
+    // One from before the first day, one starting after it (no line, no returns before it starts).
+    await withBenchmarks(page, (first) => {
+      const late = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+      return [
+        { id: "WIG", label: "WIG", note: "test WIG", points: series(new Date(Date.parse(first) - 14 * 86_400_000).toISOString().slice(0, 10), 1000, 0.0005) },
+        { id: "MSCI_WORLD", label: "MSCI World", note: "test world", points: series(late, 50, 0) },
+      ];
+    });
+    await page.reload();
+    const table = page.getByTestId("years-table");
+    await expect(table.locator("thead th").filter({ hasText: "WIG" })).toHaveCount(1);
+    await expect(table.locator("thead th").filter({ hasText: "MSCI World" })).toHaveCount(1);
+    const oldest = page.getByTestId("years-row").last();
+    await expect(oldest.getByTestId("years-bench-WIG")).toHaveText(/^\+\d.* %$/); // growing: positive
+    await expect(oldest.getByTestId("years-bench-MSCI_WORLD")).toHaveText("–");
+    await expect(page.getByTestId("years-total").getByTestId("years-bench-WIG")).toHaveText(/\d %/);
+    const growth = page.getByTestId("growth-chart");
+    await page.getByTestId("performance-range").getByRole("button", { name: "ALL" }).click();
+    await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(4); // portfolio, CPI, CPI + 2 %, WIG (MSCI World starts later)
+    const key = page.getByTestId("returns-pair").locator(".chart-key").last();
+    await expect(key).toContainText("WIG");
+    await expect(key).not.toContainText("MSCI World");
+    // Over the last month both have a value on the first day: both lines
+    await page.getByTestId("performance-range").getByRole("button", { name: "1M" }).click();
+    await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(5);
+    await expect(key).toContainText("MSCI World 100,00 zł");
   });
 
   test("holds the charts' space while loading; a new range dims the three charts that follow it", async ({ page }) => {

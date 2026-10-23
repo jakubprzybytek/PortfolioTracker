@@ -19,6 +19,7 @@ import {
   type AccountItem,
   type BackfillItem,
   type CouponPeriodItem,
+  type BenchmarkPriceItem,
   type FxRateItem,
   type HistoryPointItem,
   type InstrumentItem,
@@ -260,6 +261,34 @@ export class Repository {
       }),
     );
     return res.Items?.[0] as FxRateItem | undefined;
+  }
+
+  // --- benchmarks (Performance view) ---------------------------------------------------------------
+
+  putBenchmarkPrices(items: Omit<BenchmarkPriceItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut("market", items.map((p) => ({ ...keys.benchmarkPrice(p.id, p.date), ...p })));
+  }
+
+  /** Closes of one benchmark in [from, to], oldest first. */
+  queryBenchmarkPrices(id: string, from: IsoDate, to: IsoDate): Promise<BenchmarkPriceItem[]> {
+    return this.queryAll<BenchmarkPriceItem>("market", {
+      KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
+      ExpressionAttributeValues: { ":pk": `BENCH#${id}`, ":from": from, ":to": to },
+    });
+  }
+
+  /** The latest stored close, if any. */
+  async latestBenchmarkPrice(id: string): Promise<BenchmarkPriceItem | undefined> {
+    const res = await this.doc.send(
+      new QueryCommand({
+        TableName: this.tables.market,
+        KeyConditionExpression: "PK = :pk",
+        ExpressionAttributeValues: { ":pk": `BENCH#${id}` },
+        ScanIndexForward: false,
+        Limit: 1,
+      }),
+    );
+    return res.Items?.[0] as BenchmarkPriceItem | undefined;
   }
 
   // --- retail bond series (Ministry file) -------------------------------------------------------

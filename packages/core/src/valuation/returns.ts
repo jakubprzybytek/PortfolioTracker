@@ -8,6 +8,7 @@ import {
   shiftMonth,
   type IsoDate,
 } from "../dates.ts";
+import { benchmarkAt, CPI_MARGIN, type BenchmarkPoint } from "../benchmarks/benchmarks.ts";
 import { dayFactor } from "./history.ts";
 import { xirr } from "./xirr.ts";
 
@@ -252,24 +253,38 @@ export function yearlyReturns(
 }
 
 /**
- * Growth of 100 zł from the first point given: the portfolio's time-weighted return chained day by day, and what CPI
- * says 100 zł then needs to be to buy as much (null before CPI starts; flat after its last published month).
+ * Growth of 100 zł from the first point given: the portfolio's time-weighted return chained day by day, what CPI
+ * says 100 zł then needs to be to buy as much (null before CPI starts; flat after its last published month), the same
+ * with `margin` a year on top (`cpiPlus`), and each benchmark from 100 on the first day (`bench[id]`; null throughout
+ * when it has no value on that day).
  */
 export function growthOf100(
   points: ReturnPoint[],
   levels: CpiLevel[],
-): { date: IsoDate; portfolio: number; cpi: number | null }[] {
-  const start = points[0] && cpiAt(levels, points[0].date);
+  benchmarks: { id: string; points: BenchmarkPoint[] }[] = [],
+  margin = CPI_MARGIN,
+): { date: IsoDate; portfolio: number; cpi: number | null; cpiPlus: number | null; bench: Record<string, number | null> }[] {
+  const first = points[0]?.date;
+  const start = first && cpiAt(levels, first);
+  const bases = benchmarks.map((b) => ({ ...b, base: first ? benchmarkAt(b.points, first) : undefined }));
   let index = 100;
   let prev: ReturnPoint | undefined;
   return points.map((p) => {
     if (prev) index *= dayFactor(prev, p) ?? 1;
     prev = p;
     const c = start && cpiAt(levels, p.date);
+    const cpi = c && start ? (100 * c.level) / start.level : null;
+    const bench: Record<string, number | null> = {};
+    for (const b of bases) {
+      const v = b.base === undefined ? undefined : benchmarkAt(b.points, p.date);
+      bench[b.id] = v === undefined || b.base === undefined ? null : round((100 * v) / b.base, 4);
+    }
     return {
       date: p.date,
       portfolio: round(index, 4),
-      cpi: c && start ? round((100 * c.level) / start.level, 4) : null,
+      cpi: cpi === null ? null : round(cpi, 4),
+      cpiPlus: cpi === null ? null : round(cpi * (1 + margin) ** (daysBetween(first!, p.date) / 365.25), 4),
+      bench,
     };
   });
 }

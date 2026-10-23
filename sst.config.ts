@@ -177,6 +177,20 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
+    // Benchmarks of the Performance view (WIG from GPW's archive, MSCI World from Yahoo): after GPW's evening file,
+    // and a morning pass. Nothing is valued from them, so no valuation follows.
+    new sst.aws.CronV2("Benchmarks", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/benchmarks.handler" },
+      schedule: "cron(5 22 ? * MON-FRI *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
+    new sst.aws.CronV2("RecheckBenchmarks", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/benchmarks.handler" },
+      schedule: "cron(20 7 ? * TUE-SAT *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
     // NBP table A is published around 12:00 on business days; the afternoon run catches a late table.
     new sst.aws.CronV2("FxNoon", { function: fx.arn, schedule: "cron(30 12 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
     new sst.aws.CronV2("FxAfternoon", { function: fx.arn, schedule: "cron(30 16 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });

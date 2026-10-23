@@ -114,6 +114,18 @@ export interface FxRateItem {
   source: string;
 }
 
+/** A benchmark's close on `date`, in its own currency (`core/benchmarks/benchmarks.ts`, the `benchmarks` job). */
+export interface BenchmarkPriceItem {
+  PK: `BENCH#${string}`;
+  SK: IsoDate;
+  id: string;
+  date: IsoDate;
+  close: number;
+  currency: string;
+  source: string;
+  fetchedAt: string;
+}
+
 /** Who set a coupon period's rate or dates: you (the app), obligacje.pl (the `coupons` job), or your coupons received. */
 export type CouponSource = "manual" | "obligacje.pl" | "coupons";
 
@@ -331,6 +343,7 @@ export const keys = {
   referenceIndex: (month: string) => ({ PK: "CPI_REF" as const, SK: month }),
   gusCpi: (series: GusCpiSeries, month: string) => ({ PK: series, SK: month }),
   fxRate: (currency: string, date: IsoDate) => ({ PK: `FX#${currency}` as const, SK: date }),
+  benchmarkPrice: (id: string, date: IsoDate) => ({ PK: `BENCH#${id}` as const, SK: date }),
   couponPeriod: (isin: string, start: IsoDate) => ({ PK: `INST#${isin}` as const, SK: `COUPON#${start}` as const }),
   transaction: (account: string, date: IsoDate, id: string) => ({ PK: `ACCT#${account}` as const, SK: `TX#${date}#${id}` as const }),
   snapshot: (date: IsoDate | "LATEST") => ({ PK: "PORTFOLIO" as const, SK: `SNAP#${date}` as const }),

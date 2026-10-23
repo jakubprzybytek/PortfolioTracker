@@ -261,8 +261,10 @@ test.describe("dashboard", () => {
     await page.getByTestId("nav-status").click();
     await expect(page).toHaveURL(/#\/status$/);
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
-    await expect(rows).toHaveCount(9);
-    await expect(page.getByTestId("jobs-table")).toContainText("valuation");
+    // Every job, once loaded (the 9 placeholder rows before that aren't job rows)
+    await expect(page.getByTestId("job-valuation")).toBeVisible();
+    await expect(rows).toHaveCount(14);
+    await expect(page.getByTestId("job-benchmarks")).toBeVisible();
     await expect(page.getByTestId("jobs-table")).toContainText("ok");
   });
 });

@@ -16,6 +16,11 @@ import {
   type PeriodReturn,
   type TotalReturn,
 } from "@portfolio/core/valuation/returns";
+import {
+  benchmarkReturn,
+  CPI_MARGIN,
+  type BenchmarkPoint,
+} from "@portfolio/core/benchmarks/benchmarks";
 import { fmtNum, fmtPct, fmtPln, signClass } from "./format.ts";
 import { ChartBusy, ChartPlaceholder, SkeletonRows } from "./Placeholders.tsx";
 import type { HistoryPoint } from "./types.ts";
@@ -26,6 +31,40 @@ export interface YearsResponse {
   years: PeriodReturn[];
   total: TotalReturn | null;
   cpi: CpiLevel[];
+  /** Each benchmark's daily value in PLN from just before the first day (WIG, MSCI World). */
+  benchmarks?: BenchmarkSeries[];
+}
+
+/** A benchmark in `GET /portfolio/years`. */
+export interface BenchmarkSeries {
+  id: string;
+  label: string;
+  note: string;
+  points: BenchmarkPoint[];
+}
+
+/** A benchmark's colour in charts (styles.css). */
+const benchColor = (id: string) => `var(--bench-${id})`;
+
+/** A benchmark's return over a period's days, with the portfolio's difference in the tooltip. */
+function BenchCell({ b, r, perYear }: { b: BenchmarkSeries; r: PeriodReturn | TotalReturn; perYear?: boolean }) {
+  let v = benchmarkReturn(b.points, r.from, r.to);
+  let mine = r.twr;
+  if (perYear) {
+    const t = r as TotalReturn;
+    v = v === null || t.years < 1 ? null : (1 + v) ** (1 / t.years) - 1;
+    mine = t.twrPerYear;
+  }
+  const diff = v === null || mine === null ? null : (mine - v) * 100;
+  return (
+    <td
+      className={signClass(v)}
+      data-testid={`years-bench-${b.id}`}
+      title={v === null ? `${b.label} has no value on ${r.from}` : `${b.label} ${r.from} → ${r.to}${perYear ? ", a year" : ""}: ${pct(v)}; the portfolio ${diff! >= 0 ? "+" : "−"}${fmtNum(Math.abs(diff!), 1)} pp`}
+    >
+      {pct(v)}
+    </td>
+  );
 }
 
 /** Keeps "−2 %" on one line: recharts wraps axis labels at spaces. */
@@ -86,7 +125,8 @@ export function YearsTable({
 }) {
   const narrow = useNarrow();
   const t = data?.total;
-  const cols = narrow ? 3 : 9;
+  const benches = narrow ? [] : (data?.benchmarks ?? []);
+  const cols = narrow ? 3 : 9 + benches.length;
   return (
     <div className="table-wrap returns" data-testid="years">
       <table className="static" data-testid="years-table">
@@ -123,6 +163,11 @@ export function YearsTable({
                 XIRR
               </th>
             )}
+            {benches.map((b) => (
+              <th key={b.id} className="bench" title={`${b.note}. Its return over the same days, to compare with Return`}>
+                {b.label}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -174,6 +219,9 @@ export function YearsTable({
                     {pct(y.xirr)}
                   </td>
                 )}
+                {benches.map((b) => (
+                  <BenchCell key={b.id} b={b} r={y} />
+                ))}
               </tr>
             );
           })}
@@ -207,6 +255,9 @@ export function YearsTable({
               {!narrow && <td>{pct(t.inflationPerYear)}</td>}
               <td className={signClass(t.realPerYear)}>{pct(t.realPerYear)}</td>
               {!narrow && <td className={signClass(t.xirr)}>{pct(t.xirr)}</td>}
+              {benches.map((b) => (
+                <BenchCell key={b.id} b={b} r={t} perYear />
+              ))}
             </tr>
           </tfoot>
         )}
@@ -256,7 +307,7 @@ export function Key({
   items: {
     label: string;
     color: string;
-    kind: "bar" | "line" | "dashed" | "dot";
+    kind: "bar" | "line" | "dashed" | "dotted" | "dot";
   }[];
 }) {
   return (
@@ -266,7 +317,7 @@ export function Key({
           <i
             className={`chart-key-${i.kind}`}
             style={
-              i.kind === "dashed"
+              i.kind === "dashed" || i.kind === "dotted"
                 ? { borderColor: i.color }
                 : { background: i.color }
             }
@@ -410,11 +461,13 @@ export function YearsChart({
 export function GrowthChart({
   history,
   cpi,
+  benchmarks = [],
   loading,
   height = 220,
 }: {
   history: HistoryPoint[];
   cpi?: CpiLevel[];
+  benchmarks?: BenchmarkSeries[];
   loading: boolean;
   height?: number;
 }) {
@@ -435,9 +488,11 @@ export function GrowthChart({
         No valuation history in this range.
       </ChartPlaceholder>
     );
-  const data = growthOf100(points, cpi ?? []);
+  const data = growthOf100(points, cpi ?? [], benchmarks);
+  // A benchmark without a value on the first day has no line (it starts later).
+  const lines = benchmarks.filter((b) => data[0]!.bench[b.id] !== null);
   const values = data
-    .flatMap((d) => [d.portfolio, d.cpi])
+    .flatMap((d) => [d.portfolio, d.cpi, d.cpiPlus, ...lines.map((b) => d.bench[b.id] ?? null)])
     .filter((v): v is number => v !== null);
   const lo = Math.min(...values);
   const hi = Math.max(...values);
@@ -451,6 +506,14 @@ export function GrowthChart({
   )
     ticks.push(Math.round(v * 100) / 100);
   const end = data.at(-1)!;
+  const zl = (v: number | null | undefined) => (v === null || v === undefined ? "–" : `${fmtNum(v, 2)} zł`);
+  const margin = `+${fmtNum(CPI_MARGIN * 100, 0)} %`;
+  const names: Record<string, string> = {
+    portfolio: "Portfolio",
+    cpi: "Inflation (CPI)",
+    cpiPlus: `Inflation ${margin}`,
+    ...Object.fromEntries(lines.map((b) => [`bench.${b.id}`, b.label])),
+  };
   return (
     <>
       <Key
@@ -460,10 +523,20 @@ export function GrowthChart({
             color: "var(--accent)",
             kind: "line",
           },
+          ...lines.map((b) => ({
+            label: `${b.label} ${zl(end.bench[b.id])}`,
+            color: benchColor(b.id),
+            kind: "line" as const,
+          })),
           {
-            label: `Inflation (CPI) ${end.cpi === null ? "–" : `${fmtNum(end.cpi, 2)} zł`}`,
+            label: `Inflation (CPI) ${zl(end.cpi)}`,
             color: "var(--cpi)",
             kind: "dashed",
+          },
+          {
+            label: `Inflation ${margin} ${zl(end.cpiPlus)}`,
+            color: "var(--cpi)",
+            kind: "dotted",
           },
         ]}
       />
@@ -495,9 +568,32 @@ export function GrowthChart({
               contentStyle={tooltipStyle}
               formatter={(v, name) => [
                 `${fmtNum(Number(v), 2)} zł`,
-                name === "portfolio" ? "Portfolio" : "Inflation (CPI)",
+                names[String(name)] ?? String(name),
               ]}
             />
+            <Line
+              type="monotone"
+              dataKey="cpiPlus"
+              stroke="var(--cpi)"
+              strokeWidth={1.5}
+              strokeDasharray="1 3"
+              strokeLinecap="round"
+              dot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+            {lines.map((b) => (
+              <Line
+                key={b.id}
+                type="monotone"
+                dataKey={`bench.${b.id}`}
+                stroke={benchColor(b.id)}
+                strokeWidth={1.5}
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            ))}
             <Line
               type="monotone"
               dataKey="cpi"

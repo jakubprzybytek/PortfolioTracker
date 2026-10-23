@@ -75,7 +75,7 @@ describe(`API ${API}`, () => {
   it("GET /status lists the last run of every job", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown> }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "export", "fx", "import", "live", "monthly", "valuation"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "export", "fx", "import", "live", "monthly", "valuation"]);
     expect(body.jobs["fx"]).toMatchObject({ status: "ok" });
     expect(body.jobs["import"]).toMatchObject({ status: "ok" });
   });
@@ -268,6 +268,12 @@ describe(`API ${API}`, () => {
     expect(body.total.xirr!).toBeCloseTo(accounts.total.xirr!, 2);
     // CPI levels from the month before the first day, for the growth of 100 zł chart
     expect(body.cpi[0]!.month).toBe("2025-01");
+    // The benchmarks, in PLN from a fortnight before the first day (empty until the stage's benchmarks job has run)
+    const benchmarks = (body as unknown as { benchmarks: { id: string; points: { date: string; value: number }[] }[] }).benchmarks;
+    expect(benchmarks.map((b) => b.id)).toEqual(["WIG", "MSCI_WORLD"]);
+    for (const b of benchmarks) {
+      expect(b.points.every((p, i) => p.value > 0 && p.date >= "2025-01-20" && (i === 0 || p.date > b.points[i - 1]!.date))).toBe(true);
+    }
   });
 
   it("GET /instruments/{isin}/transactions filters by ISIN", async () => {
