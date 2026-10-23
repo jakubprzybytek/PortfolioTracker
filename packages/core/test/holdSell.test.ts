@@ -6,6 +6,7 @@ import {
   DEFAULT_ASSUMPTIONS,
   earlyRedemptionFee,
   extendReferenceIndex,
+  buyHoldOrSell,
   buyMore,
   holdOrSell,
   ibkrTerms,
@@ -259,5 +260,54 @@ describe("buyMore", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ code: "TOS1029", offerSeries: "TOS1029", grossYield: null, alternative: null, spread: null, duration: null, weight: 0.4 });
     expect(rows[0]!.netYield).toBeCloseTo(0.05 * 0.81, 3);
+  });
+});
+
+describe("buyHoldOrSell", () => {
+  // DS1028 (fixed 5 %, matures 2028-10-25) at `price` %, against a 5 % alternative before tax, in IKE.
+  const accrued = Math.round(((50 * 360) / 365) * 100) / 100;
+  const at = (price: number, commission = 0, today = TODAY) =>
+    base({
+      today,
+      holdings: [holding({ account: "IKE Broker", code: "DS1028", cleanPrice: price, accruedInterest: accrued, valuePerUnit: price * 10 + accrued, value: 10 * (price * 10 + accrued), cost: price * 100 })],
+      instruments: new Map([["PL0000000001", instrument({ code: "DS1028", terms: fixedTerms })]]),
+      assumptions: { ...DEFAULT_ASSUMPTIONS, alternative: "rate", altRate: 0.05, commission },
+    });
+
+  it("cheap: one more bought yields clearly more than the alternative: buy more", () => {
+    const [r] = buyHoldOrSell(at(90)).rows;
+    expect(r).toMatchObject({ code: "DS1028", decision: "BUY" });
+    expect(r!.bought?.netYield).toBeGreaterThan(0.1);
+    expect(r!.boughtSpread!).toBeCloseTo(r!.bought!.netYield - r!.held.alternative.yield, 6);
+  });
+
+  it("dear: keeping yields clearly less: sell; at par: hold", () => {
+    expect(buyHoldOrSell(at(110)).rows[0]!.decision).toBe("SELL");
+    expect(buyHoldOrSell(at(100)).rows[0]!.decision).toBe("HOLD");
+  });
+
+  it("between the two prices of a commission: worth keeping, not worth buying: hold", () => {
+    // 2 % commission each way: held yields more than bought
+    const r = buyHoldOrSell(at(99.5, 0.02)).rows[0]!;
+    expect(r.held.yieldIfHeld).toBeGreaterThan(r.bought!.netYield);
+    expect(r.decision).toBe("HOLD");
+  });
+
+  it("under three months to maturity: matures soon, nothing compared", () => {
+    expect(buyHoldOrSell(at(100, 0, "2028-08-20")).rows[0]!.decision).toBe("MATURES");
+  });
+
+  it("retail: never buy more (the series on offer is another bond); its yield is shown with the row", () => {
+    const old = tos("TOS0127", "2024-01-01", 0.03);
+    const input = base({
+      holdings: [holding({ account: "Retail", isin: old.isin, code: "TOS0127", type: "BOND_RETAIL", value: 1060 })],
+      instruments: new Map([[old.isin, instrument({ isin: old.isin, code: "TOS0127", type: "BOND_RETAIL", retail: old })]]),
+      transactions: [{ id: "1", account: "Retail", date: "2024-01-15", type: "BUY", isin: old.isin, quantity: 10, price: 100, amount: -1000, currency: "PLN" } as TransactionItem],
+      offers: [tos("TOS1029", "2026-10-01", 0.09)],
+    });
+    const [r] = buyHoldOrSell(input).rows;
+    expect(r!.bought?.offerSeries).toBe("TOS1029");
+    expect(r!.boughtSpread).toBeNull();
+    expect(r!.decision).not.toBe("BUY");
   });
 });

@@ -10,7 +10,7 @@ export const VIEWS: { view: View; label: string; path: string; hidden?: true }[]
   { view: "performance", label: "Performance", path: "#/performance" },
   { view: "holdings", label: "Holdings", path: "#/holdings" },
   { view: "prices", label: "Prices", path: "#/prices" },
-  { view: "holdsell", label: "Hold or sell", path: "#/hold-sell" },
+  { view: "holdsell", label: "Buy, hold or sell", path: "#/hold-sell" },
   { view: "sales", label: "Sales", path: "#/sales" },
   { view: "cashflows", label: "Cash flows", path: "#/cash-flows" },
   { view: "indicators", label: "Indicators", path: "#/indicators" },

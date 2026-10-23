@@ -603,8 +603,10 @@ describe(`API ${API}`, () => {
     expect((await get<Note[]>("/notes")).body.some((n) => n.title.startsWith("Integration"))).toBe(false);
   });
 
-  it("GET /hold-sell compares every bond position kept to maturity with selling it today; PUT keeps the assumptions", async () => {
-    type Row = { account: string; code: string; maturity: string; taxFree: boolean; verdict: string; flows: { date: string; kind: string; amount: number }[]; sellNow: { net: number }; alternative: { label: string; series?: string; yield: number }; difference: number; holdAtMaturity: number; sellAtMaturity: number };
+  it("GET /hold-sell: every bond position kept, sold or one more bought, and a decision; PUT keeps the assumptions", async () => {
+    type Held = { account: string; code: string; maturity: string; taxFree: boolean; verdict: string; flows: { date: string; kind: string; amount: number }[]; sellNow: { net: number }; alternative: { label: string; series?: string; yield: number }; difference: number; holdAtMaturity: number; sellAtMaturity: number; yieldIfHeld: number };
+    type Bought = { type: string; netYield: number; grossYield: number | null; offerSeries?: string; flows: { kind: string }[] };
+    type Row = { account: string; code: string; type: string; maturity: string; held: Held; bought: Bought | null; boughtSpread: number | null; decision: string };
     type Body = { date: string; assumptions: { cpi: number; alternative: string }; saved: boolean; offers: { series: string }[]; rows: Row[]; skipped: { code: string; reason: string }[] };
     await send("PUT", "/hold-sell/assumptions", { reset: true });
     const { status, body } = await get<Body>("/hold-sell");
@@ -613,23 +615,26 @@ describe(`API ${API}`, () => {
     expect(body.assumptions.alternative).toBe("retail");
     // Every bond of the sample: listed fixed and IZ, retail, the floating corporate, the IBKR Bund.
     expect(body.rows.map((r) => r.code).sort()).toEqual(expect.arrayContaining(["DE0001102523", "DS0432", "EDO0935", "IZ0836", "KRU0827"]));
+    const order = ["SELL", "BUY", "HOLD", "MATURES"];
+    expect(body.rows.map((r) => order.indexOf(r.decision))).toEqual([...body.rows.map((r) => order.indexOf(r.decision))].sort((x, y) => x - y)); // sells first, then buys
     for (const r of body.rows) {
-      expect(["HOLD", "SELL", "EVEN"]).toContain(r.verdict);
-      expect(r.flows.at(-1)).toMatchObject({ kind: "redemption", date: r.maturity });
-      expect(r.sellNow.net).toBeGreaterThan(0);
-      expect(r.difference).toBeCloseTo(r.holdAtMaturity - r.sellAtMaturity, 0);
-      if (body.offers.length) expect(r.alternative.series).toBeTruthy();
+      expect(order).toContain(r.decision);
+      const h = r.held;
+      expect(h.flows.at(-1)).toMatchObject({ kind: "redemption", date: r.maturity });
+      expect(h.sellNow.net).toBeGreaterThan(0);
+      expect(h.difference).toBeCloseTo(h.holdAtMaturity - h.sellAtMaturity, 0);
+      if (body.offers.length) expect(h.alternative.series).toBeTruthy();
+      if (r.type === "BOND_RETAIL") {
+        expect(r.decision).not.toBe("BUY"); // the series on offer is another bond
+        expect(r.boughtSpread).toBeNull();
+      } else if (r.bought) {
+        expect(r.bought.netYield).toBeLessThanOrEqual(r.bought.grossYield! + 1e-9);
+        expect(r.boughtSpread).toBeCloseTo(r.bought.netYield - h.alternative.yield, 5);
+        if (r.decision === "BUY") expect(r.boughtSpread!).toBeGreaterThan(0);
+      }
+      if (r.decision === "SELL") expect(h.yieldIfHeld).toBeLessThan(h.alternative.yield);
     }
-    expect(body.rows.find((r) => r.account === "ike")?.taxFree ?? true).toBe(true);
-    // Buy more: one more bond of each held at its last price; retail rows are the series on offer, one per account and kind.
-    const buy = (body as unknown as { buy: { code: string; type: string; netYield: number; grossYield: number | null; realYield: number; spread: number | null; offerSeries?: string; weight: number | null }[] }).buy;
-    expect(buy.map((b) => b.code)).toEqual(expect.arrayContaining(["DS0432", "IZ0836", "KRU0827"]));
-    expect(buy.map((b) => b.netYield)).toEqual([...buy.map((b) => b.netYield)].sort((x, y) => y - x));
-    for (const b of buy) {
-      expect(b.netYield).toBeGreaterThan(-0.5);
-      if (b.type === "BOND_RETAIL") expect(b.offerSeries).toBe(b.code);
-      else expect(b.netYield).toBeLessThanOrEqual(b.grossYield! + 1e-9);
-    }
+    expect(body.rows.find((r) => r.account === "ike")?.held.taxFree ?? true).toBe(true);
 
     expect((await send("PUT", "/hold-sell/assumptions", { cpi: "a lot" })).status).toBe(400);
     const put = await send("PUT", "/hold-sell/assumptions", { cpi: 0.03, wibor: 0.05, nbpRate: 0.04, alternative: "rate", altRate: 0.06 });
@@ -637,8 +642,8 @@ describe(`API ${API}`, () => {
     const after = (await get<Body>("/hold-sell")).body;
     expect(after).toMatchObject({ saved: true, assumptions: { cpi: 0.03, alternative: "rate" } });
     const ds = after.rows.find((r) => r.code === "DS0432")!;
-    expect(ds.alternative.label).toContain("6,00 %");
-    expect(ds.alternative.yield).toBeCloseTo(ds.account === "ike" ? 0.06 : 0.06 * 0.81, 6);
+    expect(ds.held.alternative.label).toContain("6,00 %");
+    expect(ds.held.alternative.yield).toBeCloseTo(ds.account === "ike" ? 0.06 : 0.06 * 0.81, 6);
     await send("PUT", "/hold-sell/assumptions", { reset: true });
     expect((await get<Body>("/hold-sell")).body.saved).toBe(false);
   });

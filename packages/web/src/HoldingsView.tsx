@@ -17,7 +17,7 @@ import { positionsXirr } from "@portfolio/core/valuation/xirr";
 import { CLASS_LABELS } from "./Allocation.tsx";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { InstrumentSettingsButton } from "./InstrumentView.tsx";
-import { holdSellKey, VERDICT_LABELS, type HoldSellResponse } from "./HoldSellView.tsx";
+import { DECISION_LABELS, holdSellKey, type HoldSellResponse } from "./HoldSellView.tsx";
 import {
   FilterBar,
   FilterSelect,
@@ -210,22 +210,25 @@ interface ClassGroup {
 }
 
 /** One holding as a row; `label` is what goes in the first column (the instrument, or the account). */
-/** Hold-or-sell verdicts per position (account#isin), for the badge on bond rows. */
+/** A fraction as "4,85 %". */
+const fmtRate = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${fmtNum(r * 100, 2)} %`);
+
+/** Buy, hold or sell verdicts per position (account#isin), for the badge on bond rows. */
 const HoldSellVerdicts = createContext<ReadonlyMap<string, HoldSellResponse["rows"][number]>>(new Map());
 
-/** "hold" / "sell" / "about the same" on a bond row: a link to its row in Hold or sell. */
+/** "buy more" / "hold" / "sell" / "matures soon" on a bond row: a link to its row in Buy, hold or sell. */
 function VerdictBadge({ account, isin }: { account: string; isin: string }) {
   const r = useContext(HoldSellVerdicts).get(`${account}#${isin}`);
   if (!r) return null;
   return (
     <a
-      className={`flag verdict ${r.verdict.toLowerCase()}`}
+      className={`flag verdict ${r.decision.toLowerCase()}`}
       href={`#/hold-sell?row=${encodeURIComponent(holdSellKey(r))}`}
       onClick={(e) => e.stopPropagation()}
-      title={`Hold or sell: kept to maturity ${r.difference >= 0 ? "brings" : "loses"} ${fmtPln(Math.abs(r.difference))} against selling today (${r.alternative.label})`}
+      title={`Buy, hold or sell: ${r.decision === "MATURES" ? "matures in under 3 months" : `if held ${fmtRate(r.held.yieldIfHeld)}, if bought ${fmtRate(r.bought?.netYield)}, against ${fmtRate(r.held.alternative.yield)} (${r.held.alternative.label})`}`}
       data-testid="hs-badge"
     >
-      {VERDICT_LABELS[r.verdict]}
+      {DECISION_LABELS[r.decision]}
     </a>
   );
 }

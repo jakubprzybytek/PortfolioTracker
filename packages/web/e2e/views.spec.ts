@@ -1068,69 +1068,52 @@ test.describe("show closed", () => {
   });
 });
 
-test.describe("hold or sell", () => {
-  test("every bond kept to maturity against sold today, the assumptions on top; a row opens its breakdown; Holdings links to it", async ({ page }) => {
+test.describe("buy, hold or sell", () => {
+  test("every bond against the alternative if held and if bought, a verdict each; a row opens its breakdown; Holdings links to it", async ({ page }) => {
     await page.goto("/#/");
-    await page.getByTestId("nav-holdsell").click();
+    const nav = page.getByTestId("nav-holdsell");
+    await expect(nav).toContainText("Buy, hold or sell");
+    await nav.click();
     await expect(page).toHaveURL(/#\/hold-sell/);
+    await expect(page.getByRole("heading", { name: "Buy, hold or sell" })).toBeVisible();
+    await expect(page.getByTestId("hs-mode")).toHaveCount(0); // one table, no switch
     const rows = page.getByTestId("hs-row");
     // The sample's bonds: DS0432 and the Bund in two accounts each, IZ0836, EDO0935, KRU0827.
     await expect(rows).toHaveCount(7);
     await expect(page.getByTestId("hs-cpi")).toHaveValue(/^\d+,\d{2}$/);
-    await expect(page.getByTestId("hs-alternative")).toHaveValue("retail");
-    for (const v of await rows.getByTestId("hs-verdict").allTextContents()) expect(["hold", "sell", "about the same"]).toContain(v);
-    // Most worth selling first: the differences go up.
-    const diffs = (await rows.getByTestId("hs-difference").allTextContents()).map((t) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", ".")));
-    expect(diffs).toEqual([...diffs].sort((a, b) => a - b));
-    // A row's breakdown: the sale today and the flows to maturity, the redemption last; in the URL.
+    for (const v of await rows.getByTestId("hs-verdict").allTextContents()) expect(["buy more", "hold", "sell", "matures soon"]).toContain(v);
+    // Sells first, then buys, holds, maturing soon.
+    const order = ["SELL", "BUY", "HOLD", "MATURES"];
+    const decisions = await rows.evaluateAll((trs) => trs.map((tr) => tr.getAttribute("data-decision")));
+    expect(decisions.map((d) => order.indexOf(d!))).toEqual([...decisions.map((d) => order.indexOf(d!))].sort((x, y) => x - y));
+    await expect(page.getByTestId("hs-summary")).toContainText("7 bond positions");
+    // Both yields on a listed bond's row
+    const ds = page.locator('[data-testid="hs-row"][data-code="DS0432"]').first();
+    await expect(ds.getByTestId("hs-yield")).toHaveText(/\d %/);
+    await expect(ds.getByTestId("hs-bought")).toHaveText(/\d %/);
+    // A row's breakdown, in the URL: the sale today, the flows kept, one more bought today, the notes
     const iz = page.locator('[data-testid="hs-row"][data-code="IZ0836"]');
     await iz.click();
     await expect(page).toHaveURL(/row=broker/);
     const flows = page.getByTestId("hs-flows");
     await expect(flows).toContainText("2036-08-25");
     await expect(flows.locator("tbody tr").nth(-2)).toContainText("redemption");
+    await expect(page.getByTestId("bm-cost")).toContainText("Accrued interest");
+    await expect(page.getByTestId("bm-cost")).toContainText("Over the alternative");
     await expect(page.getByTestId("hs-breakdown")).toContainText("IZ indexation at CPI");
+    expect(await page.getByTestId("hs-breakdown").locator(".hs-notes").evaluate((ul) => parseFloat(getComputedStyle(ul).paddingLeft))).toBeLessThan(24);
     await iz.click();
     await expect(page.getByTestId("hs-breakdown")).toHaveCount(0);
+    // A retail row: if bought = the series of its kind on offer
+    await page.locator('[data-testid="hs-row"][data-code="EDO0935"]').click();
+    await expect(page.getByTestId("bm-bought")).toContainText("on offer");
     // Holdings: a badge on bond rows, linking to the row here.
     await page.goto("/#/holdings");
     const badge = page.locator('[data-testid="holding-row"][data-isin="PL0000117024"]').getByTestId("hs-badge");
-    await expect(badge).toHaveText(/^(hold|sell|about the same)$/);
+    await expect(badge).toHaveText(/^(buy more|hold|sell|matures soon)$/);
     await badge.click();
     await expect(page).toHaveURL(/#\/hold-sell\?row=broker%23PL0000117024/);
     await expect(page.getByTestId("hs-breakdown")).toBeVisible();
-  });
-});
-
-test.describe("buy more", () => {
-  test("the other half of Hold or sell: one more of each bond held, best after-tax yield first; a row opens what it rests on", async ({ page }) => {
-    await page.goto("/#/hold-sell");
-    const mode = page.getByTestId("hs-mode");
-    await mode.getByRole("button", { name: "Buy more" }).click();
-    await expect(page).toHaveURL(/#\/hold-sell\?mode=buy$/);
-    await expect(mode.getByRole("button", { name: "Buy more" })).toHaveAttribute("aria-pressed", "true");
-    await expect(mode.getByRole("button", { name: "Buy more" })).toHaveClass(/active/); // drawn as selected
-    await expect(mode.getByRole("button", { name: "Hold or sell" })).not.toHaveClass(/active/);
-    await expect(page.getByTestId("hs-assumptions")).toBeVisible(); // shared
-    const rows = page.getByTestId("bm-row");
-    await expect(rows.first()).toBeVisible();
-    await expect(page.locator('[data-testid="bm-row"][data-code="DS0432"]').first()).toBeVisible();
-    const net = (await rows.getByTestId("bm-net").allTextContents()).map((t) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", ".")));
-    expect(net).toEqual([...net].sort((a, b) => b - a));
-    const ds = page.locator('[data-testid="bm-row"][data-code="DS0432"]').first();
-    await ds.click();
-    // Its breakdown, as Hold or sell's: one bond today (price, accrued, commission, paid), the payments to maturity
-    // with their tax, then the notes, whose bullets sit close to the left edge
-    await expect(page.getByTestId("bm-cost")).toContainText("Accrued interest");
-    await expect(page.getByTestId("bm-cost")).toContainText("Duration");
-    await expect(page.getByTestId("bm-flows").locator("tbody tr").nth(-3)).toContainText("redemption");
-    await expect(page.getByTestId("bm-flows")).toContainText("Received after tax");
-    expect(await page.getByTestId("bm-notes").locator(".hs-notes").evaluate((ul) => parseFloat(getComputedStyle(ul).paddingLeft))).toBeLessThan(24);
-    await page.reload();
-    await expect(page.getByTestId("bm-notes")).toBeVisible(); // the open row is in the URL
-    await mode.getByRole("button", { name: "Hold or sell" }).click();
-    await expect(page.getByTestId("hs-row").first()).toBeVisible();
-    await expect(page).toHaveURL(/#\/hold-sell$/);
   });
 });
 

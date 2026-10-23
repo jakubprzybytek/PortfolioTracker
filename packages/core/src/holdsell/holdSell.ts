@@ -642,7 +642,7 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
     const floating = "floating" in per && per.floating;
     const fixed = (h.type === "BOND_LISTED" && inst.terms?.couponType === "FIXED") || (h.type === "BOND_CORPORATE" && !floating) || h.type === "BOND_IBKR";
     notes.push(`at the last price${h.priceDate ? ` (${h.priceDate})` : ""} + accrued interest; the ask can be higher, above all on Catalyst`);
-    notes.push(`${pct(commission)} commission${a.commission === undefined ? " (the account's, from its trades)" : ""}`);
+    notes.push(`purchase: ${pct(commission)} commission${a.commission === undefined ? " (the account's, from its trades)" : ""}`);
     notes.push(taxFree ? "no tax (IKE/IKZE)" : "tax 19 % on coupons (less the accrued interest paid) and on the gain over the price paid");
     if (h.type === "BOND_LISTED" && inst.terms?.couponType === "INDEXED") notes.push(`IZ indexation at CPI ${pct(a.cpi)}: the real yield is the steadier figure`);
     if (floating) notes.push(`coupons not set yet: WIBOR ${pct(a.wibor)} + margin; the margin over WIBOR is the steadier figure`);
@@ -665,4 +665,59 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
   }
   // The best after-tax yield first.
   return rows.sort((x, y) => y.netYield - x.netYield);
+}
+
+// --- buy, hold or sell: both halves together ---------------------------------------------------------------
+
+/** One verdict per bond position: buy more, hold, sell, or (under three months left) none. */
+export type Decision = "BUY" | "HOLD" | "SELL" | "MATURES";
+
+/** Under this many days to maturity no yield is compared (a few weeks' yield, annualised, says nothing). */
+export const MATURES_SOON_DAYS = 90;
+
+/**
+ * A bond position in "Buy, hold or sell" (Docs/ui.md): kept to maturity against sold today (`held`, from what a sale
+ * brings) and one more bought today (`bought`, from what a purchase costs), both against the same alternative.
+ */
+export interface ReviewRow {
+  account: string;
+  isin: string;
+  code: string;
+  name: string;
+  type: InstrumentItem["type"];
+  maturity: IsoDate;
+  years: number;
+  held: HoldSellRow;
+  /** Listed, corporate and IBKR bonds: this bond; retail: the series of the same kind on offer (another bond). */
+  bought: BuyMoreRow | null;
+  /** `bought.netYield` − the alternative's yield (listed, corporate and IBKR bonds). */
+  boughtSpread: number | null;
+  decision: Decision;
+}
+
+const DECISION_ORDER: Decision[] = ["SELL", "BUY", "HOLD", "MATURES"];
+
+/**
+ * Hold or sell and buy more, one row per position: "sell" when keeping it yields clearly less than the alternative,
+ * "buy more" when one more bought today yields clearly more (not for retail bonds: the series on offer is another
+ * bond), "hold" in between (keeping pays, but not enough to buy more: selling and buying back costs two commissions),
+ * "matures soon" under three months left. Within 0,2 % a year of the alternative counts as neither side. Sells first,
+ * then buys, then holds.
+ */
+export function buyHoldOrSell(input: HoldSellInput & { portfolioValue?: number }): { rows: ReviewRow[]; skipped: HoldSellSkipped[] } {
+  const { rows: held, skipped } = holdOrSell(input);
+  const bought = buyMore(input);
+  const rows = held.map((h): ReviewRow => {
+    const kind = h.type === "BOND_RETAIL" ? input.instruments.get(h.isin)?.retail?.kind : undefined;
+    const b = kind ? (bought.find((r) => r.type === "BOND_RETAIL" && r.account === h.account && r.offerSeries?.startsWith(kind)) ?? null) : (bought.find((r) => r.account === h.account && r.isin === h.isin) ?? null);
+    const alt = h.alternative.yield;
+    const boughtSpread = b && !kind ? round(b.netYield - alt, 6) : null;
+    const days = daysBetween(input.today, h.maturity);
+    const decision: Decision =
+      days < MATURES_SOON_DAYS ? "MATURES" : h.yieldIfHeld < alt - EVEN_BAND ? "SELL" : boughtSpread !== null && boughtSpread > EVEN_BAND ? "BUY" : "HOLD";
+    return { account: h.account, isin: h.isin, code: h.code, name: h.name, type: h.type, maturity: h.maturity, years: h.years, held: h, bought: b, boughtSpread, decision };
+  });
+  const rank = (r: ReviewRow) => (r.decision === "SELL" ? r.held.difference : r.decision === "BUY" ? -(r.boughtSpread ?? 0) : r.decision === "HOLD" ? r.held.difference : r.years);
+  rows.sort((x, y) => DECISION_ORDER.indexOf(x.decision) - DECISION_ORDER.indexOf(y.decision) || rank(x) - rank(y));
+  return { rows, skipped };
 }

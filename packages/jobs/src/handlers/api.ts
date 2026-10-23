@@ -37,8 +37,7 @@ import {
   adjustForSplits,
   DEFAULT_ASSUMPTIONS,
   HoldSellAssumptionsInput,
-  holdOrSell,
-  buyMore,
+  buyHoldOrSell,
   offerSeriesCode,
   RETAIL_OFFER_TERMS,
   type HoldSellAssumptions,
@@ -612,7 +611,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, noteOf(existing));
       }
       case "GET /hold-sell": {
-        // Every bond position kept to maturity vs sold today (core/holdsell), with the assumptions and the offers used.
+        // Every bond position: buy more, hold or sell (core/holdsell), with the assumptions and the offers used.
         const [snap, instruments, txs, refIndex, saved] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments(), repo.listTransactions(), repo.listReferenceIndex(), repo.getSetting<HoldSellAssumptions>(HOLD_SELL_SETTING)]);
         if (!snap) return json(404, { error: "No valuation yet" });
         const day = snap.date;
@@ -634,9 +633,8 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
           offers,
           assumptions,
         };
-        const result = holdOrSell(input);
-        // "Buy more": one more bond of each held at its last price (core/holdsell, buyMore); weights of positions + cash.
-        const buy = buyMore({ ...input, portfolioValue: snap.totals.value + (snap.totals.cash ?? 0) });
+        // Buy, hold or sell: each position kept vs sold today, and one more bought today (core/holdsell); weights of positions + cash.
+        const result = buyHoldOrSell({ ...input, portfolioValue: snap.totals.value + (snap.totals.cash ?? 0) });
         return json(200, {
           date: day,
           assumptions,
@@ -644,7 +642,6 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
           saved: !!saved,
           offers: offers.map((o) => ({ series: o.series, kind: o.kind, termMonths: o.termMonths, firstRate: o.rates[0] ?? null, margin: o.margin ?? null, saleStart: o.saleStart, saleEnd: o.saleEnd })),
           ...result,
-          buy,
         });
       }
       case "PUT /hold-sell/assumptions": {

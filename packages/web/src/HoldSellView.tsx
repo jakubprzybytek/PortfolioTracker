@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
-import type { BuyMoreRow, HoldSellAssumptions, HoldSellRow, HoldSellSkipped } from "@portfolio/core";
+import type { Decision, HoldSellAssumptions, HoldSellSkipped, ReviewRow } from "@portfolio/core";
 import { apiSend } from "./api.ts";
-import { BuyMoreTable } from "./BuyMoreTable.tsx";
+import { BoughtToday } from "./BoughtToday.tsx";
 import { fmtNum, fmtPln, parseNum, signClass } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
@@ -22,18 +22,17 @@ export interface HoldSellResponse {
   defaults: HoldSellAssumptions;
   saved: boolean;
   offers: Offer[];
-  rows: HoldSellRow[];
+  /** One per bond position: kept vs sold today, one more bought today, the decision (core/holdsell, buyHoldOrSell). */
+  rows: ReviewRow[];
   skipped: HoldSellSkipped[];
-  /** "Buy more": one more bond of each held, bought today (core/holdsell, buyMore). */
-  buy?: BuyMoreRow[];
 }
 
-export const VERDICT_LABELS: Record<HoldSellRow["verdict"], string> = { HOLD: "hold", SELL: "sell", EVEN: "about the same" };
+export const DECISION_LABELS: Record<Decision, string> = { BUY: "buy more", HOLD: "hold", SELL: "sell", MATURES: "matures soon" };
 const KIND_LABELS: Record<string, string> = { coupon: "coupon", interest: "interest", redemption: "redemption" };
 /** A fraction as "2,50 %" (yields, rates). */
 const fmtRate = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${fmtNum(r * 100, 2)} %`);
 const term = (months: number) => (months >= 12 ? `${months / 12} y` : `${months} m`);
-const rowKey = (r: Pick<HoldSellRow, "account" | "isin">) => `${r.account}#${r.isin}`;
+const rowKey = (r: Pick<ReviewRow, "account" | "isin">) => `${r.account}#${r.isin}`;
 
 /** The assumptions as typed: percentages as text ("2,5"), blank = the account's own commission. */
 interface Draft {
@@ -48,17 +47,16 @@ const pctText = (r: number | undefined) => (r === undefined ? "" : fmtNum(r * 10
 const draftOf = (a: HoldSellAssumptions): Draft => ({ cpi: pctText(a.cpi), wibor: pctText(a.wibor), nbpRate: pctText(a.nbpRate), alternative: a.alternative, altRate: pctText(a.altRate), commission: pctText(a.commission) });
 
 /**
- * Hold or sell (road map 19): every bond position kept to maturity against sold today with the money in the
- * alternative until then. The assumptions on top (future CPI, WIBOR, NBP rate, the alternative, a sale's commission);
- * a row opens its breakdown: what a sale brings, the flows still to come, and what the result rests on.
+ * Buy, hold or sell (road map 19, with Buy more since 2026-10-23): every bond position kept to maturity against sold
+ * today (the yield if held, from what a sale brings) and one more bought today (the yield if bought, from what it
+ * costs), both against the same alternative: sell, hold, buy more, or matures soon. The assumptions on top (future CPI,
+ * WIBOR, NBP rate, the alternative, the commission); a row opens its breakdown: the sale, the flows still to come, one
+ * more bought, and what it rests on.
  */
 export function HoldSellView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const data = useApi<HoldSellResponse>("/hold-sell");
   const d = data.data;
   const open = params["row"] ?? null;
-  // Two halves sharing the assumptions: hold or sell what's held, or buy more of it (`?mode=buy`).
-  const buyMode = params["mode"] === "buy";
-  const setMode = (buy: boolean) => setParams({ ...params, mode: buy ? "buy" : undefined, row: undefined });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,29 +99,21 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
       </label>
     );
 
-  const sells = d?.rows.filter((r) => r.verdict === "SELL").length ?? 0;
+  const count = (k: Decision) => d?.rows.filter((r) => r.decision === k).length ?? 0;
   const narrow = useNarrow();
-  const toggle = (r: HoldSellRow) => setParams({ ...params, row: open === rowKey(r) ? undefined : rowKey(r) });
+  const toggle = (r: ReviewRow) => setParams({ ...params, row: open === rowKey(r) ? undefined : rowKey(r) });
   return (
     <>
-      <header className="view-header hs-header">
-        <h2 className="view-title">Hold or sell</h2>
-        <div className="range hs-mode" role="group" aria-label="Hold or sell, or buy more" data-testid="hs-mode">
-          <button type="button" className={buyMode ? "" : "active"} aria-pressed={!buyMode} onClick={() => setMode(false)}>
-            Hold or sell
-          </button>
-          <button type="button" className={buyMode ? "active" : ""} aria-pressed={buyMode} onClick={() => setMode(true)}>
-            Buy more
-          </button>
-        </div>
+      <header className="view-header">
+        <h2 className="view-title">Buy, hold or sell</h2>
         <span className="muted" data-testid="hs-date">
           {d ? `as of ${d.date}` : data.loading ? "Loading…" : ""}
         </span>
       </header>
       <p className="muted hs-intro">
-        {buyMode
-          ? "Each bond held, one more bought today at its last price and kept to maturity: its yield before and after tax (none in IKE/IKZE), after inflation, and over the retail bond on offer for a similar term, at the assumptions below. Retail bonds: the series on offer now."
-          : "Each bond kept to maturity against sold today, with the money in the alternative until the same day. What you paid doesn't matter; after tax (none in IKE/IKZE), at the assumptions below."}
+        Each bond held, against the alternative until its maturity: <strong>if held</strong>, from what selling it today would bring; <strong>if bought</strong>, from what one
+        more costs today. Sell when keeping it yields less than the alternative; buy more when one more yields more; hold in between. After tax (none in IKE/IKZE), at the
+        assumptions below.
       </p>
       {data.error && <p className="error">{data.error}</p>}
 
@@ -185,47 +175,43 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
         )}
       </section>
 
-      {buyMode ? (
-        <>
-          {d?.buy && (
-            <p className="muted" data-testid="bm-summary">
-              {d.buy.length} bonds. Best yield after tax first; a row opens what it rests on.
-            </p>
-          )}
-          <BuyMoreTable rows={d?.buy} today={d?.date ?? ""} loading={data.loading} open={open} toggle={(key) => setParams({ ...params, row: open === key ? undefined : key })} />
-        </>
-      ) : (
-      <>
       {d && (
         <p className="muted" data-testid="hs-summary">
-          {d.rows.length} bond positions{sells ? `, ${sells} worth selling` : ""}. Most worth selling first.
+          {d.rows.length} bond positions:{" "}
+          {(["SELL", "BUY", "HOLD", "MATURES"] as const)
+            .filter((k) => count(k))
+            .map((k) => `${count(k)} ${DECISION_LABELS[k]}`)
+            .join(", ")}
+          . Sells first, then buys.
         </p>
       )}
       {narrow ? (
         <ul className="hs-list panel" data-testid="hs-table">
           {!d && data.loading && <li className="muted">Loading…</li>}
           {d?.rows.map((r) => (
-            <li key={rowKey(r)} className={open === rowKey(r) ? "selected" : ""} data-testid="hs-row" data-code={r.code}>
+            <li key={rowKey(r)} className={open === rowKey(r) ? "selected" : ""} data-testid="hs-row" data-code={r.code} data-decision={r.decision}>
               <button type="button" className="hs-item" onClick={() => toggle(r)}>
                 <span className="hs-line">
                   <span className="hs-what">
                     <InstrumentLabel code={r.code} name={r.name} />
                   </span>
-                  <span className={`flag verdict ${r.verdict.toLowerCase()}`} data-testid="hs-verdict">
-                    {VERDICT_LABELS[r.verdict]}
+                  <span className={`flag verdict ${r.decision.toLowerCase()}`} data-testid="hs-verdict">
+                    {DECISION_LABELS[r.decision]}
                   </span>
                 </span>
                 <span className="hs-line muted">
-                  {r.account} · {r.maturity} ({fmtNum(r.years, 1)} y) · sell now {fmtPln(r.sellNow.net)}
+                  {r.account} · {r.maturity} ({fmtNum(r.years, 1)} y)
                 </span>
-                <span className="hs-line">
-                  <span>
-                    held <strong data-testid="hs-yield">{fmtRate(r.yieldIfHeld)}</strong> vs {fmtRate(r.alternative.yield)} <span className="muted">{r.alternative.series ?? ""}</span>
+                {r.decision !== "MATURES" && (
+                  <span className="hs-line">
+                    <span>
+                      held <strong data-testid="hs-yield">{fmtRate(r.held.yieldIfHeld)}</strong> · bought <strong data-testid="hs-bought">{fmtRate(r.bought?.netYield)}</strong>
+                    </span>
+                    <span className="muted">
+                      vs {fmtRate(r.held.alternative.yield)} {r.held.alternative.series ?? ""}
+                    </span>
                   </span>
-                  <span className={signClass(r.difference)} data-testid="hs-difference">
-                    {fmtPln(r.difference)}
-                  </span>
-                </span>
+                )}
               </button>
               {open === rowKey(r) && <Breakdown r={r} />}
             </li>
@@ -233,69 +219,78 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
           {d && d.rows.length === 0 && <li className="muted">No bonds held.</li>}
         </ul>
       ) : (
-      <div className="table-wrap">
-        <table data-testid="hs-table" className="static">
-          <thead>
-            <tr>
-              <th className="left">Bond</th>
-              <th>Maturity</th>
-              <th title="What a sale (or an early redemption) brings today, after its commission or fee and the tax due now">Sell now</th>
-              <th title="The annual yield of keeping it: giving up the sale's amount today for what it still pays, after tax">If held</th>
-              <th className="left" title="What the money from a sale goes into until the bond's maturity, its yield after tax">Alternative</th>
-              <th title="At maturity: kept (its payments reinvested at the alternative's yield) − sold today and put into the alternative">Difference</th>
-              <th className="left"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {!d && data.loading && <SkeletonRows rows={5} cols={7} />}
-            {d?.rows.map((r) => {
-              const isOpen = open === rowKey(r);
-              return (
-                <Fragment key={rowKey(r)}>
-                  <tr className={`clickable${isOpen ? " selected" : ""}`} onClick={() => toggle(r)} data-testid="hs-row" data-code={r.code}>
-                    <td className="left instrument">
-                      <InstrumentLabel code={r.code} name={r.name} />
-                      <div className="sub muted">{r.account}</div>
-                    </td>
-                    <td>
-                      {r.maturity}
-                      <div className="sub muted">{fmtNum(r.years, 1)} y</div>
-                    </td>
-                    <td>{fmtPln(r.sellNow.net)}</td>
-                    <td data-testid="hs-yield">{fmtRate(r.yieldIfHeld)}</td>
-                    <td className="left">
-                      {fmtRate(r.alternative.yield)}
-                      <div className="sub muted">{r.alternative.label}</div>
-                    </td>
-                    <td className={signClass(r.difference)} data-testid="hs-difference">
-                      {fmtPln(r.difference)}
-                    </td>
-                    <td className="left">
-                      <span className={`flag verdict ${r.verdict.toLowerCase()}`} data-testid="hs-verdict">
-                        {VERDICT_LABELS[r.verdict]}
-                      </span>
-                    </td>
-                  </tr>
-                  {isOpen && (
-                    <tr className="hs-detail">
-                      <td colSpan={7}>
-                        <Breakdown r={r} />
+        <div className="table-wrap">
+          <table data-testid="hs-table" className="static">
+            <thead>
+              <tr>
+                <th className="left">Bond</th>
+                <th>Maturity</th>
+                <th title="The annual yield of keeping it: giving up what a sale brings today (after its commission or fee and the tax due now) for what it still pays, after tax">If held</th>
+                <th title="The annual yield of one more bought today at its last price (+ accrued interest and commission), held to maturity, after tax. Retail bonds: the series of the same kind on offer">
+                  If bought
+                </th>
+                <th className="left" title="What the money goes into otherwise until the bond's maturity (by default the retail bond on offer with the nearest term), its yield after tax">
+                  Alternative
+                </th>
+                <th className="left" title="Sell: keeping it yields less than the alternative. Buy more: one more yields more. Hold: in between (within 0,2 % a year counts as neither). Matures soon: under 3 months left">
+                  Verdict
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {!d && data.loading && <SkeletonRows rows={5} cols={6} />}
+              {d?.rows.map((r) => {
+                const isOpen = open === rowKey(r);
+                const soon = r.decision === "MATURES";
+                return (
+                  <Fragment key={rowKey(r)}>
+                    <tr className={`clickable${isOpen ? " selected" : ""}`} onClick={() => toggle(r)} data-testid="hs-row" data-code={r.code} data-decision={r.decision}>
+                      <td className="left instrument">
+                        <InstrumentLabel code={r.code} name={r.name} />
+                        <div className="sub muted">{r.account}</div>
+                      </td>
+                      <td>
+                        {r.maturity}
+                        <div className="sub muted">{fmtNum(r.years, 1)} y</div>
+                      </td>
+                      <td data-testid="hs-yield">
+                        {soon ? "–" : fmtRate(r.held.yieldIfHeld)}
+                        <div className="sub muted">sell now {fmtPln(r.held.sellNow.net)}</div>
+                      </td>
+                      <td data-testid="hs-bought">
+                        {soon ? "–" : fmtRate(r.bought?.netYield)}
+                        {r.bought && <div className="sub muted">{r.bought.offerSeries ? `${r.bought.offerSeries} on offer` : `${fmtNum(r.bought.price.perBond, 2)} ${r.bought.price.currency === "PLN" ? "zł" : r.bought.price.currency}`}</div>}
+                      </td>
+                      <td className="left">
+                        {soon ? "–" : fmtRate(r.held.alternative.yield)}
+                        <div className="sub muted">{r.held.alternative.label}</div>
+                      </td>
+                      <td className="left">
+                        <span className={`flag verdict ${r.decision.toLowerCase()}`} data-testid="hs-verdict">
+                          {DECISION_LABELS[r.decision]}
+                        </span>
                       </td>
                     </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-            {d && d.rows.length === 0 && (
-              <tr>
-                <td className="left muted" colSpan={7}>
-                  No bonds held.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                    {isOpen && (
+                      <tr className="hs-detail">
+                        <td colSpan={6}>
+                          <Breakdown r={r} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+              {d && d.rows.length === 0 && (
+                <tr>
+                  <td className="left muted" colSpan={6}>
+                    No bonds held.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
       {d && d.skipped.length > 0 && (
         <p className="muted hs-skipped" data-testid="hs-skipped">
@@ -308,14 +303,13 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
           ))}
         </p>
       )}
-      </>
-      )}
     </>
   );
 }
 
-/** One position's numbers: the sale today, the flows to maturity, both sides at maturity, the assumptions used. */
-function Breakdown({ r }: { r: HoldSellRow }) {
+/** One position's numbers: the sale today, the flows to maturity kept, one more bought today, what it rests on. */
+function Breakdown({ r: row }: { r: ReviewRow }) {
+  const r = row.held;
   const s = r.sellNow;
   return (
     <div className="hs-breakdown" data-testid="hs-breakdown">
@@ -388,9 +382,11 @@ function Breakdown({ r }: { r: HoldSellRow }) {
           </tbody>
         </table>
       </div>
+      {row.bought && <BoughtToday b={row.bought} spread={row.boughtSpread} />}
       <ul className="muted hs-notes">
+        {row.decision === "MATURES" && <li>matures in under 3 months: a yield over so few weeks, a year, says nothing, so none is compared</li>}
         {r.flows.some((f) => f.projected) && <li>* from the assumptions</li>}
-        {r.notes.map((n) => (
+        {[...new Set([...r.notes, ...(row.bought?.notes ?? [])])].map((n) => (
           <li key={n}>{n}</li>
         ))}
       </ul>
