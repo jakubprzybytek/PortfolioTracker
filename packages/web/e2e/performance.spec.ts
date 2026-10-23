@@ -58,6 +58,29 @@ test.describe("performance", () => {
     expect(labels.every((t) => t === "0 %" || /^[-−]/.test(t))).toBe(true);
   });
 
+  test("two parts: by year (the whole history) and over time (with the range picker)", async ({ page }) => {
+    const byYear = page.getByTestId("by-year");
+    const overTime = page.getByTestId("over-time");
+    await expect(byYear.getByTestId("years-table")).toBeVisible();
+    await expect(byYear.getByTestId("years-chart")).toBeVisible();
+    await expect(byYear.getByTestId("performance-range")).toHaveCount(0);
+    await expect(overTime.getByTestId("performance-range")).toBeVisible();
+    for (const id of ["growth-chart", "drawdown-chart", "allocation-chart"]) await expect(overTime.getByTestId(id)).toBeVisible();
+    // By year comes first
+    expect((await byYear.boundingBox())!.y).toBeLessThan((await overTime.boundingBox())!.y);
+  });
+
+  test("returns by year: Return right before the tinted benchmarks, under their own heading", async ({ page }) => {
+    const table = page.getByTestId("years-table");
+    await expect(page.getByTestId("years-row").first()).toBeVisible();
+    const heads = await table.locator("thead tr:last-child th").evaluateAll((ths) => ths.filter((th) => (th as HTMLElement).offsetParent !== null).map((th) => th.textContent?.trim()));
+    const i = heads.indexOf("Return");
+    expect(heads.slice(i, i + 4)).toEqual(["Return", "WIG", "World", "40/60"]);
+    await expect(table.locator("thead th.group-label")).toContainText("Benchmarks");
+    const bg = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(await bg("[data-testid=years-row] td.bench")).not.toBe(await bg("[data-testid=years-row] td.ret"));
+  });
+
   test("returns by year against inflation: the table, the bars per year and the growth of 100 zł", async ({ page }) => {
     await withBenchmarks(page, () => []);
     await page.reload();
@@ -76,8 +99,8 @@ test.describe("performance", () => {
     // Growth of 100 zł: the portfolio, CPI and CPI + 2 % from 100 at the start of the range
     const growth = page.getByTestId("growth-chart");
     await expect(growth.locator("path.recharts-line-curve")).toHaveCount(3);
-    await expect(page.getByTestId("returns-pair").locator(".chart-key").last()).toContainText("Inflation +2 %");
-    await expect(page.getByTestId("returns-pair").locator(".chart-key").last()).toContainText("Inflation (CPI)");
+    await expect(page.getByTestId("growth-panel").locator(".chart-key")).toContainText("Inflation +2 %");
+    await expect(page.getByTestId("growth-panel").locator(".chart-key")).toContainText("Inflation (CPI)");
     await page.getByTestId("performance-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
     await expect(growth.locator("path.recharts-line-curve")).toHaveCount(3);
@@ -115,7 +138,7 @@ test.describe("performance", () => {
     await page.getByTestId("performance-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
     await expect(growth.locator("path.recharts-line-curve")).toHaveCount(4); // portfolio, CPI, CPI + 2 %, WIG (the other two start later)
-    const key = page.getByTestId("returns-pair").locator(".chart-key").last();
+    const key = page.getByTestId("growth-panel").locator(".chart-key");
     await expect(key).toContainText("WIG");
     await expect(key).not.toContainText("MSCI World");
     // Over the last month both have a value on the first day: both lines
@@ -134,7 +157,15 @@ test.describe("performance", () => {
     });
     await page.reload();
     await expect(page.getByTestId("chart-skeleton")).toHaveCount(4); // return and inflation, growth of 100 zł, drawdown, allocation over time
+    // The table's header while loading is the loaded one (the benchmarks come from the fixed list), placeholders under each column
+    const heads = page.getByTestId("years-table").locator("thead th");
+    const visibleTexts = () => heads.evaluateAll((ths) => ths.filter((th) => (th as HTMLElement).offsetParent !== null).map((th) => th.textContent));
+    const loadingHeads = await visibleTexts();
+    const visibleCells = (sel: string) => page.locator(sel).first().evaluate((tr) => [...tr.children].filter((td) => (td as HTMLElement).offsetParent !== null).length);
+    expect(await visibleCells("[data-testid=years-table] tbody tr.skeleton-row")).toBe(await visibleCells("[data-testid=years-table] thead tr:last-child"));
     release();
+    await expect(page.getByTestId("years-row").first()).toBeVisible();
+    expect(await visibleTexts()).toEqual(loadingHeads);
     await expect(page.getByTestId("growth-chart")).toBeVisible();
     await expect(page.getByTestId("chart-skeleton")).toHaveCount(0);
     gate = new Promise<void>((r) => (release = r));

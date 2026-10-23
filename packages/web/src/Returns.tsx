@@ -17,12 +17,14 @@ import {
   type TotalReturn,
 } from "@portfolio/core/valuation/returns";
 import {
+  BENCHMARKS,
   benchmarkReturn,
   CPI_MARGIN,
+  MIX,
   type BenchmarkPoint,
 } from "@portfolio/core/benchmarks/benchmarks";
 import { fmtNum, fmtPct, fmtPln, signClass } from "./format.ts";
-import { ChartBusy, ChartPlaceholder, SkeletonRows } from "./Placeholders.tsx";
+import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
 import type { HistoryPoint } from "./types.ts";
 import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
 
@@ -48,9 +50,13 @@ export interface BenchmarkSeries {
 /** A benchmark's colour in charts (styles.css). */
 const benchColor = (id: string) => `var(--bench-${id})`;
 
-/** A benchmark's return over a period's days, with the portfolio's difference in the tooltip. */
-function BenchCell({ b, r, perYear }: { b: BenchmarkSeries; r: PeriodReturn | TotalReturn; perYear?: boolean }) {
-  let v = benchmarkReturn(b.points, r.from, r.to);
+/** The benchmarks' columns: the fixed list, so the header is the same while loading. */
+const BENCH_COLUMNS = [...BENCHMARKS, MIX].map((b) => ({ id: b.id, label: b.label, short: b.short, note: b.note }));
+type BenchColumn = (typeof BENCH_COLUMNS)[number];
+
+/** A benchmark's return over a period's days (`b` undefined: not loaded), with the portfolio's difference in the tooltip. */
+function BenchCell({ col, b, r, perYear }: { col: BenchColumn; b?: BenchmarkSeries; r: PeriodReturn | TotalReturn; perYear?: boolean }) {
+  let v = b ? benchmarkReturn(b.points, r.from, r.to) : null;
   let mine = r.twr;
   if (perYear) {
     const t = r as TotalReturn;
@@ -60,9 +66,9 @@ function BenchCell({ b, r, perYear }: { b: BenchmarkSeries; r: PeriodReturn | To
   const diff = v === null || mine === null ? null : (mine - v) * 100;
   return (
     <td
-      className={signClass(v)}
-      data-testid={`years-bench-${b.id}`}
-      title={v === null ? `${b.label} has no value on ${r.from}` : `${b.label} ${r.from} → ${r.to}${perYear ? ", a year" : ""}: ${pct(v)}; the portfolio ${diff! >= 0 ? "+" : "−"}${fmtNum(Math.abs(diff!), 1)} pp`}
+      className={`bench ${signClass(v)}`}
+      data-testid={`years-bench-${col.id}`}
+      title={v === null ? `${col.label} has no value on ${r.from}` : `${col.label} ${r.from} → ${r.to}${perYear ? ", a year" : ""}: ${pct(v)}; the portfolio's return ${diff! >= 0 ? "+" : "−"}${fmtNum(Math.abs(diff!), 1)} pp`}
     >
       {pct(v)}
     </td>
@@ -114,9 +120,12 @@ function Inflation({ r, short = false }: { r: PeriodReturn; short?: boolean }) {
 }
 
 /**
- * Per calendar year: value at the start and the end, money put in, profit, the time-weighted return (deposits and
- * withdrawals don't count), inflation (CPI December on December), the real return and the money-weighted XIRR; the
- * last row the whole history, its rates a year.
+ * Per calendar year: value at the start and the end, money put in, profit, the money-weighted XIRR, the time-weighted
+ * return (deposits and withdrawals don't count) next to the benchmarks' returns over the same days (tinted, under
+ * their own heading: they compare with Return, both time-weighted and nominal), inflation (CPI December on December)
+ * and the real return; the last row the whole history, its rates a year. One list of columns drives the header, the
+ * placeholders and the rows, so loading and loaded look the same; narrower screens hide `col-start`, then `col-end`,
+ * then `col-xirr` (styles.css), a phone shows year, return (inflation under it) and real.
  */
 export function YearsTable({
   data,
@@ -127,56 +136,85 @@ export function YearsTable({
 }) {
   const narrow = useNarrow();
   const t = data?.total;
-  const benches = narrow ? [] : (data?.benchmarks ?? []);
-  const cols = narrow ? 3 : 9 + benches.length;
+  const series = new Map((data?.benchmarks ?? []).map((b) => [b.id, b]));
+  const benches = narrow ? [] : BENCH_COLUMNS;
+  const cols: string[] = narrow
+    ? ["left", "ret", ""]
+    : ["left", "col-start", "col-start", "col-end", "col-end", "col-xirr", "ret", ...benches.map(() => "bench"), "", ""];
+  const firstBench = cols.indexOf("bench");
   return (
     <div className="table-wrap returns" data-testid="years">
       <table className="static" data-testid="years-table">
         <thead>
+          {!narrow && (
+            <tr className="group-row">
+              {cols.map((c, i) =>
+                c !== "bench" ? (
+                  <th key={i} className={c} aria-hidden />
+                ) : i === firstBench ? (
+                  <th
+                    key={i}
+                    className="bench group-label"
+                    colSpan={benches.length}
+                    title="Each benchmark's return over the same days as the row, to compare with Return (both time-weighted, before inflation)"
+                  >
+                    Benchmarks <span className="muted">· compare with Return</span>
+                  </th>
+                ) : null,
+              )}
+            </tr>
+          )}
           <tr>
             <th className="left">Year</th>
             {!narrow && (
-              <th className="col-start" title="Value (positions + cash) at the end of the year before">
-                Start
-              </th>
+              <>
+                <th className="col-start" title="Value (positions + cash) at the end of the year before">
+                  Start
+                </th>
+                <th className="col-start" title="Money put in − taken out during the year">
+                  Put in
+                </th>
+                <th className="col-end" title="Value (positions + cash) at the end of the year">
+                  End
+                </th>
+                <th className="col-end" title="End − start − money put in">
+                  Profit
+                </th>
+                <th
+                  className="col-xirr"
+                  title="Money-weighted return (XIRR) of the start value, the money put in and the end value: what your money earned, its timing included. A part of a year: over those days, not a year"
+                >
+                  XIRR
+                </th>
+              </>
             )}
-            {!narrow && (
-              <th className="col-start" title="Money put in − taken out during the year">Put in</th>
-            )}
-            {!narrow && (
-              <th className="col-end" title="Value (positions + cash) at the end of the year">
-                End
-              </th>
-            )}
-            {!narrow && <th className="col-end" title="End − start − money put in">Profit</th>}
-            <th title="Time-weighted return: each day's growth chained, so money put in or taken out doesn't count. Comparable with inflation and with funds">
+            <th className="ret" title="Time-weighted return: each day's growth chained, so money put in or taken out doesn't count. Comparable with inflation and with the benchmarks">
               Return
             </th>
-            {!narrow && (
-              <th title="CPI over the same days (GUS; a whole year: December on December)">
-                Inflation
-              </th>
-            )}
-            <th title="(1 + return) / (1 + inflation) − 1: what the money gained in what it buys">
-              Real
-            </th>
-            {!narrow && (
-              <th className="col-xirr" title="Money-weighted return (XIRR) of the start value, the money put in and the end value: what your money earned, its timing included. A part of a year: over those days, not a year">
-                XIRR
-              </th>
-            )}
             {benches.map((b) => (
               <th key={b.id} className="bench" title={`${b.note}. Its return over the same days, to compare with Return`}>
-                {b.short ?? b.label}
+                {b.short}
               </th>
             ))}
+            {!narrow && <th title="CPI over the same days (GUS; a whole year: December on December)">Inflation</th>}
+            <th title="(1 + return) / (1 + inflation) − 1: what the money gained in what it buys">Real</th>
           </tr>
         </thead>
         <tbody>
-          {!data && loading && <SkeletonRows rows={4} cols={cols} />}
+          {!data &&
+            loading &&
+            [0, 1, 2, 3].map((r) => (
+              <tr key={r} className="skeleton-row" aria-hidden data-testid="skeleton-row">
+                {cols.map((c, i) => (
+                  <td key={i} className={c}>
+                    <span className="skeleton-bar" style={{ width: i === 0 ? "70%" : "55%" }} />
+                  </td>
+                ))}
+              </tr>
+            ))}
           {data && data.years.length === 0 && (
             <tr>
-              <td className="left muted" colSpan={cols}>
+              <td className="left muted" colSpan={cols.length}>
                 No valuation history yet.
               </td>
             </tr>
@@ -184,23 +222,23 @@ export function YearsTable({
           {data?.years.map((y) => {
             const { label, sub } = yearLabel(y, narrow);
             return (
-              <tr
-                key={y.year}
-                data-testid="years-row"
-                data-year={y.year}
-                className={y.partial ? "partial" : undefined}
-              >
+              <tr key={y.year} data-testid="years-row" data-year={y.year} className={y.partial ? "partial" : undefined}>
                 <td className="left">
                   {label}
                   {sub && <div className="sub muted">{sub}</div>}
                 </td>
-                {!narrow && <td className="col-start">{fmtPln(y.startValue)}</td>}
-                {!narrow && <td className="col-start">{fmtPln(y.netDeposits)}</td>}
-                {!narrow && <td className="col-end">{fmtPln(y.endValue)}</td>}
                 {!narrow && (
-                  <td className={`col-end ${signClass(y.profit)}`}>{fmtPln(y.profit)}</td>
+                  <>
+                    <td className="col-start">{fmtPln(y.startValue)}</td>
+                    <td className="col-start">{fmtPln(y.netDeposits)}</td>
+                    <td className="col-end">{fmtPln(y.endValue)}</td>
+                    <td className={`col-end ${signClass(y.profit)}`}>{fmtPln(y.profit)}</td>
+                    <td className={`col-xirr ${signClass(y.xirr)}`} data-testid="years-xirr">
+                      {pct(y.xirr)}
+                    </td>
+                  </>
                 )}
-                <td className={signClass(y.twr)} data-testid="years-twr">
+                <td className={`ret ${signClass(y.twr)}`} data-testid="years-twr">
                   {pct(y.twr)}
                   {narrow && (
                     <div className="sub muted">
@@ -208,6 +246,9 @@ export function YearsTable({
                     </div>
                   )}
                 </td>
+                {benches.map((b) => (
+                  <BenchCell key={b.id} col={b} b={series.get(b.id)} r={y} />
+                ))}
                 {!narrow && (
                   <td data-testid="years-inflation">
                     <Inflation r={y} />
@@ -216,14 +257,6 @@ export function YearsTable({
                 <td className={signClass(y.real)} data-testid="years-real">
                   {pct(y.real)}
                 </td>
-                {!narrow && (
-                  <td className={`col-xirr ${signClass(y.xirr)}`} data-testid="years-xirr">
-                    {pct(y.xirr)}
-                  </td>
-                )}
-                {benches.map((b) => (
-                  <BenchCell key={b.id} b={b} r={y} />
-                ))}
               </tr>
             );
           })}
@@ -236,30 +269,26 @@ export function YearsTable({
             >
               <td className="left">
                 All
-                <div className="sub muted">
-                  {narrow ? "a year" : `a year, since ${t.from.slice(0, 7)}`}
-                </div>
+                <div className="sub muted">{narrow ? "a year" : `a year, since ${t.from.slice(0, 7)}`}</div>
               </td>
-              {!narrow && <td className="col-start">–</td>}
-              {!narrow && <td className="col-start">{fmtPln(t.netDeposits)}</td>}
-              {!narrow && <td className="col-end">{fmtPln(t.endValue)}</td>}
               {!narrow && (
-                <td className={`col-end ${signClass(t.profit)}`}>{fmtPln(t.profit)}</td>
+                <>
+                  <td className="col-start">–</td>
+                  <td className="col-start">{fmtPln(t.netDeposits)}</td>
+                  <td className="col-end">{fmtPln(t.endValue)}</td>
+                  <td className={`col-end ${signClass(t.profit)}`}>{fmtPln(t.profit)}</td>
+                  <td className={`col-xirr ${signClass(t.xirr)}`}>{pct(t.xirr)}</td>
+                </>
               )}
-              <td className={signClass(t.twrPerYear)}>
+              <td className={`ret ${signClass(t.twrPerYear)}`}>
                 {pct(t.twrPerYear)}
-                {narrow && (
-                  <div className="sub muted">
-                    infl. {pct(t.inflationPerYear)}
-                  </div>
-                )}
+                {narrow && <div className="sub muted">infl. {pct(t.inflationPerYear)}</div>}
               </td>
+              {benches.map((b) => (
+                <BenchCell key={b.id} col={b} b={series.get(b.id)} r={t} perYear />
+              ))}
               {!narrow && <td>{pct(t.inflationPerYear)}</td>}
               <td className={signClass(t.realPerYear)}>{pct(t.realPerYear)}</td>
-              {!narrow && <td className={`col-xirr ${signClass(t.xirr)}`}>{pct(t.xirr)}</td>}
-              {benches.map((b) => (
-                <BenchCell key={b.id} b={b} r={t} perYear />
-              ))}
             </tr>
           </tfoot>
         )}

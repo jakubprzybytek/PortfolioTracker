@@ -522,6 +522,13 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
 }
 .chart-legend { font-size: 0.8rem; font-weight: 400; margin-left: 8px; }
+/* Performance: two parts that don't mix (By year: the whole history; Over time: the range picked in its header). */
+.perf-part + .perf-part { margin-top: 40px; padding-top: 18px; border-top: 2px solid var(--border); }
+.part-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.part-header .range { margin-bottom: 0; }
+.part-title { font-size: 1.3rem; margin: 0; letter-spacing: -0.01em; }
+.part-header + h2 { margin-top: 14px; }
+.part-note { font-size: 0.85rem; margin-right: auto; }
 /* Two charts side by side (Dashboard: drawdown, allocation over time); headings and panels line up across them. */
 .chart-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; }
 .chart-pair > div { display: grid; grid-row: span 2; grid-template-rows: subgrid; }
@@ -688,6 +695,12 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .returns tr.partial td:first-child { font-style: italic; }
 .returns tfoot td { border-top: 2px solid var(--border); font-weight: 600; }
 .returns sup { font-size: 0.7em; font-weight: 400; }
+/* The benchmarks: a tinted block under its own heading, right of Return (what they compare with, in bold). */
+.returns .bench { background: var(--band); }
+.returns .ret { font-weight: 600; }
+.returns thead tr.group-row th { border-bottom: 0; padding-top: 6px; padding-bottom: 0; height: auto; }
+.returns thead th.group-label { text-align: center; font-size: 0.72rem; text-transform: none; letter-spacing: 0; border-radius: 6px 6px 0 0; }
+.returns thead th.group-label .muted { font-weight: 400; }
 /* Narrower screens drop the least needed columns (money first, then XIRR) instead of scrolling sideways; return, inflation, real and the benchmarks stay. */
 @media (max-width: 1320px) { .returns .col-start { display: none; } }
 @media (max-width: 1120px) { .returns .col-end { display: none; } }
