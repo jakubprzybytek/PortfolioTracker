@@ -500,3 +500,164 @@ export function holdOrSell(input: HoldSellInput): { rows: HoldSellRow[]; skipped
   }
   return { rows: rows.sort((x, y) => x.difference - y.difference), skipped };
 }
+
+// --- buy more ------------------------------------------------------------------------------------------
+
+/**
+ * "Buy more?" for a bond position held (Docs/ui.md, "Hold or sell", Buy more): what one more bond bought today at its
+ * last price would yield to maturity, before and after tax, after inflation, over the retail bond on offer for a
+ * similar term, and how much it reacts to interest rates. Retail series can't be bought again: their row is the
+ * series of the same kind on offer today.
+ */
+export interface BuyMoreRow {
+  account: string;
+  isin: string;
+  code: string;
+  name: string;
+  type: InstrumentItem["type"];
+  maturity: IsoDate;
+  years: number;
+  taxFree: boolean;
+  /** What one more bond costs: last price + accrued interest (retail: 100 zł), the commission on top, in the bond's currency. */
+  price: { perBond: number; commission: number; date: IsoDate | null; currency: string };
+  /** Retail: the series on offer that "buying more" means. */
+  offerSeries?: string;
+  /** Yield to maturity before tax (null for retail rows: the after-tax figure is the one that matters there). */
+  grossYield: number | null;
+  /** After tax (none in IKE/IKZE): the figure to compare. */
+  netYield: number;
+  /** (1 + netYield) / (1 + CPI assumed) − 1. */
+  realYield: number;
+  /** The retail bond on offer for the nearest term, after tax (none for a retail row: it is one). */
+  alternative: Alternative | null;
+  /** netYield − the alternative's yield. */
+  spread: number | null;
+  /** Modified duration (years): the price moves about −duration % per +1 pp of yield. Fixed-rate bonds only. */
+  duration: number | null;
+  /** This instrument's share of the portfolio (positions + cash), all accounts together. */
+  weight: number | null;
+  notes: string[];
+}
+
+/** Modified duration of `flows` (gross, per bond) priced at `price` and yielding `y` a year. */
+function modifiedDuration(price: number, flows: { t: number; amount: number }[], y: number): number {
+  const weighted = flows.reduce((s, f) => s + (f.t * f.amount) / (1 + y) ** f.t, 0);
+  return weighted / price / (1 + y);
+}
+
+export function buyMore(input: HoldSellInput & { portfolioValue?: number }): BuyMoreRow[] {
+  const { today, assumptions: a } = input;
+  const rows: BuyMoreRow[] = [];
+  const bondIsins = new Set([...input.instruments.values()].filter((i) => BOND_TYPES.has(i.type)).map((i) => i.isin));
+  const valueByIsin = new Map<string, number>();
+  for (const h of input.holdings) if (h.value !== null) valueByIsin.set(h.isin, (valueByIsin.get(h.isin) ?? 0) + h.value);
+  const weightOf = (isin: string) => (input.portfolioValue ? round((valueByIsin.get(isin) ?? 0) / input.portfolioValue, 4) : null);
+  const real = (y: number) => round((1 + y) / (1 + a.cpi) - 1, 6);
+  // Retail: one row per account and kind (buying more = the series on offer), weighed with all series of that kind.
+  const retailKindOf = (isin: string) => input.instruments.get(isin)?.retail?.kind;
+  const kindValue = new Map<string, number>();
+  for (const h of input.holdings) {
+    const k = h.type === "BOND_RETAIL" ? retailKindOf(h.isin) : undefined;
+    if (k && h.value !== null) kindValue.set(k, (kindValue.get(k) ?? 0) + h.value);
+  }
+  const retailDone = new Set<string>();
+
+  for (const h of input.holdings) {
+    if (!BOND_TYPES.has(h.type) || h.quantity <= 0) continue;
+    const inst = input.instruments.get(h.isin);
+    if (!inst) continue;
+    const taxFree = isTaxFreeAccount(h.account);
+    const tax = taxFree ? 0 : INTEREST_TAX;
+    const base = { account: h.account, isin: h.isin, code: h.code, name: h.name, type: h.type, taxFree, weight: weightOf(h.isin) };
+
+    if (h.type === "BOND_RETAIL") {
+      const kind = inst.retail?.kind;
+      const offer = kind && input.offers.find((o) => o.kind === kind);
+      if (!offer || retailDone.has(`${h.account}|${offer.series}`)) continue;
+      retailDone.add(`${h.account}|${offer.series}`);
+      const months = offer.termMonths;
+      const maturity = lotSeries(offer, today).maturity;
+      const netYield = retailOfferYield(offer, today, maturity, taxFree, a);
+      rows.push({
+        ...base,
+        code: offer.series,
+        name: `${kind} on offer (you hold ${kind} series)`,
+        weight: input.portfolioValue ? round((kindValue.get(kind) ?? 0) / input.portfolioValue, 4) : null,
+        maturity,
+        years: round(yearsBetween(today, maturity), 2),
+        price: { perBond: 100, commission: 0, date: today, currency: "PLN" },
+        offerSeries: offer.series,
+        grossYield: null,
+        netYield,
+        realYield: real(netYield),
+        alternative: null,
+        spread: null,
+        duration: null,
+        notes: [`the series on offer now (${months >= 12 ? `${months / 12} y` : `${months} m`}), 100 zł a bond, held to maturity`, offer.margin !== undefined ? `later rates: CPI ${pct(a.cpi)} + margin` : "fixed rate"],
+      });
+      continue;
+    }
+
+    const per =
+      h.type === "BOND_LISTED" && inst.terms
+        ? listedBond(inst.terms, today, input.referenceIndex, a)
+        : h.type === "BOND_CORPORATE"
+          ? corporateBond(inst, input.couponPeriods.get(h.isin) ?? [], today, a)
+          : h.type === "BOND_IBKR"
+            ? ibkrBond(inst, today)
+            : "no terms";
+    if (typeof per === "string" || h.valuePerUnit === null || per.maturity <= today || per.flows.length === 0) continue;
+    const commission = a.commission ?? commissionRate(input.transactions, h.account, bondIsins);
+    const notes: string[] = [];
+    // The value per unit is in PLN; IBKR bonds pay in their currency, so their price goes back to it at the same rate.
+    const fx = h.type === "BOND_IBKR" ? (h.fx?.rate ?? 1) : 1;
+    const perBond = h.valuePerUnit / fx;
+    const accrued = (h.accruedInterest ?? 0) / (h.type === "BOND_IBKR" ? fx : 1);
+    const c = perBond * commission;
+    const cost = perBond + c;
+    // Tax: coupons less the accrued interest paid with the bond (deductible from the first one), and the gain over
+    // the price paid at redemption.
+    let accruedLeft = accrued;
+    const flows = per.flows.map((f) => {
+      let taxBase = f.taxBase;
+      if (f.kind !== "redemption" && accruedLeft > 0) {
+        const used = Math.min(accruedLeft, taxBase);
+        taxBase -= used;
+        accruedLeft -= used;
+      }
+      if (f.kind === "redemption") taxBase = Math.max(0, f.perBond - cost);
+      return { t: yearsBetween(today, f.date), gross: f.perBond, net: f.perBond - Math.max(0, taxBase) * tax };
+    });
+    const grossYield = irr(cost, flows.map((f) => ({ t: f.t, amount: f.gross })));
+    const netYield = irr(cost, flows.map((f) => ({ t: f.t, amount: f.net })));
+    const years = yearsBetween(today, per.maturity);
+    const offer = nearestOffer(input.offers, years);
+    const alternative: Alternative | null = offer
+      ? { label: `${offer.series} (retail, ${offer.termMonths >= 12 ? `${offer.termMonths / 12} y` : `${offer.termMonths} m`})`, series: offer.series, yield: retailOfferYield(offer, today, per.maturity, taxFree, a) }
+      : null;
+    const floating = "floating" in per && per.floating;
+    const fixed = (h.type === "BOND_LISTED" && inst.terms?.couponType === "FIXED") || (h.type === "BOND_CORPORATE" && !floating) || h.type === "BOND_IBKR";
+    notes.push(`at the last price${h.priceDate ? ` (${h.priceDate})` : ""} + accrued interest; the ask can be higher, above all on Catalyst`);
+    notes.push(`${pct(commission)} commission${a.commission === undefined ? " (the account's, from its trades)" : ""}`);
+    notes.push(taxFree ? "no tax (IKE/IKZE)" : "tax 19 % on coupons (less the accrued interest paid) and on the gain over the price paid");
+    if (h.type === "BOND_LISTED" && inst.terms?.couponType === "INDEXED") notes.push(`IZ indexation at CPI ${pct(a.cpi)}: the real yield is the steadier figure`);
+    if (floating) notes.push(`coupons not set yet: WIBOR ${pct(a.wibor)} + margin; the margin over WIBOR is the steadier figure`);
+    if (h.type === "BOND_CORPORATE") notes.push("a corporate bond's yield is what's promised; the spread is the pay for the issuer's risk");
+    if (h.type === "BOND_IBKR") notes.push(`in ${h.currency}: the exchange rate's moves aren't counted`);
+    rows.push({
+      ...base,
+      maturity: per.maturity,
+      years: round(years, 2),
+      price: { perBond: round(perBond, 4), commission: round(c, 4), date: h.priceDate, currency: h.type === "BOND_IBKR" ? h.currency : "PLN" },
+      grossYield,
+      netYield,
+      realYield: real(netYield),
+      alternative,
+      spread: alternative ? round(netYield - alternative.yield, 6) : null,
+      duration: fixed ? round(modifiedDuration(cost, flows.map((f) => ({ t: f.t, amount: f.gross })), grossYield), 2) : null,
+      notes,
+    });
+  }
+  // The best after-tax yield first.
+  return rows.sort((x, y) => y.netYield - x.netYield);
+}

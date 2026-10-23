@@ -621,6 +621,15 @@ describe(`API ${API}`, () => {
       if (body.offers.length) expect(r.alternative.series).toBeTruthy();
     }
     expect(body.rows.find((r) => r.account === "ike")?.taxFree ?? true).toBe(true);
+    // Buy more: one more bond of each held at its last price; retail rows are the series on offer, one per account and kind.
+    const buy = (body as unknown as { buy: { code: string; type: string; netYield: number; grossYield: number | null; realYield: number; spread: number | null; offerSeries?: string; weight: number | null }[] }).buy;
+    expect(buy.map((b) => b.code)).toEqual(expect.arrayContaining(["DS0432", "IZ0836", "KRU0827"]));
+    expect(buy.map((b) => b.netYield)).toEqual([...buy.map((b) => b.netYield)].sort((x, y) => y - x));
+    for (const b of buy) {
+      expect(b.netYield).toBeGreaterThan(-0.5);
+      if (b.type === "BOND_RETAIL") expect(b.offerSeries).toBe(b.code);
+      else expect(b.netYield).toBeLessThanOrEqual(b.grossYield! + 1e-9);
+    }
 
     expect((await send("PUT", "/hold-sell/assumptions", { cpi: "a lot" })).status).toBe(400);
     const put = await send("PUT", "/hold-sell/assumptions", { cpi: 0.03, wibor: 0.05, nbpRate: 0.04, alternative: "rate", altRate: 0.06 });

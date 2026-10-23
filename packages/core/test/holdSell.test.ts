@@ -6,6 +6,7 @@ import {
   DEFAULT_ASSUMPTIONS,
   earlyRedemptionFee,
   extendReferenceIndex,
+  buyMore,
   holdOrSell,
   ibkrTerms,
   irr,
@@ -194,5 +195,61 @@ describe("holdOrSell", () => {
     );
     expect(rows).toEqual([]);
     expect(skipped).toEqual([{ account: "Broker", isin: "PL0000000001", code: "XYZ0128", reason: "no coupon periods (the instrument's settings)" }]);
+  });
+});
+
+describe("buyMore", () => {
+  // One more DS1028 (fixed 5 %, yearly coupon on 25 October, matures 2028-10-25) at `price` %, plus accrued interest to T+2.
+  const accrued = Math.round(((50 * 360) / 365) * 100) / 100;
+  const listed = (price: number, account = "IKE Broker") =>
+    base({
+      holdings: [holding({ account, code: "DS1028", cleanPrice: price, accruedInterest: accrued, valuePerUnit: price * 10 + accrued, value: 10 * (price * 10 + accrued) })],
+      instruments: new Map([["PL0000000001", instrument({ code: "DS1028", terms: fixedTerms })]]),
+      offers: [tos("TOS1029", "2026-10-01", 0.05)],
+      assumptions: { ...DEFAULT_ASSUMPTIONS, cpi: 0.025, commission: 0 },
+    });
+
+  it("at par in IKE: about the coupon before and after tax, real after CPI, duration about two years, over the retail bond on offer", () => {
+    const [r] = buyMore({ ...listed(100), portfolioValue: 100_000 });
+    expect(r).toMatchObject({ code: "DS1028", taxFree: true, maturity: "2028-10-25", price: { perBond: 1000 + accrued, commission: 0, currency: "PLN" } });
+    expect(r!.grossYield!).toBeCloseTo(0.05, 2);
+    expect(r!.netYield).toBe(r!.grossYield);
+    expect(r!.realYield).toBeCloseTo((1 + r!.netYield) / 1.025 - 1, 6);
+    // Macaulay ~1,88 years, modified = that / (1 + yield)
+    expect(r!.duration!).toBeGreaterThan(1.75);
+    expect(r!.duration!).toBeLessThan(1.85);
+    expect(r!.alternative?.series).toBe("TOS1029");
+    expect(r!.spread!).toBeCloseTo(r!.netYield - r!.alternative!.yield, 6);
+    expect(r!.weight).toBeCloseTo(0.1049, 3);
+  });
+
+  it("outside IKE: 19 % tax, but not on the accrued interest paid with the bond; cheaper means a higher yield", () => {
+    const r = buyMore(listed(100, "Broker"))[0]!;
+    expect(r.taxFree).toBe(false);
+    // About 5 % × 0,81: the first coupon (50) mostly gives back the accrued interest paid (49,32), which isn't taxed.
+    expect(r.netYield).toBeGreaterThan(0.039);
+    expect(r.netYield).toBeLessThan(0.0415);
+    expect(r.netYield).toBeLessThan(r.grossYield!);
+    expect(buyMore(listed(90))[0]!.grossYield!).toBeGreaterThan(0.1);
+  });
+
+  it("retail: one row per account and kind, the series on offer now, weighed with every series of that kind held", () => {
+    const old1 = tos("TOS0127", "2024-01-01", 0.06);
+    const old2 = tos("TOS0627", "2024-06-01", 0.06);
+    const input = base({
+      holdings: [
+        holding({ account: "Retail", isin: old1.isin, code: "TOS0127", type: "BOND_RETAIL", value: 1000 }),
+        holding({ account: "Retail", isin: old2.isin, code: "TOS0627", type: "BOND_RETAIL", value: 3000 }),
+      ],
+      instruments: new Map([
+        [old1.isin, instrument({ isin: old1.isin, code: "TOS0127", type: "BOND_RETAIL", retail: old1 })],
+        [old2.isin, instrument({ isin: old2.isin, code: "TOS0627", type: "BOND_RETAIL", retail: old2 })],
+      ]),
+      offers: [tos("TOS1029", "2026-10-01", 0.05)],
+    });
+    const rows = buyMore({ ...input, portfolioValue: 10_000 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ code: "TOS1029", offerSeries: "TOS1029", grossYield: null, alternative: null, spread: null, duration: null, weight: 0.4 });
+    expect(rows[0]!.netYield).toBeCloseTo(0.05 * 0.81, 3);
   });
 });

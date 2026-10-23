@@ -38,6 +38,7 @@ import {
   DEFAULT_ASSUMPTIONS,
   HoldSellAssumptionsInput,
   holdOrSell,
+  buyMore,
   offerSeriesCode,
   RETAIL_OFFER_TERMS,
   type HoldSellAssumptions,
@@ -623,7 +624,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const held = new Set(snap.holdings.map((h) => h.isin));
         const corporate = instruments.filter((i) => i.type === "BOND_CORPORATE" && held.has(i.isin));
         const periods = await Promise.all(corporate.map((i) => repo.listCouponPeriods(i.isin)));
-        const result = holdOrSell({
+        const input = {
           today: day,
           holdings: snap.holdings,
           instruments: new Map(instruments.map((i) => [i.isin, i])),
@@ -632,7 +633,10 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
           referenceIndex: toReferenceIndex(refIndex),
           offers,
           assumptions,
-        });
+        };
+        const result = holdOrSell(input);
+        // "Buy more": one more bond of each held at its last price (core/holdsell, buyMore); weights of positions + cash.
+        const buy = buyMore({ ...input, portfolioValue: snap.totals.value + (snap.totals.cash ?? 0) });
         return json(200, {
           date: day,
           assumptions,
@@ -640,6 +644,7 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
           saved: !!saved,
           offers: offers.map((o) => ({ series: o.series, kind: o.kind, termMonths: o.termMonths, firstRate: o.rates[0] ?? null, margin: o.margin ?? null, saleStart: o.saleStart, saleEnd: o.saleEnd })),
           ...result,
+          buy,
         });
       }
       case "PUT /hold-sell/assumptions": {

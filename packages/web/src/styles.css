@@ -721,3 +721,10 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .chart-key-dashed { width: 16px; height: 0; border-top: 2px dashed; display: inline-block; }
 .chart-key-dotted { width: 16px; height: 0; border-top: 2px dotted; display: inline-block; }
 .chart-tip { padding: 6px 10px; font-size: 0.85rem; line-height: 1.6; }
+/* Hold or sell / Buy more: the switch next to the title (the date on the right); on a phone on a row of its own. */
+.view-header.hs-header .hs-mode { margin: 0 auto 0 16px; }
+@media (max-width: 720px) {
+  .view-header.hs-header { flex-wrap: wrap; }
+  .view-header.hs-header .hs-mode { order: 3; margin: 4px 0 0; }
+}
+.hs-item strong[data-testid="bm-net"] { white-space: nowrap; }

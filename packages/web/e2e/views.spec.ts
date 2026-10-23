@@ -1102,6 +1102,30 @@ test.describe("hold or sell", () => {
   });
 });
 
+test.describe("buy more", () => {
+  test("the other half of Hold or sell: one more of each bond held, best after-tax yield first; a row opens what it rests on", async ({ page }) => {
+    await page.goto("/#/hold-sell");
+    const mode = page.getByTestId("hs-mode");
+    await mode.getByRole("button", { name: "Buy more" }).click();
+    await expect(page).toHaveURL(/#\/hold-sell\?mode=buy$/);
+    await expect(mode.getByRole("button", { name: "Buy more" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByTestId("hs-assumptions")).toBeVisible(); // shared
+    const rows = page.getByTestId("bm-row");
+    await expect(rows.first()).toBeVisible();
+    await expect(page.locator('[data-testid="bm-row"][data-code="DS0432"]').first()).toBeVisible();
+    const net = (await rows.getByTestId("bm-net").allTextContents()).map((t) => Number(t.replace(/[^\d,−-]/g, "").replace("−", "-").replace(",", ".")));
+    expect(net).toEqual([...net].sort((a, b) => b - a));
+    const ds = page.locator('[data-testid="bm-row"][data-code="DS0432"]').first();
+    await ds.click();
+    await expect(page.getByTestId("bm-notes")).toContainText("duration");
+    await page.reload();
+    await expect(page.getByTestId("bm-notes")).toBeVisible(); // the open row is in the URL
+    await mode.getByRole("button", { name: "Hold or sell" }).click();
+    await expect(page.getByTestId("hs-row").first()).toBeVisible();
+    await expect(page).toHaveURL(/#\/hold-sell$/);
+  });
+});
+
 test.describe("indicators view", () => {
   test("lists CPI m/m and the reference index; a click shows the chart, its range in the URL", async ({ page }) => {
     await page.goto("/#/indicators");

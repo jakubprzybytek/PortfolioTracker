@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
-import type { HoldSellAssumptions, HoldSellRow, HoldSellSkipped } from "@portfolio/core";
+import type { BuyMoreRow, HoldSellAssumptions, HoldSellRow, HoldSellSkipped } from "@portfolio/core";
 import { apiSend } from "./api.ts";
+import { BuyMoreTable } from "./BuyMoreTable.tsx";
 import { fmtNum, fmtPln, parseNum, signClass } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
@@ -23,6 +24,8 @@ export interface HoldSellResponse {
   offers: Offer[];
   rows: HoldSellRow[];
   skipped: HoldSellSkipped[];
+  /** "Buy more": one more bond of each held, bought today (core/holdsell, buyMore). */
+  buy?: BuyMoreRow[];
 }
 
 export const VERDICT_LABELS: Record<HoldSellRow["verdict"], string> = { HOLD: "hold", SELL: "sell", EVEN: "about the same" };
@@ -53,6 +56,9 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
   const data = useApi<HoldSellResponse>("/hold-sell");
   const d = data.data;
   const open = params["row"] ?? null;
+  // Two halves sharing the assumptions: hold or sell what's held, or buy more of it (`?mode=buy`).
+  const buyMode = params["mode"] === "buy";
+  const setMode = (buy: boolean) => setParams({ ...params, mode: buy ? "buy" : undefined, row: undefined });
   const [draft, setDraft] = useState<Draft | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,15 +106,24 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
   const toggle = (r: HoldSellRow) => setParams({ ...params, row: open === rowKey(r) ? undefined : rowKey(r) });
   return (
     <>
-      <header className="view-header">
+      <header className="view-header hs-header">
         <h2 className="view-title">Hold or sell</h2>
+        <div className="range hs-mode" role="group" aria-label="Hold or sell, or buy more" data-testid="hs-mode">
+          <button type="button" aria-pressed={!buyMode} onClick={() => setMode(false)}>
+            Hold or sell
+          </button>
+          <button type="button" aria-pressed={buyMode} onClick={() => setMode(true)}>
+            Buy more
+          </button>
+        </div>
         <span className="muted" data-testid="hs-date">
           {d ? `as of ${d.date}` : data.loading ? "Loading…" : ""}
         </span>
       </header>
       <p className="muted hs-intro">
-        Each bond kept to maturity against sold today, with the money in the alternative until the same day. What you paid doesn't matter; after tax (none in IKE/IKZE), at
-        the assumptions below.
+        {buyMode
+          ? "Each bond held, one more bought today at its last price and kept to maturity: its yield before and after tax (none in IKE/IKZE), after inflation, and over the retail bond on offer for a similar term, at the assumptions below. Retail bonds: the series on offer now."
+          : "Each bond kept to maturity against sold today, with the money in the alternative until the same day. What you paid doesn't matter; after tax (none in IKE/IKZE), at the assumptions below."}
       </p>
       {data.error && <p className="error">{data.error}</p>}
 
@@ -170,6 +185,17 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
         )}
       </section>
 
+      {buyMode ? (
+        <>
+          {d?.buy && (
+            <p className="muted" data-testid="bm-summary">
+              {d.buy.length} bonds. Best yield after tax first; a row opens what it rests on.
+            </p>
+          )}
+          <BuyMoreTable rows={d?.buy} today={d?.date ?? ""} loading={data.loading} open={open} toggle={(key) => setParams({ ...params, row: open === key ? undefined : key })} />
+        </>
+      ) : (
+      <>
       {d && (
         <p className="muted" data-testid="hs-summary">
           {d.rows.length} bond positions{sells ? `, ${sells} worth selling` : ""}. Most worth selling first.
@@ -281,6 +307,8 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
             </Fragment>
           ))}
         </p>
+      )}
+      </>
       )}
     </>
   );
