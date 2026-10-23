@@ -12,22 +12,104 @@ const fmtPrice = (r: BuyMoreRow) => `${fmtNum(r.price.perBond, 2)} ${r.price.cur
 /** A price older than a week: the yield may be off. */
 const oldPrice = (r: BuyMoreRow, today: string) => !!r.price.date && (Date.parse(today) - Date.parse(r.price.date)) / 86_400_000 > 7;
 
-/** What a row's figures rest on, and how to read them. */
+const KIND_LABELS: Record<BuyMoreRow["flows"][number]["kind"], string> = { coupon: "coupon", interest: "interest", redemption: "redemption" };
+
+/** One row's numbers, as Hold or sell's breakdown: one bond bought today, what it pays to maturity, then what it rests on. */
 function Notes({ r }: { r: BuyMoreRow }) {
+  const cur = r.price.currency === "PLN" ? "zł" : r.price.currency;
+  const money = (v: number) => `${fmtNum(v, 2)} ${cur}`;
+  const cost = r.price.perBond + r.price.commission;
+  const received = r.flows.reduce((s, f) => s + f.amount - f.tax, 0);
   return (
     <div className="hs-breakdown" data-testid="bm-notes">
-      <ul className="muted bm-notes">
-        {r.price.commission > 0 && (
-          <li>
-            one bond: {fmtPrice(r)} + {fmtNum(r.price.commission, 2)} commission
-          </li>
-        )}
-        {r.alternative && (
-          <li>
-            alternative: {r.alternative.label}, {fmtRate(r.alternative.yield)} after tax
-          </li>
-        )}
-        {r.duration !== null && <li>duration {fmtNum(r.duration, 2)}: if yields rise by 1 pp, the price falls by about {fmtNum(r.duration, 1)} % (matters only if sold before maturity)</li>}
+      <div>
+        <h4>{r.offerSeries ? `One ${r.offerSeries} today` : "One more bond today"}</h4>
+        <table className="static compact" data-testid="bm-cost">
+          <tbody>
+            {r.price.accrued > 0 ? (
+              <>
+                <tr>
+                  <td className="left">Price{r.price.date ? ` (${r.price.date})` : ""}</td>
+                  <td>{money(r.price.perBond - r.price.accrued)}</td>
+                </tr>
+                <tr>
+                  <td className="left">Accrued interest</td>
+                  <td>{money(r.price.accrued)}</td>
+                </tr>
+              </>
+            ) : (
+              <tr>
+                <td className="left">{r.offerSeries ? "Nominal" : `Price${r.price.date ? ` (${r.price.date})` : ""}`}</td>
+                <td>{money(r.price.perBond)}</td>
+              </tr>
+            )}
+            {r.price.commission > 0 && (
+              <tr>
+                <td className="left">Commission</td>
+                <td>{money(r.price.commission)}</td>
+              </tr>
+            )}
+            <tr className="total">
+              <td className="left">Paid</td>
+              <td>{money(cost)}</td>
+            </tr>
+            {r.alternative && (
+              <tr>
+                <td className="left">Alternative: {r.alternative.label}</td>
+                <td>{fmtRate(r.alternative.yield)}</td>
+              </tr>
+            )}
+            {r.duration !== null && (
+              <tr title="If yields rise by 1 pp, the price falls by about this many % (matters only if sold before maturity)">
+                <td className="left">Duration</td>
+                <td>{fmtNum(r.duration, 2)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h4>Held to maturity</h4>
+        <table className="static compact" data-testid="bm-flows">
+          <thead>
+            <tr>
+              <th className="left">Date</th>
+              <th className="left">What</th>
+              <th>Amount</th>
+              <th>Tax</th>
+            </tr>
+          </thead>
+          <tbody>
+            {r.flows.map((f) => (
+              <tr key={`${f.date}#${f.kind}`} title={f.projected ? "From the assumptions (a rate or an index not published yet)" : ""}>
+                <td className="left">{f.date}</td>
+                <td className="left">
+                  {KIND_LABELS[f.kind]}
+                  {f.projected && <span className="muted"> *</span>}
+                </td>
+                <td>{money(f.amount)}</td>
+                <td>{f.tax ? `−${money(f.tax)}` : "–"}</td>
+              </tr>
+            ))}
+            <tr className="total">
+              <td className="left" colSpan={3}>
+                Received after tax
+              </td>
+              <td>{money(received)}</td>
+            </tr>
+            <tr>
+              <td className="left" colSpan={3}>
+                A year, after tax{r.grossYield !== null ? ` (before: ${fmtRate(r.grossYield)})` : ""}
+              </td>
+              <td>
+                <strong>{fmtRate(r.netYield)}</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ul className="muted hs-notes">
+        {r.flows.some((f) => f.projected) && <li>* from the assumptions</li>}
         {r.notes.map((n) => (
           <li key={n}>{n}</li>
         ))}

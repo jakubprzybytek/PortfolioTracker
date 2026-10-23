@@ -1119,9 +1119,13 @@ test.describe("buy more", () => {
     expect(net).toEqual([...net].sort((a, b) => b - a));
     const ds = page.locator('[data-testid="bm-row"][data-code="DS0432"]').first();
     await ds.click();
-    await expect(page.getByTestId("bm-notes")).toContainText("duration");
-    // The notes' bullets sit close to the left edge (no browser-default 40 px indent)
-    expect(await page.locator(".bm-notes").evaluate((ul) => parseFloat(getComputedStyle(ul).paddingLeft))).toBeLessThan(24);
+    // Its breakdown, as Hold or sell's: one bond today (price, accrued, commission, paid), the payments to maturity
+    // with their tax, then the notes, whose bullets sit close to the left edge
+    await expect(page.getByTestId("bm-cost")).toContainText("Accrued interest");
+    await expect(page.getByTestId("bm-cost")).toContainText("Duration");
+    await expect(page.getByTestId("bm-flows").locator("tbody tr").nth(-3)).toContainText("redemption");
+    await expect(page.getByTestId("bm-flows")).toContainText("Received after tax");
+    expect(await page.getByTestId("bm-notes").locator(".hs-notes").evaluate((ul) => parseFloat(getComputedStyle(ul).paddingLeft))).toBeLessThan(24);
     await page.reload();
     await expect(page.getByTestId("bm-notes")).toBeVisible(); // the open row is in the URL
     await mode.getByRole("button", { name: "Hold or sell" }).click();

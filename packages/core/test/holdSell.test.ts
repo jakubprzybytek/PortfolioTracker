@@ -230,6 +230,14 @@ describe("buyMore", () => {
     expect(r.netYield).toBeGreaterThan(0.039);
     expect(r.netYield).toBeLessThan(0.0415);
     expect(r.netYield).toBeLessThan(r.grossYield!);
+    // Per bond: the first coupon taxed only on what exceeds the accrued interest paid (50 − 49,32), later ones in full
+    expect(r.flows.map((f) => [f.date, f.kind, f.amount, f.tax])).toEqual([
+      ["2026-10-25", "coupon", 50, 0.13],
+      ["2027-10-25", "coupon", 50, 9.5],
+      ["2028-10-25", "coupon", 50, 9.5],
+      ["2028-10-25", "redemption", 1000, 0],
+    ]);
+    expect(r.price.accrued).toBe(accrued);
     expect(buyMore(listed(90))[0]!.grossYield!).toBeGreaterThan(0.1);
   });
 

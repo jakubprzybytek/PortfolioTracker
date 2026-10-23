@@ -518,8 +518,10 @@ export interface BuyMoreRow {
   maturity: IsoDate;
   years: number;
   taxFree: boolean;
-  /** What one more bond costs: last price + accrued interest (retail: 100 zł), the commission on top, in the bond's currency. */
-  price: { perBond: number; commission: number; date: IsoDate | null; currency: string };
+  /** What one more bond costs: last price + accrued interest (retail: 100 zł), the commission on top, in the bond's currency; `accrued`: the interest part. */
+  price: { perBond: number; accrued: number; commission: number; date: IsoDate | null; currency: string };
+  /** What one bond pays until maturity, its tax (per bond, in the bond's currency); projected = from the assumptions. */
+  flows: { date: IsoDate; kind: HoldFlow["kind"]; amount: number; tax: number; projected?: boolean }[];
   /** Retail: the series on offer that "buying more" means. */
   offerSeries?: string;
   /** Yield to maturity before tax (null for retail rows: the after-tax figure is the one that matters there). */
@@ -578,6 +580,7 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
       const months = offer.termMonths;
       const maturity = lotSeries(offer, today).maturity;
       const netYield = retailOfferYield(offer, today, maturity, taxFree, a);
+      const flows = retailBond(offer, today, today, a).flows.map((f) => ({ date: f.date, kind: f.kind, amount: round(f.perBond), tax: round(Math.max(0, f.taxBase) * tax), ...(f.projected ? { projected: true } : {}) }));
       rows.push({
         ...base,
         code: offer.series,
@@ -585,7 +588,8 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
         weight: input.portfolioValue ? round((kindValue.get(kind) ?? 0) / input.portfolioValue, 4) : null,
         maturity,
         years: round(yearsBetween(today, maturity), 2),
-        price: { perBond: 100, commission: 0, date: today, currency: "PLN" },
+        price: { perBond: 100, accrued: 0, commission: 0, date: today, currency: "PLN" },
+        flows,
         offerSeries: offer.series,
         grossYield: null,
         netYield,
@@ -626,7 +630,7 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
         accruedLeft -= used;
       }
       if (f.kind === "redemption") taxBase = Math.max(0, f.perBond - cost);
-      return { t: yearsBetween(today, f.date), gross: f.perBond, net: f.perBond - Math.max(0, taxBase) * tax };
+      return { t: yearsBetween(today, f.date), date: f.date, kind: f.kind, projected: !!f.projected, gross: f.perBond, net: f.perBond - Math.max(0, taxBase) * tax };
     });
     const grossYield = irr(cost, flows.map((f) => ({ t: f.t, amount: f.gross })));
     const netYield = irr(cost, flows.map((f) => ({ t: f.t, amount: f.net })));
@@ -648,7 +652,8 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
       ...base,
       maturity: per.maturity,
       years: round(years, 2),
-      price: { perBond: round(perBond, 4), commission: round(c, 4), date: h.priceDate, currency: h.type === "BOND_IBKR" ? h.currency : "PLN" },
+      price: { perBond: round(perBond, 4), accrued: round(accrued, 4), commission: round(c, 4), date: h.priceDate, currency: h.type === "BOND_IBKR" ? h.currency : "PLN" },
+      flows: flows.map((f) => ({ date: f.date, kind: f.kind, amount: round(f.gross), tax: round(f.gross - f.net), ...(f.projected ? { projected: true } : {}) })),
       grossYield,
       netYield,
       realYield: real(netYield),

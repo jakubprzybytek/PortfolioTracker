@@ -728,5 +728,3 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
   .view-header.hs-header .hs-mode { order: 3; margin: 4px 0 0; }
 }
 .hs-item strong[data-testid="bm-net"] { white-space: nowrap; }
-.bm-notes { margin: 0; padding-left: 1.1rem; }
-.bm-notes li + li { margin-top: 2px; }
