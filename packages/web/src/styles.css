@@ -18,6 +18,9 @@
   --bench-WIG: #db2777; /* benchmarks in charts: WIG pink, MSCI World teal */
   --bench-MSCI_WORLD: #0d9488;
   --bench-MIX_40_60: #7c3aed; /* 40/60 World/EDO: violet */
+  --inc-coupons: #2563eb; /* income: coupons blue, dividends violet, interest green */
+  --inc-dividends: #8b5cf6;
+  --inc-interest: #10b981;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   font-size: 15px;
@@ -44,6 +47,9 @@
     --bench-WIG: #f472b6;
     --bench-MSCI_WORLD: #2dd4bf;
     --bench-MIX_40_60: #a78bfa;
+    --inc-coupons: #60a5fa;
+    --inc-dividends: #a78bfa;
+    --inc-interest: #34d399;
     --shadow: none;
   }
 }

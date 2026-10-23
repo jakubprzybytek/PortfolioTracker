@@ -20,6 +20,7 @@ import {
   type BackfillItem,
   type CouponPeriodItem,
   type BenchmarkPriceItem,
+  type QualityReportItem,
   type FxRateItem,
   type HistoryPointItem,
   type InstrumentItem,
@@ -261,6 +262,16 @@ export class Repository {
       }),
     );
     return res.Items?.[0] as FxRateItem | undefined;
+  }
+
+  // --- data quality (the `quality` job, the Status page) ---------------------------------------------
+
+  putQualityReport(report: Omit<QualityReportItem, "PK" | "SK">): Promise<void> {
+    return this.put("market", { PK: "QUALITY", SK: "LATEST", ...report });
+  }
+
+  getQualityReport(): Promise<QualityReportItem | undefined> {
+    return this.get<QualityReportItem>("market", { PK: "QUALITY", SK: "LATEST" });
   }
 
   // --- benchmarks (Performance view) ---------------------------------------------------------------

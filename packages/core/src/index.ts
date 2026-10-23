@@ -45,3 +45,5 @@ export * from "./targets/targets.ts";
 export * from "./valuation/sales.ts";
 export * from "./cashflows/cashFlows.ts";
 export * from "./benchmarks/benchmarks.ts";
+export * from "./valuation/income.ts";
+export * from "./quality/quality.ts";

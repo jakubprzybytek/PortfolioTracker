@@ -65,9 +65,21 @@ test.describe("performance", () => {
     await expect(byYear.getByTestId("years-chart")).toBeVisible();
     await expect(byYear.getByTestId("performance-range")).toHaveCount(0);
     await expect(overTime.getByTestId("performance-range")).toBeVisible();
+    await expect(byYear.getByTestId("income-chart")).toBeVisible();
     for (const id of ["growth-chart", "drawdown-chart", "allocation-chart"]) await expect(overTime.getByTestId(id)).toBeVisible();
     // By year comes first
     expect((await byYear.boundingBox())!.y).toBeLessThan((await overTime.boundingBox())!.y);
+  });
+
+  test("income by year: coupons, dividends and interest stacked per year, next to return and inflation", async ({ page }) => {
+    const chart = page.getByTestId("income-chart");
+    await expect(chart.locator(".recharts-bar-rectangle").first()).toBeVisible();
+    await expect(page.getByTestId("years-pair").locator(".chart-key").last()).toContainText("Coupons");
+    // Side by side with the yearly bars
+    const [a, b] = [(await page.getByTestId("years-chart").boundingBox())!, (await chart.boundingBox())!];
+    expect(b.x).toBeGreaterThan(a.x + a.width);
+    await chart.locator(".recharts-bar-rectangle").first().hover();
+    await expect(page.locator(".chart-tip").filter({ hasText: "Total" })).toBeVisible();
   });
 
   test("returns by year: Return right before the tinted benchmarks, under their own heading", async ({ page }) => {
@@ -156,7 +168,7 @@ test.describe("performance", () => {
       await route.continue();
     });
     await page.reload();
-    await expect(page.getByTestId("chart-skeleton")).toHaveCount(4); // return and inflation, growth of 100 zł, drawdown, allocation over time
+    await expect(page.getByTestId("chart-skeleton")).toHaveCount(5); // return and inflation, income, growth of 100 zł, drawdown, allocation over time
     // The table's header while loading is the loaded one (the benchmarks come from the fixed list), placeholders under each column
     const heads = page.getByTestId("years-table").locator("thead th");
     const visibleTexts = () => heads.evaluateAll((ths) => ths.filter((th) => (th as HTMLElement).offsetParent !== null).map((th) => th.textContent));

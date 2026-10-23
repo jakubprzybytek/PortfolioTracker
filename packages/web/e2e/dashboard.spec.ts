@@ -257,13 +257,40 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("tx-toast")).toHaveText("Prices were refreshed less than 5 minutes ago.");
   });
 
+  test("the Status page lists the data-quality issues, the urgent kinds first; none, or not checked yet", async ({ page }) => {
+    const report = {
+      checkedAt: "2026-10-23T06:30:12Z",
+      instruments: 19,
+      from: "2025-10-23",
+      lastDay: "2026-10-22",
+      issues: [
+        { kind: "gap", isin: "IE00B4L5Y983", code: "EUNK", date: "2026-03-06", detail: "no price on 2026-03-06" },
+        { kind: "stale", isin: "PLKRUK000057", code: "KRU0827", date: "2026-10-01", detail: "no price since 2026-10-01 (16 trading days)" },
+      ],
+    };
+    let body: unknown = report;
+    await page.route("**/quality", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(body) }));
+    await page.goto("/#/status");
+    const rows = page.getByTestId("quality-row");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.first()).toHaveAttribute("data-kind", "stale");
+    await expect(rows.first()).toContainText("Price stopped");
+    await expect(page.getByTestId("quality-summary")).toContainText("19 held instruments");
+    body = { ...report, issues: [] };
+    await page.reload();
+    await expect(page.getByTestId("quality-table")).toContainText("No problems found.");
+    body = null;
+    await page.reload();
+    await expect(page.getByTestId("quality-summary")).toContainText("not checked yet");
+  });
+
   test("job runs are on the Status page, linked from the menu", async ({ page }) => {
     await page.getByTestId("nav-status").click();
     await expect(page).toHaveURL(/#\/status$/);
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
     // Every job, once loaded (the 9 placeholder rows before that aren't job rows)
     await expect(page.getByTestId("job-valuation")).toBeVisible();
-    await expect(rows).toHaveCount(14);
+    await expect(rows).toHaveCount(15);
     await expect(page.getByTestId("job-benchmarks")).toBeVisible();
     await expect(page.getByTestId("jobs-table")).toContainText("ok");
   });

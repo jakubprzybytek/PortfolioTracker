@@ -114,6 +114,18 @@ export interface FxRateItem {
   source: string;
 }
 
+/** The latest data-quality report (`quality` job, core/quality/quality.ts): one item, rewritten by each run. */
+export interface QualityReportItem {
+  PK: "QUALITY";
+  SK: "LATEST";
+  checkedAt: string;
+  /** Held instruments with quoted prices that were checked, and the period: the last year up to `lastDay`. */
+  instruments: number;
+  from: IsoDate;
+  lastDay: IsoDate;
+  issues: import("../quality/quality.ts").QualityIssue[];
+}
+
 /** A benchmark's close on `date`, in its own currency (`core/benchmarks/benchmarks.ts`, the `benchmarks` job). */
 export interface BenchmarkPriceItem {
   PK: `BENCH#${string}`;

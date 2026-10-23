@@ -143,6 +143,14 @@ PK = FX#<CCY>               SK = <YYYY-MM-DD>       mid, table_no, source       
 PK = BENCH#<id>             SK = <YYYY-MM-DD>       id, close, currency, source, fetchedAt   (benchmarks of the Performance view: WIG, MSCI_WORLD; the close in its own currency, PLN at NBP when read)
 ```
 
+### Data-quality report
+
+```
+PK = QUALITY                SK = LATEST
+```
+
+`checkedAt`, `instruments` (how many were checked), `from`, `lastDay`, `issues` (`kind` gap / stale / jump / range, `isin`, `code`, `date`, `to`, `detail`): the `quality` job's latest report, rewritten by each run; the next run e-mails only issues not in it. Read by `GET /quality` (Status page).
+
 ### Exchange calendar
 
 ```
@@ -252,6 +260,7 @@ Each function links only the tables it needs. The spreadsheet feed isn't linked 
 | Function | `market` | `transactions` | `holdings` |
 |---|---|---|---|
 | `EodGpw`, `RecheckGpw`, `EodEtf`, `EodCatalyst`, `EodBonds`, `Benchmarks` (and their rechecks), `Live`, `Coupons`, `Monthly` | read/write | — | — |
+| `Quality` | read/write (its report) | — | read (the latest snapshot) |
 | `Fx` | read/write | read | — |
 | `Export` | read | read | — |
 | `Backfill` | read/write | — | — |

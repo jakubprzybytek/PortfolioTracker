@@ -23,7 +23,8 @@ import {
   MIX,
   type BenchmarkPoint,
 } from "@portfolio/core/benchmarks/benchmarks";
-import { fmtNum, fmtPct, fmtPln, signClass } from "./format.ts";
+import type { YearIncome } from "@portfolio/core/valuation/income";
+import { fmtCompact, fmtNum, fmtPct, fmtPln, signClass } from "./format.ts";
 import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
 import type { HistoryPoint } from "./types.ts";
 import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
@@ -35,6 +36,8 @@ export interface YearsResponse {
   cpi: CpiLevel[];
   /** Each benchmark's daily value in PLN from just before the first day (WIG, MSCI World). */
   benchmarks?: BenchmarkSeries[];
+  /** Coupons, dividends and interest per calendar year, PLN (NBP D-1), oldest first. */
+  income?: YearIncome[];
 }
 
 /** A benchmark in `GET /portfolio/years`. */
@@ -644,6 +647,72 @@ export function GrowthChart({
               isAnimationActive={false}
             />
           </LineChart>
+        </ResponsiveContainer>
+        <ChartBusy busy={loading} />
+      </div>
+    </>
+  );
+}
+
+const INCOME_KINDS = [
+  { key: "coupons", label: "Coupons", color: "var(--inc-coupons)" },
+  { key: "dividends", label: "Dividends", color: "var(--inc-dividends)" },
+  { key: "interest", label: "Interest", color: "var(--inc-interest)" },
+] as const;
+
+/** The income chart's tooltip: the year, each kind and the total, in a fixed order. */
+function IncomeTip({ active, y, partial }: { active?: boolean; y?: YearIncome; partial?: boolean }) {
+  if (!active || !y) return null;
+  return (
+    <div className="chart-tip" style={tooltipStyle}>
+      <div>
+        {y.year}
+        {partial ? " so far" : ""}
+      </div>
+      {INCOME_KINDS.map((k) => (
+        <div key={k.key} style={{ color: k.color }}>
+          {k.label} {fmtPln(y[k.key])}
+        </div>
+      ))}
+      <div>
+        <b>Total {fmtPln(y.total)}</b>
+      </div>
+    </div>
+  );
+}
+
+/** Coupons, dividends and interest received per calendar year (PLN at NBP D-1), stacked; * the year so far. */
+export function IncomeChart({ data, loading, height = 220 }: { data?: YearsResponse; loading: boolean; height?: number }) {
+  const narrow = useNarrow();
+  const thisYear = new Date().getFullYear();
+  const rows = (data?.income ?? []).map((y) => ({ ...y, label: y.year === thisYear ? `${y.year}*` : String(y.year), partial: y.year === thisYear }));
+  if (rows.length === 0)
+    return (
+      <ChartPlaceholder loading={loading} height={height}>
+        No coupons, dividends or interest yet.
+      </ChartPlaceholder>
+    );
+  const shown = INCOME_KINDS.filter((k) => rows.some((r) => r[k.key] !== 0));
+  return (
+    <>
+      <Key items={shown.map((k) => ({ label: k.label, color: k.color, kind: "bar" as const }))} />
+      <div className="chart-frame" data-testid="income-chart" style={{ width: "100%", height }}>
+        <ResponsiveContainer>
+          <ComposedChart data={rows} margin={chartMargin(narrow)} barCategoryGap="28%">
+            <CartesianGrid stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted)" />
+            <YAxis {...(narrow ? narrowYAxis : { width: 56, tick: { fontSize: 11 } })} stroke="var(--muted)" tickFormatter={(v: number) => fmtCompact(v)} />
+            <Tooltip
+              cursor={{ fill: "var(--band)" }}
+              content={({ active, payload }) => {
+                const r = payload?.[0]?.payload as (YearIncome & { partial: boolean }) | undefined;
+                return <IncomeTip active={active} y={r} partial={r?.partial} />;
+              }}
+            />
+            {shown.map((k, i) => (
+              <Bar key={k.key} dataKey={k.key} stackId="income" fill={k.color} radius={i === shown.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />
+            ))}
+          </ComposedChart>
         </ResponsiveContainer>
         <ChartBusy busy={loading} />
       </div>

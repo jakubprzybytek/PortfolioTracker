@@ -222,6 +222,14 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
+    // Data quality (gaps, stale prices, jumps, bond prices out of range) of what's held, after the morning rechecks;
+    // reads the latest snapshot for what's held.
+    new sst.aws.CronV2("Quality", {
+      function: { ...defaults, handler: "packages/jobs/src/handlers/quality.handler", link: [...link, market, holdings] },
+      schedule: "cron(30 8 ? * TUE-SAT *)",
+      timezone: WARSAW,
+      retries: 2,
+    });
     // NBP table A is published around 12:00 on business days; the afternoon run catches a late table.
     new sst.aws.CronV2("FxNoon", { function: fx.arn, schedule: "cron(30 12 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
     new sst.aws.CronV2("FxAfternoon", { function: fx.arn, schedule: "cron(30 16 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
@@ -343,6 +351,7 @@ export default $config({
     api.route("GET /indicators/{id}", apiHandler, auth);
     api.route("GET /holdings/history", apiHandler, auth);
     api.route("GET /status", apiHandler, auth);
+    api.route("GET /quality", apiHandler, auth);
     api.route("GET /notes", apiHandler, auth);
     api.route("POST /notes", apiHandler, auth);
     api.route("PUT /notes/{id}", apiHandler, auth);

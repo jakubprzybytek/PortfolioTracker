@@ -93,11 +93,11 @@ Accrued interest is computed by the valuation from each bond's coupon periods. T
 
 ## Verification after backfill
 
-- [ ] For each instrument: count of `PX` items vs trading days in the calendar; list the gaps.
+- [x] For each instrument: count of `PX` items vs trading days in the calendar; list the gaps. Done daily by the `quality` job for what's held (Status page, ingestion.md "Data quality rules").
 - [ ] Spot-check 3 random dates per instrument against a second source (broker statement, website).
 - [ ] Portfolio value at a few month-ends matches the broker statements / the old sheet within rounding.
 - [ ] Retail bond values match the official interest tables.
-- [ ] No unresolved `jump` flags.
+- [x] No unresolved `jump` flags: the `quality` job lists jumps of the last year.
 
 ## After the backfill
 

@@ -52,6 +52,7 @@ import {
   MIX,
   mixSeries,
   cpiIndicators,
+  incomeByYear,
   cpiLevels,
   yearlyReturns,
   fxCurrencyOf,
@@ -327,10 +328,12 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         // Per calendar year and over the whole history: start and end value, money put in, profit, time-weighted and
         // money-weighted return, inflation over the same days (CPI: GUS since December, else the monthly chain) and the
         // real return; plus the CPI levels from the first day on, for the growth of 100 zł chart (`growthOf100`).
-        const [points, ytd, mom] = await Promise.all([portfolioHistory("2000-01-01", today()), repo.listGusCpi("CPI_YTD"), repo.listReferenceIndex()]);
+        // Also the income per year (coupons, dividends, interest; PLN at NBP D-1) for "Income by year".
+        const [points, ytd, mom, txs] = await Promise.all([portfolioHistory("2000-01-01", today()), repo.listGusCpi("CPI_YTD"), repo.listReferenceIndex(), repo.listTransactions()]);
         const levels = cpiLevels(ytd, mom);
         const start = points[0] ? shiftMonth(points[0].date.slice(0, 7), -1) : "9999-12";
-        return json(200, { ...yearlyReturns(points, levels), cpi: levels.filter((l) => l.month >= start), benchmarks: await benchmarkSeries(points[0]?.date) });
+        const [benchmarks, fx] = await Promise.all([benchmarkSeries(points[0]?.date), fxHistoryOf(txs, today())]);
+        return json(200, { ...yearlyReturns(points, levels), cpi: levels.filter((l) => l.month >= start), benchmarks, income: incomeByYear(txs, fx) });
       }
       case "GET /instruments": {
         const items = (await repo.listInstruments()).filter((i) => i.isin !== "MF-TERMS");
@@ -667,8 +670,11 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         await repo.putSetting(TARGETS_SETTING, parsed.data);
         return json(200, { targets: parsed.data });
       }
+      case "GET /quality":
+        // The latest data-quality report (the `quality` job), or null before its first run.
+        return json(200, (await repo.getQualityReport()) ?? null);
       case "GET /status": {
-        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "benchmarks", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];
+        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "benchmarks", "quality", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];
         const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.latestJobRun(j)) ?? null])));
         return json(200, { now: new Date().toISOString(), jobs: runs });
       }

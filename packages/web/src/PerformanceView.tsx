@@ -2,7 +2,7 @@ import { CLASS_LABELS } from "./Allocation.tsx";
 import { RANGES, rangeFrom, today, type RangeKey } from "./format.ts";
 import { AllocationChart, DrawdownChart } from "./HistoryCharts.tsx";
 import { RangePicker } from "./RangePicker.tsx";
-import { GrowthChart, YearsChart, YearsTable, type YearsResponse } from "./Returns.tsx";
+import { GrowthChart, IncomeChart, YearsChart, YearsTable, type YearsResponse } from "./Returns.tsx";
 import type { HistoryPoint } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -32,10 +32,20 @@ export function PerformanceView({ params, setParams }: { params: Record<string, 
           Returns by year <span className="muted chart-legend">time-weighted (deposits don't count), against the benchmarks over the same days and inflation (CPI December on December)</span>
         </h2>
         {years.error ? <p className="error">{years.error}</p> : <YearsTable data={years.data} loading={years.loading} />}
-        <h2>
-          Return and inflation <span className="muted chart-legend">per year; the dot: real return; * part of a year</span>
-        </h2>
-        <section className="panel">{years.error ? <p className="error">{years.error}</p> : <YearsChart data={years.data} loading={years.loading} />}</section>
+        <div className="chart-pair" data-testid="years-pair">
+          <div>
+            <h2>
+              Return and inflation <span className="muted chart-legend">per year; the dot: real return; * part of a year</span>
+            </h2>
+            <section className="panel">{years.error ? <p className="error">{years.error}</p> : <YearsChart data={years.data} loading={years.loading} />}</section>
+          </div>
+          <div>
+            <h2>
+              Income by year <span className="muted chart-legend">coupons, dividends and interest received, PLN; * so far</span>
+            </h2>
+            <section className="panel">{years.error ? <p className="error">{years.error}</p> : <IncomeChart data={years.data} loading={years.loading} />}</section>
+          </div>
+        </div>
       </section>
 
       <section className="perf-part" data-testid="over-time">
