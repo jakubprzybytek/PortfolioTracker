@@ -103,14 +103,18 @@ async function get<T>(path: string): Promise<T | undefined> {
   return (await res.json()) as T;
 }
 
-/** The bond's snapshot, or undefined when onvista doesn't know the ISIN. */
-export async function fetchSnapshot(isin: string): Promise<OnvistaSnapshot | undefined> {
-  const json = await get<SnapshotResponse>(`/bonds/ISIN:${encodeURIComponent(isin)}/snapshot`);
+/** onvista's kind of instrument: bonds, or funds (ETFs too: also used to fill days Yahoo lacks). */
+export type OnvistaKind = "BOND" | "FUND";
+const KIND_PATH: Record<OnvistaKind, string> = { BOND: "bonds", FUND: "funds" };
+
+/** The instrument's snapshot, or undefined when onvista doesn't know the ISIN. */
+export async function fetchSnapshot(isin: string, kind: OnvistaKind = "BOND"): Promise<OnvistaSnapshot | undefined> {
+  const json = await get<SnapshotResponse>(`/${KIND_PATH[kind]}/ISIN:${encodeURIComponent(isin)}/snapshot`);
   return json?.instrument ? parseSnapshot(json) : undefined;
 }
 
 /** Daily closes on one exchange from `from` on (up to the last finished session). */
-export async function fetchHistory(idInstrument: string, idNotation: number, from: string): Promise<OnvistaBar[]> {
-  const json = await get<HistoryResponse>(`/instruments/BOND/${idInstrument}/eod_history?idNotation=${idNotation}&range=MAX&startDate=${from}`);
+export async function fetchHistory(idInstrument: string, idNotation: number, from: string, kind: OnvistaKind = "BOND"): Promise<OnvistaBar[]> {
+  const json = await get<HistoryResponse>(`/instruments/${kind}/${idInstrument}/eod_history?idNotation=${idNotation}&range=MAX&startDate=${from}`);
   return json ? parseHistory(json) : [];
 }

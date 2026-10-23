@@ -3,17 +3,22 @@
 
 import { Resource } from "sst";
 import { queueValuation, repo, runJob } from "../lib/context.ts";
-import { interpolatePricePath, today, type PriceItem } from "@portfolio/core";
+import { interpolatePricePath, isTradingDay, today, type PriceItem } from "@portfolio/core";
 import { BIZNESRADAR_SOURCE_ID, backfillBiznesradarHistory } from "../lib/catalystJobs.ts";
 import { syncCouponTerms } from "../lib/couponJobs.ts";
 import { YAHOO_SOURCE_ID, backfillYahooHistory } from "../lib/etfJobs.ts";
 import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
-import { ONVISTA_SOURCE_ID, backfillOnvistaHistory } from "../lib/onvistaJobs.ts";
+import { ONVISTA_SOURCE_ID, backfillOnvistaHistory, fillEtfGapsFromOnvista } from "../lib/onvistaJobs.ts";
 
 export interface BackfillEvent {
   isin: string;
   /** Re-run the valuation afterwards (default true). */
   revalue?: boolean;
+  /**
+   * Instead of the whole history: fill only the days in [from, to] without a price, from a second source (ETFs:
+   * onvista's closes on the same exchange). For gaps the `quality` job reports (Yahoo holes); never overwrites.
+   */
+  fillGaps?: { source: "onvista"; from: string; to: string };
 }
 
 export async function backfillInstrument(isin: string): Promise<{ status: string; rows?: number; from?: string; to?: string }> {
@@ -109,6 +114,17 @@ export async function backfillInstrument(isin: string): Promise<{ status: string
 export async function handler(event: BackfillEvent) {
   const isins = [event.isin];
   const revalue = event.revalue ?? true;
+  if (event.fillGaps) {
+    const { from, to } = event.fillGaps;
+    return runJob("backfill", async () => {
+      const inst = await repo.getInstrument(event.isin);
+      if (!inst) throw new Error(`Unknown instrument ${event.isin}`);
+      if (inst.type !== "ETF") throw new Error(`${inst.code}: filling gaps from onvista is for ETFs`);
+      const r = await fillEtfGapsFromOnvista(inst, from, to, (d) => isTradingDay(inst.venue, d));
+      if (revalue && r.rows > 0) await queueValuation({ reason: "gaps filled", from: r.dates[0] });
+      return { itemsWritten: r.rows, note: `${inst.code}: ${r.rows} missing days filled from onvista${r.dates.length ? ` (${r.dates[0]} – ${r.dates.at(-1)})` : ""}` };
+    });
+  }
   return runJob("backfill", async () => {
     const results: Record<string, unknown> = {};
     let itemsWritten = 0;
