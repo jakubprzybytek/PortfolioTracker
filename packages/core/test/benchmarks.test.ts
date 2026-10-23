@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { benchmarkAt, benchmarkInPln, benchmarkReturn, BENCHMARKS } from "../src/benchmarks/benchmarks.ts";
+import { benchmarkAt, benchmarkInPln, benchmarkReturn, BENCHMARKS, edoValues, mixSeries } from "../src/benchmarks/benchmarks.ts";
+import type { RetailTerms } from "../src/mf/retailRates.ts";
 import { cpiLevels, growthOf100 } from "../src/valuation/returns.ts";
 
 const fx = new Map([
@@ -70,5 +71,31 @@ describe("growthOf100 with benchmarks", () => {
     // CPI flat; a year (365 of 365.25 days) at 2 %.
     expect(g[2]!.cpiPlus).toBeCloseTo(100 * 1.02 ** (365 / 365.25), 3);
     expect(g[2]!.cpi).toBe(100);
+  });
+});
+
+describe("the 40/60 mix", () => {
+  it("grows each day by the weighted growth of its parts, rebalanced daily, from the first day all parts have a value", () => {
+    const a = [
+      { date: "2025-01-01", value: 10 },
+      { date: "2025-01-02", value: 11 }, // +10 %
+      { date: "2025-01-03", value: 11 },
+    ];
+    const b = [
+      { date: "2025-01-02", value: 100 },
+      { date: "2025-01-03", value: 102 }, // +2 %
+    ];
+    expect(mixSeries([{ weight: 0.4, points: a }, { weight: 0.6, points: b }])).toEqual([
+      { date: "2025-01-02", value: 100 },
+      { date: "2025-01-03", value: 101.2 }, // 0.4 × 0 % + 0.6 × 2 %
+    ]);
+    expect(mixSeries([])).toEqual([]);
+  });
+
+  it("values an EDO bond bought on the start day from the series' published rates", () => {
+    const terms = { series: "EDO0135", kind: "EDO", termMonths: 120, periodMonths: 12, capitalises: true, margin: 0.02, rates: [0.0655, 0.045, null] } as unknown as RetailTerms;
+    const v = edoValues(terms, "2025-01-20", ["2025-01-10", "2025-01-20", "2026-01-20", "2027-01-20"]);
+    expect(v.map((p) => p.date)).toEqual(["2025-01-20", "2026-01-20", "2027-01-20"]); // nothing before it's bought
+    expect(v.map((p) => p.value)).toEqual([100, 106.55, 111.34]); // 6.55 %, then 4.5 % on 106.55
   });
 });

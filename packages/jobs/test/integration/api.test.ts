@@ -270,7 +270,7 @@ describe(`API ${API}`, () => {
     expect(body.cpi[0]!.month).toBe("2025-01");
     // The benchmarks, in PLN from a fortnight before the first day (empty until the stage's benchmarks job has run)
     const benchmarks = (body as unknown as { benchmarks: { id: string; points: { date: string; value: number }[] }[] }).benchmarks;
-    expect(benchmarks.map((b) => b.id)).toEqual(["WIG", "MSCI_WORLD"]);
+    expect(benchmarks.map((b) => b.id)).toEqual(["WIG", "MSCI_WORLD", "MIX_40_60"]);
     for (const b of benchmarks) {
       expect(b.points.every((p, i) => p.value > 0 && p.date >= "2025-01-20" && (i === 0 || p.date > b.points[i - 1]!.date))).toBe(true);
     }

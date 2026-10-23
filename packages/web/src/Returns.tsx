@@ -39,6 +39,8 @@ export interface YearsResponse {
 export interface BenchmarkSeries {
   id: string;
   label: string;
+  /** The table column's header. */
+  short?: string;
   note: string;
   points: BenchmarkPoint[];
 }
@@ -134,19 +136,19 @@ export function YearsTable({
           <tr>
             <th className="left">Year</th>
             {!narrow && (
-              <th title="Value (positions + cash) at the end of the year before">
+              <th className="col-start" title="Value (positions + cash) at the end of the year before">
                 Start
               </th>
             )}
             {!narrow && (
-              <th title="Money put in − taken out during the year">Put in</th>
+              <th className="col-start" title="Money put in − taken out during the year">Put in</th>
             )}
             {!narrow && (
-              <th title="Value (positions + cash) at the end of the year">
+              <th className="col-end" title="Value (positions + cash) at the end of the year">
                 End
               </th>
             )}
-            {!narrow && <th title="End − start − money put in">Profit</th>}
+            {!narrow && <th className="col-end" title="End − start − money put in">Profit</th>}
             <th title="Time-weighted return: each day's growth chained, so money put in or taken out doesn't count. Comparable with inflation and with funds">
               Return
             </th>
@@ -159,13 +161,13 @@ export function YearsTable({
               Real
             </th>
             {!narrow && (
-              <th title="Money-weighted return (XIRR) of the start value, the money put in and the end value: what your money earned, its timing included. A part of a year: over those days, not a year">
+              <th className="col-xirr" title="Money-weighted return (XIRR) of the start value, the money put in and the end value: what your money earned, its timing included. A part of a year: over those days, not a year">
                 XIRR
               </th>
             )}
             {benches.map((b) => (
               <th key={b.id} className="bench" title={`${b.note}. Its return over the same days, to compare with Return`}>
-                {b.label}
+                {b.short ?? b.label}
               </th>
             ))}
           </tr>
@@ -192,11 +194,11 @@ export function YearsTable({
                   {label}
                   {sub && <div className="sub muted">{sub}</div>}
                 </td>
-                {!narrow && <td>{fmtPln(y.startValue)}</td>}
-                {!narrow && <td>{fmtPln(y.netDeposits)}</td>}
-                {!narrow && <td>{fmtPln(y.endValue)}</td>}
+                {!narrow && <td className="col-start">{fmtPln(y.startValue)}</td>}
+                {!narrow && <td className="col-start">{fmtPln(y.netDeposits)}</td>}
+                {!narrow && <td className="col-end">{fmtPln(y.endValue)}</td>}
                 {!narrow && (
-                  <td className={signClass(y.profit)}>{fmtPln(y.profit)}</td>
+                  <td className={`col-end ${signClass(y.profit)}`}>{fmtPln(y.profit)}</td>
                 )}
                 <td className={signClass(y.twr)} data-testid="years-twr">
                   {pct(y.twr)}
@@ -215,7 +217,7 @@ export function YearsTable({
                   {pct(y.real)}
                 </td>
                 {!narrow && (
-                  <td className={signClass(y.xirr)} data-testid="years-xirr">
+                  <td className={`col-xirr ${signClass(y.xirr)}`} data-testid="years-xirr">
                     {pct(y.xirr)}
                   </td>
                 )}
@@ -238,11 +240,11 @@ export function YearsTable({
                   {narrow ? "a year" : `a year, since ${t.from.slice(0, 7)}`}
                 </div>
               </td>
-              {!narrow && <td>–</td>}
-              {!narrow && <td>{fmtPln(t.netDeposits)}</td>}
-              {!narrow && <td>{fmtPln(t.endValue)}</td>}
+              {!narrow && <td className="col-start">–</td>}
+              {!narrow && <td className="col-start">{fmtPln(t.netDeposits)}</td>}
+              {!narrow && <td className="col-end">{fmtPln(t.endValue)}</td>}
               {!narrow && (
-                <td className={signClass(t.profit)}>{fmtPln(t.profit)}</td>
+                <td className={`col-end ${signClass(t.profit)}`}>{fmtPln(t.profit)}</td>
               )}
               <td className={signClass(t.twrPerYear)}>
                 {pct(t.twrPerYear)}
@@ -254,7 +256,7 @@ export function YearsTable({
               </td>
               {!narrow && <td>{pct(t.inflationPerYear)}</td>}
               <td className={signClass(t.realPerYear)}>{pct(t.realPerYear)}</td>
-              {!narrow && <td className={signClass(t.xirr)}>{pct(t.xirr)}</td>}
+              {!narrow && <td className={`col-xirr ${signClass(t.xirr)}`}>{pct(t.xirr)}</td>}
               {benches.map((b) => (
                 <BenchCell key={b.id} b={b} r={t} perYear />
               ))}

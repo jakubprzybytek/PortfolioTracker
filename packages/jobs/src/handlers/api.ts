@@ -48,6 +48,9 @@ import {
   defaultAssetClass,
   BENCHMARKS,
   benchmarkInPln,
+  edoValues,
+  MIX,
+  mixSeries,
   cpiIndicators,
   cpiLevels,
   yearlyReturns,
@@ -113,9 +116,19 @@ async function benchmarkSeries(first: string | undefined) {
   const from = addDays(first, -14);
   const currencies = [...new Set(BENCHMARKS.map((b) => b.currency))].filter((c) => c !== "PLN");
   const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(from, -14), today())).sort((a, b) => a.date.localeCompare(b.date))] as const)));
-  return Promise.all(
-    BENCHMARKS.map(async (b) => ({ id: b.id, label: b.label, note: b.note, points: benchmarkInPln(await repo.queryBenchmarkPrices(b.id, from, today()), b.currency, fx) })),
+  const fetched = await Promise.all(
+    BENCHMARKS.map(async (b) => ({ id: b.id, label: b.label, short: b.short, note: b.note, points: benchmarkInPln(await repo.queryBenchmarkPrices(b.id, from, today()), b.currency, fx) })),
   );
+  // 40/60: MSCI World and the EDO series on sale on `from`, bought then (none without that series' terms).
+  const world = fetched.find((b) => b.id === "MSCI_WORLD")!;
+  const edo = await repo.getRetailSeries(offerSeriesCode("EDO", 120, from.slice(0, 7)));
+  const mix = edo
+    ? mixSeries([
+        { weight: MIX.world, points: world.points },
+        { weight: MIX.edo, points: edoValues(edo, from, world.points.map((p) => p.date)) },
+      ])
+    : [];
+  return [...fetched, { id: MIX.id, label: MIX.label, short: MIX.short, note: MIX.note, points: mix }];
 }
 
 /** "Refresh prices" at most this often. */

@@ -55,7 +55,7 @@ Tests log in as `portfolio-tracker-test@albedoonline.com` with a password (allow
 `.github/workflows/cd.yml` runs on every push to `main`:
 
 1. **int** – the next minor version `v0.1`, `v0.2`, … (latest `v0.*` tag + 1; a re-run of a tagged commit keeps its tag), type-check and unit tests, `sst deploy --stage int`, integration tests against `https://int.portfoliotracker.albedoonline.com/api`, Playwright E2E against the int site, both inside `sst shell --stage int` (they log in as the test user). The tests seed `int` with `data/instruments.json` and the sample transactions. If they pass, the job pushes the version tag.
-2. **prod** and **test** – only if int passed, both checked out at the tag, in parallel (a matrix; one failing doesn't cancel the other): `sst deploy --stage prod` (the version shows in the page footer); `sst deploy --stage test` (the stage holding the history import, so its code stays current). No tests run against either.
+2. **prod** – only if int passed, checked out at the tag: `sst deploy --stage prod` (the version shows in the page footer). No tests run against it. (Until 2026-10-23 the history-import stage `test` deployed alongside it; removed, see data/README.md.)
 
 AWS access uses the OIDC role in [infra/github/README.md](infra/github/README.md). Runs are serialised (`concurrency: cd`). A failed `int` stops the run: nothing reaches prod or test and no tag is created. Re-run failed runs from the Actions tab.
 

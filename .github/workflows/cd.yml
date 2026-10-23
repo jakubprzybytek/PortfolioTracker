@@ -1,5 +1,5 @@
 # Continuous delivery: every push to main deploys `int`, runs the tests against it and tags the commit
-# with the next minor version (v0.1, v0.2, …); then `prod` and `test` deploy in parallel from that tag.
+# with the next minor version (v0.1, v0.2, …); then `prod` deploys from that tag.
 
 name: CD
 
@@ -81,7 +81,7 @@ jobs:
           git tag -a "$APP_VERSION" -m "Release $APP_VERSION"
           git push origin "$APP_VERSION"
 
-  # prod and test deploy side by side from the tag once int passed; one failing doesn't cancel the other.
+  # prod deploys from the tag once int passed (a matrix, so another stage can be added; `test` was removed 2026-10-23).
   deploy:
     name: Deploy ${{ matrix.stage }}
     needs: int
@@ -89,7 +89,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        stage: [prod, test]
+        stage: [prod]
     environment: ${{ matrix.stage }}
     env:
       APP_VERSION: ${{ needs.int.outputs.version }}

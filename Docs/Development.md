@@ -63,7 +63,7 @@ Continuous delivery (`.github/workflows/cd.yml`). Every push or merge to `main`:
 1. deploys **int** after the type check and unit tests,
 2. runs the **regression tests** against int: integration (API) and E2E (browser),
 3. tags the commit `v0.N` (the version in the page footer) only if they all passed: the tag marks a release that passed int,
-4. deploys **prod** and **test** (the history-import stage) from that tag, in parallel. A failed test deploy doesn't hold back prod; a failed prod deploy leaves the tag, so re-running the failed job deploys the same tag.
+4. deploys **prod** from that tag. A failed prod deploy leaves the tag, so re-running the failed job deploys the same tag.
 
 A failure at any step before that stops the run: nothing reaches prod or test. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
 

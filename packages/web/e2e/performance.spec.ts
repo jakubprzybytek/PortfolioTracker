@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-type Bench = { id: string; label: string; note: string; points: { date: string; value: number }[] };
+type Bench = { id: string; label: string; short?: string; note: string; points: { date: string; value: number }[] };
 
 /** Replaces the benchmarks in `GET /portfolio/years` (the stage may not have fetched any yet), made from the first day valued. */
 async function withBenchmarks(page: Page, make: (first: string) => Bench[]) {
@@ -89,13 +89,24 @@ test.describe("performance", () => {
       const late = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
       return [
         { id: "WIG", label: "WIG", note: "test WIG", points: series(new Date(Date.parse(first) - 14 * 86_400_000).toISOString().slice(0, 10), 1000, 0.0005) },
-        { id: "MSCI_WORLD", label: "MSCI World", note: "test world", points: series(late, 50, 0) },
+        { id: "MSCI_WORLD", label: "MSCI World", short: "World", note: "test world", points: series(late, 50, 0) },
+        { id: "MIX_40_60", label: "40/60 World/EDO", short: "40/60", note: "test mix", points: series(late, 100, 0) },
       ];
     });
     await page.reload();
     const table = page.getByTestId("years-table");
     await expect(table.locator("thead th").filter({ hasText: "WIG" })).toHaveCount(1);
-    await expect(table.locator("thead th").filter({ hasText: "MSCI World" })).toHaveCount(1);
+    await expect(table.locator("thead th").filter({ hasText: "World" })).toHaveCount(1);
+    await expect(table.locator("thead th").filter({ hasText: "40/60" })).toHaveCount(1);
+    // Three benchmark columns still fit at 1280 px (the box doesn't scroll)
+    const wrap = page.getByTestId("years");
+    expect(await wrap.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    // A narrower screen drops the money columns and XIRR first; the benchmarks stay
+    await page.setViewportSize({ width: 1024, height: 900 });
+    expect(await wrap.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    await expect(table.locator("thead th").filter({ hasText: "40/60" })).toBeVisible();
+    await expect(table.locator("thead th.col-start").first()).toBeHidden();
+    await page.setViewportSize({ width: 1280, height: 900 });
     const oldest = page.getByTestId("years-row").last();
     await expect(oldest.getByTestId("years-bench-WIG")).toHaveText(/^\+\d.* %$/); // growing: positive
     await expect(oldest.getByTestId("years-bench-MSCI_WORLD")).toHaveText("–");
@@ -103,14 +114,14 @@ test.describe("performance", () => {
     const growth = page.getByTestId("growth-chart");
     await page.getByTestId("performance-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
-    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(4); // portfolio, CPI, CPI + 2 %, WIG (MSCI World starts later)
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(4); // portfolio, CPI, CPI + 2 %, WIG (the other two start later)
     const key = page.getByTestId("returns-pair").locator(".chart-key").last();
     await expect(key).toContainText("WIG");
     await expect(key).not.toContainText("MSCI World");
     // Over the last month both have a value on the first day: both lines
     await page.getByTestId("performance-range").getByRole("button", { name: "1M" }).click();
     await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
-    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(5);
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(6);
     await expect(key).toContainText("MSCI World 100,00 zł");
   });
 

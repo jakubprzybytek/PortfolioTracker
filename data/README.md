@@ -69,7 +69,7 @@ node scripts/history-ledger-to-import.ts ~/Downloads/transactions-2008-2022.xlsx
 # → data/private/history/: instruments.json, prices.json, accounts.json, transactions.json (rows with "In test" = Yes); import in that order
 ```
 
-On 2026-10-23 its output was identical to stage `test` (836 transactions, 33 instruments, 1004 prices, 6 accounts). The IKE Bossa tab (2018–2022, from the broker's e-mails) is in the sheet only.
+On 2026-10-23 its output was identical to stage `test` (836 transactions, 33 instruments, 1004 prices, 6 accounts, all from these files, nothing entered in the app), and the stage was removed the same day (the history won't go to prod). To rebuild it: `npm run deploy -- --stage test`, then upload the four files to its files bucket in order: `imports/instruments/`, `imports/prices/`, `imports/accounts/`, `imports/transactions/` (the import Lambda starts the backfill and valuation; ~6,800 days from 2008). The IKE Bossa tab (2018–2022, from the broker's e-mails) is in the sheet only.
 
 The older converter below built the first import from the "Bonds 2010-2015" sheet; keep it for reference.
 

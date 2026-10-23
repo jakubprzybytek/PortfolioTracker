@@ -17,6 +17,7 @@
   --cpi: #d97706; /* inflation in charts (amber against the accent's blue) */
   --bench-WIG: #db2777; /* benchmarks in charts: WIG pink, MSCI World teal */
   --bench-MSCI_WORLD: #0d9488;
+  --bench-MIX_40_60: #7c3aed; /* 40/60 World/EDO: violet */
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
   font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
   font-size: 15px;
@@ -42,6 +43,7 @@
     --cpi: #e08a0b;
     --bench-WIG: #f472b6;
     --bench-MSCI_WORLD: #2dd4bf;
+    --bench-MIX_40_60: #a78bfa;
     --shadow: none;
   }
 }
@@ -686,6 +688,10 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .returns tr.partial td:first-child { font-style: italic; }
 .returns tfoot td { border-top: 2px solid var(--border); font-weight: 600; }
 .returns sup { font-size: 0.7em; font-weight: 400; }
+/* Narrower screens drop the least needed columns (money first, then XIRR) instead of scrolling sideways; return, inflation, real and the benchmarks stay. */
+@media (max-width: 1320px) { .returns .col-start { display: none; } }
+@media (max-width: 1120px) { .returns .col-end { display: none; } }
+@media (max-width: 960px) { .returns .col-xirr { display: none; } }
 @media (max-width: 720px) { .returns table { font-size: 0.88rem; } .returns table td, .returns table th { padding: 6px 4px; } .returns td .sub { white-space: normal; } }
 /* A chart's key above its plot (Returns: return, inflation, real; growth of 100 zł). */
 .chart-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }

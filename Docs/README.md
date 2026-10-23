@@ -76,13 +76,12 @@ Docs/
 
 ## Delivery
 
-GitHub Actions on `main`: deploy `int` → integration + E2E tests → tag `v0.N` → deploy `prod` and `test` from the tag (see the root README).
+GitHub Actions on `main`: deploy `int` → integration + E2E tests → tag `v0.N` → deploy `prod` from the tag (see the root README).
 
 | Stage | Deployed by | Data | URL |
 |---|---|---|---|
 | `prod` | CD, after `int` passes | yours (starts empty) | https://portfoliotracker.albedoonline.com |
 | `int` | CD, every push to `main` | sample data, re-seeded by the tests | https://int.portfoliotracker.albedoonline.com |
-| `test` | CD, in parallel with `prod` | the history before the app (2008–2022), imported by hand | https://test.portfoliotracker.albedoonline.com |
 | `dev` | you (`npm run dev -- --stage dev` or `npm run deploy -- --stage dev`) | sample data | https://dev.portfoliotracker.albedoonline.com |
 
 Each stage has one domain: the site at `/`, the API at `/api/*` (CloudFront Router, same origin). Versions are minor tags `v0.1`, `v0.2`, …; the deployed version shows in the page footer.
@@ -125,7 +124,7 @@ Phase 1:
 - [x] Corporate bonds: not in the GPW archive; gpwcatalyst.pl lists all corporate bonds, snapshot only.
 - [x] IZ indexed nominal and accrued interest: computed with the Ministry's method; exact match with published values.
 - [x] IaC: SST v4.
-- [x] Custom domains per stage and CD (int → tests → prod → tag); first release `v0.1` on 2026-10-11. Since 2026-10-18: int → tests → tag, then `prod` and `test` deploy from the tag.
+- [x] Custom domains per stage and CD (int → tests → prod → tag); first release `v0.1` on 2026-10-11. Since 2026-10-18: int → tests → tag, then `prod` (and until 2026-10-23 `test`) deploy from the tag.
 
 Later phases:
 - [x] ETF source: Yahoo chart API works from Lambda for all 10 ETFs in the sheet, full daily history (data-sources.md). EODHD stays the fallback.
@@ -149,7 +148,7 @@ Later phases:
 - [x] Closed positions (2026-10-16): "Show closed" in Holdings and Prices adds the positions and instruments held no more, greyed, with their realised gain and coupons, and charts over the time they were held (gaps between holding periods at zero).
 - [x] Finding things (2026-10-16): an "Instrument" text filter in Holdings and Prices; a position's transactions in its chart panel ("Transactions (n)"); Account first among the Transactions filters, notes on one line.
 - [x] Phones (2026-10-17): Transactions as a list of two-line rows, filters in rows of two, the valuation date and "Update prices" on the title's row, the position's transactions in place of its chart; long transaction lists drawn 200 rows at a time.
-- [x] Stage `test` (2026-10-16): the history before the app (2008–2022, accounts closed before it) converted from the history spreadsheet (`scripts/history-sheet-to-import.ts`) and imported; deployed by CD since 2026-10-17.
+- [x] Stage `test` (2026-10-16): the history before the app (2008–2022, accounts closed before it) converted from the history spreadsheet (`scripts/history-sheet-to-import.ts`) and imported; deployed by CD since 2026-10-17. Removed on 2026-10-23 (the history won't go to prod); it can be rebuilt from its spreadsheet (data/README.md, "History before the app").
 - [x] Asset class per instrument (2026-10-18): set by hand where the rule (by type, "bond" in an ETF's name) is wrong; the allocation charts follow.
 - [x] Instrument view (2026-10-18): the cog (⚙) in a chart panel (Prices, Holdings) opens one view with the instrument's properties: asset class, values entered by hand, coupon periods (until then separate buttons in the panel).
 - [x] Chart panel controls (2026-10-18): one row with the title (range as a segmented control, as "Group by", everywhere; Transactions with a count badge, an icon up to 480 px; ⚙; ✕), all the same height; on a phone the controls on the row below the title.
@@ -176,7 +175,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 7. ~~Update the value of a hand-valued asset~~ Done (2026-10-14): "Edit values" in its chart panel (Prices, Holdings), values listed and deletable (ui.md).
 8. ~~Targets and rebalancing~~ Done (2026-10-18): a target share and a band per class (shares, bonds, cash, other) in the Dashboard's asset mix (ticks on its bar; the legend gives each class's share, its target and the difference), and a calculator folding out under "Rebalance" switching between "New money" (a deposit split across the classes below target, nothing sold) and "Sell and buy" (every class to its target) (ui.md, "Targets").
 9. ~~Closed positions~~ Done (2026-10-20): realised gain per account (Dashboard), per closed position ("Show closed" in Holdings, 2026-10-16), and a **Sales** view: every sale, redemption and write-off folding out into the buys FIFO matched it against (cost, share of the proceeds, days held), and per year a PIT-38 summary (proceeds, costs, profit at NBP D-1; outside IKE/IKZE, without write-offs and retail bonds) (ui.md, "Sales"). Not done: the sheet's dividends assigned to each pair.
-10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab. CPI done (2026-10-21): returns by year against inflation and the growth of 100 zł against CPI, now in Performance (ui.md, "Performance"). Indices and CPI + a margin done (2026-10-23): WIG (GPW archive) and MSCI World (IWDA.AS, Yahoo) as lines on the growth of 100 zł and columns in Returns by year, plus an "inflation + 2 %" line; a fixed list, stored apart from the instruments by a `benchmarks` job (ui.md, "Performance"). Left, not planned now: the sheet's money-weighted variant (your own deposits put into the benchmark instead), and a benchmark mirroring the target mix (shares in MSCI World, bonds in EDO). Sources checked: GPW's archive has every GPW index (WIG since 1991, WIG20TR, mWIG40TR, sWIG80TR since 2017); Yahoo has world ETFs (IWDA.AS EUR since 2009, CSPX.L, ACWI.L, V80A.DE) but its Polish indices are short; Stooq is blocked.
+10. **Benchmarks** on the portfolio chart (CPI + margin, indices), as the sheet's Benchmarki tab. CPI done (2026-10-21): returns by year against inflation and the growth of 100 zł against CPI, now in Performance (ui.md, "Performance"). Indices and CPI + a margin done (2026-10-23): WIG (GPW archive) and MSCI World (IWDA.AS, Yahoo) as lines on the growth of 100 zł and columns in Returns by year, plus an "inflation + 2 %" line and a 40/60 MSCI World/EDO mix (2026-10-23, computed from IWDA and the EDO series on sale on the first day, rebalanced daily); a fixed list, stored apart from the instruments by a `benchmarks` job (ui.md, "Performance"). Left, not planned now: the sheet's money-weighted variant (your own deposits put into the benchmark instead), and a benchmark following your own targets (the 40/60 is fixed). Sources checked: GPW's archive has every GPW index (WIG since 1991, WIG20TR, mWIG40TR, sWIG80TR since 2017); Yahoo has world ETFs (IWDA.AS EUR since 2009, CSPX.L, ACWI.L, V80A.DE) but its Polish indices are short; Stooq is blocked.
 11. **IBKR Flex Web Service:** IBKR trades without downloading statements (needs a Flex Query and a token); mark prices for US T-bills.
 12. **More Dashboard charts:** income per year. (Drawdown and allocation over time done on 2026-10-15.)
 13. ~~Asset class per instrument~~ Done (2026-10-18): a "Class" column and filter in Prices and a "Class" select in the instrument's settings (the cog in its chart panel); one class per instrument (shares, bonds, cash, other), the rule (by type, "bond" in an ETF's name) unless set by hand; a change revalues the instrument's history.
@@ -190,7 +189,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
 18. ~~Monthly export of `transactions` to S3~~ Done (2026-10-14): the `Export` job backs up accounts, instruments, prices entered by hand and transactions to `exports/<date>/` on the 1st, in the import formats (data-storage.md, restore: data/README.md).
 21. ~~Responsiveness when switching views~~ Done (2026-10-15): `useApi` goes through SWR, so a view visited before shows its last data at once and refetches it in the background (placeholders only the first time); a save or a finished valuation refetches what's on screen. **Reload** in the menu frame refetches the current view without asking the server for anything new; its icon turns while any request is under way. The "Refresh" button next to the valuation date is now **Update prices**, with its own icon (ui.md).
-22. ~~History import to `prod`~~ Dropped (2026-10-23): the history before the app (2008–2022) won't be imported to `prod`; prod's history starts with its own transactions (2022-03). The converted history stays on stage `test` and in its spreadsheet (data/README.md, "History before the app").
+22. ~~History import to `prod`~~ Dropped (2026-10-23): the history before the app (2008–2022) won't be imported to `prod`; prod's history starts with its own transactions (2022-03). Stage `test`, which held it, was removed the same day; the spreadsheet can rebuild it (data/README.md, "History before the app").
 23. ~~Valuation speed with a long history~~ Done (2026-10-18): chart points, one pass over the transactions, batched writes, merged requests (done list above).
 
 ### Beyond the sheet
