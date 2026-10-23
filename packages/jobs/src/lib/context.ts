@@ -7,6 +7,7 @@ import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import { Repository, type IsoDate } from "@portfolio/core";
+import { alertFor, sendAlert } from "./alerts.ts";
 
 // Getters: each function links only the tables it needs, and Resource throws for an unlinked one.
 export const repo = new Repository({
@@ -52,14 +53,21 @@ export async function queueValuation(payload: object): Promise<void> {
 /** Runs a job body and records a JOB#/RUN# item with the outcome. Rethrows so Lambda retries apply. */
 export async function runJob<T extends { itemsWritten?: number; note?: string }>(job: string, body: () => Promise<T>): Promise<T> {
   const startedAt = new Date().toISOString();
+  // The run before this one decides whether to e-mail (alerts.ts: only when a job starts failing or works again).
+  const previous = await repo.latestJobRun(job).catch(() => undefined);
   try {
     const result = await body();
     await repo.putJobRun({ job, startedAt, finishedAt: new Date().toISOString(), status: "ok", ...result });
     console.log(`${job}: ok`, JSON.stringify(result));
+    const alert = alertFor(job, "ok", previous, result.note);
+    if (alert) await sendAlert(alert);
     return result;
   } catch (err) {
-    await repo.putJobRun({ job, startedAt, finishedAt: new Date().toISOString(), status: "failed", note: String((err as Error).message ?? err) });
+    const note = String((err as Error).message ?? err);
+    await repo.putJobRun({ job, startedAt, finishedAt: new Date().toISOString(), status: "failed", note });
     console.error(`${job}: failed`, err);
+    const alert = alertFor(job, "failed", previous, note);
+    if (alert) await sendAlert(alert);
     throw err;
   }
 }

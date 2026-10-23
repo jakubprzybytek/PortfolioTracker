@@ -164,7 +164,7 @@ Later phases:
 
 ## Outstanding work (2026-10-23)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 7, 8, 9, 13, 14, 15, 18, 19, 20, 21, 23, 24. Dropped: 22. Open: 6, 10 (its money-weighted variant), 11, 12, 16, 17, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested next: 16 (alerts on failed jobs, with the non-functional review's alarms).
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 7, 8, 9, 13, 14, 15, 16, 18, 19, 20, 21, 23, 24. Dropped: 22. Open: 6, 10 (its money-weighted variant), 11, 12, 17, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested next: 17 (data-quality checks) or the non-functional review's "Week 1" list.
 
 ### Correctness and accuracy
 1. ~~Foreign bonds at IBKR are priced by calculation~~ Done (2026-10-14): the EUR bonds are priced from Börse Stuttgart's closes (onvista, `eod-bonds`), within 0.015 of IBKR's marks; the calculated prices had been up to 1 % off. US T-bills (none held now) stay calculated.
@@ -188,7 +188,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 ### Operations and housekeeping
 14. ~~`prod`: drop the old `Table`~~ Done (2026-10-14): it was empty; removed from `sst.config.ts` and deleted in AWS.
 15. ~~`prod`: the "EUR cash" / "USD cash" instruments~~ Done (2026-10-14): marked inactive (no transaction uses them).
-16. **Alerts on failed jobs** (e-mail via SNS); today a failure only shows on the Dashboard.
+16. ~~Alerts on failed jobs~~ Done (2026-10-23): e-mail through an SNS topic on prod: a job that starts failing or works again (one message per change, from `runJob`), and CloudWatch alarms on the valuation's errors or timeouts and on the dead-letter queue. Not covered: other jobs timing out, a schedule that stops firing (ingestion.md, "Failure handling").
 17. **Data-quality checks** from the backfill plan (backfill.md): price gaps per instrument, spot checks against a second source, month-end values against broker statements (done for IBKR's cash and costs, 2026-10-13).
 18. ~~Monthly export of `transactions` to S3~~ Done (2026-10-14): the `Export` job backs up accounts, instruments, prices entered by hand and transactions to `exports/<date>/` on the 1st, in the import formats (data-storage.md, restore: data/README.md).
 21. ~~Responsiveness when switching views~~ Done (2026-10-15): `useApi` goes through SWR, so a view visited before shows its last data at once and refetches it in the background (placeholders only the first time); a save or a finished valuation refetches what's on screen. **Reload** in the menu frame refetches the current view without asking the server for anything new; its icon turns while any request is under way. The "Refresh" button next to the valuation date is now **Update prices**, with its own icon (ui.md).

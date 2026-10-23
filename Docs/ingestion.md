@@ -91,7 +91,7 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
 
 - Every run writes a `JOB#…/RUN#…` item; the Dashboard lists the last run of each job and shows a banner for any that failed.
 - Lambda retries: 2 for the scheduled jobs; the valuation queue retries a message 3 times, then moves it to `ValuationDeadLetter`.
-- Planned (README item 16): an on-failure destination → SNS → e-mail, and a CloudWatch alarm on the jobs' `Errors` metric. The "alert" actions in the data quality rules above wait for it; until then they show on the Dashboard.
+- **E-mail alerts (prod, 2026-10-23, README item 16):** an SNS topic `Alerts` with an e-mail subscription (the address is the `AlertEmail` secret of prod; AWS asks once to confirm it). `runJob` publishes when a job starts failing (its error) and when it works again: one message per change, so retries and later failures of a job that keeps failing stay quiet (`jobs/lib/alerts.ts`). Two CloudWatch alarms publish to the same topic (and again when they clear): the valuation Lambda's `Errors` ≥ 1 in 5 min (a timeout leaves no job run) and `ValuationDeadLetter` holding a message. Kept to two: CloudWatch has 10 alarm metrics free, one per job function would be ~18 (~$1 a month). Not covered yet: a job other than the valuation timing out or crashing before `runJob` records it (it shows as an old last run on the Status page), and a schedule that stops firing. The "alert" actions in the data quality rules above still only show on the Dashboard.
 - Scraping etiquette: one request per page, 2–5 s delay between requests during backfill, descriptive User-Agent, cache in S3.
 
 ## Secrets

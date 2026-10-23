@@ -53,8 +53,14 @@ export default $config({
     // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload.
     const files = new sst.aws.Bucket("Files");
 
-    // Each function links only the tables it needs (Docs/data-storage.md, "Access per function").
-    const link = [files];
+    // E-mail alerts (prod only): jobs publish when they start failing or work again (jobs/lib/alerts.ts), CloudWatch
+    // alarms below when the valuation errors or times out and when the dead-letter queue holds a request. The address
+    // is the `AlertEmail` secret (the repo is public); AWS e-mails it once to confirm the subscription.
+    const alerts = $app.stage === "prod" ? new sst.aws.SnsTopic("Alerts") : undefined;
+    if (alerts) new aws.sns.TopicSubscription("AlertsEmail", { topic: alerts.arn, protocol: "email", endpoint: new sst.Secret("AlertEmail").value });
+
+    // Each function links only the tables it needs (Docs/data-storage.md, "Access per function"); every one may alert.
+    const link = alerts ? [files, alerts] : [files];
     // arm64 (Graviton): all the code is plain JS, and it's ~20 % cheaper than x86_64.
     const defaults = { link: [...link, market], timeout: "5 minutes" as const, memory: "512 MB" as const, architecture: "arm64" as const };
 
@@ -79,6 +85,31 @@ export default $config({
     });
     // Up to 10 requests waiting together make one run (a FIFO queue allows 10; the handler merges their ranges).
     valuationQueue.subscribe(valuation.arn, { batch: { size: 10 } });
+
+    // Two alarms, within CloudWatch's 10 free ones (one per job function would be ~18): what `runJob` can't report.
+    if (alerts) {
+      const notify = { alarmActions: [alerts.arn], okActions: [alerts.arn], treatMissingData: "notBreaching", evaluationPeriods: 1, period: 300 };
+      new aws.cloudwatch.MetricAlarm("ValuationErrors", {
+        ...notify,
+        alarmDescription: "The valuation Lambda failed or timed out (a timeout leaves no job run)",
+        namespace: "AWS/Lambda",
+        metricName: "Errors",
+        dimensions: { FunctionName: valuation.name },
+        statistic: "Sum",
+        comparisonOperator: "GreaterThanOrEqualToThreshold",
+        threshold: 1,
+      });
+      new aws.cloudwatch.MetricAlarm("ValuationDeadLetterNotEmpty", {
+        ...notify,
+        alarmDescription: "A revaluation request failed 3 times and waits in the dead-letter queue (kept 14 days)",
+        namespace: "AWS/SQS",
+        metricName: "ApproximateNumberOfMessagesVisible",
+        dimensions: { QueueName: valuationDeadLetter.nodes.queue.name },
+        statistic: "Maximum",
+        comparisonOperator: "GreaterThanThreshold",
+        threshold: 0,
+      });
+    }
 
     const backfill = new sst.aws.Function("Backfill", {
       ...defaults,
