@@ -62,6 +62,17 @@ node scripts/sheet-to-transactions.ts ~/Downloads/portfolio.xlsx --mf-retail ~/D
 
 ## History before the app (2008–2022)
 
+The source of truth for this history is the Google Sheet "Transactions 2008-2022" (id `1PdLbkDohaoB-p7-gB2ZGhRqYdTHtsM3jh4IzgHWHupI`): one tab per account (the import fields plus source, date and amount confidence, remarks and whether the row is in stage `test`), Instruments, Prices, Accounts, Open questions and Data Sources. Rebuild the import files from it:
+
+```sh
+node scripts/history-ledger-to-import.ts ~/Downloads/transactions-2008-2022.xlsx   # or a folder of tab dumps; optional 2nd arg: output folder
+# → data/private/history/: instruments.json, prices.json, accounts.json, transactions.json (rows with "In test" = Yes); import in that order
+```
+
+On 2026-10-23 its output was identical to stage `test` (836 transactions, 33 instruments, 1004 prices, 6 accounts). The IKE Bossa tab (2018–2022, from the broker's e-mails) is in the sheet only.
+
+The older converter below built the first import from the "Bonds 2010-2015" sheet; keep it for reference.
+
 `scripts/history-sheet-to-import.ts` converts the "Bonds 2010-2015" history spreadsheet (accounts closed before the app started: the DM BZWBK brokerage account with its Catalyst and treasury bonds and an unitised shares/certificates position, the BZ WBK/Santander and ING savings accounts, the Arka funds, XTB and a term deposit) into import files:
 
 ```sh
