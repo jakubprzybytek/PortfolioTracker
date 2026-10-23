@@ -109,10 +109,10 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
       <header className="view-header hs-header">
         <h2 className="view-title">Hold or sell</h2>
         <div className="range hs-mode" role="group" aria-label="Hold or sell, or buy more" data-testid="hs-mode">
-          <button type="button" aria-pressed={!buyMode} onClick={() => setMode(false)}>
+          <button type="button" className={buyMode ? "" : "active"} aria-pressed={!buyMode} onClick={() => setMode(false)}>
             Hold or sell
           </button>
-          <button type="button" aria-pressed={buyMode} onClick={() => setMode(true)}>
+          <button type="button" className={buyMode ? "active" : ""} aria-pressed={buyMode} onClick={() => setMode(true)}>
             Buy more
           </button>
         </div>

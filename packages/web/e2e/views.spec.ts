@@ -1109,6 +1109,8 @@ test.describe("buy more", () => {
     await mode.getByRole("button", { name: "Buy more" }).click();
     await expect(page).toHaveURL(/#\/hold-sell\?mode=buy$/);
     await expect(mode.getByRole("button", { name: "Buy more" })).toHaveAttribute("aria-pressed", "true");
+    await expect(mode.getByRole("button", { name: "Buy more" })).toHaveClass(/active/); // drawn as selected
+    await expect(mode.getByRole("button", { name: "Hold or sell" })).not.toHaveClass(/active/);
     await expect(page.getByTestId("hs-assumptions")).toBeVisible(); // shared
     const rows = page.getByTestId("bm-row");
     await expect(rows.first()).toBeVisible();
@@ -1118,6 +1120,8 @@ test.describe("buy more", () => {
     const ds = page.locator('[data-testid="bm-row"][data-code="DS0432"]').first();
     await ds.click();
     await expect(page.getByTestId("bm-notes")).toContainText("duration");
+    // The notes' bullets sit close to the left edge (no browser-default 40 px indent)
+    expect(await page.locator(".bm-notes").evaluate((ul) => parseFloat(getComputedStyle(ul).paddingLeft))).toBeLessThan(24);
     await page.reload();
     await expect(page.getByTestId("bm-notes")).toBeVisible(); // the open row is in the URL
     await mode.getByRole("button", { name: "Hold or sell" }).click();

@@ -16,7 +16,7 @@ const oldPrice = (r: BuyMoreRow, today: string) => !!r.price.date && (Date.parse
 function Notes({ r }: { r: BuyMoreRow }) {
   return (
     <div className="hs-breakdown" data-testid="bm-notes">
-      <ul className="muted">
+      <ul className="muted bm-notes">
         {r.price.commission > 0 && (
           <li>
             one bond: {fmtPrice(r)} + {fmtNum(r.price.commission, 2)} commission
