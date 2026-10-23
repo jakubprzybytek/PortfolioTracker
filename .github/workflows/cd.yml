@@ -81,16 +81,12 @@ jobs:
           git tag -a "$APP_VERSION" -m "Release $APP_VERSION"
           git push origin "$APP_VERSION"
 
-  # prod deploys from the tag once int passed (a matrix, so another stage can be added; `test` was removed 2026-10-23).
-  deploy:
-    name: Deploy ${{ matrix.stage }}
+  # prod deploys from the tag once int passed.
+  prod:
+    name: Deploy prod
     needs: int
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        stage: [prod]
-    environment: ${{ matrix.stage }}
+    environment: prod
     env:
       APP_VERSION: ${{ needs.int.outputs.version }}
     steps:
@@ -106,5 +102,5 @@ jobs:
         with:
           role-to-assume: ${{ env.AWS_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
-      - name: Deploy ${{ matrix.stage }}
-        run: npx sst deploy --stage ${{ matrix.stage }}
+      - name: Deploy prod
+        run: npx sst deploy --stage prod
