@@ -193,11 +193,12 @@ test.describe("performance", () => {
 test.describe("performance on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("returns by year: three columns that fit the screen, inflation under the return; the header fits too", async ({ page }) => {
+  test("returns by year: four columns that fit the screen (XIRR among them), inflation under the return; the header fits too", async ({ page }) => {
     await page.goto("/#/performance");
     const table = page.getByTestId("years-table");
     await expect(page.getByTestId("years-row").first()).toBeVisible();
-    await expect(table.locator("thead th")).toHaveCount(3);
+    await expect(table.locator("thead th")).toHaveCount(4);
+    await expect(page.getByTestId("years-row").first().getByTestId("years-xirr")).toBeVisible();
     await expect(page.getByTestId("years-row").first().getByTestId("years-twr")).toContainText("infl.");
     const wrap = page.getByTestId("years");
     expect(await wrap.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);

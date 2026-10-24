@@ -128,7 +128,7 @@ function Inflation({ r, short = false }: { r: PeriodReturn; short?: boolean }) {
  * their own heading: they compare with Return, both time-weighted and nominal), inflation (CPI December on December)
  * and the real return; the last row the whole history, its rates a year. One list of columns drives the header, the
  * placeholders and the rows, so loading and loaded look the same; narrower screens hide `col-start`, then `col-end`,
- * then `col-xirr` (styles.css), a phone shows year, return (inflation under it) and real.
+ * then `col-xirr` (styles.css), a phone shows year, XIRR, return (inflation under it) and real, in equal columns.
  */
 export function YearsTable({
   data,
@@ -141,8 +141,10 @@ export function YearsTable({
   const t = data?.total;
   const series = new Map((data?.benchmarks ?? []).map((b) => [b.id, b]));
   const benches = narrow ? [] : BENCH_COLUMNS;
+  // XIRR stays on a phone (its own class: col-xirr is hidden below 960 px).
+  const xirrCls = narrow ? "xirr" : "col-xirr";
   const cols: string[] = narrow
-    ? ["left", "ret", ""]
+    ? ["left", "xirr", "ret", ""]
     : ["left", "col-start", "col-start", "col-end", "col-end", "col-xirr", "ret", ...benches.map(() => "bench"), "", ""];
   const firstBench = cols.indexOf("bench");
   return (
@@ -183,14 +185,14 @@ export function YearsTable({
                 <th className="col-end" title="End − start − money put in">
                   Profit
                 </th>
-                <th
-                  className="col-xirr"
-                  title="Money-weighted return (XIRR) of the start value, the money put in and the end value: what your money earned, its timing included. A part of a year: over those days, not a year"
-                >
-                  XIRR
-                </th>
               </>
             )}
+            <th
+              className={xirrCls}
+              title="Money-weighted return (XIRR) of the start value, the money put in and the end value: what your money earned, its timing included. A part of a year: over those days, not a year"
+            >
+              XIRR
+            </th>
             <th className="ret" title="Time-weighted return: each day's growth chained, so money put in or taken out doesn't count. Comparable with inflation and with the benchmarks">
               Return
             </th>
@@ -236,11 +238,11 @@ export function YearsTable({
                     <td className="col-start">{fmtPln(y.netDeposits)}</td>
                     <td className="col-end">{fmtPln(y.endValue)}</td>
                     <td className={`col-end ${signClass(y.profit)}`}>{fmtPln(y.profit)}</td>
-                    <td className={`col-xirr ${signClass(y.xirr)}`} data-testid="years-xirr">
-                      {pct(y.xirr)}
-                    </td>
                   </>
                 )}
+                <td className={`${xirrCls} ${signClass(y.xirr)}`} data-testid="years-xirr">
+                  {pct(y.xirr)}
+                </td>
                 <td className={`ret ${signClass(y.twr)}`} data-testid="years-twr">
                   {pct(y.twr)}
                   {narrow && (
@@ -280,9 +282,9 @@ export function YearsTable({
                   <td className="col-start">{fmtPln(t.netDeposits)}</td>
                   <td className="col-end">{fmtPln(t.endValue)}</td>
                   <td className={`col-end ${signClass(t.profit)}`}>{fmtPln(t.profit)}</td>
-                  <td className={`col-xirr ${signClass(t.xirr)}`}>{pct(t.xirr)}</td>
                 </>
               )}
+              <td className={`${xirrCls} ${signClass(t.xirr)}`}>{pct(t.xirr)}</td>
               <td className={`ret ${signClass(t.twrPerYear)}`}>
                 {pct(t.twrPerYear)}
                 {narrow && <div className="sub muted">infl. {pct(t.inflationPerYear)}</div>}

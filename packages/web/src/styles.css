@@ -714,7 +714,15 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 @media (max-width: 1320px) { .returns .col-start { display: none; } }
 @media (max-width: 1120px) { .returns .col-end { display: none; } }
 @media (max-width: 960px) { .returns .col-xirr { display: none; } }
-@media (max-width: 720px) { .returns table { font-size: 0.88rem; } .returns table td, .returns table th { padding: 6px 4px; } .returns td .sub { white-space: normal; } }
+/* A phone: four even columns (year, XIRR, return, real; the year a bit narrower) with room at the panel's edges. */
+@media (max-width: 720px) {
+  .returns table { font-size: 0.88rem; table-layout: fixed; }
+  .returns table th:first-child { width: 24%; }
+  .returns table td, .returns table th { padding: 8px 6px; }
+  .returns table td:first-child, .returns table th:first-child { padding-left: 12px; }
+  .returns table td:last-child, .returns table th:last-child { padding-right: 12px; }
+  .returns td .sub { padding-left: 0; }
+}
 /* A chart's key above its plot (Returns: return, inflation, real; growth of 100 zł). */
 .chart-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
 .chart-key-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
