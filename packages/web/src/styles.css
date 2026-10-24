@@ -721,7 +721,20 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
   .returns table td, .returns table th { padding: 8px 6px; }
   .returns table td:first-child, .returns table th:first-child { padding-left: 12px; }
   .returns table td:last-child, .returns table th:last-child { padding-right: 12px; }
+  /* A tap on a row opens its details (YearDetail): the money, the days, inflation and the benchmarks, two to a line. */
+  .returns td .caret { display: inline-block; width: 1em; font-style: normal; }
   .returns td .sub { padding-left: 0; }
+  .returns tr.clickable td:first-child .sub { padding-left: 1em; }
+  .returns tr.years-detail-row > td { background: var(--row); white-space: normal; text-align: left; font-weight: 400; border-top: 0; padding: 10px 12px 12px; }
+  .returns .years-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 0; }
+  .returns .years-figures > div { min-width: 0; }
+  .returns .years-figures > .wide { grid-column: 1 / -1; }
+  .returns .years-figures.three { grid-template-columns: repeat(3, 1fr); }
+  .returns .years-figures dt { font-size: 0.75rem; color: var(--muted); }
+  .returns .years-figures dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .returns .years-figures .vs { display: block; font-weight: 400; font-size: 0.75rem; }
+  .returns .years-detail-head { margin: 12px 0 6px; font-size: 0.8rem; }
+  .returns .years-detail-head .muted { font-weight: 400; }
 }
 /* A chart's key above its plot (Returns: return, inflation, real; growth of 100 zł). */
 .chart-key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }

@@ -1,3 +1,4 @@
+import { Fragment, useState, type ReactNode } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -57,8 +58,8 @@ const benchColor = (id: string) => `var(--bench-${id})`;
 const BENCH_COLUMNS = [...BENCHMARKS, MIX].map((b) => ({ id: b.id, label: b.label, short: b.short, note: b.note }));
 type BenchColumn = (typeof BENCH_COLUMNS)[number];
 
-/** A benchmark's return over a period's days (`b` undefined: not loaded), with the portfolio's difference in the tooltip. */
-function BenchCell({ col, b, r, perYear }: { col: BenchColumn; b?: BenchmarkSeries; r: PeriodReturn | TotalReturn; perYear?: boolean }) {
+/** A benchmark's return over a period's days (a year for the whole history) and the portfolio's return minus it in pp; `b` undefined: not loaded. */
+function benchVs(b: BenchmarkSeries | undefined, r: PeriodReturn | TotalReturn, perYear?: boolean): { v: number | null; diff: number | null } {
   let v = b ? benchmarkReturn(b.points, r.from, r.to) : null;
   let mine = r.twr;
   if (perYear) {
@@ -66,7 +67,12 @@ function BenchCell({ col, b, r, perYear }: { col: BenchColumn; b?: BenchmarkSeri
     v = v === null || t.years < 1 ? null : (1 + v) ** (1 / t.years) - 1;
     mine = t.twrPerYear;
   }
-  const diff = v === null || mine === null ? null : (mine - v) * 100;
+  return { v, diff: v === null || mine === null ? null : (mine - v) * 100 };
+}
+
+/** A benchmark's return over a period's days (`b` undefined: not loaded), with the portfolio's difference in the tooltip. */
+function BenchCell({ col, b, r, perYear }: { col: BenchColumn; b?: BenchmarkSeries; r: PeriodReturn | TotalReturn; perYear?: boolean }) {
+  const { v, diff } = benchVs(b, r, perYear);
   return (
     <td
       className={`bench ${signClass(v)}`}
@@ -122,13 +128,97 @@ function Inflation({ r, short = false }: { r: PeriodReturn; short?: boolean }) {
   );
 }
 
+/** The phone's caret before a row's year: the row opens its details. */
+const Caret = ({ open }: { open: boolean }) => (
+  <span className="caret" aria-hidden>
+    {open ? "▾" : "▸"}
+  </span>
+);
+
+/** A label over its value in a row's details. */
+const Fig = ({ label, cls, wide, children }: { label: string; cls?: string; wide?: boolean; children: ReactNode }) => (
+  <div className={wide ? "wide" : undefined}>
+    <dt>{label}</dt>
+    <dd className={cls}>{children}</dd>
+  </div>
+);
+
+/**
+ * A row's details on a phone, for what only the wide table shows: the money (start, put in, end, profit), the days,
+ * inflation in full and the benchmarks against the return. `total`: the whole history (rates a year, and in all).
+ */
+function YearDetail({ r, total, series, cols }: { r: PeriodReturn; total?: TotalReturn; series: Map<string, BenchmarkSeries>; cols: number }) {
+  const mine = total ? total.twrPerYear : r.twr;
+  return (
+    <tr className="years-detail-row" data-testid="years-detail">
+      <td colSpan={cols}>
+        <dl className="years-figures">
+          <Fig label="Days" wide>
+            {r.from} → {r.to}
+          </Fig>
+          {total ? <Fig label="Years">{fmtNum(total.years, 1)}</Fig> : <Fig label="Start">{fmtPln(r.startValue)}</Fig>}
+          <Fig label="Put in">{fmtPln(r.netDeposits)}</Fig>
+          <Fig label="End">{fmtPln(r.endValue)}</Fig>
+          <Fig label="Profit" cls={signClass(r.profit)}>
+            {fmtPln(r.profit)}
+          </Fig>
+          {total ? (
+            <Fig label="Inflation a year">{pct(total.inflationPerYear)}</Fig>
+          ) : (
+            <Fig label="Inflation">
+              <Inflation r={r} />
+            </Fig>
+          )}
+          {total && (
+            <>
+              <Fig label="Return in all" cls={signClass(total.twr)}>
+                {pct(total.twr)}
+              </Fig>
+              <Fig label="Inflation in all">{pct(total.inflation)}</Fig>
+              <Fig label="Real in all" cls={signClass(total.real)}>
+                {pct(total.real)}
+              </Fig>
+            </>
+          )}
+        </dl>
+        <h4 className="years-detail-head">
+          Benchmarks{" "}
+          <span className="muted">
+            · return {pct(mine)}
+            {total ? " a year" : ""}
+          </span>
+        </h4>
+        <dl className="years-figures three" data-testid="years-detail-benchmarks">
+          {BENCH_COLUMNS.map((c) => {
+            const { v, diff } = benchVs(series.get(c.id), r, !!total);
+            return (
+              <div key={c.id} title={c.note}>
+                <dt>{c.label}</dt>
+                <dd>
+                  <span className={signClass(v)}>{pct(v)}</span>
+                  {diff !== null && (
+                    <span className="muted vs">
+                      {fmtNum(Math.abs(diff), 1)} pp {diff >= 0 ? "ahead" : "behind"}
+                    </span>
+                  )}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </td>
+    </tr>
+  );
+}
+
 /**
  * Per calendar year: value at the start and the end, money put in, profit, the money-weighted XIRR, the time-weighted
  * return (deposits and withdrawals don't count) next to the benchmarks' returns over the same days (tinted, under
  * their own heading: they compare with Return, both time-weighted and nominal), inflation (CPI December on December)
  * and the real return; the last row the whole history, its rates a year. One list of columns drives the header, the
  * placeholders and the rows, so loading and loaded look the same; narrower screens hide `col-start`, then `col-end`,
- * then `col-xirr` (styles.css), a phone shows year, XIRR, return (inflation under it) and real, in equal columns.
+ * then `col-xirr` (styles.css), a phone shows year, XIRR, return (inflation under it) and real, in equal columns, and a tap on a row opens
+ * the rest under it (YearDetail).
  */
 export function YearsTable({
   data,
@@ -138,6 +228,11 @@ export function YearsTable({
   loading: boolean;
 }) {
   const narrow = useNarrow();
+  // The row opened on a phone: its year, or "all".
+  const [open, setOpen] = useState<number | "all" | null>(null);
+  const toggle = (k: number | "all") => setOpen((o) => (o === k ? null : k));
+  const rowCls = (k: number | "all", base = "") => [base, narrow ? "clickable" : "", narrow && open === k ? "selected" : ""].filter(Boolean).join(" ") || undefined;
+  const rowProps = (k: number | "all") => (narrow ? { onClick: () => toggle(k), "aria-expanded": open === k } : {});
   const t = data?.total;
   const series = new Map((data?.benchmarks ?? []).map((b) => [b.id, b]));
   const benches = narrow ? [] : BENCH_COLUMNS;
@@ -226,43 +321,48 @@ export function YearsTable({
           )}
           {data?.years.map((y) => {
             const { label, sub } = yearLabel(y, narrow);
+            const k = y.year!;
             return (
-              <tr key={y.year} data-testid="years-row" data-year={y.year} className={y.partial ? "partial" : undefined}>
-                <td className="left">
-                  {label}
-                  {sub && <div className="sub muted">{sub}</div>}
-                </td>
-                {!narrow && (
-                  <>
-                    <td className="col-start">{fmtPln(y.startValue)}</td>
-                    <td className="col-start">{fmtPln(y.netDeposits)}</td>
-                    <td className="col-end">{fmtPln(y.endValue)}</td>
-                    <td className={`col-end ${signClass(y.profit)}`}>{fmtPln(y.profit)}</td>
-                  </>
-                )}
-                <td className={`${xirrCls} ${signClass(y.xirr)}`} data-testid="years-xirr">
-                  {pct(y.xirr)}
-                </td>
-                <td className={`ret ${signClass(y.twr)}`} data-testid="years-twr">
-                  {pct(y.twr)}
-                  {narrow && (
-                    <div className="sub muted">
-                      infl. <Inflation r={y} short />
-                    </div>
-                  )}
-                </td>
-                {benches.map((b) => (
-                  <BenchCell key={b.id} col={b} b={series.get(b.id)} r={y} />
-                ))}
-                {!narrow && (
-                  <td data-testid="years-inflation">
-                    <Inflation r={y} />
+              <Fragment key={k}>
+                <tr data-testid="years-row" data-year={y.year} className={rowCls(k, y.partial ? "partial" : "")} {...rowProps(k)}>
+                  <td className="left">
+                    {narrow && <Caret open={open === k} />}
+                    {label}
+                    {sub && <div className="sub muted">{sub}</div>}
                   </td>
-                )}
-                <td className={signClass(y.real)} data-testid="years-real">
-                  {pct(y.real)}
-                </td>
-              </tr>
+                  {!narrow && (
+                    <>
+                      <td className="col-start">{fmtPln(y.startValue)}</td>
+                      <td className="col-start">{fmtPln(y.netDeposits)}</td>
+                      <td className="col-end">{fmtPln(y.endValue)}</td>
+                      <td className={`col-end ${signClass(y.profit)}`}>{fmtPln(y.profit)}</td>
+                    </>
+                  )}
+                  <td className={`${xirrCls} ${signClass(y.xirr)}`} data-testid="years-xirr">
+                    {pct(y.xirr)}
+                  </td>
+                  <td className={`ret ${signClass(y.twr)}`} data-testid="years-twr">
+                    {pct(y.twr)}
+                    {narrow && (
+                      <div className="sub muted">
+                        infl. <Inflation r={y} short />
+                      </div>
+                    )}
+                  </td>
+                  {benches.map((b) => (
+                    <BenchCell key={b.id} col={b} b={series.get(b.id)} r={y} />
+                  ))}
+                  {!narrow && (
+                    <td data-testid="years-inflation">
+                      <Inflation r={y} />
+                    </td>
+                  )}
+                  <td className={signClass(y.real)} data-testid="years-real">
+                    {pct(y.real)}
+                  </td>
+                </tr>
+                {narrow && open === k && <YearDetail r={y} series={series} cols={cols.length} />}
+              </Fragment>
             );
           })}
         </tbody>
@@ -270,9 +370,12 @@ export function YearsTable({
           <tfoot>
             <tr
               data-testid="years-total"
+              className={rowCls("all")}
+              {...rowProps("all")}
               title={`Since ${t.from}, ${fmtNum(t.years, 1)} years. In all: return ${pct(t.twr)}, inflation ${pct(t.inflation)}, real ${pct(t.real)}`}
             >
               <td className="left">
+                {narrow && <Caret open={open === "all"} />}
                 All
                 <div className="sub muted">{narrow ? "a year" : `a year, since ${t.from.slice(0, 7)}`}</div>
               </td>
@@ -295,6 +398,7 @@ export function YearsTable({
               {!narrow && <td>{pct(t.inflationPerYear)}</td>}
               <td className={signClass(t.realPerYear)}>{pct(t.realPerYear)}</td>
             </tr>
+            {narrow && open === "all" && <YearDetail r={t} total={t} series={series} cols={cols.length} />}
           </tfoot>
         )}
       </table>

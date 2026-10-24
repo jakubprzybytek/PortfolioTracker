@@ -204,6 +204,26 @@ test.describe("performance on a phone", () => {
     expect(await wrap.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
+
+  test("returns by year: a tap on a row opens what the wide table shows (money, inflation, benchmarks), a second tap closes it", async ({ page }) => {
+    await page.goto("/#/performance");
+    const row = page.getByTestId("years-row").first();
+    await expect(row).toBeVisible();
+    await expect(page.getByTestId("years-detail")).toHaveCount(0);
+    await row.click();
+    const detail = page.getByTestId("years-detail");
+    await expect(detail).toHaveCount(1);
+    await expect(row).toHaveAttribute("aria-expanded", "true");
+    for (const label of ["Days", "Start", "Put in", "End", "Profit", "Inflation"]) await expect(detail.locator("dt", { hasText: new RegExp(`^${label}$`) })).toBeVisible();
+    await expect(detail.getByTestId("years-detail-benchmarks").locator("dt")).toHaveCount(3);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    // The whole history: its rates a year, and in all.
+    await page.getByTestId("years-total").click();
+    await expect(detail).toHaveCount(1);
+    await expect(detail.locator("dt", { hasText: "Return in all" })).toBeVisible();
+    await page.getByTestId("years-total").click();
+    await expect(page.getByTestId("years-detail")).toHaveCount(0);
+  });
 });
 
 test.describe("status", () => {
