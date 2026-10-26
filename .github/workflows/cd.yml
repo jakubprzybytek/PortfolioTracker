@@ -13,12 +13,9 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  id-token: write # OIDC → AWS
-  contents: write # push the version tag
+  contents: read
 
 env:
-  AWS_REGION: eu-west-1
-  AWS_ROLE: arn:aws:iam::${{ secrets.AWS_ACCOUNT }}:role/GitHub-PortfolioTracker # account number: repository secret (masked in logs)
   NODE_VERSION: "24"
 
 jobs:
@@ -26,7 +23,9 @@ jobs:
   int:
     name: Deploy int + test + tag
     runs-on: ubuntu-latest
-    environment: int
+    permissions:
+      contents: write # push the version tag
+      id-token: write # OIDC → AWS (infra/github/README.md)
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -53,8 +52,10 @@ jobs:
       - run: npm test
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ env.AWS_ROLE }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHub-PortfolioTracker
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gh-portfoliotracker-${{ github.run_id }}
+          mask-aws-account-id: true
       - name: Deploy int
         run: npx sst deploy --stage int
       # Inside `sst shell`: the tests log in as the stage's test user (Resource.TestUser, TestUserPassword).
@@ -86,7 +87,9 @@ jobs:
     name: Deploy prod
     needs: int
     runs-on: ubuntu-latest
-    environment: prod
+    permissions:
+      contents: read
+      id-token: write # OIDC → AWS
     env:
       APP_VERSION: ${{ needs.int.outputs.version }}
     steps:
@@ -100,7 +103,9 @@ jobs:
       - run: npm ci
       - uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ env.AWS_ROLE }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHub-PortfolioTracker
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gh-portfoliotracker-${{ github.run_id }}
+          mask-aws-account-id: true
       - name: Deploy prod
         run: npx sst deploy --stage prod

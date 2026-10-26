@@ -4,128 +4,133 @@
     {
       "Sid": "Identity",
       "Effect": "Allow",
-      "Action": [
-        "sts:GetCallerIdentity"
-      ],
+      "Action": ["sts:GetCallerIdentity"],
       "Resource": "*"
     },
     {
       "Sid": "SstState",
       "Effect": "Allow",
-      "Action": [
-        "ssm:GetParameter",
-        "ssm:GetParameters",
-        "ssm:PutParameter",
-        "ssm:DeleteParameter"
-      ],
+      "Action": ["ssm:GetParameter", "ssm:GetParameters", "ssm:PutParameter", "ssm:DeleteParameter"],
       "Resource": "arn:aws:ssm:*:ACCOUNT_ID:parameter/sst/*"
+    },
+    {
+      "Sid": "Buckets",
+      "Effect": "Allow",
+      "Action": ["s3:*"],
+      "Resource": [
+        "arn:aws:s3:::portfolio-tracker-*",
+        "arn:aws:s3:::portfolio-tracker-*/*",
+        "arn:aws:s3:::sst-asset-*",
+        "arn:aws:s3:::sst-asset-*/*"
+      ]
+    },
+    {
+      "Sid": "Functions",
+      "Effect": "Allow",
+      "Action": ["lambda:*"],
+      "Resource": [
+        "arn:aws:lambda:eu-west-1:ACCOUNT_ID:function:portfolio-tracker-*",
+        "arn:aws:lambda:eu-west-1:ACCOUNT_ID:event-source-mapping:*"
+      ]
+    },
+    {
+      "Sid": "EventSourceMappingsCreate",
+      "Effect": "Allow",
+      "Action": ["lambda:CreateEventSourceMapping", "lambda:ListEventSourceMappings"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Logs",
+      "Effect": "Allow",
+      "Action": ["logs:*"],
+      "Resource": "arn:aws:logs:eu-west-1:ACCOUNT_ID:log-group:*"
+    },
+    {
+      "Sid": "ApiAccessLogDelivery",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery",
+        "logs:DeleteLogDelivery", "logs:ListLogDeliveries"
+      ],
+      "Resource": "*"
     },
     {
       "Sid": "ApiGateway",
       "Effect": "Allow",
-      "Action": [
-        "apigateway:*"
-      ],
-      "Resource": "arn:aws:apigateway:*::/*"
-    },
-    {
-      "Sid": "Compute",
-      "Effect": "Allow",
-      "Action": [
-        "lambda:*",
-        "scheduler:*",
-        "logs:*",
-        "events:*"
-      ],
-      "Resource": "*"
+      "Action": ["apigateway:*"],
+      "Resource": "arn:aws:apigateway:eu-west-1::/*"
     },
     {
       "Sid": "Queues",
       "Effect": "Allow",
-      "Action": [
-        "sqs:*"
-      ],
-      "Resource": "arn:aws:sqs:*:ACCOUNT_ID:portfolio-tracker-*"
+      "Action": ["sqs:*"],
+      "Resource": "arn:aws:sqs:eu-west-1:ACCOUNT_ID:portfolio-tracker-*"
     },
     {
-      "Sid": "Data",
+      "Sid": "Tables",
       "Effect": "Allow",
-      "Action": [
-        "dynamodb:*",
-        "s3:*"
-      ],
-      "Resource": "*"
+      "Action": ["dynamodb:*"],
+      "Resource": "arn:aws:dynamodb:eu-west-1:ACCOUNT_ID:table/portfolio-tracker-*"
     },
     {
-      "Sid": "Edge",
+      "Sid": "Schedules",
       "Effect": "Allow",
-      "Action": [
-        "cloudfront:*",
-        "cloudfront-keyvaluestore:*",
-        "acm:*",
-        "route53:*"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "Roles",
-      "Effect": "Allow",
-      "Action": [
-        "iam:CreateRole",
-        "iam:DeleteRole",
-        "iam:GetRole",
-        "iam:UpdateRole",
-        "iam:UpdateAssumeRolePolicy",
-        "iam:PutRolePolicy",
-        "iam:DeleteRolePolicy",
-        "iam:GetRolePolicy",
-        "iam:ListRolePolicies",
-        "iam:AttachRolePolicy",
-        "iam:DetachRolePolicy",
-        "iam:ListAttachedRolePolicies",
-        "iam:ListInstanceProfilesForRole",
-        "iam:TagRole",
-        "iam:UntagRole",
-        "iam:ListRoleTags",
-        "iam:PassRole",
-        "iam:CreateServiceLinkedRole"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "Auth",
-      "Effect": "Allow",
-      "Action": [
-        "cognito-idp:DescribeUserPool",
-        "cognito-idp:GetUserPoolMfaConfig",
-        "cognito-idp:ListTagsForResource",
-        "cognito-idp:CreateUserPoolClient",
-        "cognito-idp:DescribeUserPoolClient",
-        "cognito-idp:UpdateUserPoolClient",
-        "cognito-idp:DeleteUserPoolClient"
-      ],
-      "Resource": "arn:aws:cognito-idp:eu-west-1:ACCOUNT_ID:userpool/eu-west-1_IVai0KEAA"
+      "Action": ["scheduler:*"],
+      "Resource": "arn:aws:scheduler:eu-west-1:ACCOUNT_ID:schedule/*/portfolio-tracker-*"
     },
     {
       "Sid": "Alerts",
       "Effect": "Allow",
-      "Action": [
-        "sns:*"
-      ],
+      "Action": ["sns:*"],
       "Resource": "arn:aws:sns:eu-west-1:ACCOUNT_ID:portfolio-tracker-*"
     },
     {
       "Sid": "Alarms",
       "Effect": "Allow",
       "Action": [
-        "cloudwatch:PutMetricAlarm",
-        "cloudwatch:DeleteAlarms",
-        "cloudwatch:DescribeAlarms",
-        "cloudwatch:ListTagsForResource",
-        "cloudwatch:TagResource",
-        "cloudwatch:UntagResource"
+        "cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:DescribeAlarms",
+        "cloudwatch:ListTagsForResource", "cloudwatch:TagResource", "cloudwatch:UntagResource"
       ],
-      "Resource": "arn:aws:cloudwatch:eu-west-1:ACCOUNT_ID:alarm:*"
+      "Resource": [
+        "arn:aws:cloudwatch:eu-west-1:ACCOUNT_ID:alarm:portfolio-tracker-*",
+        "arn:aws:cloudwatch:eu-west-1:ACCOUNT_ID:alarm:Valuation*"
+      ]
+    },
+    {
+      "Sid": "Auth",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:DescribeUserPool", "cognito-idp:GetUserPoolMfaConfig", "cognito-idp:ListTagsForResource",
+        "cognito-idp:CreateUserPoolClient", "cognito-idp:DescribeUserPoolClient",
+        "cognito-idp:UpdateUserPoolClient", "cognito-idp:DeleteUserPoolClient"
+      ],
+      "Resource": "arn:aws:cognito-idp:eu-west-1:ACCOUNT_ID:userpool/eu-west-1_IVai0KEAA"
+    },
+    {
+      "Sid": "Edge",
+      "Effect": "Allow",
+      "Action": ["cloudfront:*", "cloudfront-keyvaluestore:*", "acm:*", "route53:*"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Roles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:UpdateRole", "iam:UpdateAssumeRolePolicy",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy", "iam:ListRolePolicies",
+        "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:ListAttachedRolePolicies",
+        "iam:ListInstanceProfilesForRole", "iam:TagRole", "iam:UntagRole", "iam:ListRoleTags"
+      ],
+      "Resource": "arn:aws:iam::ACCOUNT_ID:role/portfolio-tracker-*"
+    },
+    {
+      "Sid": "PassRoles",
+      "Effect": "Allow",
+      "Action": ["iam:PassRole"],
+      "Resource": "arn:aws:iam::ACCOUNT_ID:role/portfolio-tracker-*",
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": ["lambda.amazonaws.com", "scheduler.amazonaws.com"] }
+      }
     }
   ]
 }
