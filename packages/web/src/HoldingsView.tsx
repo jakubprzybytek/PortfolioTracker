@@ -45,6 +45,7 @@ import {
   type RangeKey,
 } from "./format.ts";
 import { RangePicker } from "./RangePicker.tsx";
+import { StickyTable, useStickyToolbar } from "./sticky.tsx";
 import { useNarrow } from "./useNarrow.ts";
 import { ValueChart, type ValuePoint } from "./ValueChart.tsx";
 import type { ClosedPosition, Holding, Snapshot } from "./types.ts";
@@ -535,6 +536,7 @@ const IncompleteFlag = ({ what }: { what: string[] }) => (
  * Filters: account, asset type ("Cash" shows only the cash rows), free text (instruments whose name or code contains it; no cash rows then). "Show closed" (shared with Prices while the app is open) adds the positions held no
  * more, greyed, after the open ones (by account: in their account; by instrument: at the end), with their realised gain;
  * they're not in the sums. A closed row's chart ranges count back from the day it closed (ALL: the time it was held).
+ * The filters and the table's header stay at the top while the list scrolls (as in Transactions).
  */
 export function HoldingsView({
   params,
@@ -973,10 +975,12 @@ export function HoldingsView({
   const total = groups.reduce((s, g) => add(s, g.sums), sums([]));
   const set = (key: string) => (value: string) =>
     setParams({ ...params, [key]: value || undefined });
+  const [toolbar, stickyStyle] = useStickyToolbar();
 
   return (
     <NewestPrice.Provider value={newestPrice}>
     <HoldSellVerdicts.Provider value={verdicts}>
+    <div style={stickyStyle}>
       <header className="view-header">
         <h2 className="view-title">Holdings</h2>
         <span className="view-meta">
@@ -1028,7 +1032,18 @@ export function HoldingsView({
         </span>
       </div>
 
+      <div className="sticky-toolbar" ref={toolbar} data-testid="holdings-toolbar">
       <FilterBar
+        compact
+        activeCount={[account, type].filter(Boolean).length + (showClosed ? 1 : 0)}
+        search={
+          <FilterText
+            label="Instrument"
+            value={text}
+            onChange={set("q")}
+            testId="filter-text"
+          />
+        }
         active={!!(account || type || text)}
         onReset={() =>
           setParams({ group: params["group"], chart: chartIsin, chartAccount })
@@ -1054,12 +1069,6 @@ export function HoldingsView({
           onChange={set("type")}
           testId="filter-type"
         />
-        <FilterText
-          label="Instrument"
-          value={text}
-          onChange={set("q")}
-          testId="filter-text"
-        />
         <FilterToggle
           label="Show closed"
           checked={showClosed}
@@ -1068,10 +1077,12 @@ export function HoldingsView({
           title="Also the positions sold, redeemed or written off, with their realised gain"
         />
       </FilterBar>
+      </div>
 
-      <div className="table-wrap">
-        <table data-testid="holdings-by-account" className="static holdings">
-          <thead>
+      <StickyTable
+        testId="holdings-by-account"
+        className="static holdings"
+        head={
             <tr>
               <th className="left">Instrument ▲</th>
               <th className="left">
@@ -1089,7 +1100,8 @@ export function HoldingsView({
               <th title={XIRR_TITLE}>XIRR</th>
               <th>Coupons</th>
             </tr>
-          </thead>
+        }
+      >
           <tbody>
             {!snap.data && snap.loading && <SkeletonRows rows={10} cols={11} />}
             {byInstrument && instrumentRows.map(renderInstrument)}
@@ -1275,8 +1287,7 @@ export function HoldingsView({
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+      </StickyTable>
       {/* Room below the list so its last rows can scroll above the docked chart. */}
       {chartIsin && <div style={{ height: panelHeight }} aria-hidden />}
       {chartIsin && (
@@ -1353,6 +1364,7 @@ export function HoldingsView({
           </div>
         </ChartPanel>
       )}
+    </div>
     </HoldSellVerdicts.Provider>
     </NewestPrice.Provider>
   );

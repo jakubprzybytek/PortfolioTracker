@@ -23,6 +23,7 @@ import {
 } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
+import { useStickyToolbar } from "./sticky.tsx";
 import { useTxForm } from "./txForm.ts";
 import { useMedia, useNarrow } from "./useNarrow.ts";
 import type { TransactionRow } from "./types.ts";
@@ -146,22 +147,7 @@ export function TransactionsView({
   const list = useMedia("(max-width: 1150px)");
 
   // The toolbar (filters) sticks to the top, under the phone's top bar; the table's header sticks under it.
-  const toolbar = useRef<HTMLDivElement | null>(null);
-  const [sticky, setSticky] = useState({ top: 0, bar: 0 });
-  useEffect(() => {
-    const bar = toolbar.current;
-    const topbar = document.querySelector<HTMLElement>(".sidebar");
-    const measure = () =>
-      setSticky({
-        top: narrow && topbar ? topbar.offsetHeight : 0,
-        bar: bar?.offsetHeight ?? 0,
-      });
-    measure();
-    const ro = new ResizeObserver(measure);
-    if (bar) ro.observe(bar);
-    if (topbar) ro.observe(topbar);
-    return () => ro.disconnect();
-  }, [narrow]);
+  const [toolbar, stickyStyle] = useStickyToolbar();
   const more = useRef<HTMLElement | null>(null);
   const moreRef = (el: HTMLElement | null) => {
     more.current = el;
@@ -184,12 +170,7 @@ export function TransactionsView({
   return (
     <div
       className="tx-view"
-      style={
-        {
-          "--sticky-top": `${sticky.top}px`,
-          "--bar-h": `${sticky.bar}px`,
-        } as CSSProperties
-      }
+      style={stickyStyle}
     >
       <header className="view-header">
         <h2 className="view-title">Transactions</h2>

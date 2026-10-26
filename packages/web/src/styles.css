@@ -157,8 +157,14 @@ td.tx-account { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
 /* The filters and the table's header stay at the top while the list scrolls (under the phone's top bar: --sticky-top;
    the header under the filters: --bar-h, both measured). The table doesn't scroll sideways (a scrolling box would hold
    its header): on narrower screens the least needed columns go instead (asset type, then fee and note: in the form). */
-.tx-toolbar { position: sticky; top: var(--sticky-top, 0px); z-index: 15; background: var(--bg); padding-top: 10px; margin-top: -10px; }
-.tx-toolbar .filters { margin-bottom: 0; padding-bottom: 12px; }
+.tx-toolbar, .sticky-toolbar { position: sticky; top: var(--sticky-top, 0px); z-index: 15; background: var(--bg); padding-top: 10px; margin-top: -10px; }
+.tx-toolbar .filters, .sticky-toolbar .filters { margin-bottom: 0; padding-bottom: 12px; }
+/* Holdings, Prices (StickyTable): the table scrolls sideways on narrower screens, so a copy of its header floats above
+   it, under the filters, following its sideways scroll; the copy is the box's top (border, rounded corners), the
+   table the rest, its own header under the copy. */
+.table-wrap.sticky-head { position: sticky; top: calc(var(--sticky-top, 0px) + var(--bar-h, 0px)); z-index: 10; overflow: hidden; border-bottom: 0; border-radius: 10px 10px 0 0; box-shadow: none; }
+.sticky-head thead th { background: var(--panel); }
+.table-wrap.sticky-body { border-top: 0; border-radius: 0 0 10px 10px; }
 /* Both axes clip, over .table-wrap's overflow-x: auto further down: clip on one axis only computes to hidden, a
    scrolling box that holds the header. */
 .table-wrap.tx-table-wrap { overflow: clip; }

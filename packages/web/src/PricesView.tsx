@@ -12,6 +12,7 @@ import type { Price, PriceRow, Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
 import { useShowClosed } from "./showClosed.ts";
+import { StickyTable, useStickyToolbar } from "./sticky.tsx";
 
 /** Bonds are priced in % of nominal; other instruments in their currency; retail bonds show their interest rate. */
 const fmtPrice = (r: PriceRow) =>
@@ -22,6 +23,7 @@ const fmtPrice = (r: PriceRow) =>
  * chart in a resizable panel docked to the bottom (as in Holdings); the open chart and the filter are in the URL.
  * "Show closed" (shared with Holdings while the app is open) adds the instruments traded but held no more, greyed, after the others: their last price
  * and the year up to it; their chart ranges count back from a month after the last transaction (ALL: from a month before the first).
+ * The filters and the table's header stay at the top while the list scrolls (as in Transactions).
  */
 export function PricesView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const [showClosed, setShowClosed] = useShowClosed();
@@ -45,6 +47,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const types = useMemo(() => uniqueOptions(all, (r) => ({ value: r.type, label: typeLabel(r.type) })), [all]);
   const classes = useMemo(() => uniqueOptions(all, (r) => ({ value: r.assetClass, label: CLASS_LABELS[r.assetClass] })), [all]);
   const newest = all.filter((r) => !r.closed).map((r) => r.priceDate).filter((d): d is string => !!d).sort().at(-1);
+  const [toolbar, stickyStyle] = useStickyToolbar();
   const closeChart = useCallback(() => setParams({ ...params, chart: undefined }), [params, setParams]);
 
   // Keep the clicked row visible above the panel.
@@ -57,7 +60,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   }, [selected, panelHeight]);
 
   return (
-    <>
+    <div style={stickyStyle}>
       <header className="view-header">
         <h2 className="view-title">Prices</h2>
         <span className="view-meta">
@@ -69,29 +72,35 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
       </header>
       {rows.error && <p className="error">{rows.error}</p>}
 
+      <div className="sticky-toolbar" ref={toolbar} data-testid="prices-toolbar">
       <FilterBar
+        compact
+        activeCount={[type, cls].filter(Boolean).length + (showClosed ? 1 : 0)}
+        search={<FilterText label="Instrument" value={text} onChange={(v) => setParams({ ...params, q: v || undefined })} testId="filter-text" />}
         active={!!(type || cls || text)}
         onReset={() => setParams({ chart: selected ?? undefined })}
         summary={rows.loading ? "Loading…" : `${shown.length - closedCount} of ${all.filter((r) => !r.closed).length} instruments${showClosed ? ` + ${closedCount} closed` : ""}`}
       >
         <FilterSelect label="Asset type" value={type} options={types} onChange={(v) => setParams({ ...params, type: v || undefined })} testId="filter-type" />
         <FilterSelect label="Class" value={cls} options={classes} onChange={(v) => setParams({ ...params, class: v || undefined })} testId="filter-class" width="8rem" />
-        <FilterText label="Instrument" value={text} onChange={(v) => setParams({ ...params, q: v || undefined })} testId="filter-text" />
         <FilterToggle label="Show closed" checked={showClosed} onChange={setShowClosed} testId="show-closed" title="Also the instruments traded but held no more" />
       </FilterBar>
+      </div>
 
-      <div className="table-wrap">
-        <table data-testid="prices-table" className="static">
-          <thead>
-            <tr>
-              <th className="left">Instrument</th>
-              <th className="left">Type</th>
-              <th className="left">Class</th>
-              <th>Price</th>
-              <th>Price date</th>
-              <th>1 year</th>
-            </tr>
-          </thead>
+      <StickyTable
+        testId="prices-table"
+        className="static"
+        head={
+          <tr>
+            <th className="left">Instrument</th>
+            <th className="left">Type</th>
+            <th className="left">Class</th>
+            <th>Price</th>
+            <th>Price date</th>
+            <th>1 year</th>
+          </tr>
+        }
+      >
           <tbody>
             {!rows.data && rows.loading && <SkeletonRows rows={8} cols={6} />}
             {shown.map((r) => (
@@ -163,8 +172,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+      </StickyTable>
 
       {/* Room below the list so its last rows can scroll above the docked chart. */}
       {selected && <div style={{ height: panelHeight }} aria-hidden />}
@@ -216,6 +224,6 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
           </div>
         </ChartPanel>
       )}
-    </>
+    </div>
   );
 }

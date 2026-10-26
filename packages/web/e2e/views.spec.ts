@@ -1385,3 +1385,29 @@ test.describe("cash flows", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });
+
+test.describe("sticky filters and header (Holdings, Prices)", () => {
+  // The table may scroll sideways (a phone, a narrow window): a copy of its header floats under the filters instead.
+  for (const [view, id] of [
+    ["holdings", "holdings-by-account"],
+    ["prices", "prices-table"],
+  ] as const)
+    for (const width of [1280, 390])
+      test(`${view} at ${width} px: scrolled down, the filters stay at the top and the header right under them, its columns over the table's`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 420 });
+        await page.goto(`/#/${view}`);
+        await expect(page.getByTestId(id).locator("tbody tr").nth(3)).toBeVisible();
+        await page.evaluate(() => window.scrollTo(0, 400));
+        const tools = (await page.getByTestId(`${view}-toolbar`).boundingBox())!;
+        const top = width < 720 ? (await page.locator(".sidebar").boundingBox())!.height : 0;
+        expect(Math.abs(tools.y - top)).toBeLessThan(3);
+        if (width < 720) expect(tools.height).toBeLessThan(100); // the search and a "Filters" button, not every dropdown
+        const head = page.getByTestId(`${id}-head`);
+        expect(Math.abs((await head.boundingBox())!.y - (tools.y + tools.height))).toBeLessThan(3);
+        // Scrolled sideways: the header follows the table.
+        await page.getByTestId(id).evaluate((t) => (t.parentElement!.scrollLeft = 150));
+        const xs = (sel: string) => page.locator(sel).evaluateAll((ths) => ths.map((th) => Math.round(th.getBoundingClientRect().x)));
+        await expect.poll(() => xs(`[data-testid=${id}-head] th`)).toEqual(await xs(`[data-testid=${id}] thead th`));
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      });
+});
