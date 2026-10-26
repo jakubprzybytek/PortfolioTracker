@@ -1,35 +1,33 @@
 # Development
 
-How to run the app on your machine, check a change in a real browser, and get it to production. Commands, stages and the test user are in the root [README.md](../README.md) ("Running", "Login", "Tests").
+This app is developed and delivered per the [sst-delivery standard](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/sst-delivery/STANDARD.md): develop on `dev`, every push to `main` goes through `int` to `prod`. The standard has the general rules (stages, tests, the CD pipeline, versions, when a push needs a yes first, test users); this file holds what is specific to PortfolioTracker. Commands and the login are also in the root [README.md](../README.md) ("Running", "Login", "Tests").
+
+## Stages
+
+| Stage | URL | Data |
+|---|---|---|
+| `dev` | https://dev.portfoliotracker.albedoonline.com, or http://localhost:5173 with `npm run dev` | sample data |
+| `int` | https://int.portfoliotracker.albedoonline.com | seeded by the tests |
+| `prod` | https://portfoliotracker.albedoonline.com | real data |
 
 ## Run locally
 
 ```sh
-npm run dev -- --stage dev
+npm run dev -- --stage dev        # sst dev: Lambdas on your machine, site on http://localhost:5173
+npm run deploy -- --stage dev     # full deployment; use it in agent sessions
 ```
 
-This runs `sst dev` against the `dev` stage:
-
-- **Infrastructure** (tables, bucket, queue, API Gateway, Cognito client) is deployed to AWS as the `dev` stage, so the data is dev's sample data in AWS.
-- **Lambdas run on your machine** ("Live"): API calls and jobs execute locally, so a code change takes effect without a deploy. The scheduled jobs only fire while `sst dev` is running.
-- **The site** runs in Vite on http://localhost:5173 (fixed port) and calls API Gateway directly. CORS allows `localhost:5173` on every stage except prod.
-- **Only the site, against a deployed stage** (no `sst dev`, nothing changes in AWS; quick for CSS and layout work): in `packages/web`, `VITE_API_URL=<the stage's apiGateway from .sst/outputs.json> VITE_AUTH_USER_POOL_ID=<COGNITO_POOL_ID in sst.config.ts> VITE_AUTH_CLIENT_ID=<authClientId> npx vite`. Log in once on localhost (its own session). Edits show at once (hot reload).
-
-Log in with your own account (it must be in the `portfolio-tracker` group) or with the test user (`portfolio-tracker-test@albedoonline.com`, password = the `TestUserPassword` secret of the stage).
-
-**Stop it when you're done** (Ctrl+C in its terminal). A leftover `sst dev` holds dev's stage lock and blocks every `deploy` to dev. If dev is locked, look for a stray `sst dev` process before anything else. For unattended use, and in an agent session, deploy instead of running `sst dev`:
-
-```sh
-npm run deploy -- --stage dev        # Lambdas and crons run in AWS; the site at https://dev.portfoliotracker.albedoonline.com
-```
+- With `sst dev`, the infrastructure (tables, bucket, queue, API Gateway, Cognito client) is `dev` in AWS; the Lambdas run locally, so a code change takes effect without a deploy. Scheduled jobs only fire while `sst dev` runs.
+- The site runs in Vite on port 5173 (fixed) and calls API Gateway directly; CORS allows `localhost:5173` on every stage except prod.
+- **Only the site, against a deployed stage** (nothing changes in AWS; quick for CSS and layout work): in `packages/web`, `VITE_API_URL=<the stage's apiGateway from .sst/outputs.json> VITE_AUTH_USER_POOL_ID=<COGNITO_POOL_ID in sst.config.ts> VITE_AUTH_CLIENT_ID=<authClientId> npx vite`. Log in once on localhost (its own session).
+- Log in with your own account (it must be in the `portfolio-tracker` group) or with the test user.
+- Stop `sst dev` when you're done: it holds `dev`'s lock and blocks every deploy to `dev`.
 
 ## Check a change in the browser
 
-Automated tests (below) prove behaviour; a look in a real browser catches layout and styling problems they don't, e.g. a style from one view leaking into another.
-
 **Claude in Chrome** (the browser extension, `mcp__claude-in-chrome__*` tools) lets Claude drive your own Chrome, with your own login:
 
-1. Run the app (`npm run dev -- --stage dev`, http://localhost:5173) or deploy dev (https://dev.portfoliotracker.albedoonline.com). Use prod (https://portfoliotracker.albedoonline.com) only to look, never to try out edits: it holds the real data.
+1. Run the app (`npm run dev -- --stage dev`) or deploy dev. Use prod only to look, never to try out edits.
 2. Claude opens the page in a **new tab**, logs in if needed, clicks through the changed view and takes screenshots; the console log (`read_console_messages`) shows runtime errors.
 3. Check desktop width and phone width (390 px) for anything that changes layout.
 
@@ -45,36 +43,26 @@ Put such probes and screenshots in `temp/<subfolder>/`, not in `packages/web/e2e
 
 ## Tests
 
-| Kind | Command | Against |
-|---|---|---|
-| Type check | `npm run typecheck` | the code |
-| Unit (Vitest) | `npm test` | the code, with fixtures |
-| Integration (API) | `npx sst shell --stage dev -- npm run test:integration` | a deployed stage (logs in as the test user) |
-| E2E (Playwright) | `WEB_URL=https://dev.portfoliotracker.albedoonline.com npx sst shell --stage dev -- npm run test:e2e` | a deployed site (without `WEB_URL`: http://localhost:5173) |
+| Kind | Command |
+|---|---|
+| Type check | `npm run typecheck` |
+| Unit (Vitest) | `npm test` |
+| Integration (API) | `npx sst shell --stage dev -- npm run test:integration` |
+| E2E (Playwright) | `WEB_URL=https://dev.portfoliotracker.albedoonline.com npx sst shell --stage dev -- npm run test:e2e` (without `WEB_URL`: http://localhost:5173) |
 
-Integration and E2E tests seed the stage with the sample data (`data/instruments.json`, `data/transactions.sample.json`). Run them on `dev` or `int` only; never on `prod`.
+- Integration and E2E tests seed the stage with the sample data (`data/instruments.json`, `data/transactions.sample.json`).
+- Test user: `portfolio-tracker-test@albedoonline.com`, group `portfolio-tracker-test` (accepted on `int` and `dev` only; prod returns 403), password in the SST secret `TestUserPassword` of `dev` and `int`.
 
-A change comes with tests at the level it touches: unit for core logic, integration for an API change, E2E for what the UI shows.
+## Delivery
 
-## Delivery: every change goes to production
+`.github/workflows/cd.yml`, per the standard: deploy `int`, integration and E2E tests against it, tag the next release, deploy `prod` from the tag. Releases are `v0.N` and show in the page footer. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
 
-Continuous delivery (`.github/workflows/cd.yml`). Every push or merge to `main`:
+Ask before pushing changes that touch data, resources holding data, access or cost ([the standard, section 5](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/sst-delivery/STANDARD.md#5-when-a-push-needs-a-yes-first)). For this app that includes:
 
-1. deploys **int** after the type check and unit tests,
-2. runs the **regression tests** against int: integration (API) and E2E (browser),
-3. tags the commit `v0.N` (the version in the page footer) only if they all passed: the tag marks a release that passed int,
-4. deploys **prod** from that tag. A failed prod deploy leaves the tag, so re-running the failed job deploys the same tag.
+- rewriting or removing transactions, holdings or market history on prod, re-imports, and backfills that overwrite;
+- changes to the shared Cognito pool's clients or groups.
 
-A failure at any step before that stops the run: nothing reaches prod or test. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
+## Deviations
 
-**By default, every code change goes all the way to prod.** Once a change is done and checked (type check, unit tests, deployed to dev with the integration and E2E tests passing, and a look in the browser for UI changes), commit it to `main` and push. There's no need to ask for permission for an ordinary change: CD and its tests are the gate.
-
-**Ask first** only when the deploy would change data, or otherwise calls for caution:
-
-- it changes or deletes stored data on prod: migrations, rewriting or removing items, re-imports, backfills that overwrite, changing keys or item shapes in a way existing items must follow;
-- it could replace or remove a resource that holds data: a table, the bucket, an index, `removal`/`protect`/deletion-protection settings;
-- it touches access or security: Cognito clients, groups, IAM, the CI deploy role, CORS, auth;
-- it noticeably raises cost or calls an external service in a new way (e.g. a paid source);
-- it can't be undone by reverting the commit and pushing again.
-
-In those cases, describe what will change and wait for a yes before pushing.
+- `cd.yml` predates the template: no manual rollback or `major` input yet (redeploy an old tag by re-running its prod job), and no `paths-ignore` for docs-only pushes.
+- This file is `Docs/Development.md` (the repo's `Docs/` folder) instead of `docs/development.md`.
