@@ -257,6 +257,23 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("tx-toast")).toHaveText("Prices were refreshed less than 5 minutes ago.");
   });
 
+  test("'Update prices' is disabled from the click, before the API answers; enabled again when it says no", async ({ page }) => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    await page.route("**/prices/refresh", async (route) => {
+      await gate; // a slow answer (a cold Lambda)
+      await route.fulfill({ status: 429, contentType: "application/json", body: JSON.stringify({ error: "Prices were refreshed less than 5 minutes ago." }) });
+    });
+    await page.goto("/");
+    const button = page.getByTestId("refresh-prices");
+    await button.click();
+    await expect(button).toBeDisabled();
+    await expect(button.locator("svg")).toHaveClass(/pulse/);
+    release();
+    await expect(page.getByTestId("tx-toast")).toHaveText("Prices were refreshed less than 5 minutes ago.");
+    await expect(button).toBeEnabled();
+  });
+
   test("the Status page lists the data-quality issues, the urgent kinds first; none, or not checked yet", async ({ page }) => {
     const report = {
       checkedAt: "2026-10-23T06:30:12Z",

@@ -71,12 +71,17 @@ function Shell({ email }: { email: string }) {
       .then((s) => setRecalc({ since: s.now, startedAt: Date.now(), phase: "valuation" }))
       .catch(() => setRecalc(null));
   }, []);
+  // "Update prices" is busy from the click, not only once the API has answered (a cold Lambda takes a second or two).
+  const [starting, setStarting] = useState(false);
   const refreshPrices = useCallback(async () => {
+    setStarting(true);
     try {
       const { now } = await apiSend<{ now: string }>("POST", "/prices/refresh");
       setRecalc({ since: now, startedAt: Date.now(), phase: "prices" });
     } catch (e) {
       setToast((e as Error).message);
+    } finally {
+      setStarting(false);
     }
   }, []);
   useEffect(() => {
@@ -107,7 +112,7 @@ function Shell({ email }: { email: string }) {
     }, 5000);
     return () => clearInterval(t);
   }, [recalc]);
-  const busy = recalc?.phase ?? null;
+  const busy = recalc?.phase ?? (starting ? "prices" : null);
   const txForm = useMemo(
     () => ({ open: (editing?: Transaction) => setForm({ editing }), saved, refreshPrices: () => void refreshPrices(), busy }),
     [saved, refreshPrices, busy],
