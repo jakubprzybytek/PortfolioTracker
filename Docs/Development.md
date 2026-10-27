@@ -57,6 +57,8 @@ Put such probes and screenshots in `temp/<subfolder>/`, not in `packages/web/e2e
 
 `.github/workflows/continuous-delivery.yaml`, per the standard: deploy `int`, integration and E2E tests against it, tag the next release, deploy `prod` from the tag. Releases are `v0.N` and show in the page footer. Rollback or redeploy: run it manually from the release tag ("Use workflow from", or `gh workflow run continuous-delivery.yaml --ref v0.153`): that tag goes to `int`, through the tests, then to `prod`, without a new version; data isn't rolled back. Works for `v0.153` and later (older tags don't have this workflow). A new leading number, only when asked: `--ref main -f major=true`. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
 
+Dependencies: Dependabot (alerts, security updates, `.github/dependabot.yml`) opens PRs; `.github/workflows/pull-request-checks.yaml` checks every PR (typecheck, unit tests, web build, registry signatures). They are handled per the [dependabot standard](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/dependabot/STANDARD.md).
+
 Ask before pushing changes that touch data, resources holding data, access or cost ([the standard, section 5](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/continuous-delivery/STANDARD.md#5-when-a-push-needs-a-yes-first)). For this app that includes:
 
 - rewriting or removing transactions, holdings or market history on prod, re-imports, and backfills that overwrite;

@@ -1,0 +1,31 @@
+# Dependabot per agent-playbook/dependabot. Security updates come from the repo setting, one PR per alert;
+# this file adds version updates. Add a block per extra npm folder (e.g. "/sst") if it has its own lockfile.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 5
+    # Don't take a release in its first days (most malicious or broken releases are pulled within that time).
+    # Applies to version updates only; security updates come right away.
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+      timezone: Europe/Warsaw
+    groups:
+      actions:
+        patterns: ["*"]
