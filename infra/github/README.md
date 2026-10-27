@@ -8,7 +8,7 @@ This repo deploys to AWS following the [aws-github-deploy standard](https://gith
 | Policies | `SST-Deployment` (shared), `PortfolioTracker-Deployment` (this repo, [deploy-policy.json](deploy-policy.json)) |
 | SST app name / resource prefix | `portfolio-tracker` |
 | Region | `eu-west-1` (CloudFront certificate in `us-east-1`) |
-| Workflows that deploy | `.github/workflows/cd.yml` (job `int`, then `prod` from the release tag) |
+| Workflows that deploy | `.github/workflows/continuous-delivery.yaml` (job `int`, then `prod` from the release tag) |
 | GitHub | secret `AWS_ACCOUNT_ID`, variable `AWS_REGION` |
 
 `deploy-policy.json` has `ACCOUNT_ID` in place of the account number. The rendered policy and the trust policy are in `private/` (gitignored).

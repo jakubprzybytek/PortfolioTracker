@@ -52,7 +52,7 @@ Tests log in as `portfolio-tracker-test@albedoonline.com` with a password (allow
 
 ## Continuous delivery
 
-`.github/workflows/cd.yml` runs on every push to `main`:
+`.github/workflows/continuous-delivery.yaml` runs on every push to `main`:
 
 1. **int** – the next minor version `v0.1`, `v0.2`, … (latest `v0.*` tag + 1; a re-run of a tagged commit keeps its tag), type-check and unit tests, `sst deploy --stage int`, integration tests against `https://int.portfoliotracker.albedoonline.com/api`, Playwright E2E against the int site, both inside `sst shell --stage int` (they log in as the test user). The tests seed `int` with `data/instruments.json` and the sample transactions. If they pass, the job pushes the version tag.
 2. **prod** – only if int passed, checked out at the tag: `sst deploy --stage prod` (the version shows in the page footer). No tests run against it. (Until 2026-10-23 the history-import stage `test` deployed alongside it; removed, see data/README.md.)

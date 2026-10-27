@@ -1,7 +1,7 @@
 # Continuous delivery: every push to main deploys `int`, runs the tests against it and tags the commit
 # with the next minor version (v0.1, v0.2, …); then `prod` deploys from that tag.
 
-name: CD
+name: Continuous Delivery
 
 on:
   push:
