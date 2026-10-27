@@ -249,7 +249,8 @@ export default $config({
       retries: 2,
     });
     new sst.aws.CronV2("ValuationEvening", { function: valuation.arn, schedule: "cron(30 22 ? * MON-FRI *)", timezone: WARSAW });
-    new sst.aws.CronV2("ValuationMorning", { function: valuation.arn, schedule: "cron(30 7 ? * TUE-SAT *)", timezone: WARSAW });
+    // Mornings Tuesday to Sunday: the weekend's days get a point too (no Sunday run left 2026-10-25 without one, a dip to 0 in the position charts).
+    new sst.aws.CronV2("ValuationMorning", { function: valuation.arn, schedule: "cron(30 7 ? * SUN,TUE-SAT *)", timezone: WARSAW });
 
     // --- auth ----------------------------------------------------------------------------------
     // One domain per stage: the site at "/", the API at "/api/*" (same origin, one certificate).

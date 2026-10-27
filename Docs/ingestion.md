@@ -34,7 +34,7 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 | `valuation` | 22:30 | DynamoDB only | retail bond `PX#CALC#…`, `PORTFOLIO/SNAP#<date>`, `SNAP#LATEST` |
 | `eod-ibkr` (later, not built) | 07:00 (next day) | IBKR Flex statement for the previous day | transactions, cash |
 | `eod-gpw-recheck` | 07:15 (next day) | re-runs `eod-gpw` for D-1 | overwrites, sets `status = final` |
-| `valuation` | 07:30 (next day) | DynamoDB only | final snapshot for D-1 |
+| `valuation` | 07:30 (next day), Tuesday to Sunday | DynamoDB only | final snapshot for D-1; Saturday's and Sunday's runs give the weekend's days their point (every day has one: a missing day shows as 0 in a position's chart) |
 | `monthly` | 16th, 10:00, retry daily until success (any day) | GUS CPI (monthly CSV: m/m, since December, year on year); new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `CPI_YTD/<month>`, `CPI_YOY/<month>`, `SERIES#…/RATE#…` |
 
 The jobs group into a few short windows a day. With DynamoDB this doesn't matter for cost; it keeps the schedule easy to follow.
