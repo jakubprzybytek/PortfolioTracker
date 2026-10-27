@@ -42,7 +42,7 @@ jobs:
         with:
           fetch-depth: 0 # the tags, for the next version
       # From main, releases only go forward: the latest vM.N tag + 1 (v0.152 -> v0.153); `major` gives v(M+1).0.
-      # A commit that already has a tag (a re-run) keeps it.
+      # `major` works from a commit already released too. Otherwise a commit that already has a tag (a re-run) keeps it.
       # From another ref: no new version; the footer shows the tag name, or <branch>-<short sha>.
       - id: version
         env:
@@ -57,9 +57,12 @@ jobs:
             current=$(tags --points-at HEAD)
             latest=$(tags)
             m=${latest%%.*}; m=${m#v}; n=${latest#*.}
-            if [ -n "$current" ]; then version="$current"
+            if [ "$MAJOR" = "true" ]; then
+              # Also on a commit that is already released (v0.157 -> v1.0); a re-run of the major release keeps its tag.
+              if [ -n "$current" ] && [ "$current" = "$latest" ] && [ "$n" = 0 ]; then version="$current"
+              else version="v$(( ${m:-0} + 1 )).0"; fi
+            elif [ -n "$current" ]; then version="$current"
             elif [ -z "$latest" ]; then version="v0.1"
-            elif [ "$MAJOR" = "true" ]; then version="v$(( m + 1 )).0"
             else version="v$m.$(( n + 1 ))"; fi
             echo "latest=${latest:-none} current=${current:-none}"
           fi
