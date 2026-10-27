@@ -1,6 +1,6 @@
 # Development
 
-This app is developed and delivered per the [sst-delivery standard](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/sst-delivery/STANDARD.md): develop on `dev`, every push to `main` goes through `int` to `prod`. The standard has the general rules (stages, tests, the CD pipeline, versions, when a push needs a yes first, test users); this file holds what is specific to PortfolioTracker. Commands and the login are also in the root [README.md](../README.md) ("Running", "Login", "Tests").
+This app is developed and delivered per the [continuous-delivery standard](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/continuous-delivery/STANDARD.md): develop on `dev`, every push to `main` goes through `int` to `prod`. The standard has the general rules (stages, tests, the CD pipeline, versions, when a push needs a yes first, test users); this file holds what is specific to PortfolioTracker. Commands and the login are also in the root [README.md](../README.md) ("Running", "Login", "Tests").
 
 ## Stages
 
@@ -57,7 +57,7 @@ Put such probes and screenshots in `temp/<subfolder>/`, not in `packages/web/e2e
 
 `.github/workflows/cd.yml`, per the standard: deploy `int`, integration and E2E tests against it, tag the next release, deploy `prod` from the tag. Releases are `v0.N` and show in the page footer. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
 
-Ask before pushing changes that touch data, resources holding data, access or cost ([the standard, section 5](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/sst-delivery/STANDARD.md#5-when-a-push-needs-a-yes-first)). For this app that includes:
+Ask before pushing changes that touch data, resources holding data, access or cost ([the standard, section 5](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/continuous-delivery/STANDARD.md#5-when-a-push-needs-a-yes-first)). For this app that includes:
 
 - rewriting or removing transactions, holdings or market history on prod, re-imports, and backfills that overwrite;
 - changes to the shared Cognito pool's clients or groups.
