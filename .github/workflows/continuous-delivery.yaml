@@ -1,5 +1,7 @@
 # Continuous delivery: every push to main deploys `int`, runs the tests against it and tags the commit
-# with the next minor version (v0.1, v0.2, …); then `prod` deploys from that tag.
+# with the next release (v0.1, v0.2, …); then `prod` deploys from that tag.
+# Manual run with `tag` (rollback / redeploy): that existing tag to int, then prod, without tests.
+# Manual run with `major`: the full pipeline, released as v(M+1).0.
 
 name: Continuous Delivery
 
@@ -7,6 +9,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to deploy to int and prod, without tests (e.g. v0.150). Empty = full pipeline from main.
+        type: string
+        default: ""
+      major:
+        description: Release main as the next leading number, v(M+1).0 (full pipeline; ignored with tag).
+        type: boolean
+        default: false
 
 concurrency:
   group: cd
@@ -22,6 +33,7 @@ jobs:
   # One job: deploy int, run the tests against it, tag the commit. The tag marks a release that passed int.
   int:
     name: Deploy int + test + tag
+    if: inputs.tag == ''
     runs-on: ubuntu-latest
     permissions:
       contents: write # push the version tag
@@ -32,14 +44,20 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the tags, for the next version
-      # A commit that already has a tag (a re-run) keeps it; otherwise the next minor version.
+      # Releases only go forward: the latest vM.N tag + 1 (v0.150 -> v0.151); `major` gives v(M+1).0.
+      # A commit that already has a tag (a re-run) keeps it.
       - id: version
+        env:
+          MAJOR: ${{ inputs.major || false }}
         run: |
-          current=$(git tag --points-at HEAD --list 'v0.*' --sort=-v:refname | head -n1)
-          latest=$(git tag --list 'v0.*' --sort=-v:refname | head -n1)
+          tags() { git tag "$@" --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+$' | head -n1 || true; }
+          current=$(tags --points-at HEAD)
+          latest=$(tags)
+          m=${latest%%.*}; m=${m#v}; n=${latest#*.}
           if [ -n "$current" ]; then version="$current"
           elif [ -z "$latest" ]; then version="v0.1"
-          else version="v0.$(( ${latest#v0.} + 1 ))"; fi
+          elif [ "$MAJOR" = "true" ]; then version="v$(( m + 1 )).0"
+          else version="v$m.$(( n + 1 ))"; fi
           echo "latest=${latest:-none} current=${current:-none} version=$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
@@ -82,20 +100,51 @@ jobs:
           git tag -a "$APP_VERSION" -m "Release $APP_VERSION"
           git push origin "$APP_VERSION"
 
-  # prod deploys from the tag once int passed.
-  prod:
-    name: Deploy prod
-    needs: int
+  # Manual run with a tag: the same tag to int first (shows the old infrastructure still applies), then prod.
+  rollback-int:
+    name: Deploy ${{ inputs.tag }} to int
+    if: inputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write # OIDC → AWS
     env:
-      APP_VERSION: ${{ needs.int.outputs.version }}
+      APP_VERSION: ${{ inputs.tag }}
+    steps:
+      - name: Check the tag
+        run: '[[ "$APP_VERSION" =~ ^v[0-9]+\.[0-9]+$ ]] || { echo "Not a release tag: $APP_VERSION"; exit 1; }'
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHub-PortfolioTracker
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: gh-portfoliotracker-${{ github.run_id }}
+          mask-aws-account-id: true
+      - name: Deploy int
+        run: npx sst deploy --stage int
+
+  # prod deploys from the tag once int passed (push), or once the tag deployed to int (manual run with a tag).
+  prod:
+    name: Deploy prod
+    needs: [int, rollback-int]
+    if: always() && (needs.int.result == 'success' || needs.rollback-int.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC → AWS
+    env:
+      APP_VERSION: ${{ inputs.tag != '' && inputs.tag || needs.int.outputs.version }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.int.outputs.version }}
+          ref: refs/tags/${{ env.APP_VERSION }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}

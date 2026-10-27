@@ -55,7 +55,7 @@ Put such probes and screenshots in `temp/<subfolder>/`, not in `packages/web/e2e
 
 ## Delivery
 
-`.github/workflows/continuous-delivery.yaml`, per the standard: deploy `int`, integration and E2E tests against it, tag the next release, deploy `prod` from the tag. Releases are `v0.N` and show in the page footer. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
+`.github/workflows/continuous-delivery.yaml`, per the standard: deploy `int`, integration and E2E tests against it, tag the next release, deploy `prod` from the tag. Releases are `v0.N` and show in the page footer. Rollback or redeploy: `gh workflow run continuous-delivery.yaml -f tag=v0.150` (deploys that tag to `int`, then `prod`, without tests; data isn't rolled back). A new leading number, only when asked: `-f major=true`. Watch runs at https://github.com/jakubprzybytek/PortfolioTracker/actions.
 
 Ask before pushing changes that touch data, resources holding data, access or cost ([the standard, section 5](https://github.com/jakubprzybytek/agent-playbook/blob/main/skills/continuous-delivery/STANDARD.md#5-when-a-push-needs-a-yes-first)). For this app that includes:
 
@@ -64,5 +64,5 @@ Ask before pushing changes that touch data, resources holding data, access or co
 
 ## Deviations
 
-- `continuous-delivery.yaml` predates the template: no manual rollback or `major` input yet (redeploy an old tag by re-running its prod job), and no `paths-ignore` for docs-only pushes.
+- `continuous-delivery.yaml` has no `paths-ignore` for docs-only pushes: a doc change is released like any other.
 - This file is `Docs/Development.md` (the repo's `Docs/` folder) instead of `docs/development.md`.
