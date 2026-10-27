@@ -1407,7 +1407,13 @@ test.describe("sticky filters and header (Holdings, Prices)", () => {
         // Scrolled sideways: the header follows the table.
         await page.getByTestId(id).evaluate((t) => (t.parentElement!.scrollLeft = 150));
         const xs = (sel: string) => page.locator(sel).evaluateAll((ths) => ths.map((th) => Math.round(th.getBoundingClientRect().x)));
-        await expect.poll(() => xs(`[data-testid=${id}-head] th`)).toEqual(await xs(`[data-testid=${id}] thead th`));
+        // Both read on every try: the table's columns can still change width while data arrives.
+        await expect
+          .poll(async () => {
+            const [floating, table] = [await xs(`[data-testid=${id}-head] th`), await xs(`[data-testid=${id}] thead th`)];
+            return floating.join() === table.join() ? "aligned" : `header ${floating} vs table ${table}`;
+          })
+          .toBe("aligned");
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       });
 });
