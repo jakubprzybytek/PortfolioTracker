@@ -30,6 +30,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Dynamo"
     }
+    "IbkrFlexToken": {
+      "type": "sst.sst.Secret"
+      "value": string
+    }
     "Import": {
       "name": string
       "type": "sst.aws.Function"
