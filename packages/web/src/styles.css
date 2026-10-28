@@ -301,7 +301,9 @@ tr.muted td { color: var(--muted); }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; font-size: 0.92rem; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; }
-.view-title button.back { font: inherit; font-size: 1.3rem; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px 0 0; }
+/* Back arrow, code and name in a row: the arrow centred on the title, the code and name on one baseline. */
+.view-title.instrument-title { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; }
+.view-title button.back { align-self: center; display: inline-flex; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 4px; margin-left: -4px; border-radius: 6px; }
 .view-title button.back:hover { color: var(--fg); }
 .view-title .instrument-name { font-size: 1rem; font-weight: 400; }
 /* Hold or sell */

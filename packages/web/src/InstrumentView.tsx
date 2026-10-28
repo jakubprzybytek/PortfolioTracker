@@ -54,11 +54,11 @@ export function InstrumentView({ params }: { params: Record<string, string> }) {
   return (
     <>
       <header className="view-header">
-        <h2 className="view-title" data-testid="instrument-title">
+        <h2 className="view-title instrument-title" data-testid="instrument-title">
           <button type="button" className="link back" onClick={back} title="Back" aria-label="Back" data-testid="instrument-back">
-            ←
-          </button>{" "}
-          {inst?.code ?? isin}{" "}
+            <Icon name="back" size={22} />
+          </button>
+          <span>{inst?.code ?? isin}</span>
           {inst && inst.name !== inst.code && <span className="muted instrument-name">{inst.name}</span>}
         </h2>
       </header>
