@@ -546,6 +546,55 @@ test.describe("holdings view", () => {
     await expect(rows.first()).toHaveAttribute("data-isin", "ZZWALUTYEUR0");
     await expect(page.getByTestId("cash-row")).toHaveCount(9); // 6 accounts in PLN, eur in PLN, EUR and USD
   });
+
+  test("filters by asset class; the asset types follow the class", async ({ page }) => {
+    await page.goto("/#/holdings");
+    const rows = page.getByTestId("holding-row");
+    await expect(rows).toHaveCount(10);
+    // in the order of the bar: account, class, type, instrument
+    expect(await page.locator(".filters select, .filters input").evaluateAll((ss) => ss.map((s) => s.getAttribute("data-testid")))).toEqual(["filter-account", "filter-class", "filter-type", "filter-text"]);
+    await page.getByTestId("filter-type").selectOption({ label: "ETF" });
+    await expect(rows).toHaveCount(1);
+    // bonds: no cash, only bond types; the ETF type is dropped
+    await page.getByTestId("filter-class").selectOption({ label: "Bonds" });
+    await expect(page).toHaveURL(/class=BONDS/);
+    await expect(page).not.toHaveURL(/type=/);
+    await expect(rows).toHaveCount(7);
+    await expect(page.getByTestId("cash-row")).toHaveCount(0);
+    await expect(page.getByTestId("filters-summary")).toHaveText("7 of 10 holdings");
+    expect(await page.getByTestId("filter-type").locator("option").allTextContents()).toEqual(["All", "Corporate bond", "Foreign bond", "Listed bond", "Retail bond"]);
+    await page.getByTestId("filter-class").selectOption({ label: "Shares" });
+    await expect(rows).toHaveCount(1);
+    // cash: the cash rows and the foreign cash
+    await page.getByTestId("filter-class").selectOption({ label: "Cash" });
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toHaveAttribute("data-isin", "ZZWALUTYEUR0");
+    await expect(page.getByTestId("cash-row")).toHaveCount(9);
+    await page.getByTestId("filters-reset").click();
+    await expect(page.getByTestId("filter-class")).toHaveValue("");
+    await expect(rows).toHaveCount(10);
+  });
+
+  test("on a phone: the search and Filters on one line; account and class, then type and Show closed", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/#/holdings");
+    await expect(page.getByTestId("holding-row")).toHaveCount(10);
+    const box = async (id: string) => (await page.getByTestId(id).boundingBox())!;
+    const [search, toggle] = [await box("filter-text"), await box("filters-toggle")];
+    expect(Math.abs(search.y + search.height / 2 - (toggle.y + toggle.height / 2))).toBeLessThan(3);
+    await page.getByTestId("filters-toggle").click();
+    const [acc, cls, type, closed] = [await box("filter-account"), await box("filter-class"), await box("filter-type"), await box("show-closed")];
+    expect(Math.abs(acc.y - cls.y)).toBeLessThan(2);
+    expect(type.y).toBeGreaterThan(acc.y + acc.height);
+    expect(Math.abs(type.y + type.height / 2 - (closed.y + closed.height / 2))).toBeLessThan(3);
+    expect(closed.x + closed.width).toBeLessThanOrEqual(390);
+    await page.getByTestId("filter-class").selectOption({ label: "Bonds" });
+    await page.getByTestId("show-closed").click();
+    await page.getByTestId("filters-toggle").click();
+    await expect(page.getByTestId("filters-toggle")).toHaveText("Filters · 2");
+    await expect(page.getByTestId("filters-reset")).toHaveText("Clear");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  });
 });
 
 test.describe("free-text filter", () => {

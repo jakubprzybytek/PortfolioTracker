@@ -533,7 +533,7 @@ const IncompleteFlag = ({ what }: { what: string[] }) => (
  * By instrument: one row per instrument (by code) with the account it's in; one held in several accounts shows
  * "▸ n accounts" and expands into one row per account. Cash is one row the same way.
  * An incomplete account (not all of its assets tracked yet) shows its cash greyed and leaves it out of the sums.
- * Filters: account, asset type ("Cash" shows only the cash rows), free text (instruments whose name or code contains it; no cash rows then). "Show closed" (shared with Prices while the app is open) adds the positions held no
+ * Filters: account, asset class (as in the allocation; "Cash": the cash rows), asset type ("Cash" shows only the cash rows), free text (instruments whose name or code contains it; no cash rows then). "Show closed" (shared with Prices while the app is open) adds the positions held no
  * more, greyed, after the open ones (by account: in their account; by instrument: at the end), with their realised gain;
  * they're not in the sums. A closed row's chart ranges count back from the day it closed (ALL: the time it was held).
  * The filters and the table's header stay at the top while the list scrolls (as in Transactions).
@@ -588,7 +588,7 @@ export function HoldingsView({
     },
     [snap.data],
   );
-  const { account = "", type = "", q: text = "" } = params;
+  const { account = "", class: cls = "", type = "", q: text = "" } = params;
   const closedAll = useMemo(
     () => (showClosed ? (snap.data?.closed ?? []) : []),
     [showClosed, snap.data],
@@ -599,11 +599,12 @@ export function HoldingsView({
         .filter(
           (c) =>
             (!account || c.account === account) &&
+            (!cls || assetClassOf(c) === cls) &&
             (!type || c.type === type) &&
             matchesText(text, c),
         )
         .sort(byClosedDate),
-    [closedAll, account, type, text],
+    [closedAll, account, cls, type, text],
   );
   const byInstrument = params["group"] === "instrument";
   const byClass = params["group"] === "class";
@@ -689,19 +690,31 @@ export function HoldingsView({
     const hasCash =
       Object.values(accounts).some((a) => a.cash !== 0) ||
       all.some(isForeignCash);
-    const types: Option[] = uniqueOptions(
-      [...all.filter((h) => !isForeignCash(h)), ...closedAll],
-      (h) => ({ value: h.type, label: typeLabel(h.type) }),
-    );
-    return {
-      account: [...names].sort().map((n) => ({ value: n, label: n })),
-      type: hasCash
+    const positions = [...all.filter((h) => !isForeignCash(h)), ...closedAll];
+    const present = new Set(positions.map((h) => assetClassOf(h)));
+    if (hasCash) present.add("CASH");
+    // Asset types within a class (all of them without one); "Cash" is the cash class's.
+    const typesFor = (c: string): Option[] => {
+      const types = uniqueOptions(
+        positions.filter((h) => !c || assetClassOf(h) === c),
+        (h) => ({ value: h.type, label: typeLabel(h.type) }),
+      );
+      return hasCash && (!c || c === "CASH")
         ? [...types, { value: "CASH", label: typeLabel("CASH") }].sort((a, b) =>
             a.label.localeCompare(b.label),
           )
-        : types,
+        : types;
+    };
+    return {
+      account: [...names].sort().map((n) => ({ value: n, label: n })),
+      cls: ASSET_CLASSES.filter((c) => present.has(c)).map((c) => ({
+        value: c,
+        label: CLASS_LABELS[c],
+      })),
+      typesFor,
     };
   }, [all, accounts, closedAll]);
+  const typeOptions = useMemo(() => options.typesFor(cls), [options, cls]);
 
   const groups = useMemo((): Group[] => {
     return options.account
@@ -715,11 +728,13 @@ export function HoldingsView({
           .filter(
             (h) =>
               accountOf(h) === name &&
+              (!cls || assetClassOf(h) === cls) &&
               (!type || shownType(h) === type) &&
               (!text.trim() || (!isForeignCash(h) && matchesText(text, h))),
           )
           .sort(byCode);
         const showCash =
+          (!cls || cls === "CASH") &&
           (!type || type === "CASH") &&
           !text.trim() &&
           info !== undefined &&
@@ -742,7 +757,7 @@ export function HoldingsView({
       .filter(
         (g) => g.holdings.length > 0 || g.cash !== null || g.closed.length > 0,
       );
-  }, [options.account, accounts, all, account, type, text, closedShown]);
+  }, [options.account, accounts, all, account, cls, type, text, closedShown]);
 
   // By instrument: the same filtered holdings, regrouped; cash becomes one group with a row per account.
   const instrumentGroups = useMemo((): InstrumentGroup[] => {
@@ -1035,7 +1050,7 @@ export function HoldingsView({
       <div className="sticky-toolbar" ref={toolbar} data-testid="holdings-toolbar">
       <FilterBar
         compact
-        activeCount={[account, type].filter(Boolean).length + (showClosed ? 1 : 0)}
+        activeCount={[account, cls, type].filter(Boolean).length + (showClosed ? 1 : 0)}
         search={
           <FilterText
             label="Instrument"
@@ -1044,9 +1059,18 @@ export function HoldingsView({
             testId="filter-text"
           />
         }
-        active={!!(account || type || text)}
+        active={!!(account || cls || type || text)}
         onReset={() =>
           setParams({ group: params["group"], chart: chartIsin, chartAccount })
+        }
+        after={
+          <FilterToggle
+            label="Show closed"
+            checked={showClosed}
+            onChange={setShowClosed}
+            testId="show-closed"
+            title="Also the positions sold, redeemed or written off, with their realised gain"
+          />
         }
         summary={
           snap.loading
@@ -1063,18 +1087,28 @@ export function HoldingsView({
           width="13rem"
         />
         <FilterSelect
+          label="Asset class"
+          value={cls}
+          options={options.cls}
+          // A type outside the new class would show nothing: it's dropped.
+          onChange={(c) =>
+            setParams({
+              ...params,
+              class: c || undefined,
+              type: options.typesFor(c).some((o) => o.value === type)
+                ? type || undefined
+                : undefined,
+            })
+          }
+          testId="filter-class"
+          width="8rem"
+        />
+        <FilterSelect
           label="Asset type"
           value={type}
-          options={options.type}
+          options={typeOptions}
           onChange={set("type")}
           testId="filter-type"
-        />
-        <FilterToggle
-          label="Show closed"
-          checked={showClosed}
-          onChange={setShowClosed}
-          testId="show-closed"
-          title="Also the positions sold, redeemed or written off, with their realised gain"
         />
       </FilterBar>
       </div>

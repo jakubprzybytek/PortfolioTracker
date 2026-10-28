@@ -53,8 +53,10 @@ export const matchesAny = (text: string, ...fields: (string | undefined)[]) => !
  * `search` (a FilterText) goes last on a computer. With `compact`, a phone shows only the search and a "Filters" button
  * (with how many dropdowns are set, `activeCount`) that folds the dropdowns out: the bar stays two short lines, so it
  * can stay on screen while the list scrolls.
+ *
+ * `after` (e.g. a FilterToggle) goes after the search; on a compact phone it's in the folded panel, after the dropdowns.
  */
-export function FilterBar({ children, active, onReset, summary, search, compact = false, activeCount = 0 }: { children: ReactNode; active: boolean; onReset: () => void; summary: string; search?: ReactNode; compact?: boolean; activeCount?: number }) {
+export function FilterBar({ children, active, onReset, summary, search, after, compact = false, activeCount = 0 }: { children: ReactNode; active: boolean; onReset: () => void; summary: string; search?: ReactNode; after?: ReactNode; compact?: boolean; activeCount?: number }) {
   const narrow = useNarrow();
   const [open, setOpen] = useState(false);
   if (narrow && compact)
@@ -69,6 +71,7 @@ export function FilterBar({ children, active, onReset, summary, search, compact 
         {open && (
           <div className="filters-panel" data-testid="filters-panel">
             {children}
+            {after}
           </div>
         )}
         <div className="filters-foot">
@@ -88,6 +91,7 @@ export function FilterBar({ children, active, onReset, summary, search, compact 
       <div className="filters" data-testid="filters">
         {children}
         {search}
+        {after}
         <div className="filters-foot">
           <span className="muted filters-summary" data-testid="filters-summary">
             {summary}
@@ -104,6 +108,7 @@ export function FilterBar({ children, active, onReset, summary, search, compact 
     <div className="filters" data-testid="filters">
       {children}
       {search}
+      {after}
       <button type="button" className="reset" onClick={onReset} disabled={!active} title="Clear filters" aria-label="Clear filters" data-testid="filters-reset">
         <Icon name="clear-filters" size={16} />
       </button>
