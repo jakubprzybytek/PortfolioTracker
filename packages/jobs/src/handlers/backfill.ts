@@ -8,6 +8,7 @@ import { BIZNESRADAR_SOURCE_ID, backfillBiznesradarHistory } from "../lib/cataly
 import { syncCouponTerms } from "../lib/couponJobs.ts";
 import { YAHOO_SOURCE_ID, backfillYahooHistory } from "../lib/etfJobs.ts";
 import { GPW_SOURCE_ID, backfillGpwHistory } from "../lib/gpwJobs.ts";
+import { IBKR_SOURCE_ID, backfillIbkrHistory } from "../lib/ibkrJobs.ts";
 import { ONVISTA_SOURCE_ID, backfillOnvistaHistory, fillEtfGapsFromOnvista } from "../lib/onvistaJobs.ts";
 
 export interface BackfillEvent {
@@ -60,6 +61,19 @@ export async function backfillInstrument(isin: string): Promise<{ status: string
       return { status: "done", ...result };
     } catch (err) {
       await repo.putBackfillStatus({ isin, status: "failed", source: BIZNESRADAR_SOURCE_ID, note: String((err as Error).message) });
+      throw err;
+    }
+  }
+
+  // IBKR's mark prices (US T-bills): from the first trade, the trade day at its price (IBKR reports from settlement).
+  if (inst.sourceIds[IBKR_SOURCE_ID]) {
+    await repo.putBackfillStatus({ isin, status: "running", source: IBKR_SOURCE_ID });
+    try {
+      const result = await backfillIbkrHistory(inst, today());
+      await repo.putBackfillStatus({ isin, status: "done", source: IBKR_SOURCE_ID, ...result });
+      return { status: "done", ...result };
+    } catch (err) {
+      await repo.putBackfillStatus({ isin, status: "failed", source: IBKR_SOURCE_ID, note: String((err as Error).message) });
       throw err;
     }
   }

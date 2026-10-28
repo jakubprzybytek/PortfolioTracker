@@ -15,6 +15,7 @@ const SOURCE_LABELS: Record<string, string> = {
   CALC: "calculated",
   MANUAL: "entered by hand",
   XSTU: "Börse Stuttgart (onvista)",
+  IBKR: "IBKR mark prices (Flex)",
 };
 
 /**

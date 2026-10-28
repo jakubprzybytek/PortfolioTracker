@@ -8,7 +8,7 @@
 | Polish treasury bonds on GPW / Catalyst | DS, PS, WZ, IZ series | GPW archive: daily XLS with all treasury bonds | BiznesRadar quote page (last trade, 15 min delayed) | GPW archive: full history per bond (1 request each) |
 | Polish corporate bonds on Catalyst | fixed and floating coupons | BiznesRadar: history page + today's quote | BiznesRadar quote page (last trade, 15 min delayed) | BiznesRadar: full history per bond (~16 pages) |
 | Polish retail treasury bonds (not traded) | EDO, COI, ROD, ROR … | Calculated from terms + CPI | – | Calculated; checked against obligacjeskarbowe.pl interest tables |
-| Foreign government bonds at IBKR | Bunds, OATs, US T-bills (zero-coupon) | onvista, Börse Stuttgart close (EUR bonds); calculated where there's no quote (US T-bills, matured bonds) | onvista: Stuttgart quote, near real time | onvista daily history (Bund from 2020); calculated paths computed once on import |
+| Foreign government bonds at IBKR | Bunds, OATs, US T-bills (zero-coupon) | onvista, Börse Stuttgart close (EUR bonds); IBKR's mark price via Flex (US T-bills); calculated for matured bonds | onvista: Stuttgart quote, near real time | onvista daily history (Bund from 2020); calculated paths computed once on import |
 | Manually valued assets | e.g. real-estate projects | Entered by you: its settings (the cog in its chart panel: Values) | – | `imports/prices/` |
 | Cash | savings accounts, broker cash | From transactions | – | IBKR activity statements (CSV); the sheet import for the other accounts |
 
@@ -144,7 +144,7 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - **Source:** the onvista.de API (unofficial, no key), the same data as its website. `GET api.onvista.de/api/v1/bonds/ISIN:<isin>/snapshot` gives the bond's id and a quote per German exchange (each with an `idNotation`); `GET /api/v1/instruments/BOND/<id>/eod_history?idNotation=…&range=MAX&startDate=…` the daily open/high/low/close/volume, up to the last finished session. Client: `jobs/lib/onvista.ts`.
 - **Exchange:** Börse Stuttgart (`sourceIds.onvista = "STU"`, venue `XSTU`): its market maker quotes the Bunds and OATs every trading day, even without trades. Checked on the three IBKR statement dates (2025-04-17, 2026-04-17, 2026-10-12): within 0.015 of IBKR's mark price for both bonds. Paris (the OAT's home market) has gaps and odd closes on onvista; Frankfurt has fewer quotes.
 - **Daily:** the `eod-bonds` job (ingestion.md); the backfill loads the whole history when the source is set. Clean price, % of nominal; the bonds held are zero-coupon, so there's no accrued interest.
-- **Not covered:** US T-bills (not listed in Germany) and matured bonds: they keep calculated prices (below).
+- **Not covered:** US T-bills (not listed in Germany): IBKR's mark prices (Flex, below); matured bonds keep calculated prices (below).
 - Compared with the calculated prices, the quotes differed by up to about 1 % (the constant-yield line ignores interest-rate moves).
 
 ### Foreign bonds at IBKR – calculated prices (used for bills and matured bonds, 2026-10-13)
@@ -152,11 +152,14 @@ Accrued interest is computed by the valuation job from each bond's terms. Extern
 - The trade prices in `pricePath` are IBKR's (statement `T. Price`); a new trade means adding its price to the instrument (re-import it) so the path is recomputed.
 - IBKR is kept in its currencies (2026-10-13): trades, fees and redemptions in the currency paid (EUR, USD), conversions as `EXCHANGE`, cash per currency, the account's own currency EUR. Its transactions come from the IBKR activity statements (above). Before that they were converted from the sheet, which booked everything in PLN (currency positions `Waluty_EUR` bought and sold with PLN); `core/transactions/nativeLedger.ts` pairs those back (sheet conversion `--native IBKR=EUR`) and stays for converting the sheet.
 
-### IBKR Flex Web Service – IBKR trades, positions, cash (later)
-- Would replace downloading statements by hand: the same activity data, fetched by a job.
-- Token + query ID; plain HTTPS request; works from Lambda (no gateway).
-- Data: positions with IBKR's mark prices and accrued interest, trades, cash, dividends/coupons.
-- Not used: TWS API / Client Portal Web API (need an always-on gateway with 2FA re-login, which doesn't fit the serverless design).
+### IBKR Flex Web Service – IBKR's mark prices (used, 2026-10-28)
+- **What:** IBKR's own end-of-day mark price of every position held at IBKR, from an Activity Flex Query run by the `eod-ibkr` job (`jobs/lib/ibkrFlex.ts`, parsing in `core/prices/ibkrFlex.ts`). Prices only; transactions still come from the app.
+- **Query** (Client Portal → Performance & Reports → Flex Queries, id 1688199, XML): Open Positions (Summary; ISIN, Conid, Symbol, Description, Asset Class, Currency, Report Date, Quantity, Mark Price, Position Value, Accrued Interest, Expiry, Level of Detail) and Prior Period Positions (ISIN, Conid, Symbol, Description, Asset Class, Currency, Expiry, Date, Price). The query's period is "Last Business Day"; the job asks for a range (`fd`/`td`, at most 365 days).
+- **Token:** Flex Web Service token in the SST secret `IbkrFlexToken` on `dev` and `prod` (not `int`: nothing at IBKR is tested there). It expires on the date set when it was made: a new one is set with `npx sst secret set IbkrFlexToken --stage prod` (and dev); the job fails (alert e-mail) until then.
+- **Calls:** `SendRequest?t=<token>&q=<query>&v=3[&fd=yyyymmdd&td=yyyymmdd]` answers a reference code and the URL to collect it; `GetStatement?t=<token>&q=<reference>&v=3` returns the statement after a few seconds (error 1019 until then). A `User-Agent` header is required. Plain HTTPS from Lambda, no gateway.
+- **Prices:** % of nominal (bonds and bills), in the position's currency; one per US business day the position was held (no price on US holidays, e.g. 2026-07-03, 2026-09-07; also none on 2026-05-01 and 2026-07-16). A position appears from its settlement day: the trade day before it gets the trade price (the instrument's `pricePath`).
+- **Used for:** instruments with venue `IBKR` and their conid in `sourceIds.ibkr` (data/README.md): `PX#IBKR#<date>`, source `ibkr` (the trade day: `trade`). The job also checks the EUR bonds priced from onvista: an onvista close more than 0.05 from IBKR's mark on the same day, and a position at IBKR that isn't an instrument in the app, go into the job's note (Status page).
+- **Not used:** TWS API / Client Portal Web API (need an always-on gateway with 2FA re-login, which doesn't fit the serverless design). IBKR trades from Flex: possible with a query with trades and cash, not built (road map 11).
 
 ### NBP API – exchange rates
 - `api.nbp.pl/api/exchangerates/rates/a/{code}/{from}/{to}/` – table A mid rates, free, no key, max 93 days per request; a range without a table answers 404. Table A as a series starts on 2002-01-02 (EUR 3.5496). Client: `jobs/lib/nbp.ts`.

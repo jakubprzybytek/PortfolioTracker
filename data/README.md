@@ -25,6 +25,8 @@ Corporate bonds (Catalyst): `"type": "BOND_CORPORATE"`, `"venue": "CATALYST"`, `
 
 Foreign government bonds at IBKR, quoted (EUR Bunds, OATs …): `"type": "BOND_IBKR"`, `"venue": "XSTU"`, `"sourceIds": { "onvista": "STU" }`, `"nominal": 1000`, `currency` of the bond. Importing one (or switching an existing one to this source) loads its whole Börse Stuttgart history from onvista. Not quoted in Germany (US T-bills): `"venue": "CALC"`, no source, a `pricePath` (below).
 
+Foreign government bonds at IBKR priced from IBKR's own mark prices (US T-bills, which no German exchange quotes): `"type": "BOND_IBKR"`, `"venue": "IBKR"`, `"sourceIds": { "ibkr": "<conid>" }` (IBKR's id, in the Flex statement or the contract details), `"nominal": 1000`, `currency` of the bill, and a `pricePath` with your trade price (it prices the trade day, which IBKR reports only from settlement). Importing one (or switching an existing one to this source) loads its prices from the first trade, at most a year back.
+
 ETF instruments: `"type": "ETF"`, `currency` of the listing, `venue` (`XAMS`, `XETR` …), `"sourceIds": { "yahoo": "VWRL.AS" }` and any `splits` (`[{ "date": "2025-12-15", "ratio": 100 }]`). Importing one loads its full price history from Yahoo and the NBP rates of its currency; recording a new split later reloads the history.
 
 Any instrument may have an `assetClass` (`SHARES`, `BONDS`, `CASH`, `OTHER`) for the Dashboard's allocation, when the rule (by type; an ETF with "bond" in its name = bonds) gets it wrong. Usually set in the app (the instrument's settings: the cog in its chart panel); the monthly export keeps it.

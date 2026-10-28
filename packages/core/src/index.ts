@@ -38,6 +38,7 @@ export * from "./valuation/xirr.ts";
 export * from "./valuation/history.ts";
 export * from "./valuation/returns.ts";
 export * from "./prices/pricePath.ts";
+export * from "./prices/ibkrFlex.ts";
 export * from "./backup/export.ts";
 export * from "./notes/schema.ts";
 export * from "./holdsell/holdSell.ts";

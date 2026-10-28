@@ -64,6 +64,12 @@ export default $config({
     // arm64 (Graviton): all the code is plain JS, and it's ~20 % cheaper than x86_64.
     const defaults = { link: [...link, market], timeout: "5 minutes" as const, memory: "512 MB" as const, architecture: "arm64" as const };
 
+    // IBKR Flex Web Service (mark prices of what's held at IBKR): the token is the `IbkrFlexToken` secret, on dev and
+    // prod only (nothing at IBKR is tested on int); the query (Open Positions + Prior Period Positions, XML) isn't
+    // secret without it. Docs/data-sources.md, "IBKR Flex Web Service".
+    const ibkrFlex = ["dev", "prod"].includes($app.stage) ? new sst.Secret("IbkrFlexToken") : undefined;
+    const ibkrEnv = { IBKR_FLEX_QUERY_ID: "1688199" };
+
     // --- jobs ----------------------------------------------------------------------------------
     // Revaluations requested by imports, backfills, FX and the monthly job go through a FIFO queue with one message group:
     // Lambda then runs them one at a time, in order. Overlapping runs could end with the older data written last
@@ -115,7 +121,8 @@ export default $config({
       ...defaults,
       handler: "packages/jobs/src/handlers/backfill.handler",
       timeout: "15 minutes",
-      link: [...link, market, valuationQueue],
+      link: [...link, market, valuationQueue, ...(ibkrFlex ? [ibkrFlex] : [])],
+      environment: ibkrEnv,
     });
 
     // NBP exchange rates; also started by an import that brings a foreign-currency instrument.
@@ -208,6 +215,15 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
+    // IBKR's mark prices (T-bills) and a check of the onvista closes against them: IBKR's statement for the last business
+    // day, before the morning valuation. Not on int (no token).
+    if (ibkrFlex)
+      new sst.aws.CronV2("EodIbkr", {
+        function: { ...defaults, handler: "packages/jobs/src/handlers/eodIbkr.handler", link: [...link, market, ibkrFlex], environment: ibkrEnv },
+        schedule: "cron(5 7 ? * TUE-SAT *)",
+        timezone: WARSAW,
+        retries: 2,
+      });
     // Benchmarks of the Performance view (WIG from GPW's archive, MSCI World from Yahoo): after GPW's evening file,
     // and a morning pass. Nothing is valued from them, so no valuation follows.
     new sst.aws.CronV2("Benchmarks", {

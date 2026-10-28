@@ -43,7 +43,8 @@ export interface QualityOptions {
   /**
    * Per venue, the shortest run of missing trading days that counts (gap or stale), when not 1 (gap) / `staleAfter`.
    * Catalyst: 10, since a corporate bond that didn't trade has no price that day by design (BiznesRadar's history
-   * lists traded sessions only, and the daily snapshot isn't written without a trade).
+   * lists traded sessions only, and the daily snapshot isn't written without a trade). IBKR: 2, since its marks follow
+   * the US business days (no price on a US holiday, e.g. 2026-07-03, 2026-09-07), not the EU calendar used here.
    */
   minRun: Record<string, number>;
   /** Day-to-day moves above this are jumps: ETFs, bonds. */
@@ -53,7 +54,7 @@ export interface QualityOptions {
   bondRange: [number, number];
 }
 
-export const QUALITY_DEFAULTS: QualityOptions = { staleAfter: 3, minRun: { CATALYST: 10 }, jumpEtf: 0.2, jumpBond: 0.05, bondRange: [50, 150] };
+export const QUALITY_DEFAULTS: QualityOptions = { staleAfter: 3, minRun: { CATALYST: 10, IBKR: 2 }, jumpEtf: 0.2, jumpBond: 0.05, bondRange: [50, 150] };
 
 /**
  * One instrument's issues between `from` and `lastDay` (the last day a price should be there by now): runs of
