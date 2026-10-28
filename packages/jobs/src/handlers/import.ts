@@ -12,6 +12,7 @@ import type { S3Event } from "aws-lambda";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { Resource } from "sst";
 import {
+  canonicalJson,
   defaultAssetClass,
   parseAccountsFile,
   parseCouponPeriods,
@@ -73,7 +74,8 @@ export async function importRetailRates(content: Uint8Array, source: string) {
   const refreshedIsins: string[] = [];
   for (const inst of await repo.listInstruments()) {
     const terms = inst.type === "BOND_RETAIL" ? series.get(inst.code) : undefined;
-    if (!terms || JSON.stringify(terms) === JSON.stringify(inst.retail)) continue;
+    // Compared whatever the key order: DynamoDB returns a stored map's keys in its own order, not as written.
+    if (!terms || canonicalJson(terms) === canonicalJson(inst.retail)) continue;
     const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, updatedAt: _u, ...rest } = inst;
     await repo.putInstrument({ ...rest, retail: terms });
     refreshedIsins.push(inst.isin);
@@ -124,11 +126,11 @@ export async function importInstruments(json: string) {
     // without a price source (retail bonds: values are calculated) have no history to load.
     const hasSource = Object.keys(i.sourceIds).length > 0;
     // A newly recorded split changes how the (split-adjusted) source history converts back: load it again.
-    const splitsChanged = JSON.stringify(before?.splits ?? []) !== JSON.stringify(item.splits ?? []);
+    const splitsChanged = canonicalJson(before?.splits ?? []) !== canonicalJson(item.splits ?? []);
     // Calculated prices: recompute whenever the known points change (a new trade).
-    const pathChanged = JSON.stringify(before?.pricePath ?? []) !== JSON.stringify(item.pricePath ?? []);
+    const pathChanged = canonicalJson(before?.pricePath ?? []) !== canonicalJson(item.pricePath ?? []);
     // A new source or venue (e.g. an IBKR bond going from calculated to quoted prices): load its history.
-    const sourceChanged = !!before && (before.venue !== item.venue || JSON.stringify(before.sourceIds) !== JSON.stringify(item.sourceIds));
+    const sourceChanged = !!before && (before.venue !== item.venue || canonicalJson(before.sourceIds) !== canonicalJson(item.sourceIds));
     if (item.pricePath?.length && pathChanged) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
     else if (hasSource && (splitsChanged || sourceChanged || !(await repo.getBackfillStatus(i.isin)))) await invokeAsync(Resource.Backfill.name, { isin: i.isin } satisfies BackfillEvent);
   }

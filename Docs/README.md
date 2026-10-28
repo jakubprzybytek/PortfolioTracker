@@ -165,7 +165,7 @@ Later phases:
 
 ## Outstanding work (2026-10-23)
 
-The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24. Dropped: 22. Open: 6, 10 (its money-weighted variant), 11, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested next: the non-functional review's "Week 1" list, and refilling the gaps the `quality` job found (AYE2).
+The app holds the whole portfolio (every account and asset type from the sheet) and new transactions are entered in it; IBKR matches its statements to the cent. Compared with the sheet on 2026-10-13 (before IBKR was rebuilt): quantities, cash, costs, net deposits, income and fees equal; values differ only where noted below (−0.08 % in total). Done: 1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24. Dropped: 22. Open: 10 (its money-weighted variant), 11, and the non-functional review's list (nfr-analysis.md: "Day 1" done on 2026-10-15, "Week 1" and "Later" open). Suggested next: the non-functional review's "Week 1" list, and refilling the gaps the `quality` job found (AYE2).
 
 ### Correctness and accuracy
 1. ~~Foreign bonds at IBKR are priced by calculation~~ Done (2026-10-14): the EUR bonds are priced from Börse Stuttgart's closes (onvista, `eod-bonds`), within 0.015 of IBKR's marks; the calculated prices had been up to 1 % off. US T-bills (none held now) stay calculated.
@@ -173,7 +173,7 @@ The app holds the whole portfolio (every account and asset type from the sheet) 
 3. ~~Corporate bonds are valued clean~~ Done (2026-10-14): coupon periods with a rate each (obligacje.pl, your coupons, or typed in); a period without a rate is flagged "no rate" and valued clean.
 4. ~~Holdings row charts after an edit or a delete~~ Done (2026-10-14): a revaluation removes the days of positions that are gone; the days left by earlier edits were cleaned up on `prod` (1,856, all from the IBKR rebuild).
 5. ~~Dashboard cards vs the chart~~ Done (2026-10-13): Total, Cash, Net deposits, Profit cards; the profit split into unrealised, realised, income, fees, currency and other; unrealised and realised per account.
-6. **The monthly job** refreshes one retail series on every run and revalues although nothing changed. Since 2026-10-15 such a revaluation only reads (unchanged days aren't written), and since 2026-10-18 it starts from that bond's first transaction, so what's left is a short wasted run.
+6. ~~The monthly job revalues retail bonds for nothing~~ Done (2026-10-28): it compared each retail bond's terms with the stored ones as JSON text, and DynamoDB returns a stored map's keys in its own order, so every retail bond (31 on prod) counted as changed on every run: its instrument rewritten and a revaluation queued. Now compared whatever the key order (`canonicalJson`), as are an instrument import's splits, price path and source ids (a false change there started a backfill).
 
 ### Missing compared with the sheet
 7. ~~Update the value of a hand-valued asset~~ Done (2026-10-14): "Edit values" in its chart panel (Prices, Holdings), values listed and deletable (ui.md).
