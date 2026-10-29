@@ -30,6 +30,13 @@ describe("trading days", () => {
 });
 
 describe("priceIssues", () => {
+  it("counts gaps from the first price on: days before it are before the instrument's history", () => {
+    const ibkr = { isin: "US0000000001", code: "T-BILL", venue: "IBKR", type: "BOND_IBKR" as const };
+    expect(priceIssues(ibkr, flat(days("2026-10-14", "2026-10-22")), "2025-10-23", "2026-10-22")).toEqual([]);
+    // A price before the window: a gap at its start still counts.
+    const early = flat(["2026-08-28", ...days("2026-09-03", "2026-10-22")]);
+    expect(priceIssues(etf, early, "2026-09-01", "2026-10-22").map((i) => [i.kind, i.date, i.to])).toEqual([["gap", "2026-09-01", "2026-09-02"]]);
+  });
   it("finds runs of trading days without a price; a short run at the end isn't an issue yet, a long one is stale", () => {
     const prices = flat(days("2026-09-01", "2026-10-22", ["2026-09-15", "2026-09-16", "2026-10-21", "2026-10-22"]));
     const issues = priceIssues(etf, prices, "2026-09-01", "2026-10-22");

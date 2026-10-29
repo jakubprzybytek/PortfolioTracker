@@ -60,6 +60,8 @@ export const QUALITY_DEFAULTS: QualityOptions = { staleAfter: 3, minRun: { CATAL
  * One instrument's issues between `from` and `lastDay` (the last day a price should be there by now): runs of
  * trading days without a price (a run reaching `lastDay` is "stale" when long enough, else not yet an issue: the
  * evening's file may come later), jumps between consecutive prices (ETFs after splits), and bond prices out of range.
+ * Gaps are counted from the first price on: days before it are before the instrument's history (an IBKR bond priced
+ * from its purchase), not missing. Pass a few days' prices before `from` so a gap at the start still counts.
  */
 export function priceIssues(
   inst: Pick<InstrumentItem, "isin" | "code" | "venue" | "type" | "splits">,
@@ -72,6 +74,8 @@ export function priceIssues(
   const base = { isin: inst.isin, code: inst.code };
   const sorted = [...prices].filter((p) => p.date >= from && p.date <= lastDay).sort((a, b) => a.date.localeCompare(b.date));
   const have = new Set(sorted.map((p) => p.date));
+  const firstPrice = prices.reduce<IsoDate | undefined>((m, p) => (!m || p.date < m ? p.date : m), undefined);
+  const gapsFrom = firstPrice && firstPrice > from ? firstPrice : from;
 
   // Gaps: runs of trading days without a price.
   const minRun = o.minRun[inst.venue];
@@ -89,7 +93,7 @@ export function priceIssues(
     } else issues.push({ ...base, kind: "gap", date: first, to: last, detail: run.length === 1 ? `no price on ${first}` : `no price ${first} – ${last} (${run.length} trading days)` });
     run = [];
   };
-  for (let d = from; d <= lastDay; d = addDays(d, 1)) {
+  for (let d = gapsFrom; d <= lastDay; d = addDays(d, 1)) {
     if (!isTradingDay(inst.venue, d)) continue;
     if (have.has(d)) flush(false);
     else run.push(d);

@@ -18,7 +18,7 @@ export async function handler(event: { date?: string } = {}) {
     const held = new Set((snapshot?.holdings ?? []).filter((h) => h.quantity > 0).map((h) => h.isin));
     const checked = instruments.filter((i) => held.has(i.isin) && isQuoted(i));
     const issues: QualityIssue[] = [];
-    for (const inst of checked) issues.push(...priceIssues(inst, await repo.queryPrices(inst.isin, inst.venue, from, day), from, lastDay));
+    for (const inst of checked) issues.push(...priceIssues(inst, await repo.queryPrices(inst.isin, inst.venue, addDays(from, -14), day), from, lastDay));
     await repo.putQualityReport({ checkedAt: new Date().toISOString(), instruments: checked.length, from, lastDay, issues });
 
     const known = new Set((previous?.issues ?? []).map(issueKey));
