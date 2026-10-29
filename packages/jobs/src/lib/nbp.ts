@@ -2,6 +2,7 @@
 // One request covers at most 93 days; a range without any table answers 404.
 
 import { addDays, type IsoDate } from "@portfolio/core";
+import { fetchWithTimeout } from "./http.ts";
 
 const BASE = "https://api.nbp.pl/api/exchangerates/rates/a";
 const MAX_DAYS = 93;
@@ -31,7 +32,7 @@ export async function fetchNbpRates(currency: string, from: IsoDate, to: IsoDate
     const endCandidate = addDays(start, MAX_DAYS - 1);
     const end = endCandidate < to ? endCandidate : to;
     const url = `${BASE}/${currency.toLowerCase()}/${start}/${end}/?format=json`;
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const res = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
     if (res.status === 404) continue; // no table in this range (holidays, or before today's table)
     if (!res.ok) throw new Error(`NBP ${currency} ${start}…${end}: HTTP ${res.status}`);
     out.push(...parseNbpRates((await res.json()) as NbpResponse));

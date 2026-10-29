@@ -200,15 +200,22 @@ export async function handler(event: S3Event) {
     let itemsWritten = 0;
     const notes: string[] = [];
     const revalue: NonNullable<Revalue>[] = [];
+    const failed: string[] = [];
+    // Each file on its own: a bad one is reported without failing the others (a retry would re-import them).
     for (const r of event.Records) {
       const key = decodeURIComponent(r.s3.object.key.replace(/\+/g, " "));
-      const result = await importKey(r.s3.bucket.name, key);
-      itemsWritten += result.itemsWritten;
-      notes.push(result.note);
-      if (result.revalue) revalue.push(result.revalue);
+      try {
+        const result = await importKey(r.s3.bucket.name, key);
+        itemsWritten += result.itemsWritten;
+        notes.push(result.note);
+        if (result.revalue) revalue.push(result.revalue);
+      } catch (err) {
+        failed.push(`${key}: ${(err as Error).message}`);
+      }
     }
     // One request per file; the valuation merges requests waiting together into one run.
     for (const r of revalue) await queueValuation({ reason: "import", ...r });
-    return { itemsWritten, note: notes.join("; ") };
+    if (failed.length === event.Records.length) throw new Error(failed.join("; "));
+    return { itemsWritten, note: [...notes, ...failed.map((f) => `failed ${f}`)].join("; ") };
   });
 }

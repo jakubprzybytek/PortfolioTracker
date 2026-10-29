@@ -5,6 +5,7 @@
 
 import { isFlexStatement, parseFlexReply, type IsoDate } from "@portfolio/core";
 import { Resource } from "sst";
+import { fetchWithTimeout } from "./http.ts";
 
 const SEND = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/SendRequest";
 const HEADERS = { "User-Agent": "portfolio-tracker/1.0 (personal use)" }; // IBKR refuses requests without one
@@ -25,7 +26,7 @@ const compact = (d: IsoDate) => d.replaceAll("-", "");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function get(url: string): Promise<string> {
-  const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const res = await fetchWithTimeout(url, { headers: HEADERS }, TIMEOUT_MS);
   if (!res.ok) throw new Error(`IBKR Flex: HTTP ${res.status}`);
   return res.text();
 }

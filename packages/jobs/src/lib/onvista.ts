@@ -5,6 +5,8 @@
 // Prices are % of nominal (clean). Börse Stuttgart's market maker quotes every trading day, even without trades, and
 // its closes match IBKR's mark prices to about 0.01 (checked on three statement dates, 2026-10-14).
 
+import { fetchWithTimeout } from "./http.ts";
+
 const BASE = "https://api.onvista.de/api/v1";
 const HEADERS = { "User-Agent": "Mozilla/5.0 (portfolio-tracker, personal use)", Accept: "application/json" };
 
@@ -97,7 +99,7 @@ export function parseHistory(json: HistoryResponse): OnvistaBar[] {
 }
 
 async function get<T>(path: string): Promise<T | undefined> {
-  const res = await fetch(`${BASE}${path}`, { headers: HEADERS });
+  const res = await fetchWithTimeout(`${BASE}${path}`, { headers: HEADERS });
   if (res.status === 404) return undefined;
   if (!res.ok) throw new Error(`onvista ${path}: HTTP ${res.status}`);
   return (await res.json()) as T;

@@ -469,10 +469,11 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
       }
       case "POST /prices/refresh": {
         // "Refresh prices": starts the Live job (today's quotes, then a revaluation of today). At most one every few
-        // minutes, so the sources aren't asked over and over.
-        const last = await repo.latestJobRun("live");
-        const retryAt = last ? Date.parse(last.startedAt) + REFRESH_EVERY_MS : 0;
-        if (retryAt > Date.now()) return json(429, { error: `Prices were refreshed less than ${REFRESH_EVERY_MS / 60_000} minutes ago.`, retryAt: new Date(retryAt).toISOString() });
+        // minutes, so the sources aren't asked over and over; claimed with one conditional write (two quick clicks
+        // can't both start it).
+        const held = await repo.claimRefresh(new Date(), REFRESH_EVERY_MS);
+        const retryAt = held ? Date.parse(held) + REFRESH_EVERY_MS : 0;
+        if (held) return json(429, { error: `Prices were refreshed less than ${REFRESH_EVERY_MS / 60_000} minutes ago.`, retryAt: new Date(retryAt).toISOString() });
         await invokeAsync(Resource.Live.name, {});
         return json(202, { now: new Date().toISOString() });
       }

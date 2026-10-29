@@ -508,13 +508,36 @@ export class Repository {
     await this.put("market", { ...keys.jobRun(item.job, item.startedAt), ...item, ttl });
   }
 
+  /**
+   * Claims "Update prices" for `everyMs`: one conditional write, so two requests at once can't both start the job.
+   * Returns undefined when claimed, or the time of the claim that still holds.
+   */
+  async claimRefresh(now: Date, everyMs: number): Promise<string | undefined> {
+    const at = now.toISOString();
+    try {
+      await this.doc.send(
+        new PutCommand({
+          TableName: this.tables.market,
+          Item: { PK: "JOB#live", SK: "CLAIM", requestedAt: at, ttl: Math.floor(now.getTime() / 1000) + 86_400 },
+          ConditionExpression: "attribute_not_exists(PK) OR requestedAt <= :cutoff",
+          ExpressionAttributeValues: { ":cutoff": new Date(now.getTime() - everyMs).toISOString() },
+          ReturnValuesOnConditionCheckFailure: "ALL_OLD",
+        }),
+      );
+      return undefined;
+    } catch (e) {
+      if ((e as Error).name !== "ConditionalCheckFailedException") throw e;
+      return ((e as { Item?: Record<string, unknown> }).Item?.["requestedAt"] as string | undefined) ?? at;
+    }
+  }
+
   /** The job's most recent run (one item read, not its 90 days of runs). */
   async latestJobRun(job: string): Promise<JobRunItem | undefined> {
     const res = await this.doc.send(
       new QueryCommand({
         TableName: this.tables.market,
-        KeyConditionExpression: "PK = :pk",
-        ExpressionAttributeValues: { ":pk": `JOB#${job}` },
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :run)",
+        ExpressionAttributeValues: { ":pk": `JOB#${job}`, ":run": "RUN#" },
         ScanIndexForward: false,
         Limit: 1,
       }),

@@ -28,7 +28,10 @@ export async function handler(event: { all?: boolean; isins?: string[] } = {}) {
       }
     }
     if (from) await queueValuation({ reason: "coupon rates", from });
-    if (failed.length) throw new Error(`${failed.length}/${bonds.length} bonds failed: ${failed.join("; ")}`);
-    return { itemsWritten, note: `${bonds.length} bonds${from ? `; new rates from ${from}` : ""}` };
+    // As `live`: the run fails only when no bond worked (a retry would re-scrape the ones that did); a partial
+    // failure is listed in the note.
+    if (failed.length === bonds.length) throw new Error(`${failed.length}/${bonds.length} bonds failed: ${failed.join("; ")}`);
+    const failures = failed.length ? `; ${failed.length} failed: ${failed.join("; ")}` : "";
+    return { itemsWritten, note: `${bonds.length} bonds${from ? `; new rates from ${from}` : ""}${failures}` };
   });
 }

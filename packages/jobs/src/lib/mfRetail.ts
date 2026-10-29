@@ -2,6 +2,8 @@
 // https://www.gov.pl/web/finanse/obligacje-detaliczne1. The attachment id changes with every update, so the
 // link is found on the page by its text.
 
+import { FILE_TIMEOUT_MS, fetchWithTimeout } from "./http.ts";
+
 const PAGE = "https://www.gov.pl/web/finanse/obligacje-detaliczne1";
 const HEADERS = { "User-Agent": "portfolio-tracker (personal use)" };
 
@@ -15,12 +17,12 @@ export function findRetailFileLink(html: string): string | undefined {
 }
 
 export async function fetchRetailFile(): Promise<{ url: string; content: Uint8Array }> {
-  const page = await fetch(PAGE, { headers: HEADERS });
+  const page = await fetchWithTimeout(PAGE, { headers: HEADERS });
   if (!page.ok) throw new Error(`MF retail page: HTTP ${page.status}`);
   const link = findRetailFileLink(await page.text());
   if (!link) throw new Error("MF retail page: no link to the retail-bond XLS (page layout changed?)");
   const url = `https://www.gov.pl${link}`;
-  const res = await fetch(url, { headers: HEADERS });
+  const res = await fetchWithTimeout(url, { headers: HEADERS }, FILE_TIMEOUT_MS);
   if (!res.ok) throw new Error(`MF retail file: HTTP ${res.status}`);
   return { url, content: new Uint8Array(await res.arrayBuffer()) };
 }

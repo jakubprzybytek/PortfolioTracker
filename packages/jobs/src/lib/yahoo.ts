@@ -3,6 +3,8 @@
 // `range=max` thins the series to monthly points, so the window is always given as period1/period2.
 // Symbols come from the instrument's sourceIds.yahoo (see core listingFromTicker).
 
+import { fetchWithTimeout } from "./http.ts";
+
 const BASE = "https://query2.finance.yahoo.com/v8/finance/chart/";
 const HEADERS = { "User-Agent": "Mozilla/5.0 (portfolio-tracker, personal use)", Accept: "application/json" };
 
@@ -62,7 +64,7 @@ export async function fetchYahooDaily(symbol: string, from: string, to: string):
   const p1 = Math.floor(Date.parse(`${from}T00:00:00Z`) / 1000);
   const p2 = Math.floor(Date.parse(`${to}T23:59:59Z`) / 1000);
   const url = `${BASE}${encodeURIComponent(symbol)}?period1=${p1}&period2=${p2}&interval=1d`;
-  const res = await fetch(url, { headers: HEADERS });
+  const res = await fetchWithTimeout(url, { headers: HEADERS });
   if (!res.ok) throw new Error(`Yahoo ${symbol}: HTTP ${res.status}`);
   return parseYahooChart((await res.json()) as ChartResponse);
 }
