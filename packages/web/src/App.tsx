@@ -1,26 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { Hub } from "aws-amplify/utils";
 import { APP_VERSION, api, apiSend } from "./api.ts";
 import { currentSession, logout, type Session } from "./auth.ts";
-import { DashboardView } from "./DashboardView.tsx";
-import { HoldingsView } from "./HoldingsView.tsx";
-import { HoldSellView } from "./HoldSellView.tsx";
 import { Icon } from "./Icons.tsx";
-import { IndicatorsView } from "./IndicatorsView.tsx";
-import { InstrumentView } from "./InstrumentView.tsx";
 import { LoginForm } from "./LoginForm.tsx";
-import { NotesView } from "./NotesView.tsx";
-import { PerformanceView } from "./PerformanceView.tsx";
-import { PricesView } from "./PricesView.tsx";
-import { SalesView } from "./SalesView.tsx";
-import { StatusView } from "./StatusView.tsx";
-import { CashFlowsView } from "./CashFlowsView.tsx";
 import { useRoute, VIEWS } from "./route.ts";
 import { TransactionForm } from "./TransactionForm.tsx";
-import { TransactionsView } from "./TransactionsView.tsx";
 import { TxFormContext } from "./txForm.ts";
 import type { Status, Transaction } from "./types.ts";
 import { clearApiCache, reloadAll, useApiBusy } from "./useApi.ts";
+
+// Each view loads with its first visit (its code and the libraries only it uses), not before the login form.
+const DashboardView = lazy(() => import("./DashboardView.tsx").then((m) => ({ default: m.DashboardView })));
+const HoldingsView = lazy(() => import("./HoldingsView.tsx").then((m) => ({ default: m.HoldingsView })));
+const HoldSellView = lazy(() => import("./HoldSellView.tsx").then((m) => ({ default: m.HoldSellView })));
+const IndicatorsView = lazy(() => import("./IndicatorsView.tsx").then((m) => ({ default: m.IndicatorsView })));
+const InstrumentView = lazy(() => import("./InstrumentView.tsx").then((m) => ({ default: m.InstrumentView })));
+const NotesView = lazy(() => import("./NotesView.tsx").then((m) => ({ default: m.NotesView })));
+const PerformanceView = lazy(() => import("./PerformanceView.tsx").then((m) => ({ default: m.PerformanceView })));
+const PricesView = lazy(() => import("./PricesView.tsx").then((m) => ({ default: m.PricesView })));
+const SalesView = lazy(() => import("./SalesView.tsx").then((m) => ({ default: m.SalesView })));
+const StatusView = lazy(() => import("./StatusView.tsx").then((m) => ({ default: m.StatusView })));
+const CashFlowsView = lazy(() => import("./CashFlowsView.tsx").then((m) => ({ default: m.CashFlowsView })));
+const TransactionsView = lazy(() => import("./TransactionsView.tsx").then((m) => ({ default: m.TransactionsView })));
 
 /** Shows the app to a logged-in user and the login form otherwise. The view (#/…) stays in the URL meanwhile. */
 export function App() {
@@ -200,6 +203,8 @@ function Shell({ email }: { email: string }) {
         {menuOpen && <div className="nav-backdrop" onClick={() => setMenuOpen(false)} aria-hidden data-testid="nav-backdrop" />}
       </nav>
       <main>
+        <ErrorBoundary resetKey={route.view}>
+        <Suspense fallback={<p className="muted view-loading" data-testid="view-loading">Loading…</p>}>
         {route.view === "dashboard" && <DashboardView />}
         {route.view === "performance" && <PerformanceView key="performance" params={route.params} setParams={setParams} />}
         {route.view === "holdings" && <HoldingsView key="holdings" params={route.params} setParams={setParams} />}
@@ -212,6 +217,8 @@ function Shell({ email }: { email: string }) {
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}
         {route.view === "instrument" && <InstrumentView key="instrument" params={route.params} />}
         {route.view === "status" && <StatusView />}
+        </Suspense>
+        </ErrorBoundary>
       </main>
       {(toast || recalc) && (
         <div className="toast" role="status">

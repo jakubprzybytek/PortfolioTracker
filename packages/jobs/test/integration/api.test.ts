@@ -225,6 +225,17 @@ describe(`API ${API}`, () => {
     expect(body.total.total).toBeCloseTo(snap.totals.value + snap.totals.cash!, 1);
   });
 
+  it("a GET's answer has an ETag: asked again with it, an unchanged answer is a bodiless 304", async () => {
+    const first = await get("/holdings");
+    expect(first.status).toBe(200);
+    expect(first.headers.get("cache-control")).toBe("private, no-cache");
+    const etag = first.headers.get("etag")!;
+    expect(etag).toMatch(/^"[A-Za-z0-9_-]{27}"$/);
+    const again = await get("/holdings", { headers: { "If-None-Match": etag } });
+    expect(again.status).toBe(304);
+    expect((await get("/holdings", { headers: { "If-None-Match": '"stale"' } })).status).toBe(200);
+  });
+
   it("GET /portfolio/history refuses dates that aren't dates", async () => {
     expect((await get("/portfolio/history?from=2025-02&to=2025-02-10")).status).toBe(400);
   });

@@ -35,9 +35,9 @@ async function login(): Promise<string> {
 }
 let token: Promise<string> | undefined;
 
-/** GET with the test user's token; `{ auth: false }` sends none. */
-export async function get<T = unknown>(path: string, opts: { auth?: boolean; token?: string } = {}): Promise<{ status: number; body: T }> {
-  const headers: Record<string, string> = {};
+/** GET with the test user's token; `{ auth: false }` sends none; `headers` adds others (the response's come back too). */
+export async function get<T = unknown>(path: string, opts: { auth?: boolean; token?: string; headers?: Record<string, string> } = {}): Promise<{ status: number; body: T; headers: Headers }> {
+  const headers: Record<string, string> = { ...opts.headers };
   if (opts.token) headers["Authorization"] = `Bearer ${opts.token}`;
   else if (opts.auth !== false) headers["Authorization"] = `Bearer ${await (token ??= login())}`;
   const res = await fetch(API + path, { headers });
@@ -48,7 +48,7 @@ export async function get<T = unknown>(path: string, opts: { auth?: boolean; tok
   } catch {
     body = text as unknown as T;
   }
-  return { status: res.status, body };
+  return { status: res.status, body, headers: res.headers };
 }
 
 /** A write request (POST/PUT/DELETE) with a JSON body (`raw`: this text as the body instead), logged in as the test user. */

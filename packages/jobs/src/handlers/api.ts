@@ -3,6 +3,7 @@
 // access groups (checked here). The one route without a login, the spreadsheet feed, is a function of its own (feed.ts).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
+import { createHash } from "node:crypto";
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import {
@@ -304,7 +305,20 @@ async function fxHistoryOf(txs: TransactionItem[], to: string, more: string[] = 
   return new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), to)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
 }
 
+/**
+ * Every response: no caching by proxies, and a GET's 200 gets an ETag of its body, so the browser revalidates
+ * (`no-cache`) and an unchanged answer comes back as a bodiless 304 instead of the whole JSON again.
+ */
 export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
+  const res = (await respond(event)) as Exclude<APIGatewayProxyResultV2, string>;
+  const headers = { ...res.headers, "cache-control": "private, no-cache" };
+  if (event.requestContext.http.method !== "GET" || res.statusCode !== 200 || typeof res.body !== "string") return { ...res, headers };
+  const etag = `"${createHash("sha256").update(res.body).digest("base64url").slice(0, 27)}"`;
+  if (event.headers["if-none-match"] === etag) return { statusCode: 304, headers: { ...headers, etag } };
+  return { ...res, headers: { ...headers, etag } };
+}
+
+async function respond(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
   if (!hasAnyGroup(event.requestContext.authorizer?.jwt?.claims, ACCESS_GROUPS)) return json(403, { error: "This account has no access" });
   const route = event.routeKey; // e.g. "GET /holdings"
   const q = event.queryStringParameters ?? {};

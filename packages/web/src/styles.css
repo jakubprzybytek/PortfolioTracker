@@ -754,3 +754,9 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .chart-key-dotted { width: 16px; height: 0; border-top: 2px dotted; display: inline-block; }
 .chart-tip { padding: 6px 10px; font-size: 0.85rem; line-height: 1.6; }
 .hs-item strong { white-space: nowrap; }
+
+/* A view's code loading (its first visit), and a view that failed to render (ErrorBoundary). */
+.view-loading { padding: 1rem 0; }
+.error-view { max-width: 40rem; padding: 1.5rem 0; }
+.error-view h2 { margin-top: 0; }
+.error-view p { margin: 0.5rem 0 1rem; overflow-wrap: anywhere; }
