@@ -319,4 +319,4 @@ Total < 100 MB. A 10-year chart query reads about 2,500 items (≈ 500 KB, 1 pag
   | `holdings` | none needed | ~minutes | a full revaluation |
   | A file deleted from the files bucket | the file itself (90 days of old versions) | minutes | restore the previous version |
 
-  Checked on dev, 2026-10-29: the backup's transactions, accounts and notes parsed with the import code equal the table's rows (30 transactions, 6 accounts, 1 note; `scripts/check-backup.ts`, a dry run that writes nothing).
+  Tested on dev, 2026-10-29: after a fresh export, the accounts, transactions and notes were deleted from the table (6 + 30 + 9 rows) and restored by uploading the backup's files to `imports/` in order. Back in 18 s, every attribute equal except the accounts' `updatedAt`, and the revaluation found all 633 days unchanged. `scripts/check-backup.ts` does the comparison without deleting anything (a dry run).

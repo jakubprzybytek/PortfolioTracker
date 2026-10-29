@@ -44,7 +44,7 @@ Every finding below was worked through; the text after this section is the revie
 | `queueValuation` cast | Done |
 | Doc drift | Done: deletion protection, alerts, settings, calendar, IBKR source ids marked as built or planned |
 | Tests: coverage, prod guard | Done: `npm run test:coverage` in the PR checks; the integration and E2E setups refuse prod |
-| RPO/RTO, restore test | Written down (data-storage.md, "Backup / export"); restore checked on dev as a dry run (the backup parsed by the import code equals the table) |
+| RPO/RTO, restore test | Written down (data-storage.md, "Backup / export"); restore tested on dev: rows deleted and re-imported from the backup, equal and back in 18 s |
 | Accessibility | Done: every text colour ≥ 4.5:1 on every row tint (the light "faint" grey darkened), the portfolio chart as a table under it, list rows reachable by keyboard |
 | Time zones | Done: `today()` is Warsaw's date (it was UTC: "Update prices" after midnight dated the quotes a day early); tests at both DST changes |
 
