@@ -22,11 +22,11 @@
     "test:coverage": "vitest run --project unit --coverage"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.15",
-    "@playwright/test": "^1.64.0",
+    "@biomejs/biome": "2.6.2",
+    "@playwright/test": "^1.64.1",
     "@types/aws-lambda": "^8.10.164",
     "@types/node": "^24.19.2",
-    "@vitest/coverage-v8": "5.0.3",
+    "@vitest/coverage-v8": "5.0.5",
     "sst": "^4.17.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
