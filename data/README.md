@@ -59,19 +59,7 @@ node scripts/history-ledger-to-import.ts ~/Downloads/transactions-2008-2022.xlsx
 
 On 2026-10-23 its output was identical to stage `test` (836 transactions, 33 instruments, 1004 prices, 6 accounts, all from these files, nothing entered in the app), and the stage was removed the same day (the history won't go to prod). To rebuild it: `npm run deploy -- --stage test`, then upload the four files to its files bucket in order: `imports/instruments/`, `imports/prices/`, `imports/accounts/`, `imports/transactions/` (the import Lambda starts the backfill and valuation; ~6,800 days from 2008). The IKE Bossa tab (2018–2022, from the broker's e-mails) is in the sheet only.
 
-The older converter below built the first import from the "Bonds 2010-2015" sheet; keep it for reference.
-
-`scripts/history-sheet-to-import.ts` converts the "Bonds 2010-2015" history spreadsheet (accounts closed before the app started: the DM BZWBK brokerage account with its Catalyst and treasury bonds and an unitised shares/certificates position, the BZ WBK/Santander and ING savings accounts, the Arka funds, XTB and a term deposit) into import files:
-
-```sh
-node scripts/history-sheet-to-import.ts ~/Downloads/history.xlsx   # or a folder with one JSON file of values per tab
-# → data/private/history/: instruments.json, prices.json, accounts.json, transactions.json; import in that order
-```
-
-- Tabs read, by their headers: Bonds, Savings, Lokata, Arka, DM BZWBK, XTB, Bond prices.
-- The bonds are no longer quoted: `BOND_CORPORATE`, venue `MANUAL`, inactive, priced from the "Bond prices" tab (% of nominal; a defaulted bond gets no price at 0 %: its `WRITE_OFF` closes the position). Arka's fund categories, the DM BZWBK shares/certificates and XTB are `FUND_MANUAL` with ids from their codes (`privateAssetId`), priced from the tabs' price tables.
-- Santander's rows stop where the app's own history of the account starts (2022-05): the sheet's last row hands over the balance (Savings tab, 2022-06-01). Don't import anything else of that account from the sheet.
-- It prints each account's cash at the end (0 for all), any position still open (none: XTB's last 0.78 PLN is sold and withdrawn on 2010-12-31, though the account was actually closed on 2017-04-06) and the lowest cash balance.
+The first import of that history was built from an older "Bonds 2010-2015" sheet by `scripts/history-sheet-to-import.ts`, removed on 2026-10-29 (in git history): the "Transactions 2008-2022" sheet above has everything it had.
 
 ## IBKR transactions from activity statements
 
