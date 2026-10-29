@@ -11,7 +11,7 @@ const LOOKBACK_DAYS = 14;
 
 export async function handler(event: { date?: IsoDate } = {}) {
   return runJob("eod-ibkr", async () => {
-    if (!flexToken()) return { itemsWritten: 0, note: "no IBKR Flex token on this stage" };
+    if (!flexToken()) return { itemsWritten: 0, idle: true, note: "no IBKR Flex token on this stage" };
     const instruments = await repo.listInstruments();
     const day = event.date ?? today();
     const to = addDays(day, -1); // IBKR's statements end with the last business day

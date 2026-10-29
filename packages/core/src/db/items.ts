@@ -342,6 +342,8 @@ export interface JobRunItem {
   /** "running" from its start until it ends; one still running after the function's timeout timed out. */
   status: "running" | "ok" | "failed";
   itemsWritten?: number;
+  /** The run had nothing to do (e.g. no instrument of its kind on this stage). */
+  idle?: boolean;
   note?: string;
   ttl: number;
 }

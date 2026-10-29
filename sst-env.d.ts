@@ -18,6 +18,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Function"
     }
+    "Backups": {
+      "name": string
+      "type": "sst.aws.Bucket"
+    }
     "Files": {
       "name": string
       "type": "sst.aws.Bucket"
@@ -74,6 +78,10 @@ declare module "sst" {
     "ValuationQueue": {
       "type": "sst.aws.Queue"
       "url": string
+    }
+    "Watchdog": {
+      "name": string
+      "type": "sst.aws.Function"
     }
     "Web": {
       "type": "sst.aws.StaticSite"

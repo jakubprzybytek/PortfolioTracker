@@ -56,7 +56,7 @@ export async function queueValuation(payload: object): Promise<void> {
  * stays visible, for the watchdog), then the outcome. Rethrows so Lambda retries apply. Logs one JSON line at the
  * start and one at the end.
  */
-export async function runJob<T extends { itemsWritten?: number; note?: string }>(job: JobName, body: () => Promise<T>): Promise<T> {
+export async function runJob<T extends { itemsWritten?: number; idle?: boolean; note?: string }>(job: JobName, body: () => Promise<T>): Promise<T> {
   const startedAt = new Date().toISOString();
   // The run before this one decides whether to e-mail (alerts.ts: only when a job starts failing or works again).
   const previous = await repo.latestJobRun(job).catch(() => undefined);

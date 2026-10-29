@@ -290,7 +290,7 @@ s3://<bucket>/raw/<source>/<YYYY>/<MM>/<DD>/<file>       e.g. raw/gpw/2026/10/09
 ```
 
 - Every job saves the original response (XLS, JSON, HTML) gzipped before parsing.
-- Lifecycle: move to Glacier Instant Retrieval after 90 days.
+- Lifecycle (2026-10-29): files of 128 KB or more move to Glacier Instant Retrieval after 90 days (smaller ones are billed as 128 KB there, so they stay). The bucket is versioned: an overwritten or deleted file of any prefix can be got back for 90 days, then its old version expires.
 - Nothing reads from it except a reprocessing script.
 
 ## Sizing
@@ -307,5 +307,5 @@ Total < 100 MB. A 10-year chart query reads about 2,500 items (≈ 500 KB, 1 pag
 ## Backup / export
 
 - PITR covers mistakes in the last 35 days on `market` and `transactions`.
-- **Monthly backup** (`Export` job, 1st of the month 04:00): what exists nowhere else, written to `exports/<date>/` in the files bucket, each in its import format (data/README.md): `accounts.json`, `instruments.json` (treasury terms by reference, `"mf"` / `"mf-retail"`, resolved again on import), `prices.json` (prices entered by hand), `coupons.json`, `transactions.json` (with their ids and sources, so a restore gives the same rows) and `notes.json`. Restore: upload the files to `imports/<kind>/` in that order (after the MF calculator and retail files). The rest of `market` (prices, rates, CPI) is fetched again by the jobs and the backfill.
+- **Monthly backup** (`Export` job, 1st of the month 04:00): what exists nowhere else, written to `exports/<date>/` in the files bucket and again in the separate `Backups` bucket (versioned, old versions kept a year, so a mistake in the files bucket doesn't take the backups with it; both are in the same AWS account, so a copy outside it is still by hand), each in its import format (data/README.md): `accounts.json`, `instruments.json` (treasury terms by reference, `"mf"` / `"mf-retail"`, resolved again on import), `prices.json` (prices entered by hand), `coupons.json`, `transactions.json` (with their ids and sources, so a restore gives the same rows) and `notes.json`. Restore: upload the files to `imports/<kind>/` in that order (after the MF calculator and retail files). The rest of `market` (prices, rates, CPI) is fetched again by the jobs and the backfill.
 - `holdings` isn't backed up: rerun valuation over the needed date range instead.

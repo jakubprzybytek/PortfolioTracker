@@ -17,7 +17,7 @@ export interface EodGpwEvent {
 export async function handler(event: EodGpwEvent = {}) {
   return runJob(event.final ? "eod-gpw-recheck" : "eod-gpw", async () => {
     const tracked = gpwInstruments(await repo.listInstruments());
-    if (tracked.length === 0) return { itemsWritten: 0, note: "no GPW instruments" };
+    if (tracked.length === 0) return { itemsWritten: 0, idle: true, note: "no GPW instruments" };
 
     const end = event.date ?? today();
     const start = addDays(end, -LOOKBACK_DAYS);

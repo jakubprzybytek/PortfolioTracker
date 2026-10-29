@@ -7,7 +7,7 @@ import { catalystInstruments, ingestBiznesradarRecent } from "../lib/catalystJob
 export async function handler(event: { date?: IsoDate } = {}) {
   return runJob("eod-catalyst", async () => {
     const tracked = catalystInstruments(await repo.listInstruments());
-    if (tracked.length === 0) return { itemsWritten: 0, note: "no Catalyst bonds" };
+    if (tracked.length === 0) return { itemsWritten: 0, idle: true, note: "no Catalyst bonds" };
     const day = event.date ?? today();
     let itemsWritten = 0;
     const failed: string[] = [];

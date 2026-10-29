@@ -9,7 +9,7 @@ const LOOKBACK_DAYS = 14;
 export async function handler(event: { date?: IsoDate } = {}) {
   return runJob("eod-etf", async () => {
     const tracked = yahooInstruments(await repo.listInstruments());
-    if (tracked.length === 0) return { itemsWritten: 0, note: "no ETFs" };
+    if (tracked.length === 0) return { itemsWritten: 0, idle: true, note: "no ETFs" };
     const end = event.date ?? today();
     let itemsWritten = 0;
     const warnings: string[] = [];

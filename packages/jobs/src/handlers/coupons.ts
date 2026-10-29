@@ -12,7 +12,7 @@ export async function handler(event: { all?: boolean; isins?: string[] } = {}) {
   return runJob("coupons", async () => {
     let bonds = couponInstruments(await repo.listInstruments(), event.all || !!event.isins);
     if (event.isins) bonds = bonds.filter((b) => event.isins!.includes(b.isin));
-    if (bonds.length === 0) return { itemsWritten: 0, note: "no corporate bonds" };
+    if (bonds.length === 0) return { itemsWritten: 0, idle: true, note: "no corporate bonds" };
     const day = today();
     let itemsWritten = 0;
     let from: string | undefined;

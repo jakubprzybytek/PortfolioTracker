@@ -54,7 +54,7 @@ export async function handler(event: { date?: IsoDate } = {}) {
     const etfs = yahooInstruments(all);
     const pages = [...catalystInstruments(all), ...gpwInstruments(all)];
     const tracked = [...new Set([...bonds, ...etfs, ...pages])];
-    if (tracked.length === 0) return { itemsWritten: 0, note: "no instruments with live quotes" };
+    if (tracked.length === 0) return { itemsWritten: 0, idle: true, note: "no instruments with live quotes" };
 
     const fetchedAt = new Date().toISOString();
     const items: PriceItem[] = [];

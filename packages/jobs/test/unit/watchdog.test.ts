@@ -39,5 +39,6 @@ describe("watchdog", () => {
     expect(check((r) => r.set("eod-etf", [run("eod-etf", 1, { itemsWritten: 0 }), run("eod-etf", 13, { itemsWritten: 0 })]))).toEqual(["eod-etf: no new prices in 120 h (2 runs)"]);
     expect(check((r) => r.set("eod-etf", [run("eod-etf", 1, { itemsWritten: 0 }), run("eod-etf", 13)]))).toEqual([]);
     expect(check((r) => r.set("quality", [run("quality", 1, { itemsWritten: 0 })]))).toEqual([]); // not a price job
+    expect(check((r) => r.set("eod-bonds", [run("eod-bonds", 1, { itemsWritten: 0, idle: true })]))).toEqual([]); // nothing to price
   });
 });

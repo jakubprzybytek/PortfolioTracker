@@ -50,8 +50,25 @@ export default $config({
     const transactions = new sst.aws.Dynamo("Transactions", { ...byType, deletionProtection, transform: withPitr });
     const holdings = new sst.aws.Dynamo("Holdings", { fields: keys, primaryIndex, deletionProtection });
 
-    // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload.
-    const files = new sst.aws.Bucket("Files");
+    // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload; exports/… =
+    // the monthly backup. Versioned: an overwritten or deleted file can be got back for 90 days.
+    const files = new sst.aws.Bucket("Files", { versioning: true });
+    new aws.s3.BucketLifecycleConfiguration("FilesLifecycle", {
+      bucket: files.name,
+      rules: [
+        // Old originals are only read to re-run a parser: Glacier Instant Retrieval after 90 days (still read at once).
+        // Only files of 128 KB or more: smaller ones are billed as 128 KB there, which costs more than keeping them.
+        { id: "raw-to-glacier-ir", status: "Enabled", filter: { and: { prefix: "raw/", objectSizeGreaterThan: 128 * 1024 } }, transitions: [{ days: 90, storageClass: "GLACIER_IR" }] },
+        { id: "old-versions", status: "Enabled", filter: {}, noncurrentVersionExpiration: { noncurrentDays: 90 }, expiration: { expiredObjectDeleteMarker: true }, abortIncompleteMultipartUpload: { daysAfterInitiation: 7 } },
+      ],
+    }, { dependsOn: [files] });
+    // A second copy of the monthly backup, apart from the live files (an `aws s3 rm` of the files bucket doesn't take
+    // it); versioned, old versions kept a year. Same account: a copy elsewhere is still by hand (data/README.md).
+    const backups = new sst.aws.Bucket("Backups", { versioning: true });
+    new aws.s3.BucketLifecycleConfiguration("BackupsLifecycle", {
+      bucket: backups.name,
+      rules: [{ id: "old-versions", status: "Enabled", filter: {}, noncurrentVersionExpiration: { noncurrentDays: 365 } }],
+    }, { dependsOn: [backups] });
 
     // E-mail alerts (prod only): jobs publish when they start failing or work again (jobs/lib/alerts.ts), CloudWatch
     // alarms below when the valuation errors or times out and when the dead-letter queue holds a request. The address
@@ -267,7 +284,7 @@ export default $config({
     // Backup of accounts, instruments, hand-entered prices, transactions and notes (the data that exists nowhere else) to
     // exports/<date>/ in the bucket, in the import formats.
     new sst.aws.CronV2("Export", {
-      function: { ...defaults, handler: "packages/jobs/src/handlers/export.handler", link: [...link, market, transactions] },
+      function: { ...defaults, handler: "packages/jobs/src/handlers/export.handler", link: [...link, market, transactions, backups] },
       schedule: "cron(0 4 1 * ? *)",
       timezone: WARSAW,
       retries: 2,

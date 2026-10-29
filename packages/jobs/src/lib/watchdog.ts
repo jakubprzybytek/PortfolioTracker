@@ -24,8 +24,10 @@ export function watchdogIssues(runs: Map<JobName, JobRunItem[]>, latest: Map<Job
         if (!("optional" in cfg)) issues.push(`${job}: has never run`);
       } else if (hoursAgo(last.startedAt) > maxAge) issues.push(`${job}: no run for ${Math.round(hoursAgo(last.startedAt))} h (expected at least every ${maxAge} h)`);
     }
-    if ("prices" in cfg && recent.some((r) => r.status === "ok") && !recent.some((r) => (r.itemsWritten ?? 0) > 0))
-      issues.push(`${job}: no new prices in ${NO_PRICES_HOURS} h (${recent.length} runs)`);
+    // Runs with nothing to do (no instrument of the kind on this stage) don't count.
+    const worked = recent.filter((r) => r.status === "ok" && !r.idle);
+    if ("prices" in cfg && worked.length > 0 && !worked.some((r) => (r.itemsWritten ?? 0) > 0))
+      issues.push(`${job}: no new prices in ${NO_PRICES_HOURS} h (${worked.length} runs)`);
   }
   return issues;
 }
