@@ -428,7 +428,7 @@ const ROUTES: Record<string, Route> = {
     const date = typeof body?.date === "string" ? body.date : "";
     const price = typeof body?.price === "number" ? body.price : NaN;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isCalendarDate(date)) return json(400, { error: "date: needs a date (YYYY-MM-DD)" });
-    if (date > addDays(today(), 1)) return json(400, { error: "date: not in the future" }); // a day ahead: UTC vs the user's clock
+    if (date > addDays(today(), 1)) return json(400, { error: "date: not in the future" }); // a day ahead: the device may be in another time zone than Warsaw
     if (!(price > 0)) return json(400, { error: "price: needs a positive number" });
     const note = typeof body?.note === "string" && body.note.trim() ? body.note.trim() : undefined;
     const [item] = parseManualPrices(JSON.stringify([{ isin, date, price, currency: inst.currency, ...(note ? { note } : {}) }]), APP_SOURCE);

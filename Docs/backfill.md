@@ -28,7 +28,7 @@ Reference data and transactions come first, because they define which instrument
 |---|---|---|---|---|
 | 1 | Instruments: ISIN, type, currency, venue, source tickers, bond terms (coupon type, rate/margin, dates, nominal; floating: rate per period) | Sheet + terms of issue / MF calculator / gpwcatalyst.pl | free | manual + import |
 | 2 | Exchange calendars (XWAR, XETRA, LSE …) for the backfill years | Exchange holiday lists | free | manual |
-| 3 | Transactions and cash | Sheet export (done), IBKR activity statements (done); later IBKR Flex | free | script per format |
+| 3 | Transactions and cash | Sheet export (done), IBKR activity statements (done); IBKR Flex for mark prices (done; for trades: not planned) | free | script per format |
 | 4 | FX (EUR, USD → PLN) | NBP API, chunks of 93 days | free | script |
 | 5 | CPI, IZ reference index, IZ series terms | MF calculator `kalkulatorodsetek.xlsm` (file import) + GUS CPI CSV | free | import |
 | 6 | Retail bond rate periods | Terms of issue + CPI → computed; checked against obligacjeskarbowe.pl interest tables | free | script + manual check |

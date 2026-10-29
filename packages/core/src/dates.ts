@@ -19,8 +19,14 @@ export function parseIsoDate(date: IsoDate): Date {
   return new Date(date + "T00:00:00Z");
 }
 
-export function today(): IsoDate {
-  return toIsoDate(new Date());
+const WARSAW_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/**
+ * Today's date in Warsaw (the market's and the schedules' time zone), not UTC: between midnight and 01:00 (02:00 in
+ * summer) Polish time UTC still says yesterday. `now` for tests.
+ */
+export function today(now: Date = new Date()): IsoDate {
+  return WARSAW_DAY.format(now) as IsoDate; // en-CA formats as YYYY-MM-DD
 }
 
 export function addDays(date: IsoDate, days: number): IsoDate {

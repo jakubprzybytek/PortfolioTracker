@@ -42,6 +42,18 @@ test.describe("dashboard", () => {
     await page.getByTestId("portfolio-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("portfolio-range").getByRole("button", { name: "ALL" })).toHaveAttribute("aria-pressed", "true");
     await expect(chart.locator("svg.recharts-surface")).toBeVisible();
+
+    // The same numbers as a table, folded under the chart: a row per month's end, newest first, profit = value − deposits.
+    const table = page.getByTestId("portfolio-table");
+    await expect(table.locator("tbody tr").first()).toBeHidden();
+    await table.getByText("As a table").click();
+    const rows = table.locator("tbody tr");
+    expect(await rows.count()).toBeGreaterThan(5);
+    const num = (t: string) => Number(t.replace(/[^\d,-]/g, "").replace(",", "."));
+    const [value, deposits, profit] = (await rows.first().locator("td").allTextContents()).slice(1).map(num);
+    expect(Math.abs(value! - deposits! - profit!)).toBeLessThan(0.02);
+    const dates = await rows.locator("td:first-child").allTextContents();
+    expect(dates).toEqual([...dates].sort().reverse());
   });
 
   test("shows where things stand now: the history charts, returns by year and jobs have their own views", async ({ page }) => {

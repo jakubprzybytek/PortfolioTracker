@@ -16,7 +16,7 @@ validate(records) -> records + flags             # sanity checks, see below
 upsert(records)                                  # DynamoDB, idempotent
 ```
 
-A job run is: pick the instruments (`active = true` and matching source) → run the adapter for today plus the look-back window → write a `JOB#…/RUN#…` item → alert on failure.
+A job run is: pick the instruments (`active = true` and matching source) → run the adapter for today plus the look-back window → write a `JOB#…/RUN#…` item (`running`, then its outcome) → e-mail on failure (prod; "Failure handling" below).
 
 ## Schedule (Warsaw time, Mon–Fri unless noted)
 
@@ -104,4 +104,4 @@ The daily `quality` job (2026-10-23, road map 17) checks the last year of every 
 
 ## Secrets
 
-API keys (EODHD and IBKR Flex token, later) are `sst.Secret`s (`sst secret set …`), linked to the functions that need them.
+API keys (the IBKR Flex token `IbkrFlexToken`, on dev and prod; EODHD if it's ever used) are `sst.Secret`s (`sst secret set …`), linked to the functions that need them.

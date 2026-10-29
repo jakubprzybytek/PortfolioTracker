@@ -329,7 +329,6 @@ export class Repository {
     );
   }
 
-  /** One transaction of an account by its id (any date). */
   /** One transaction: a GetItem when its date is known (the form sends it), else a filtered read of the account. */
   async findTransaction(account: string, id: string, date?: IsoDate): Promise<TransactionItem | undefined> {
     if (date) return this.get<TransactionItem>("transactions", keys.transaction(account, date, id));

@@ -4,6 +4,50 @@ A review of the app as built against the usual non-functional requirements: obse
 
 **Overall:** for a single-user serverless app it is in good shape: pure, tested core; idempotent jobs; FIFO-serialised valuation with a dead-letter queue; per-function table links; OIDC-based CD with int → tests → prod; SRP login + JWT authorizer + group gate; raw-file archive; monthly backup; docs that are an actual design record. The gaps are the last 10 %: nobody is told when something breaks, outbound HTTP can hang, a few hot paths read whole partitions, and the infra doesn't match two claims in the docs.
 
+## Status (2026-10-29, v0.167 and later)
+
+Every finding below was worked through; the text after this section is the review as written on 2026-10-15.
+
+| Finding | Status |
+|---|---|
+| No alerting | Done: e-mails on failing jobs (2026-10-23); a daily **watchdog** for runs that timed out (`running` left behind), jobs that stopped running and price jobs that wrote nothing for 120 h; three CloudWatch alarms (valuation errors, dead-letter queue, watchdog silent) |
+| Free-text logs | Done: Lambda's JSON log format; `runJob` logs a JSON line at the start and the end; API errors carry the request id |
+| Hand-maintained job list | Done: `jobs/lib/jobs.ts`, used by `runJob` (typed) and `GET /status` |
+| DLQ invisible | Done: `GET /status` gives its depth, the Status page warns |
+| Per-source metrics | Not done as metrics (EMF is ~$0.30 per metric a month); the watchdog reads the same counts from the job runs |
+| Unbounded outbound HTTP | Done: `jobs/lib/http.ts` `fetchWithTimeout` (20 s, 60 s for files) everywhere |
+| `coupons` all-or-nothing | Done: fails only when every bond failed |
+| `import` one batch | Done: each file on its own |
+| Sequential revaluation | Done earlier (road map 23: one pass, batched writes, loads in parallel) |
+| `live` throttle race | Done: one conditional write claims the 5 minutes |
+| Backup next to live data, no versioning | Done: files bucket versioned (90 days), raw originals ≥ 128 KB to Glacier IR after 90 days; a separate versioned `Backups` bucket gets the monthly export too. A copy outside the account: by hand |
+| Deletion protection | Done (2026-10-15) |
+| `/status` partitions, `/instruments` N+1 | Done (2026-10-15) |
+| `findTransaction` filter | Done: the form sends `?date=`, a GetItem |
+| Every endpoint lists all transactions | Not done: fine at 10× the data (as the review says); a per-ISIN index when it isn't |
+| SheetJS in the API bundle | Not needed: the bundler already leaves it out (checked in the built bundles) |
+| x86_64 | Done (arm64) |
+| No HTTP caching | Done: `Cache-Control: private, no-cache` and an ETag on every GET (304 when unchanged) |
+| One 835 KB chunk | Done: views load on demand, React/Amplify/charts in chunks of their own; first load ~400 KB |
+| No budget alarm | Already there: the account's $5 monthly budget with e-mails (outside the app) |
+| Error leakage, CORS `*` | Done (2026-10-15) |
+| No security headers | Done: CSP, HSTS, nosniff, DENY framing, no-referrer, Permissions-Policy (CloudFront response-headers policy) |
+| Direct API Gateway URL | Accepted, as the review says |
+| CI role over-broad | Done (2026-10-26) |
+| Actions by tag, no Dependabot | Done: pinned by SHA; Dependabot (npm and actions) |
+| MFA off | Not done, by choice |
+| No audit trail | Done: `TXLOG` items, `GET /transactions/log`, "Changes to transactions" on the Status page |
+| Input validation edges | Done: query dates and account names checked (400), `{isin}` checked once for every route |
+| No linter | Done: Biome in both workflows (`biome.jsonc`) |
+| No ErrorBoundary | Done |
+| `api.ts` switch | Done: a `ROUTES` table of handlers |
+| `queueValuation` cast | Done |
+| Doc drift | Done: deletion protection, alerts, settings, calendar, IBKR source ids marked as built or planned |
+| Tests: coverage, prod guard | Done: `npm run test:coverage` in the PR checks; the integration and E2E setups refuse prod |
+| RPO/RTO, restore test | Written down (data-storage.md, "Backup / export"); restore checked on dev as a dry run (the backup parsed by the import code equals the table) |
+| Accessibility | Done: every text colour ≥ 4.5:1 on every row tint (the light "faint" grey darkened), the portfolio chart as a table under it, list rows reachable by keyboard |
+| Time zones | Done: `today()` is Warsaw's date (it was UTC: "Update prices" after midnight dated the quotes a day early); tests at both DST changes |
+
 ## Top 10, by value ÷ effort
 
 | # | Finding | Area | Effort |

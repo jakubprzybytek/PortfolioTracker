@@ -63,7 +63,7 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 |---|---|
 | `isin`, `name`, `type` | `IE00B3RBWM25`, "Vanguard FTSE All-World", `ETF` / `BOND_LISTED` / `BOND_CORPORATE` / `BOND_RETAIL` / `BOND_IBKR` / `FUND_MANUAL` / `CURRENCY` (foreign cash as a position, from the old PLN-only bookings; accounts in several currencies hold cash per currency instead) / `CASH` |
 | `currency`, `venue` | `EUR`, `XAMS` (MIC of the listing prices come from: `XAMS` Euronext Amsterdam, `XETR` Xetra, `XWAR` GPW) |
-| `sourceIds` | `{ "yahoo": "VWRL.AS" }`, `{ "gpw": "<CODE>" }`, later `{ "ibkr_conid": "…" }` |
+| `sourceIds` | `{ "yahoo": "VWRL.AS" }`, `{ "gpw": "<CODE>" }`, `{ "ibkr": "<conid>" }` (instruments priced from IBKR's Flex statement) |
 | `nominal` | Corporate bonds (`BOND_CORPORATE`, no terms): nominal per bond (1000 or 100); prices are clean % of it; value = clean % × nominal + accrued interest from its coupon periods |
 | `pricePath` | Foreign bonds at IBKR (`BOND_IBKR`, `nominal` 1000) without a quote (`venue = CALC`: US T-bills, matured bonds): known prices `[{ date, price }]` (% of nominal: your trades, redemption at maturity); the backfill writes a price per weekday in between at a constant yield. Quoted ones have `venue = XSTU`, `sourceIds.onvista = "STU"` |
 | `splits` | ETFs: `[{ "date": "2025-12-15", "ratio": 100 }]`: from `date` on one unit became `ratio` units. Prices are stored as traded; charts and the 1-year change divide earlier prices by later splits (`core/prices/splits.ts`) |
@@ -156,7 +156,7 @@ PK = QUALITY                SK = LATEST
 PK = CAL#<venue>            SK = <YYYY-MM-DD>       type = HOLIDAY | HALF_DAY, note
 ```
 
-Planned, not filled yet: entered by hand once a year, for gap repair (a holiday isn't a gap).
+Not built (and not needed so far): the days the Warsaw exchange is closed are computed in code (`core/settlement.ts`: Polish public holidays, Good Friday, 24 and 31 December), and the quality checks use them and the usual EU and US holidays (`core/quality/quality.ts`). This item would only be wanted for one-off closures.
 
 ### Job runs
 
@@ -216,7 +216,7 @@ PK = SETTING#<name>         SK = META
 
 `value`, `updatedAt`: choices made in the app that aren't data, e.g. `holdSell` (the Buy, hold or sell assumptions: `cpi`, `wibor`, `nbpRate`, `alternative`, `altRate`, `commission`; deleted to go back to the defaults) and `targets` (the target allocation: `targets` and `bands` per asset class, in %; deleted by "Remove targets") and `feedToken` (the spreadsheet link: `hash` (SHA-256 of the token, never the token), `createdAt`, `lastUsedAt`; replaced by "Create new link", deleted by "Revoke"; ui.md, "Access"). Not in the monthly backup (set again in a minute).
 
-### Later: settings you enter
+### Planned (not built): settings you enter
 
 ```
 PK = MULTI#<ISIN>           SK = META                           split: { <asset_class>: pct } (multi-asset look-through)
@@ -309,3 +309,14 @@ Total < 100 MB. A 10-year chart query reads about 2,500 items (≈ 500 KB, 1 pag
 - PITR covers mistakes in the last 35 days on `market` and `transactions`.
 - **Monthly backup** (`Export` job, 1st of the month 04:00): what exists nowhere else, written to `exports/<date>/` in the files bucket and again in the separate `Backups` bucket (versioned, old versions kept a year, so a mistake in the files bucket doesn't take the backups with it; both are in the same AWS account, so a copy outside it is still by hand), each in its import format (data/README.md): `accounts.json`, `instruments.json` (treasury terms by reference, `"mf"` / `"mf-retail"`, resolved again on import), `prices.json` (prices entered by hand), `coupons.json`, `transactions.json` (with their ids and sources, so a restore gives the same rows) and `notes.json`. Restore: upload the files to `imports/<kind>/` in that order (after the MF calculator and retail files). The rest of `market` (prices, rates, CPI) is fetched again by the jobs and the backfill.
 - `holdings` isn't backed up: rerun valuation over the needed date range instead.
+- Not in the backup: settings (targets, Buy-hold-sell assumptions, the spreadsheet link's token: set again in the app) and the audit trail (`TXLOG`; PITR keeps it).
+- **Recovery targets (2026-10-29):**
+
+  | Loss | Recovery point (RPO) | Recovery time (RTO) | How |
+  |---|---|---|---|
+  | A mistake in the last 35 days (a wrong import, an edit) | the second before it | ~1 h | PITR restore of `transactions` (or `market`) to a new table, then copy the rows back (or point the stage at it) |
+  | A table lost for good (with its PITR) | the last monthly backup (≤ 1 month; newer transactions entered again from the audit trail or the brokers) | ~2 h | redeploy, the MF files, then the backup's files in order (data/README.md); jobs and backfills refetch prices |
+  | `holdings` | none needed | ~minutes | a full revaluation |
+  | A file deleted from the files bucket | the file itself (90 days of old versions) | minutes | restore the previous version |
+
+  Checked on dev, 2026-10-29: the backup's transactions, accounts and notes parsed with the import code equal the table's rows (30 transactions, 6 accounts, 1 note; `scripts/check-backup.ts`, a dry run that writes nothing).

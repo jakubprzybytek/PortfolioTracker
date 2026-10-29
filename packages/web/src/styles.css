@@ -4,7 +4,7 @@
   --panel: #ffffff;
   --fg: #111827;
   --muted: #4b5563;
-  --faint: #6b7280;
+  --faint: #666e7b; /* 4.5:1 or more on every row tint (WCAG AA) */
   --border: #e5e7eb;
   --line: #f0f1f3;
   --accent: #2563eb;
@@ -760,3 +760,10 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .error-view { max-width: 40rem; padding: 1.5rem 0; }
 .error-view h2 { margin-top: 0; }
 .error-view p { margin: 0.5rem 0 1rem; overflow-wrap: anywhere; }
+
+/* Read by screen readers only. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* A chart's numbers as a table, folded under it. */
+.chart-table { margin: 0.25rem 0 1rem; }
+.chart-table summary { cursor: pointer; color: var(--muted); font-size: 0.9em; }
+.chart-table .table-wrap { max-height: 22rem; overflow-y: auto; margin-top: 0.5rem; }
