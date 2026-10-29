@@ -304,7 +304,7 @@ test.describe("dashboard", () => {
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
     // Every job, once loaded (the 9 placeholder rows before that aren't job rows)
     await expect(page.getByTestId("job-valuation")).toBeVisible();
-    await expect(rows).toHaveCount(15);
+    await expect(rows).toHaveCount(17); // lib/jobs.ts
     await expect(page.getByTestId("job-benchmarks")).toBeVisible();
     await expect(page.getByTestId("jobs-table")).toContainText("ok");
   });

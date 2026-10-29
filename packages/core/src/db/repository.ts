@@ -542,7 +542,9 @@ export class Repository {
       return undefined;
     } catch (e) {
       if ((e as Error).name !== "ConditionalCheckFailedException") throw e;
-      return ((e as { Item?: Record<string, unknown> }).Item?.["requestedAt"] as string | undefined) ?? at;
+      // The item that blocked the write comes back in DynamoDB's own format ({ S: "…" }), not unmarshalled.
+      const held = (e as { Item?: Record<string, { S?: string }> }).Item?.["requestedAt"]?.S;
+      return held && !Number.isNaN(Date.parse(held)) ? held : at;
     }
   }
 
