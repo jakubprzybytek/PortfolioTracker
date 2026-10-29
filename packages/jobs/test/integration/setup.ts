@@ -15,6 +15,9 @@ function resources() {
   }
 }
 
+// The tests seed the stage with sample data (uploaded straight to its bucket): never on prod.
+if (Resource.App.stage === "prod") throw new Error("The integration tests seed sample data: they must not run against prod");
+
 const res = resources();
 export const outputs = { files: res.files };
 export const API = (process.env["API_URL"] ?? `${res.site.replace(/\/$/, "")}/api`).replace(/\/$/, "");

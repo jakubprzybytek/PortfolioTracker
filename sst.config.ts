@@ -405,6 +405,7 @@ export default $config({
     api.route("PUT /instruments/{isin}/coupons/{start}", apiHandler, auth);
     api.route("DELETE /instruments/{isin}/coupons/{start}", apiHandler, auth);
     api.route("GET /transactions", apiHandler, auth);
+    api.route("GET /transactions/log", apiHandler, auth);
     api.route("POST /transactions", apiHandler, auth);
     api.route("PUT /transactions/{id}", apiHandler, auth);
     api.route("DELETE /transactions/{id}", apiHandler, auth);
@@ -440,7 +441,43 @@ export default $config({
       ],
     });
 
-    const router = new sst.aws.Router("Router", { domain });
+    // Security headers on every response of the site and the API (Docs/ui.md, "Access"). The CSP allows only this
+    // origin and Cognito (the login): no inline scripts, no other hosts, so one injected script can't send the tokens
+    // (kept in localStorage) anywhere. Styles allow 'unsafe-inline' (attributes set by charts); scripts don't.
+    const securityHeaders = new aws.cloudfront.ResponseHeadersPolicy("SecurityHeaders", {
+      name: `portfolio-tracker-${$app.stage}-security-headers`,
+      securityHeadersConfig: {
+        contentSecurityPolicy: {
+          override: true,
+          contentSecurityPolicy: [
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data:",
+            "font-src 'self'",
+            "connect-src 'self' https://cognito-idp.eu-west-1.amazonaws.com",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'none'",
+          ].join("; "),
+        },
+        strictTransportSecurity: { override: true, accessControlMaxAgeSec: 31_536_000, includeSubdomains: true },
+        contentTypeOptions: { override: true },
+        frameOptions: { override: true, frameOption: "DENY" },
+        referrerPolicy: { override: true, referrerPolicy: "no-referrer" },
+      },
+      customHeadersConfig: { items: [{ header: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()", override: true }] },
+    });
+    const router = new sst.aws.Router("Router", {
+      domain,
+      transform: {
+        cdn: (args) => {
+          args.defaultCacheBehavior = $resolve([args.defaultCacheBehavior, securityHeaders.id]).apply(([b, id]) => ({ ...b, responseHeadersPolicyId: id }));
+          args.orderedCacheBehaviors = $resolve([args.orderedCacheBehaviors ?? [], securityHeaders.id]).apply(([bs, id]) => bs.map((b) => ({ ...b, responseHeadersPolicyId: id })));
+        },
+      },
+    });
     router.route("/api", api.url, { rewrite: { regex: "^/api/(.*)$", to: "/$1" } });
     const publicApiUrl = $interpolate`https://${domain}/api`;
 

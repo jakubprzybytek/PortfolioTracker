@@ -225,6 +225,10 @@ describe(`API ${API}`, () => {
     expect(body.total.total).toBeCloseTo(snap.totals.value + snap.totals.cash!, 1);
   });
 
+  it("GET /portfolio/history refuses dates that aren't dates", async () => {
+    expect((await get("/portfolio/history?from=2025-02&to=2025-02-10")).status).toBe(400);
+  });
+
   it("GET /portfolio/history returns one snapshot per day since the first transaction", async () => {
     const { status, body } = await get<{ date: string; totals: { value: number; cash?: number }; total: number; netDeposits: number }[]>("/portfolio/history?from=2025-02-01&to=2025-02-10");
     expect(status).toBe(200);
@@ -445,9 +449,20 @@ describe(`API ${API}`, () => {
     expect(edited.body).toMatchObject({ id, date: "2099-01-03", amount: 150, source: "app" });
     expect(await mine()).toEqual([expect.objectContaining({ id, date: "2099-01-03", amount: 150 })]);
 
-    expect((await send("DELETE", `/transactions/${id}?account=api-test`)).status).toBe(200);
+    // With ?date= (as the form sends it) the lookup is by key: the wrong date doesn't find it.
+    expect((await send("DELETE", `/transactions/${id}?account=api-test&date=2099-01-02`)).status).toBe(404);
+    expect((await send("DELETE", `/transactions/${id}?account=api-test&date=2099-1-3`)).status).toBe(400);
+    expect((await send("DELETE", `/transactions/${id}?account=api%23test`)).status).toBe(400);
+    expect((await send("DELETE", `/transactions/${id}?account=api-test&date=2099-01-03`)).status).toBe(200);
     expect(await mine()).toEqual([]);
     expect((await send("DELETE", `/transactions/${id}?account=api-test`)).status).toBe(404);
+
+    // Every change is in the audit trail, newest first: added, edited (before and after), deleted.
+    type Log = { at: string; action: string; by: string; before?: Tx; after?: Tx };
+    const log = (await get<Log[]>("/transactions/log?limit=20")).body.filter((e) => (e.after ?? e.before)?.id === id);
+    expect(log.map((e) => e.action)).toEqual(["deleted", "edited", "added"]);
+    expect(log[1]).toMatchObject({ before: { date: "2099-01-02", amount: 100 }, after: { date: "2099-01-03", amount: 150 } });
+    expect(log[0]!.by).not.toBe("unknown");
     expect((await send("PUT", "/transactions/0000000000000000?account=api-test", { date: "2099-01-03", account: "api-test", type: "DEPOSIT", amount: 1 })).status).toBe(404);
   });
 

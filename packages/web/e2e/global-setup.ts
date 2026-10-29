@@ -17,7 +17,10 @@ export async function signIn(page: import("@playwright/test").Page, email: strin
 }
 
 export default async function globalSetup(config: FullConfig) {
+  // The tests add, edit and delete data: never on prod (its API refuses the test user anyway).
+  if (Resource.App.stage === "prod") throw new Error("The E2E tests change data: they must not run against prod");
   const baseURL = config.projects[0]!.use.baseURL!;
+  if (/^https:\/\/portfoliotracker\.albedoonline\.com/.test(baseURL)) throw new Error("The E2E tests must not run against the prod site");
   const { email, password } = testUser();
   const browser = await chromium.launch();
   const page = await browser.newPage();

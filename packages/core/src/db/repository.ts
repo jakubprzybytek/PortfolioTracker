@@ -32,6 +32,7 @@ import {
   type RetailSeriesItem,
   type SnapshotItem,
   type TransactionItem,
+  type TransactionLogItem,
 } from "./items.ts";
 
 const GSI1 = "GSI1";
@@ -329,13 +330,27 @@ export class Repository {
   }
 
   /** One transaction of an account by its id (any date). */
-  async findTransaction(account: string, id: string): Promise<TransactionItem | undefined> {
+  /** One transaction: a GetItem when its date is known (the form sends it), else a filtered read of the account. */
+  async findTransaction(account: string, id: string, date?: IsoDate): Promise<TransactionItem | undefined> {
+    if (date) return this.get<TransactionItem>("transactions", keys.transaction(account, date, id));
     const items = await this.queryAll<TransactionItem>("transactions", {
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       FilterExpression: "id = :id",
       ExpressionAttributeValues: { ":pk": `ACCT#${account}`, ":sk": "TX#", ":id": id },
     });
     return items[0];
+  }
+
+  /** Records a change to a transaction (the audit trail): who, when, and the transaction before and after. */
+  async putTransactionLog(entry: Omit<TransactionLogItem, "PK" | "SK">): Promise<void> {
+    const id = entry.after?.id ?? entry.before?.id ?? "";
+    await this.put("transactions", { PK: "TXLOG", SK: `${entry.at}#${id}`, ...entry });
+  }
+
+  /** The latest changes to transactions, newest first. */
+  async listTransactionLog(limit: number): Promise<TransactionLogItem[]> {
+    const res = await this.doc.send(new QueryCommand({ TableName: this.tables.transactions, KeyConditionExpression: "PK = :pk", ExpressionAttributeValues: { ":pk": "TXLOG" }, ScanIndexForward: false, Limit: limit }));
+    return (res.Items ?? []) as TransactionLogItem[];
   }
 
   async deleteTransaction(t: Pick<TransactionItem, "account" | "date" | "id">): Promise<void> {

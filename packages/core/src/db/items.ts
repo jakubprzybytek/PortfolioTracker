@@ -333,6 +333,18 @@ export interface BackfillItem {
   updatedAt: string;
 }
 
+/** One change to a transaction in the app (PK "TXLOG", SK "<at>#<id>"): the audit trail, kept for good. */
+export interface TransactionLogItem {
+  PK: "TXLOG";
+  SK: string;
+  at: string;
+  action: "added" | "edited" | "deleted";
+  /** The Cognito user name (or sub) of who made it. */
+  by: string;
+  before?: Omit<TransactionItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">;
+  after?: Omit<TransactionItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">;
+}
+
 export interface JobRunItem {
   PK: `JOB#${string}`;
   SK: `RUN#${string}`;

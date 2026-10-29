@@ -6,7 +6,9 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import {
+  ACCOUNT_NAME,
   APP_SOURCE,
+  type IsoDate,
   CouponPeriodInput,
   couponChecks,
   CPI_INDICATORS,
@@ -154,6 +156,26 @@ const ACCESS_GROUPS = (process.env["ACCESS_GROUPS"] ?? "portfolio-tracker").spli
 /** A request the API refuses with a 400 and this message, wherever it's found. */
 class BadRequest extends Error {}
 
+/** A query parameter that must be a date (YYYY-MM-DD); anything else is a 400. */
+function dateParam(q: Record<string, string | undefined>, name: string): IsoDate {
+  const v = q[name];
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(v))) throw new BadRequest(`?${name}= must be a date (YYYY-MM-DD)`);
+  return v as IsoDate;
+}
+
+/** An account name from the query: as the transaction schema allows (no "#", which separates key parts). */
+function accountParam(q: Record<string, string | undefined>): string | undefined {
+  const v = q["account"];
+  if (v !== undefined && !ACCOUNT_NAME.test(v)) throw new BadRequest("?account= isn't a valid account name");
+  return v;
+}
+
+/** Who made a change: the Cognito user name, else its sub. */
+const userOf = (event: APIGatewayProxyEventV2WithJWTAuthorizer): string => {
+  const claims = event.requestContext.authorizer?.jwt?.claims ?? {};
+  return String(claims["username"] ?? claims["cognito:username"] ?? claims["sub"] ?? "unknown");
+};
+
 /** JSON body of a POST/PUT (API Gateway may pass it base64-encoded); not JSON → 400. */
 const bodyOf = (event: APIGatewayProxyEventV2WithJWTAuthorizer): unknown => {
   if (!event.body) return undefined;
@@ -171,7 +193,7 @@ const withoutKeys = ({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...rest }: Transa
  * Validates a transaction from the form and stores it (new id, or `id` when editing). A buy of a manually valued
  * asset also records its price that day, so it has a value. Then revalues from the earliest day touched.
  */
-async function saveTransaction(input: unknown, existing?: TransactionItem): Promise<APIGatewayProxyResultV2> {
+async function saveTransaction(input: unknown, by: string, existing?: TransactionItem): Promise<APIGatewayProxyResultV2> {
   const parsed = ManualTransaction.safeParse(input);
   if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
   const t = parsed.data;
@@ -181,6 +203,7 @@ async function saveTransaction(input: unknown, existing?: TransactionItem): Prom
   const item: TxOut = { ...t, id: existing?.id ?? newTransactionId(), source: existing?.source ?? APP_SOURCE };
   if (existing && (existing.date !== item.date || existing.account !== item.account)) await repo.deleteTransaction(existing);
   await repo.putTransactions([item]);
+  await repo.putTransactionLog({ at: new Date().toISOString(), action: existing ? "edited" : "added", by, ...(existing ? { before: withoutKeys(existing) } : {}), after: item });
   const inst = t.isin ? instruments.find((i) => i.isin === t.isin) : undefined;
   if (inst?.type === "FUND_MANUAL" && t.type === "BUY" && t.price) await repo.putPrices(parseManualPrices(JSON.stringify([{ isin: inst.isin, date: t.date, price: t.price }]), APP_SOURCE));
   const from = existing && existing.date < item.date ? existing.date : item.date;
@@ -286,10 +309,10 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
   const route = event.routeKey; // e.g. "GET /holdings"
   const q = event.queryStringParameters ?? {};
   const isin = event.pathParameters?.["isin"];
-  const from = q["from"] ?? addDays(today(), -365);
-  const to = q["to"] ?? today();
 
   try {
+    const from = q["from"] ? dateParam(q, "from") : addDays(today(), -365);
+    const to = q["to"] ? dateParam(q, "to") : today();
     switch (route) {
       case "GET /holdings": {
         // `flows`: each position's own cash flows to the snapshot's day (PLN, NBP D-1), for the XIRR of any row or group.
@@ -526,7 +549,8 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         const id = q["isin"];
         if (!id || !ISIN.test(id)) return json(400, { error: "Invalid ISIN" });
         // Held nowhere now (a closed position): every account that traded it.
-        let accounts = q["account"] ? [q["account"]] : [...new Set(((await repo.getSnapshot("LATEST"))?.holdings ?? []).filter((h) => h.isin === id).map((h) => h.account))];
+        const account = accountParam(q);
+        let accounts = account ? [account] : [...new Set(((await repo.getSnapshot("LATEST"))?.holdings ?? []).filter((h) => h.isin === id).map((h) => h.account))];
         if (accounts.length === 0) accounts = [...new Set((await repo.listTransactions()).filter((t) => t.isin === id).map((t) => t.account))];
         const byDate = new Map<string, { date: string; value: number; cost: number; quantity: number }>();
         for (const a of accounts)
@@ -552,18 +576,25 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         return json(200, rows);
       }
       case "POST /transactions":
-        return await saveTransaction(bodyOf(event));
+        return await saveTransaction(bodyOf(event), userOf(event));
       case "PUT /transactions/{id}":
       case "DELETE /transactions/{id}": {
+        // ?date= (the stored date; the form sends it) makes the lookup one GetItem instead of a read of the account.
         const id = event.pathParameters?.["id"];
-        const account = q["account"];
+        const account = accountParam(q);
         if (!id || !account) return json(400, { error: "Needs the transaction id and ?account=" });
-        const existing = await repo.findTransaction(account, id);
+        const existing = await repo.findTransaction(account, id, q["date"] ? dateParam(q, "date") : undefined);
         if (!existing) return json(404, { error: `No transaction ${id} in ${account}` });
-        if (route.startsWith("PUT")) return await saveTransaction(bodyOf(event), existing);
+        if (route.startsWith("PUT")) return await saveTransaction(bodyOf(event), userOf(event), existing);
         await repo.deleteTransaction(existing);
+        await repo.putTransactionLog({ at: new Date().toISOString(), action: "deleted", by: userOf(event), before: withoutKeys(existing) });
         await queueValuation({ reason: "transaction deleted", from: existing.date });
         return json(200, withoutKeys(existing));
+      }
+      case "GET /transactions/log": {
+        // The audit trail: the latest changes made in the app (who, when, before and after), newest first.
+        const limit = Math.min(Math.max(Number(q["limit"] ?? 50) || 50, 1), 500);
+        return json(200, (await repo.listTransactionLog(limit)).map(({ PK: _p, SK: _s, ...e }) => e));
       }
       case "GET /instruments/lookup": {
         // A code typed in the form: an instrument already tracked, or a treasury series to add.

@@ -202,7 +202,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
         currency: cur,
         ...(note.trim() ? { note: note.trim() } : {}),
       };
-      if (editing) await apiSend("PUT", `/transactions/${editing.id}`, tx, { account: editing.account });
+      if (editing) await apiSend("PUT", `/transactions/${editing.id}`, tx, { account: editing.account, date: editing.date });
       else await apiSend("POST", "/transactions", tx);
       onSaved(editing ? "Transaction updated." : "Transaction added.");
     } catch (e) {
@@ -215,7 +215,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
     if (!editing) return;
     setBusy(true);
     try {
-      await apiSend("DELETE", `/transactions/${editing.id}`, undefined, { account: editing.account });
+      await apiSend("DELETE", `/transactions/${editing.id}`, undefined, { account: editing.account, date: editing.date });
       onSaved("Transaction deleted.");
     } catch (e) {
       setError((e as Error).message);

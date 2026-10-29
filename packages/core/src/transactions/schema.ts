@@ -6,10 +6,13 @@ import type { TransactionItem } from "../db/items.ts";
 
 export const transactionTypes = ["BUY", "SELL", "COUPON", "REDEMPTION", "DEPOSIT", "WITHDRAWAL", "FEE", "TAX", "INTEREST", "DIVIDEND", "SPLIT", "EXCHANGE", "WRITE_OFF"] as const;
 
+/** An account name: up to 100 characters, no "#" (it separates the parts of the table keys). */
+export const ACCOUNT_NAME = /^[^#]{1,100}$/;
+
 export const TransactionInput = z.object({
   id: z.string().min(1).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  account: z.string().min(1),
+  account: z.string().regex(ACCOUNT_NAME, "1–100 characters, no #"),
   type: z.enum(transactionTypes),
   isin: z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}\d$/).optional(),
   quantity: z.number().positive().optional(),

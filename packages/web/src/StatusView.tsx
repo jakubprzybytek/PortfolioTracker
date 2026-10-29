@@ -1,7 +1,7 @@
 import type { QualityReportItem } from "@portfolio/core/db/items";
 import type { QualityIssue } from "@portfolio/core/quality/quality";
 import { SkeletonRows } from "./Placeholders.tsx";
-import type { Status } from "./types.ts";
+import type { Status, Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
 const KIND_LABELS: Record<QualityIssue["kind"], string> = { gap: "Missing prices", stale: "Price stopped", jump: "Jump", range: "Out of range" };
@@ -98,6 +98,70 @@ export function StatusView() {
                 <td className={`left ${j?.status === "failed" ? "status-failed" : j?.status === "ok" ? "status-ok" : "muted"}`}>{j?.status ?? "–"}</td>
                 <td className="left muted" style={{ whiteSpace: "normal", maxWidth: 600 }}>
                   {j?.note ?? ""}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <TransactionLog />
+    </>
+  );
+}
+
+interface LogEntry {
+  at: string;
+  action: "added" | "edited" | "deleted";
+  by: string;
+  before?: Transaction;
+  after?: Transaction;
+}
+
+/** What changed in a transaction: the fields that differ, "old → new". */
+function changes(e: LogEntry): string {
+  const t = (e.after ?? e.before)!;
+  const what = `${t.date} · ${t.account} · ${t.type}${t.isin ? ` ${t.isin}` : ""} · ${t.amount} ${t.currency}`;
+  if (e.action !== "edited" || !e.before || !e.after) return what;
+  const before = e.before as unknown as Record<string, unknown>;
+  const after = e.after as unknown as Record<string, unknown>;
+  const diff = [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))
+    .map((k) => `${k}: ${String(before[k] ?? "–")} → ${String(after[k] ?? "–")}`);
+  return `${what}${diff.length ? ` (${diff.join(", ")})` : " (no change)"}`;
+}
+
+/** The audit trail: the latest changes to transactions made in the app. */
+function TransactionLog() {
+  const log = useApi<LogEntry[]>("/transactions/log", { limit: "30" });
+  return (
+    <>
+      <h2>Changes to transactions</h2>
+      {log.error && <p className="error">{log.error}</p>}
+      <div className="table-wrap">
+        <table data-testid="tx-log" className="static">
+          <thead>
+            <tr>
+              <th className="left">When</th>
+              <th className="left">Change</th>
+              <th className="left">Transaction</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!log.data && log.loading && <SkeletonRows rows={3} cols={3} />}
+            {log.data?.length === 0 && (
+              <tr>
+                <td className="left muted" colSpan={3}>
+                  No changes made in the app yet.
+                </td>
+              </tr>
+            )}
+            {log.data?.map((e) => (
+              <tr key={`${e.at}/${(e.after ?? e.before)?.id}`} data-testid="tx-log-row">
+                <td className="left muted">{e.at.replace("T", " ").slice(0, 16)}</td>
+                <td className="left">{e.action}</td>
+                <td className="left" style={{ whiteSpace: "normal" }}>
+                  {changes(e)}
                 </td>
               </tr>
             ))}
