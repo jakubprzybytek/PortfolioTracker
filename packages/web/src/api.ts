@@ -13,13 +13,24 @@ export function apiSend<T>(method: "POST" | "PUT" | "DELETE", path: string, body
   return request<T>(method, path, params, body);
 }
 
+/**
+ * The last answer to each GET with its ETag: asked again, the API answers 304 when nothing changed and this body is
+ * used, instead of the whole JSON coming again. Sent as `x-if-none-match` (CloudFront drops a standard
+ * If-None-Match on the uncached /api). Cleared with the session (clearAnswers).
+ */
+const answers = new Map<string, { etag: string; body: unknown }>();
+export const clearAnswers = () => answers.clear();
+
 async function request<T>(method: string, path: string, params: Record<string, string | undefined>, body?: unknown): Promise<T> {
   const url = new URL(API_URL + path, window.location.origin);
   for (const [k, v] of Object.entries(params)) if (v !== undefined) url.searchParams.set(k, v);
   const token = await accessToken();
   const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
   if (body !== undefined) headers["content-type"] = "application/json";
-  const res = await fetch(url, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+  const known = method === "GET" ? answers.get(url.href) : undefined;
+  if (known) headers["x-if-none-match"] = known.etag;
+  const res = await fetch(url, { method, headers, cache: "no-store", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+  if (res.status === 304 && known) return known.body as T;
   if (res.status === 401) {
     // Token missing, expired or revoked: back to the login form (the view stays in the URL).
     await logout();
@@ -34,5 +45,8 @@ async function request<T>(method: string, path: string, params: Record<string, s
     }
     throw new Error(message);
   }
-  return (await res.json()) as T;
+  const data = (await res.json()) as T;
+  const etag = res.headers.get("etag");
+  if (method === "GET" && etag) answers.set(url.href, { etag: etag.replace(/^W\//, ""), body: data });
+  return data;
 }

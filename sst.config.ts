@@ -356,7 +356,7 @@ export default $config({
     // The site calls the API on its own origin (/api through the Router); only `sst dev` (localhost) and the E2E tests
     // against the local dev server call API Gateway cross-origin, never on prod.
     const api = new sst.aws.ApiGatewayV2("Api", {
-      cors: { allowOrigins: [`https://${domain}`, ...(testing ? ["http://localhost:5173"] : [])], allowHeaders: ["authorization", "content-type"] },
+      cors: { allowOrigins: [`https://${domain}`, ...(testing ? ["http://localhost:5173"] : [])], allowHeaders: ["authorization", "content-type", "x-if-none-match"], exposeHeaders: ["etag"] },
       // A ceiling per route (the account's default is 10,000 requests/s): bounds what a flood can cost, mainly on the
       // feed, the one route without a login. The app's own bursts (a view's few requests, the E2E tests) stay well below.
       transform: {

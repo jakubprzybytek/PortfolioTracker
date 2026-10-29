@@ -229,10 +229,12 @@ describe(`API ${API}`, () => {
     expect(first.status).toBe(200);
     expect(first.headers.get("cache-control")).toBe("private, no-cache");
     const etag = first.headers.get("etag")!;
-    expect(etag).toMatch(/^"[A-Za-z0-9_-]{27}"$/);
-    const again = await get("/holdings", { headers: { "If-None-Match": etag } });
+    expect(etag).toMatch(/^(W\/)?"[A-Za-z0-9_-]{27}"$/); // weak once CloudFront has compressed it
+    // As the site sends it (CloudFront drops a standard If-None-Match on /api); a weak tag counts too.
+    const again = await get("/holdings", { headers: { "x-if-none-match": etag.replace(/^W\//, "") } });
     expect(again.status).toBe(304);
-    expect((await get("/holdings", { headers: { "If-None-Match": '"stale"' } })).status).toBe(200);
+    expect((await get("/holdings", { headers: { "x-if-none-match": etag } })).status).toBe(304);
+    expect((await get("/holdings", { headers: { "x-if-none-match": '"stale"' } })).status).toBe(200);
   });
 
   it("GET /portfolio/history refuses dates that aren't dates", async () => {

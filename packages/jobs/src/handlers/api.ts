@@ -306,15 +306,20 @@ async function fxHistoryOf(txs: TransactionItem[], to: string, more: string[] = 
 }
 
 /**
- * Every response: no caching by proxies, and a GET's 200 gets an ETag of its body, so the browser revalidates
- * (`no-cache`) and an unchanged answer comes back as a bodiless 304 instead of the whole JSON again.
+ * Every response: no caching by proxies, and a GET's 200 gets an ETag of its body; asked again with it, an unchanged
+ * answer is a bodiless 304 instead of the whole JSON. The site sends it as `x-if-none-match` (web/src/api.ts):
+ * CloudFront, caching nothing for /api, drops a standard If-None-Match before it reaches here.
  */
 export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
   const res = (await respond(event)) as Exclude<APIGatewayProxyResultV2, string>;
   const headers = { ...res.headers, "cache-control": "private, no-cache" };
   if (event.requestContext.http.method !== "GET" || res.statusCode !== 200 || typeof res.body !== "string") return { ...res, headers };
   const etag = `"${createHash("sha256").update(res.body).digest("base64url").slice(0, 27)}"`;
-  if (event.headers["if-none-match"] === etag) return { statusCode: 304, headers: { ...headers, etag } };
+  // CloudFront compresses the answer and makes the ETag weak (W/"…"), which the browser sends back as it is.
+  const asked = [event.headers["if-none-match"], event.headers["x-if-none-match"]]
+    .flatMap((h) => (h ?? "").split(","))
+    .map((t) => t.trim().replace(/^W\//, ""));
+  if (asked.includes(etag)) return { statusCode: 304, headers: { ...headers, etag } };
   return { ...res, headers: { ...headers, etag } };
 }
 

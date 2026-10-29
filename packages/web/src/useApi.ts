@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import useSWR, { mutate } from "swr";
-import { api } from "./api.ts";
+import { api, clearAnswers } from "./api.ts";
 import { apiKey, parseApiKey } from "./apiKey.ts";
 
 /**
@@ -36,7 +36,10 @@ function fetcher<T>(key: string): Promise<T> {
 export const reloadAll = () => void mutate(() => true);
 
 /** Forgets every cached response (logout: the next user must not see them). */
-export const clearApiCache = () => void mutate(() => true, undefined, { revalidate: false });
+export const clearApiCache = () => {
+  clearAnswers();
+  void mutate(() => true, undefined, { revalidate: false });
+};
 
 /** How many requests of useApi are under way: the "Reload" icon turns while any is. */
 const inFlight = (() => {

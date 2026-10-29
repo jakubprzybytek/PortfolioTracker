@@ -206,7 +206,9 @@ function Shell({ email }: { email: string }) {
       </nav>
       <main>
         <ErrorBoundary resetKey={route.view}>
-        <Suspense fallback={<p className="muted view-loading" data-testid="view-loading">Loading…</p>}>
+        {/* Keyed by view: switching views mounts the new one fresh. Unkeyed, a view left while the next one's code
+            was still loading stayed hidden with its state, and coming straight back showed that old instance. */}
+        <Suspense key={route.view} fallback={<p className="muted view-loading" data-testid="view-loading">Loading…</p>}>
         {route.view === "dashboard" && <DashboardView />}
         {route.view === "performance" && <PerformanceView key="performance" params={route.params} setParams={setParams} />}
         {route.view === "holdings" && <HoldingsView key="holdings" params={route.params} setParams={setParams} />}
