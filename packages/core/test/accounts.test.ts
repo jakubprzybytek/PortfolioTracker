@@ -30,20 +30,21 @@ describe("accountSummaries", () => {
     tx({ date: "2025-08-01", type: "WITHDRAWAL", amount: -500 }),
     tx({ date: "2025-03-01", account: "b", type: "DEPOSIT", amount: 2000 }),
   ];
-  const snap = { date: "2026-01-01", holdings: [holding("a", 9500)], accounts: { a: { cash: 765 }, b: { cash: 2000, incomplete: ["ETFs"] } } };
+  const snap = { date: "2026-01-01", holdings: [holding("a", 9500)], accounts: { a: { cash: 765 }, b: { cash: 2000 } } };
 
   it("per account: net deposits, value, cash, profit, income, costs and XIRR", () => {
     const { accounts } = accountSummaries(snap, txs);
     expect(accounts[0]).toMatchObject({ account: "a", netDeposits: 9500, positions: 9500, cash: 765, total: 10265, profit: 765, income: 300, costs: 35, firstDate: "2025-01-01" });
     expect(accounts[0]!.xirr!).toBeGreaterThan(0.07);
     expect(accounts[0]!.xirr!).toBeLessThan(0.09);
-    expect(accounts[1]).toMatchObject({ account: "b", incomplete: ["ETFs"], netDeposits: 2000, total: 2000, profit: 0 });
+    expect(accounts[1]).toMatchObject({ account: "b", netDeposits: 2000, total: 2000, profit: 0 });
   });
 
-  it("the total covers only fully tracked accounts", () => {
+  it("the total covers every account", () => {
     const { total } = accountSummaries(snap, txs);
-    expect(total).toMatchObject({ account: "Total", netDeposits: 9500, total: 10265, profit: 765 });
-    expect(total.xirr).toBeCloseTo(accountSummaries(snap, txs).accounts[0]!.xirr!, 6);
+    expect(total).toMatchObject({ account: "Total", netDeposits: 11500, total: 12265, profit: 765, firstDate: "2025-01-01" });
+    expect(total.xirr!).toBeGreaterThan(0);
+    expect(total.xirr!).toBeLessThan(accountSummaries(snap, txs).accounts[0]!.xirr!); // b earned nothing
   });
 
   it("an account emptied (no positions, no cash) is closed as of its last transaction, and still in the total", () => {
@@ -54,8 +55,8 @@ describe("accountSummaries", () => {
     expect(closed).toMatchObject({ closed: true, lastDate: "2025-07-01", netDeposits: -40, total: 0, profit: 40, income: 40 });
     expect(closed.xirr!).toBeGreaterThan(0.08); // 4 % in five months
     expect(accounts.find((a) => a.account === "a")!.closed).toBeUndefined();
-    expect(accounts.find((a) => a.account === "b")!.closed).toBeUndefined(); // incomplete, not closed
-    expect(total).toMatchObject({ netDeposits: 9460, profit: 805 });
+    expect(accounts.find((a) => a.account === "b")!.closed).toBeUndefined(); // still holds cash, not closed
+    expect(total).toMatchObject({ netDeposits: 11460, profit: 805 });
   });
 
   it("splits the profit: unrealised + realised (FIFO) + income − fees not in a trade; the rest is `other`", () => {

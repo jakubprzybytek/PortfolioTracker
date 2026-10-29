@@ -7,11 +7,21 @@ import { listingFromTicker } from "../instruments/listing.ts";
 import type { InstrumentInput } from "../instruments/schema.ts";
 import { privateAssetId } from "../prices/manual.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
-import { RETAIL_LABELS } from "./fromSheet.ts";
 import { TransactionInput } from "./schema.ts";
 
 /** Source of transactions entered in the app. */
 export const APP_SOURCE = "app";
+
+/** Polish names of the retail series kinds (EDO → emerytalne 10-letnie). */
+export const RETAIL_LABELS: Record<string, string> = {
+  EDO: "emerytalne 10-letnie",
+  COI: "indeksowane 4-letnie",
+  ROD: "rodzinne 12-letnie",
+  ROS: "rodzinne 6-letnie",
+  TOS: "stałoprocentowe 3-letnie",
+  ROR: "roczne",
+  DOR: "dwuletnie",
+};
 
 /** A transaction from the form: the import record without an id (the server gives one). */
 export const ManualTransaction = TransactionInput.omit({ id: true });

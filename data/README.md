@@ -7,7 +7,7 @@ Upload a file to the bucket under `imports/<kind>/` and the `Import` Lambda load
 | `mf-calculator` | `imports/mf-calculator/<name>.xlsm` | Ministry of Finance `kalkulatorodsetek.xlsm` from [gov.pl/web/finanse/kalkulatory2](https://www.gov.pl/web/finanse/kalkulatory2): CPI reference index + treasury bond terms. Import this first. |
 | `mf-retail` | `imports/mf-retail/<name>.xls` | Ministry of Finance "Dane dotyczące obligacji detalicznych" from [gov.pl/web/finanse/obligacje-detaliczne1](https://www.gov.pl/web/finanse/obligacje-detaliczne1): every retail bond series with its rates. Import before retail instruments. The `monthly` job also fetches it. |
 | `prices` | `imports/prices/<name>.json` | Manual prices for assets without a price source: `[{ "isin": "ZZ…", "date": "2026-10-11", "price": 1000, "currency": "PLN" }]`. A new value is easier entered in the app (its settings: the cog in its chart panel). |
-| `accounts` | `imports/accounts/<name>.json` | `[{ "account": "…", "incomplete": ["ETFs"] }]`: accounts whose assets aren't all tracked yet (their cash is shown greyed and not totalled). Written by the converter. |
+| `accounts` | `imports/accounts/<name>.json` | `[{ "account": "…", "baseCurrency": "EUR" }]`: account metadata; `baseCurrency` only for an account kept in another currency than PLN. |
 | `instruments` | `imports/instruments/<name>.json` | Instruments to track ([instruments.json](instruments.json)). `"terms": "mf"` resolves bond terms from the calculator by code. A new instrument starts its own history backfill. |
 | `coupons` | `imports/coupons/<name>.json` | Coupon periods of corporate bonds ([coupons.sample.json](coupons.sample.json)): `[{ "isin", "start", "end", "recordDate", "paymentDate", "datesSource", "rate": 0.0713, "rateSource": "manual" }]`. Easier in the app (its settings: the cog in its chart panel); the `coupons` job adds the dates from obligacje.pl. Mostly for restoring a backup. |
 | `transactions` | `imports/transactions/<name>.json` | Your transactions ([transactions.sample.json](transactions.sample.json) shows the format). Re-importing the same file is safe: ids are derived from the row contents. |
@@ -46,21 +46,7 @@ Transactions keep their ids and sources, so restoring into a table that still ha
 
 ## Transactions from the reference spreadsheet
 
-`scripts/sheet-to-transactions.ts` converts the "Transakcje" tab of the Google Sheets tracker (File → Download → Microsoft Excel) into a transactions file:
-
-```sh
-node scripts/sheet-to-transactions.ts ~/Downloads/portfolio.xlsx --mf-retail ~/Downloads/Dane_dotyczace_obligacji_detalicznych.xls
-# → data/private/: instruments.json, prices.json, accounts.json, transactions.json (gitignored); import in that order
-```
-
-- **Catalyst bonds:** list them in `data/private/catalyst.json` (`[{ "ticker": "CPS0130", "isin": "PLCFRPT00070", "nominal": 1000, "name": "Cyfrowy Polsat S.A. (WIBOR 6M + 3.85%)" }]`, from obligacje.pl; or `--catalyst <file>`). Buys/sells become % of nominal, coupons `COUPON` (as received, i.e. after tax in a taxable account). A bond still held is priced from BiznesRadar; one no longer held (usually redeemed) gets its trade prices as manual prices.
-- **IBKR:** foreign government bonds (ticker = ISIN; price per 1000 → % of nominal; `pricePath` from your trades plus 100 % at the maturity in the name while held) With `--native IBKR=EUR` the account is kept in its currencies: each trade and fee in the currency that paid it, the currency rows (`Waluty_EUR`) as exchanges, the account's own currency EUR. Without it, the sheet's PLN bookings (currency positions "EUR cash" bought and sold with PLN). No file needed.
-- **ETFs:** the sheet has no ISINs, so list them in `data/private/etfs.json` (`[{ "ticker": "AMS:VWRL", "isin": "IE00B3RBWM25" }]`, or pass `--etfs <file>`). Their buys, sells, dividends and splits are converted (EUR price, PLN amount and fee, the trade's `fxRate`); the ETF instruments (venue and Yahoo symbol from the ticker's exchange, splits from the sheet's Split rows) go to `data/private/instruments.json`.
-- Converts what the app can value: cash movements (deposits, withdrawals, interest, costs), the instruments in [instruments.json](instruments.json) (matched by code) and retail treasury bonds: the sheet's `EDO-110332` becomes series EDO0332 (ISIN from the Ministry file) with interest from 2022-03-11 (`valueDate`); COI/ROR interest becomes `COUPON`. Your retail series go to `data/private/instruments.json`: import it after the `mf-retail` file. Everything else is listed as skipped, with the reason (retail bonds, Catalyst bonds, ETFs, IBKR bonds, currency positions …); it gets converted once the app supports it.
-- Bond prices: the sheet stores PLN per bond; the file gets % of nominal. Buy amounts exclude the fee (the sheet's total includes it).
-- Ids are derived from the row contents, so re-running the script and re-importing never duplicates transactions, even after the sheet re-sorts its rows. Identical rows (e.g. two equal deposits on one day) get distinct ids.
-- The file is validated with the same schema as the Import Lambda before it's written.
-- The app is now where transactions are entered: don't re-import the sheet into `prod` (its newer rows would duplicate them). IBKR comes from its statements instead (below).
+The "Transakcje" tab of the Google Sheets tracker was converted once (2026-10-13) by `scripts/sheet-to-transactions.ts` and `packages/core/src/transactions/fromSheet.ts`; both were removed on 2026-10-29 (road map 25) and are in git history (before commit "Road map 25 (part 2)"). The app is now where transactions are entered: don't re-import the sheet into `prod` (its newer rows would duplicate them). IBKR comes from its statements instead (below).
 
 ## History before the app (2008–2022)
 

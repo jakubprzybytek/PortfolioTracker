@@ -20,8 +20,8 @@ export interface ValuationContext {
   couponPeriods: Map<string, InterestPeriod[]>;
   /** A price older than this many days is flagged stale (not for manual prices). */
   staleAfterDays?: number;
-  /** Account metadata: which accounts aren't fully tracked yet, their own currency. */
-  accounts?: { account: string; incomplete?: string[]; baseCurrency?: string }[];
+  /** Account metadata: each account's own currency. */
+  accounts?: { account: string; baseCurrency?: string }[];
   /** Latest NBP mid rate on or before `date` per currency (PLN per unit); derived from `fxHistory` when absent. */
   fx?: Map<string, { mid: number; date: IsoDate }>;
   /** All NBP mid rates per currency, oldest first: transactions in another currency count at the rate of the day before. */
@@ -189,7 +189,6 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
   const accounts: Record<string, AccountSnapshot> = {};
   let cashTotal = 0;
   for (const [account, byCurrency] of [...ledger.cashByAccount()].sort(([a], [b]) => a.localeCompare(b))) {
-    const missing = meta.get(account)?.incomplete ?? [];
     const baseCurrency = meta.get(account)?.baseCurrency;
     // Each currency at the day's NBP rate; the account's cash is their sum in PLN.
     let cash = 0;
@@ -205,10 +204,8 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
       cash: round2(cash),
       ...(foreign ? { currencies } : {}),
       ...(baseCurrency && baseCurrency !== "PLN" ? { baseCurrency } : {}),
-      ...(missing.length ? { incomplete: missing } : {}),
     };
-    // An incomplete account's cash misses the untracked purchases (it would be far too high): not in the total.
-    if (missing.length === 0) cashTotal += cash;
+    cashTotal += cash;
   }
   return { date, holdings, totals: { ...totals, cash: round2(cashTotal) }, accounts, byType, computedAt: new Date().toISOString() };
 }

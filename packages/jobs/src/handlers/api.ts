@@ -100,12 +100,11 @@ async function inflationIndicators() {
 }
 
 async function portfolioHistory(from: string, to: string) {
-  const [points, txs, accounts] = await Promise.all([repo.queryHistoryPoints(from, to), repo.listTransactions(), repo.listAccounts()]);
+  const [points, txs] = await Promise.all([repo.queryHistoryPoints(from, to), repo.listTransactions()]);
   const currencies = [...new Set(txs.filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL").map((t) => t.currency))].filter((c) => c && c !== "PLN");
   const first = txs.map((t) => t.date).sort()[0] ?? from;
   const fx: FxHistory = new Map(await Promise.all(currencies.map(async (c) => [c, (await repo.queryFxRates(c, addDays(first, -14), to)).sort((a, b) => a.date.localeCompare(b.date))] as const)));
-  const incomplete = new Set(accounts.filter((a) => a.incomplete?.length).map((a) => a.account));
-  const deposits = netDepositsByDate(txs, points.map((p) => p.date), fx, incomplete);
+  const deposits = netDepositsByDate(txs, points.map((p) => p.date), fx);
   return points.map((p) => ({ date: p.date, totals: p.totals, byType: p.byType, byClass: p.byClass, total: Math.round((p.totals.value + (p.totals.cash ?? 0)) * 100) / 100, netDeposits: deposits.get(p.date) ?? 0 }));
 }
 /**

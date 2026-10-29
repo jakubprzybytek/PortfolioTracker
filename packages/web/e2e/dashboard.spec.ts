@@ -25,10 +25,8 @@ test.describe("dashboard", () => {
     const parts = await page.getByTestId("profit-breakdown").locator(".value").allTextContents();
     expect(parts).toHaveLength(5);
     expect(Math.abs(parts.reduce((s, t) => s + num(t), 0) - profit)).toBeLessThan(0.02);
-    // Cash: bonds + broker + foreign + ibkr + ike (8 597,39) + eur (its EUR and USD at today's rate); the incomplete
-    // "etf" account is left out and the card says so
+    // Cash: bonds + broker + foreign + ibkr + ike (8 597,39) + eur (its EUR and USD at today's rate)
     await expect(page.getByTestId("total-cash")).toContainText(/\d\s\d{3},\d{2}\s*zł/);
-    await expect(page.getByTestId("total-cash")).toContainText("1 incomplete account not included");
     await expect(page.getByTestId("total-all")).toContainText("zł");
     // The cards stay compact: their note line isn't styled as a note of the Notes view (padding, 200 px tall)
     const card = await page.getByTestId("total-all").boundingBox();
@@ -65,10 +63,10 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("years-row").first().getByTestId("years-twr")).toContainText(value!);
   });
 
-  test("lists the accounts with net deposits, profit and XIRR; the incomplete one greyed and outside the total", async ({ page }) => {
+  test("lists the accounts with net deposits, profit and XIRR, and their total", async ({ page }) => {
     const rows = page.getByTestId("account-row");
-    await expect(rows).toHaveCount(7);
-    expect(await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute("data-account")))).toEqual(["bonds", "broker", "etf", "eur", "foreign", "ibkr", "ike"]);
+    await expect(rows).toHaveCount(6);
+    expect(await rows.evaluateAll((rs) => rs.map((r) => r.getAttribute("data-account")))).toEqual(["bonds", "broker", "eur", "foreign", "ibkr", "ike"]);
     // An account kept in EUR: a second line in EUR (deposits as made, 5 000 PLN at 4.2543 + 100 EUR)
     const base = page.locator('tr[data-testid="account-base-row"][data-account="eur"]');
     await expect(base.locator("td").nth(0)).toHaveText("└ in EUR");
@@ -78,9 +76,8 @@ test.describe("dashboard", () => {
     await expect(broker.locator("td").nth(4)).toHaveText(/zł$/); // unrealised
     await expect(broker.locator("td").nth(5)).toHaveText(/^0,00\s*zł$/); // realised: nothing sold
     await expect(broker.locator("td").nth(6)).toHaveText(/%$/); // XIRR
-    await expect(page.locator('tr[data-testid="account-row"][data-account="etf"]')).toHaveClass(/muted/);
     await expect(page.getByTestId("accounts-total").locator("td").nth(1)).toHaveText("66 403,69 zł");
-    await expect(page.getByTestId("accounts-total").locator("td").first()).toHaveText("Total (fully tracked accounts)"); // "etf" isn't // incl. the closed account's −20, and eur: 5 000 + 100 EUR at 4.2369
+    await expect(page.getByTestId("accounts-total").locator("td").first()).toHaveText("Total"); // incl. the closed account's −20, and eur: 5 000 + 100 EUR at 4.2369
   });
 
   test("folds closed accounts into one greyed row; they stay in the total", async ({ page }) => {

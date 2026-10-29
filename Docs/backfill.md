@@ -47,7 +47,7 @@ Reference data and transactions come first, because they define which instrument
 
 ### 3. Transactions
 - Entered by you: the app's "Add transaction" form, or a JSON file uploaded to `imports/transactions/` (format: data/README.md).
-- One converter per format, writing that JSON: the reference sheet (`scripts/sheet-to-transactions.ts`), IBKR activity statements (`scripts/ibkr-statements-to-transactions.ts`); IBKR Flex XML later.
+- One converter per format, writing that JSON: the reference sheet (`scripts/sheet-to-transactions.ts`, used once, removed 2026-10-29), IBKR activity statements (`scripts/ibkr-statements-to-transactions.ts`); IBKR Flex XML later.
 - `tx_id` = broker id where available, else a hash of (date, isin, type, quantity, amount), so re-imports don't create duplicates.
 
 ### 4–6. FX, CPI, retail bonds

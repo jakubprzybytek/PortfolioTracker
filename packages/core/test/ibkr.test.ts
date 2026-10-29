@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
 import { interpolatePricePath } from "../src/prices/pricePath.ts";
-import { convertSheetRows, maturityFromName, type SheetRow } from "../src/transactions/fromSheet.ts";
 import { parseTransactionFile } from "../src/transactions/schema.ts";
 import { cashByAccount } from "../src/valuation/cash.ts";
 import { positionKey, positionsAt } from "../src/valuation/positions.ts";
@@ -37,11 +36,6 @@ describe("price path", () => {
     expect(path.find((p) => p.date === "2026-10-02")!.price).toBe(97.22);
   });
 
-  it("reads the maturity from IBKR's bond names", () => {
-    expect(maturityFromName("DE Govt 0.0 Nov15'27")).toBe("2027-11-15");
-    expect(maturityFromName("US-T Govt Bill Oct01'26")).toBe("2026-10-01");
-    expect(maturityFromName("US912797XX00")).toBeUndefined();
-  });
 });
 
 describe("IBKR positions and valuation", () => {
@@ -77,37 +71,5 @@ describe("IBKR positions and valuation", () => {
     const by = Object.fromEntries(snap.holdings.map((h) => [h.isin, h]));
     expect(by[EUR]).toMatchObject({ type: "CURRENCY", quantity: 134, valuePerUnit: 4.3, value: 576.2, flags: [] });
     expect(by[OAT]).toMatchObject({ nominal: 1000, valuePerUnit: 4235.5, value: 21177.5, flags: [] }); // 98.5 % × 1000 × 4.3
-  });
-});
-
-describe("convertSheetRows: IBKR", () => {
-  const row = (r: Partial<SheetRow>): SheetRow => ({
-    row: 2, account: "IBKR", date: "2025-10-02", ticker: "Waluty_EUR", name: "Waluty_EUR", currency: "EUR", assetClass: "Waluty",
-    type: "Zakup", quantity: 10441, price: 1, fee: 0, fxRate: 4.25895, nominal: 1, totalPln: 44467.7, comment: "", ...r,
-  });
-
-  it("converts currency rows into a currency position and bond rows into a bond with a price path to maturity", () => {
-    const out = convertSheetRows(
-      [
-        row({}),
-        row({ ticker: OAT, name: "FR Govt 0.0 Feb25'27", assetClass: "Obligacje skarbowe zagraniczne", quantity: 5, price: 972.2, fee: 21.3, fxRate: 4.26, totalPln: 20729.16 }),
-        row({ type: "Sprzedaż", quantity: 4866, fxRate: 4.26, totalPln: 20729.16 }),
-      ],
-      new Map(),
-    );
-    expect(out.transactions.map((t) => [t.type, t.isin, t.quantity, t.price, t.fxRate, t.amount, t.fee])).toEqual([
-      ["BUY", EUR, 10441, 1, 4.25895, -44467.7, 0],
-      ["BUY", OAT, 5, 97.22, 4.26, -20707.86, 21.3],
-      ["SELL", EUR, 4866, 1, 4.26, 20729.16, 0],
-    ]);
-    expect(out.ibkrInstruments).toEqual([
-      {
-        isin: OAT, code: OAT, name: "FR Govt 0.0 Feb25'27", type: "BOND_IBKR", currency: "EUR", venue: "CALC", sourceIds: {}, active: true, nominal: 1000,
-        pricePath: [{ date: "2025-10-02", price: 97.22 }, { date: "2027-02-25", price: 100 }],
-      },
-      { isin: EUR, code: "EUR", name: "EUR cash", type: "CURRENCY", currency: "EUR", venue: "FX", sourceIds: {}, active: true },
-    ]);
-    expect(out.skipped).toEqual([]);
-    expect(() => parseTransactionFile(JSON.stringify(out.transactions), "check")).not.toThrow();
   });
 });

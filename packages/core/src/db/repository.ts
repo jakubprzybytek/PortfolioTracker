@@ -343,7 +343,7 @@ export class Repository {
   }
 
   /** Replaces the metadata of the given accounts (others are left alone). */
-  putAccounts(accounts: { account: string; incomplete?: string[]; baseCurrency?: string }[]): Promise<number> {
+  putAccounts(accounts: { account: string; baseCurrency?: string }[]): Promise<number> {
     const updatedAt = new Date().toISOString();
     return this.batchPut(
       "transactions",
@@ -352,7 +352,6 @@ export class Repository {
         GSI1PK: "ACCOUNT",
         GSI1SK: a.account,
         account: a.account,
-        ...(a.incomplete?.length ? { incomplete: a.incomplete } : {}),
         ...(a.baseCurrency && a.baseCurrency !== "PLN" ? { baseCurrency: a.baseCurrency } : {}),
         updatedAt,
       })),

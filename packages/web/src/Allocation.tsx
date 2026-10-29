@@ -52,9 +52,8 @@ export function Allocation({ snapshot }: { snapshot: Snapshot }) {
   }
   const cash = snapshot.totals.cash ?? 0;
   add(byType, "CASH", typeLabel("CASH"), cash);
-  // Cash in its own currency (fully tracked accounts, as in the totals).
+  // Cash in its own currency.
   for (const a of Object.values(snapshot.accounts ?? {})) {
-    if (a.incomplete?.length) continue;
     if (!a.currencies) add(byCurrency, "PLN", "PLN", a.cash);
     else for (const [ccy, c] of Object.entries(a.currencies)) add(byCurrency, ccy, ccy, c.value ?? 0);
   }

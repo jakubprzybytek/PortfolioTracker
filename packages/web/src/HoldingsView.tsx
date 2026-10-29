@@ -60,9 +60,6 @@ import {
 
 const GROUP_LABELS = { account: "Account", class: "Class", instrument: "Instrument" };
 
-/** Snapshots written before holdings carried their account have none. */
-const accountOf = (h: Holding) => h.account ?? "–";
-
 interface Sums {
   value: number;
   cost: number;
@@ -118,11 +115,10 @@ function SumCells({ s, xirr }: { s: Sums; xirr?: number | null }) {
 interface Group {
   name: string;
   holdings: Holding[];
-  /** Cash row, when shown (the account's cash is non-zero or it's incomplete): its PLN value. */
+  /** Cash row, when shown (the account's cash is non-zero): its PLN value. */
   cash: number | null;
   /** The cash per currency (PLN and others, each with its PLN value); one line without a currency for PLN-only accounts. */
   cashLines: CashLine[];
-  incomplete: string[];
   sums: Sums;
   /** Positions held no more ("Show closed"), last closed first. */
   closed: ClosedPosition[];
@@ -441,13 +437,11 @@ const cashLinesOf = (info: {
 function CashRow({
   account,
   line,
-  incomplete,
   label,
   second = typeLabel("CASH"),
 }: {
   account: string;
   line: CashLine;
-  incomplete: boolean;
   label: ReactNode;
   second?: ReactNode;
 }) {
@@ -457,7 +451,6 @@ function CashRow({
       data-testid="cash-row"
       data-account={account}
       data-currency={line.currency ?? "PLN"}
-      className={incomplete ? "muted" : ""}
     >
       <td className="left indent">
         {label}
@@ -475,15 +468,7 @@ function CashRow({
         {foreign && line.rate ? `${fmtNum(line.rate, 4)} PLN` : ""}
       </td>
       <td></td>
-      <td
-        title={
-          incomplete
-            ? "Incomplete: purchases of untracked assets are missing, so this is too high. Not included in the sums."
-            : ""
-        }
-      >
-        {fmtPln(line.value)}
-      </td>
+      <td>{fmtPln(line.value)}</td>
       <td colSpan={5}></td>
     </tr>
   );
@@ -517,22 +502,11 @@ function ExpandToggle({
   );
 }
 
-const IncompleteFlag = ({ what }: { what: string[] }) => (
-  <span
-    className="flag"
-    title="Not all assets of this account are tracked yet: its cash and value are incomplete"
-    data-testid="incomplete"
-  >
-    incomplete: {what.join(", ")} not tracked yet
-  </span>
-);
-
 /**
  * Latest snapshot, grouped by account (default) or by instrument (`?group=instrument`).
  * By account: accounts alphabetically, instruments sorted by code, then the account's cash.
  * By instrument: one row per instrument (by code) with the account it's in; one held in several accounts shows
  * "▸ n accounts" and expands into one row per account. Cash is one row the same way.
- * An incomplete account (not all of its assets tracked yet) shows its cash greyed and leaves it out of the sums.
  * Filters: account, asset class (as in the allocation; "Cash": the cash rows), asset type ("Cash" shows only the cash rows), free text (instruments whose name or code contains it; no cash rows then). "Show closed" (shared with Prices while the app is open) adds the positions held no
  * more, greyed, after the open ones (by account: in their account; by instrument: at the end), with their realised gain;
  * they're not in the sums. A closed row's chart ranges count back from the day it closed (ALL: the time it was held).
@@ -681,9 +655,9 @@ export function HoldingsView({
 
   const options = useMemo(() => {
     const names = new Set([
-      ...all.map(accountOf),
+      ...all.map((h) => h.account),
       ...Object.entries(accounts)
-        .filter(([, a]) => a.cash !== 0 || a.incomplete)
+        .filter(([, a]) => a.cash !== 0)
         .map(([n]) => n),
       ...closedAll.map((c) => c.account),
     ]);
@@ -722,12 +696,11 @@ export function HoldingsView({
       .filter((name) => !account || name === account)
       .map((name): Group => {
         const info = accounts[name];
-        const incomplete = info?.incomplete ?? [];
         // Text: instruments only (foreign cash isn't one).
         const holdings = all
           .filter(
             (h) =>
-              accountOf(h) === name &&
+              h.account === name &&
               (!cls || assetClassOf(h) === cls) &&
               (!type || shownType(h) === type) &&
               (!text.trim() || (!isForeignCash(h) && matchesText(text, h))),
@@ -738,7 +711,7 @@ export function HoldingsView({
           (!type || type === "CASH") &&
           !text.trim() &&
           info !== undefined &&
-          (info.cash !== 0 || incomplete.length > 0);
+          info.cash !== 0;
         const cash = showCash ? info.cash : null;
         const closed = closedShown.filter((c) => c.account === name);
         return {
@@ -746,11 +719,7 @@ export function HoldingsView({
           holdings,
           cash,
           cashLines: showCash ? cashLinesOf(info) : [],
-          incomplete,
-          sums: sums(
-            holdings,
-            cash !== null && incomplete.length === 0 ? cash : 0,
-          ),
+          sums: sums(holdings, cash ?? 0),
           closed,
         };
       })
@@ -769,7 +738,7 @@ export function HoldingsView({
       .map(([isin, hs]) => ({
         isin,
         first: hs[0]!,
-        holdings: hs.sort((a, b) => accountOf(a).localeCompare(accountOf(b))),
+        holdings: hs.sort((a, b) => a.account.localeCompare(b.account)),
         sums: sums(hs),
       }))
       .sort((a, b) => byCode(a.first, b.first));
@@ -784,7 +753,7 @@ export function HoldingsView({
   const cashRows = groups.filter((g) => g.cash !== null);
   const cashSums = sums(
     [],
-    cashRows.reduce((s, g) => s + (g.incomplete.length ? 0 : g.cash!), 0),
+    cashRows.reduce((s, g) => s + g.cash!, 0),
   );
 
   // By class: the same filtered rows, regrouped into shares, bonds, cash (the accounts' cash and foreign cash), other.
@@ -794,7 +763,7 @@ export function HoldingsView({
     return ASSET_CLASSES.map((cls): ClassGroup => {
       const hs = holdings
         .filter((h) => assetClassOf(h) === cls)
-        .sort((a, b) => byCode(a, b) || accountOf(a).localeCompare(accountOf(b)));
+        .sort((a, b) => byCode(a, b) || a.account.localeCompare(b.account));
       const cash = cls === "CASH" ? cashGroups : [];
       return {
         cls,
@@ -803,7 +772,7 @@ export function HoldingsView({
         closed: closedShown.filter((c) => assetClassOf(c) === cls),
         sums: sums(
           hs,
-          cash.reduce((n, g) => n + (g.incomplete.length ? 0 : g.cash!), 0),
+          cash.reduce((n, g) => n + g.cash!, 0),
         ),
       };
     }).filter(
@@ -828,10 +797,10 @@ export function HoldingsView({
       return (
         <tr
           key={g.isin}
-          className={`clickable${isSelected(g.isin, accountOf(only)) ? " selected" : ""}`}
+          className={`clickable${isSelected(g.isin, only.account) ? " selected" : ""}`}
           data-testid={`instrument-${g.first.code}`}
-          data-account={accountOf(only)}
-          onClick={() => select(g.isin, accountOf(only))}
+          data-account={only.account}
+          onClick={() => select(g.isin, only.account)}
           title={
             isForeignCash(only)
               ? FOREIGN_CASH_TITLE
@@ -839,7 +808,7 @@ export function HoldingsView({
           }
         >
           <td className="left instrument">{label}</td>
-          <td className="left">{accountOf(only)}</td>
+          <td className="left">{only.account}</td>
           <td>{fmtQty(only)}</td>
           <PriceCell h={only} />
           <td>
@@ -886,14 +855,14 @@ export function HoldingsView({
         {open &&
           g.holdings.map((h) => (
             <HoldingRow
-              key={`${g.isin}/${accountOf(h)}`}
+              key={`${g.isin}/${h.account}`}
               h={h}
-              account={accountOf(h)}
+              account={h.account}
               label=""
-              second={<span className="sub">└ {accountOf(h)}</span>}
+              second={<span className="sub">└ {h.account}</span>}
               detail={false}
-              selected={isSelected(g.isin, accountOf(h))}
-              onSelect={() => select(g.isin, accountOf(h))}
+              selected={isSelected(g.isin, h.account)}
+              onSelect={() => select(g.isin, h.account)}
               xirr={xirrOf([h])}
             />
           ))}
@@ -922,14 +891,14 @@ export function HoldingsView({
         </tr>
         {positions.map((h) => (
           <HoldingRow
-            key={`${accountOf(h)}/${h.isin}`}
+            key={`${h.account}/${h.isin}`}
             h={h}
-            account={accountOf(h)}
+            account={h.account}
             detail
-            selected={isSelected(h.isin, accountOf(h))}
-            onSelect={() => select(h.isin, accountOf(h))}
+            selected={isSelected(h.isin, h.account)}
+            onSelect={() => select(h.isin, h.account)}
             label={labelOf(h)}
-            second={accountOf(h)}
+            second={h.account}
             xirr={xirrOf([h])}
           />
         ))}
@@ -939,29 +908,21 @@ export function HoldingsView({
               key={`${c.name}/${line.currency ?? "PLN"}`}
               account={c.name}
               line={line}
-              incomplete={c.incomplete.length > 0}
               label={<strong>Cash</strong>}
-              second={
-                <>
-                  {c.name}{" "}
-                  {c.incomplete.length > 0 && (
-                    <IncompleteFlag what={c.incomplete} />
-                  )}
-                </>
-              }
+              second={c.name}
             />
           )),
         )}
         {g.holdings.filter(isForeignCash).map((h) => (
           <HoldingRow
-            key={`${accountOf(h)}/${h.isin}`}
+            key={`${h.account}/${h.isin}`}
             h={h}
-            account={accountOf(h)}
+            account={h.account}
             detail
-            selected={isSelected(h.isin, accountOf(h))}
-            onSelect={() => select(h.isin, accountOf(h))}
+            selected={isSelected(h.isin, h.account)}
+            onSelect={() => select(h.isin, h.account)}
             label={labelOf(h)}
-            second={accountOf(h)}
+            second={h.account}
           />
         ))}
         {g.closed.length > 0 && (
@@ -1146,16 +1107,8 @@ export function HoldingsView({
                     key={line.currency ?? "PLN"}
                     account={cashRows[0]!.name}
                     line={line}
-                    incomplete={cashRows[0]!.incomplete.length > 0}
                     label={<strong>Cash</strong>}
-                    second={
-                      <>
-                        {cashRows[0]!.name}{" "}
-                        {cashRows[0]!.incomplete.length > 0 && (
-                          <IncompleteFlag what={cashRows[0]!.incomplete} />
-                        )}
-                      </>
-                    }
+                    second={cashRows[0]!.name}
                   />
                 ))}
               </>
@@ -1175,9 +1128,7 @@ export function HoldingsView({
                     />
                   </td>
                   <td colSpan={3}></td>
-                  <td title="Accounts whose assets are all tracked (incomplete ones are greyed when expanded)">
-                    {fmtPln(cashSums.value)}
-                  </td>
+                  <td>{fmtPln(cashSums.value)}</td>
                   <td colSpan={5}></td>
                 </tr>
                 {expanded.has("cash") &&
@@ -1187,16 +1138,8 @@ export function HoldingsView({
                         key={`${g.name}/${line.currency ?? "PLN"}`}
                         account={g.name}
                         line={line}
-                        incomplete={g.incomplete.length > 0}
                         label=""
-                        second={
-                          <>
-                            <span className="sub">└ {g.name}</span>{" "}
-                            {g.incomplete.length > 0 && (
-                              <IncompleteFlag what={g.incomplete} />
-                            )}
-                          </>
-                        }
+                        second={<span className="sub">└ {g.name}</span>}
                       />
                     )),
                   )}
@@ -1235,9 +1178,6 @@ export function HoldingsView({
                     <td className="left" colSpan={5}>
                       {g.name}{" "}
                       <span className="muted">· {g.holdings.length}</span>
-                      {g.incomplete.length > 0 && (
-                        <IncompleteFlag what={g.incomplete} />
-                      )}
                     </td>
                     <SumCells s={g.sums} xirr={xirrOf(g.holdings)} />
                   </tr>
@@ -1260,7 +1200,6 @@ export function HoldingsView({
                       key={line.currency ?? "PLN"}
                       account={g.name}
                       line={line}
-                      incomplete={g.incomplete.length > 0}
                       label={<strong>Cash</strong>}
                     />
                   ))}
@@ -1298,12 +1237,7 @@ export function HoldingsView({
             {groupCount > 1 && (
               <tr className="total" data-testid="holdings-total">
                 <td className="left" colSpan={5}>
-                  Total{" "}
-                  {groups.some((g) => g.incomplete.length > 0) && (
-                    <span className="muted">
-                      (cash of incomplete accounts not included)
-                    </span>
-                  )}
+                  Total
                 </td>
                 <SumCells
                   s={total}

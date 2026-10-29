@@ -5,30 +5,22 @@ import type { AccountSummary } from "./types.ts";
 
 const pct = (v: number | null) => (v === null ? "–" : fmtPct(v * 100));
 
-/** `partial`: the total row when some account isn't fully tracked (it's left out, so say so). */
-function Row({ a, total = false, partial = false }: { a: AccountSummary; total?: boolean; partial?: boolean }) {
-  const incomplete = !!a.incomplete?.length;
+function Row({ a, total = false }: { a: AccountSummary; total?: boolean }) {
   return (
     <tr
-      className={total ? "total" : incomplete ? "muted" : a.closed ? "closed" : ""}
+      className={total ? "total" : a.closed ? "closed" : ""}
       data-testid={total ? "accounts-total" : "account-row"}
       data-account={a.account}
       title={
-        incomplete
-          ? `Incomplete: ${a.incomplete!.join(", ")} not tracked yet. Its figures are partial and not in the total.`
-          : a.closed
-            ? `Closed: emptied on ${a.lastDate}. Its profit stays in the total.`
-            : ""
+        a.closed ? `Closed: emptied on ${a.lastDate}. Its profit stays in the total.` : ""
       }
     >
       <td className="left">
         {total ? (
-          <>
-            Total {partial && <span className="muted">(fully tracked accounts)</span>}
-          </>
+          "Total"
         ) : (
           <>
-            {a.closed ? <span className="sub">└ {a.account}</span> : a.account} {incomplete && <span className="flag">incomplete</span>}
+            {a.closed ? <span className="sub">└ {a.account}</span> : a.account}
             {a.closed && <span className="flag">closed {a.lastDate}</span>}
           </>
         )}
@@ -122,7 +114,7 @@ export function AccountsTable({ data }: { data: AccountsData }) {
             </tr>
           )}
           {showClosed && closed.map((a) => <Row key={a.account} a={a} />)}
-          {data.data && <Row a={data.data.total} total partial={data.data.accounts.some((a) => a.incomplete?.length)} />}
+          {data.data && <Row a={data.data.total} total />}
         </tbody>
       </table>
     </div>

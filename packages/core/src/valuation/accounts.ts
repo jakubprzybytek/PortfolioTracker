@@ -1,5 +1,5 @@
 // Per-account summary for the Dashboard: money put in, what it's worth now, profit, income, costs and the
-// money-weighted annual return (XIRR). Accounts not fully tracked are listed but left out of the total.
+// money-weighted annual return (XIRR), and their total.
 
 import type { IsoDate } from "../dates.ts";
 import type { SnapshotItem, TransactionItem } from "../db/items.ts";
@@ -12,8 +12,6 @@ export { xirr, type CashFlow } from "./xirr.ts";
 
 export interface AccountSummary {
   account: string;
-  /** What isn't tracked yet (the figures are then incomplete and not in the total). */
-  incomplete?: string[];
   /** Nothing left in it (no positions, no cash): `lastDate` is when it was emptied. */
   closed?: true;
   /** Date of its last transaction. */
@@ -53,8 +51,8 @@ export interface AccountSummary {
 
 const INCOME = new Set<TransactionItem["type"]>(["COUPON", "INTEREST", "DIVIDEND"]);
 
-/** One row per account of the snapshot (and any account with transactions), sorted by name, plus the total of the complete ones. */
 /**
+ * One row per account of the snapshot (and any account with transactions), sorted by name, plus their total.
  * Money in another currency than PLN counts at the NBP rate of the day before (`fx`), as Polish tax does; without a
  * rate, at the broker's (`fxRate`) or not at all.
  */
@@ -97,7 +95,7 @@ export function accountSummaries(
     const total = round2(positions + cash);
     const flows = flowsOf(own);
     const held = snapshot.holdings.some((h) => h.account === account && h.quantity !== 0);
-    const closed = !info?.incomplete?.length && !held && cash === 0 && own.length > 0;
+    const closed = !held && cash === 0 && own.length > 0;
     const netDeposits = round2(-flows.reduce((s, f) => s + f.amount, 0));
     const profit = round2(total - netDeposits);
     const income = round2(own.filter((t) => INCOME.has(t.type)).reduce((s, t) => s + plnOf(t), 0));
@@ -106,7 +104,6 @@ export function accountSummaries(
     const fees = round2(own.reduce((s, t) => s + plnOf(t, t.type === "FEE" || t.type === "TAX" ? -t.amount : t.type === "EXCHANGE" ? (t.fee ?? 0) : 0), 0));
     return {
       account,
-      ...(info?.incomplete?.length ? { incomplete: info.incomplete } : {}),
       ...(closed ? { closed: true as const } : {}),
       netDeposits,
       positions,
@@ -126,10 +123,8 @@ export function accountSummaries(
     };
   });
 
-  const complete = rows.filter((r) => !r.incomplete);
   const sum = (k: "netDeposits" | "positions" | "cash" | "total" | "profit" | "income" | "costs" | "unrealised" | "realised" | "fees" | "other") =>
-    round2(complete.reduce((s, r) => s + r[k], 0));
-  const completeNames = new Set(complete.map((r) => r.account));
+    round2(rows.reduce((s, r) => s + r[k], 0));
   const total: AccountSummary = {
     account: "Total",
     netDeposits: sum("netDeposits"),
@@ -143,20 +138,20 @@ export function accountSummaries(
     realised: sum("realised"),
     fees: sum("fees"),
     other: sum("other"),
-    xirr: xirr([...flowsOf(txs.filter((t) => completeNames.has(t.account))), { date, amount: sum("total") }]),
-    firstDate: complete.map((r) => r.firstDate).sort()[0] ?? date,
-    lastDate: complete.map((r) => r.lastDate).sort().at(-1) ?? date,
+    xirr: xirr([...flowsOf(txs), { date, amount: sum("total") }]),
+    firstDate: rows.map((r) => r.firstDate).sort()[0] ?? date,
+    lastDate: rows.map((r) => r.lastDate).sort().at(-1) ?? date,
   };
   return { accounts: rows, total };
 }
 
 /**
  * Money put in minus taken out (deposits − withdrawals) up to and including each of `dates`, in PLN: other currencies
- * at the NBP rate of the day before, as in the account summary. Accounts in `exclude` (not fully tracked) left out.
+ * at the NBP rate of the day before, as in the account summary.
  */
-export function netDepositsByDate(transactions: TransactionItem[], dates: IsoDate[], fx?: FxHistory, exclude: Set<string> = new Set()): Map<IsoDate, number> {
+export function netDepositsByDate(transactions: TransactionItem[], dates: IsoDate[], fx?: FxHistory): Map<IsoDate, number> {
   const flows = transactions
-    .filter((t) => (t.type === "DEPOSIT" || t.type === "WITHDRAWAL") && !exclude.has(t.account))
+    .filter((t) => t.type === "DEPOSIT" || t.type === "WITHDRAWAL")
     .map((t) => ({ date: t.date, pln: (t.currency || "PLN") === "PLN" ? t.amount : t.amount * (rateD1(fx, t.currency, t.date) ?? NaN) }))
     .sort((a, b) => a.date.localeCompare(b.date));
   const out = new Map<IsoDate, number>();

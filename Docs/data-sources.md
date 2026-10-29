@@ -19,7 +19,7 @@ Transactions are the only data the app can't fetch or rebuild (data-storage.md).
 | Source | Accounts | Since | How |
 |---|---|---|---|
 | **The app** ("Add transaction" form, ui.md) | all | 2026-10-13 | Entered by you; `source: "app"`. **The app is now the record**: new transactions go here, not into the spreadsheet. |
-| **The reference spreadsheet** ("Transakcje" tab) | all but IBKR | history up to 2026-10-13 | Converted once by `scripts/sheet-to-transactions.ts` (data/README.md). Not re-imported any more: its newer rows would duplicate what's entered in the app. |
+| **The reference spreadsheet** ("Transakcje" tab) | all but IBKR | history up to 2026-10-13 | Converted once by `scripts/sheet-to-transactions.ts` (removed 2026-10-29; in git history). Not re-imported any more: its newer rows would duplicate what's entered in the app. |
 | **IBKR activity statements** (CSV) | IBKR | whole history | Converted by `scripts/ibkr-statements-to-transactions.ts`; replaced the sheet's IBKR rows on 2026-10-13 (below). |
 
 ### IBKR activity statements – IBKR transactions (used, 2026-10-13)

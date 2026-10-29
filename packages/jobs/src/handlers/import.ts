@@ -3,7 +3,7 @@
 //   imports/mf-retail/*.xls        Ministry retail-bond file → series terms and published rates (also fetched monthly)
 //   imports/instruments/*.json     instruments to track (terms "mf"/"mf-retail" resolved from the imported files)
 //   imports/prices/*.json          manual prices [{ isin, date, price, currency? }] (assets without a price source)
-//   imports/accounts/*.json        account metadata [{ account, incomplete: ["ETFs", …] }]
+//   imports/accounts/*.json        account metadata [{ account, baseCurrency? }]
 //   imports/coupons/*.json         coupon periods of corporate bonds [{ isin, start, end, recordDate, paymentDate, rate … }]
 //   imports/transactions/*.json    your transactions
 //   imports/notes/*.json           notes [{ id, title, body, createdAt, updatedAt }] (the backup's notes.json)

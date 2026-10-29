@@ -39,7 +39,7 @@ export function instrumentInput(i: InstrumentItem): InstrumentInput {
 export function exportFiles(data: { accounts: AccountItem[]; instruments: InstrumentItem[]; manualPrices: PriceItem[]; couponPeriods?: CouponPeriodItem[]; transactions: TransactionItem[]; notes?: NoteItem[] }): Record<ExportKind, unknown[]> {
   const accounts = [...data.accounts]
     .sort((a, b) => a.account.localeCompare(b.account))
-    .map((a) => ({ account: a.account, ...(a.incomplete?.length ? { incomplete: a.incomplete } : {}), ...(a.baseCurrency ? { baseCurrency: a.baseCurrency } : {}) }));
+    .map((a) => ({ account: a.account, ...(a.baseCurrency ? { baseCurrency: a.baseCurrency } : {}) }));
   const instruments = data.instruments
     .filter((i) => !PSEUDO.has(i.isin))
     .sort((a, b) => a.isin.localeCompare(b.isin))

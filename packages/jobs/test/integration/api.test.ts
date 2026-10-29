@@ -130,9 +130,9 @@ describe(`API ${API}`, () => {
     expect(edo.valuePerUnit!).toBeGreaterThan(106); // 100 + 6.00 after year 1, plus year-2 interest so far
     // Manually valued: the latest manual price (950 on 2026-09-30), never stale; its income counts as received.
     expect(by["ike/SAMPLE-APARTMENT"]).toMatchObject({ type: "FUND_MANUAL", quantity: 1, cost: 900, value: 950, gain: 50, couponsReceived: 12.5, flags: [] });
-    // Cash per account; the incomplete account's cash is shown but not in the total.
+    // Cash per account.
     const { eur, ...plnOnly } = snap.accounts!;
-    expect(plnOnly).toEqual({ bonds: { cash: 1013.9 }, broker: { cash: 5420.86 }, closed: { cash: 0 }, etf: { cash: 2000, incomplete: ["ETFs"] }, foreign: { cash: 663.14 }, ibkr: { cash: 1400 }, ike: { cash: 99.49 } });
+    expect(plnOnly).toEqual({ bonds: { cash: 1013.9 }, broker: { cash: 5420.86 }, closed: { cash: 0 }, foreign: { cash: 663.14 }, ibkr: { cash: 1400 }, ike: { cash: 99.49 } });
     // An account in several currencies: cash per currency (EUR 1000 − 962 − 1.25 − 20 + 100), each at today's NBP rate.
     expect(eur).toMatchObject({ baseCurrency: "EUR", currencies: { PLN: { amount: 700, value: 700 }, EUR: { amount: 116.75 }, USD: { amount: 23.2 } } });
     for (const c of Object.values(eur!.currencies!)) expect(c.value!).toBeCloseTo(c.amount * (c.rate ?? 1), 1);
@@ -190,21 +190,19 @@ describe(`API ${API}`, () => {
     for (const h of r.body.holdings) expect(r.body.flows[`${h.account}|${h.isin}`]![0]![1]).toBeLessThan(0);
   });
 
-  it("GET /accounts gives each account's net deposits, value, profit, income, costs and XIRR; the total skips incomplete ones", async () => {
-    type Row = { account: string; incomplete?: string[]; closed?: true; lastDate: string; netDeposits: number; positions: number; cash: number; total: number; profit: number; income: number; costs: number; xirr: number | null };
+  it("GET /accounts gives each account's net deposits, value, profit, income, costs and XIRR, and their total", async () => {
+    type Row = { account: string; closed?: true; lastDate: string; netDeposits: number; positions: number; cash: number; total: number; profit: number; income: number; costs: number; xirr: number | null };
     const { status, body } = await get<{ date: string; accounts: Row[]; total: Row }>("/accounts");
     expect(status).toBe(200);
     const snap = (await get<SnapshotItem>("/holdings")).body;
     expect(body.date).toBe(snap.date);
-    expect(body.accounts.map((a) => a.account)).toEqual(["bonds", "broker", "closed", "etf", "eur", "foreign", "ibkr", "ike"]);
+    expect(body.accounts.map((a) => a.account)).toEqual(["bonds", "broker", "closed", "eur", "foreign", "ibkr", "ike"]);
     const by = Object.fromEntries(body.accounts.map((a) => [a.account, a]));
     // Money in EUR at the NBP rate of the day before (2025-11-28: 4.2369); in the account's own EUR, the PLN at 2025-10-31's 4.2543.
     expect(by["eur"]).toMatchObject({ netDeposits: 5423.69, costs: 5.32, base: { currency: "EUR", netDeposits: 1275.28 } });
     expect(by["broker"]).toMatchObject({ netDeposits: 30000, cash: 5420.86, income: 914.2, costs: 50.88 }); // coupons 350 + 214.2 + 350; fees 31.8 + 19.08
     expect(by["ike"]).toMatchObject({ netDeposits: 6000, cash: 99.49, income: 12.5, costs: 8.01 });
     expect(by["bonds"]).toMatchObject({ netDeposits: 5000, cash: 1013.9, income: 70, costs: 8.1 });
-    expect(by["etf"]).toMatchObject({ incomplete: ["ETFs"], netDeposits: 2000, cash: 2000 });
-    expect(by["etf"]!.closed).toBeUndefined();
     // emptied (1000 in, 20 interest, 1020 out): closed, its profit still in the total
     expect(by["closed"]).toMatchObject({ closed: true, lastDate: "2025-07-01", netDeposits: -20, positions: 0, cash: 0, total: 0, profit: 20, income: 20 });
     expect(by["broker"]!.closed).toBeUndefined();
@@ -221,7 +219,7 @@ describe(`API ${API}`, () => {
     }
     expect(by["broker"]!.xirr).not.toBeNull();
     expect(by["ibkr"]).toMatchObject({ netDeposits: 10000, cash: 1400 });
-    expect(body.total).toMatchObject({ account: "Total", netDeposits: 66403.69 }); // without the incomplete "etf"
+    expect(body.total).toMatchObject({ account: "Total", netDeposits: 66403.69 });
     expect(body.total.cash).toBeCloseTo(snap.totals.cash!, 1);
     expect(body.total.total).toBeCloseTo(snap.totals.value + snap.totals.cash!, 1);
   });
@@ -300,12 +298,12 @@ describe(`API ${API}`, () => {
   it("GET /transactions lists all transactions newest first, with their instrument", async () => {
     const { status, body } = await get<{ date: string; account: string; type: string; isin?: string; instrument: { code: string; type: string } | null }[]>("/transactions");
     expect(status).toBe(200);
-    expect(body).toHaveLength(31);
+    expect(body).toHaveLength(30);
     const dates = body.map((t) => t.date);
     expect(dates).toEqual([...dates].sort().reverse());
     expect(body[0]).toMatchObject({ date: "2026-09-30", account: "ike", type: "INTEREST", instrument: { code: "SAMPLE-APARTMENT", type: "FUND_MANUAL" } });
     expect(body.filter((t) => t.type === "DEPOSIT").every((t) => t.instrument === null)).toBe(true);
-    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["bonds", "broker", "closed", "etf", "eur", "foreign", "ibkr", "ike"]));
+    expect(new Set(body.map((t) => t.account))).toEqual(new Set(["bonds", "broker", "closed", "eur", "foreign", "ibkr", "ike"]));
     expect(body.find((t) => t.type === "SPLIT")).toMatchObject({ account: "foreign", ratio: 100, amount: 0, instrument: { code: "SPXS", type: "ETF" } });
   });
 
@@ -694,7 +692,7 @@ describe(`API ${API}`, () => {
     expect(body.year).toBe(2025);
     expect(body.years.slice(-1)).toEqual([2025]);
     const of = (a: string) => body.accounts.find((x) => x.account === a);
-    // In use in 2025, by name; "etf" and "bonds" got their first money in 2026.
+    // In use in 2025, by name; "bonds" got its first money in 2026.
     expect(body.accounts.map((a) => a.account).filter((a) => !a.startsWith("api-") && !a.startsWith("e2e"))).toEqual(["broker", "closed", "eur", "foreign", "ibkr", "ike"]);
     expect(of("broker")!.net[1]).toBe(30000);
     expect(of("closed")!.net).toEqual([0, 0, 1000, 0, 0, 0, -1020, 0, 0, 0, 0, 0]);

@@ -72,7 +72,6 @@ export function DashboardView() {
 
   const snap = holdings.data;
   const totals = snap?.totals;
-  const incomplete = Object.values(snap?.accounts ?? {}).filter((a) => a.incomplete?.length).length;
   const cash = totals?.cash;
   const cardsLoading = !snap && holdings.loading;
   const failedJobs = Object.entries(status.data?.jobs ?? {}).filter(([, j]) => j?.status === "failed");
@@ -102,7 +101,7 @@ export function DashboardView() {
 
       <section className="cards" data-testid="totals">
         <Card loading={cardsLoading} label="Total" value={fmtPln(totals && cash !== undefined ? totals.value + cash : totals?.value)} testId="total-all" note={totals ? `positions ${fmtPln(totals.value)} + cash` : undefined} />
-        <Card loading={cardsLoading} label="Cash" value={fmtPln(cash)} testId="total-cash" note={incomplete ? `${incomplete} incomplete account${incomplete > 1 ? "s" : ""} not included` : undefined} />
+        <Card loading={cardsLoading} label="Cash" value={fmtPln(cash)} testId="total-cash" />
         <Card loading={sumLoading} label="Net deposits" value={fmtPln(sum?.netDeposits)} testId="total-deposits" note="money put in − taken out" />
         <Card
           loading={sumLoading}

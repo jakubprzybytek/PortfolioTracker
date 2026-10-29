@@ -11,7 +11,6 @@
   { "date": "2025-09-15", "account": "ike", "type": "DEPOSIT", "amount": 1000, "note": "for the retail bond (sample data)" },
   { "date": "2026-06-01", "account": "ike", "type": "BUY", "isin": "ZZSAMPLEAPA0", "quantity": 1, "price": 900, "amount": -900, "note": "manually valued asset (sample data)" },
   { "date": "2026-09-30", "account": "ike", "type": "INTEREST", "isin": "ZZSAMPLEAPA0", "amount": 12.5 },
-  { "date": "2026-01-10", "account": "etf", "type": "DEPOSIT", "amount": 2000, "note": "account whose ETFs aren't tracked (sample data)" },
   { "date": "2025-08-01", "account": "foreign", "type": "DEPOSIT", "amount": 10000, "note": "account with an ETF priced in EUR (sample data)" },
   { "date": "2025-08-11", "account": "foreign", "type": "BUY", "isin": "IE00B3YCGJ38", "quantity": 2, "price": 1093.04, "fxRate": 4.2619, "amount": -9316.86, "fee": 20, "note": "EUR price; amount in PLN at the broker's rate" },
   { "date": "2025-12-15", "account": "foreign", "type": "SPLIT", "isin": "IE00B3YCGJ38", "ratio": 100, "amount": 0, "note": "100:1 split" },

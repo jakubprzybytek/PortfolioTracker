@@ -175,7 +175,7 @@ PK = ACCT#<account>         SK = META
 GSI1PK = ACCOUNT            GSI1SK = <account>
 ```
 
-`account`, `incomplete` (kinds of assets not tracked yet, e.g. `["ETFs"]`; absent = complete), `updatedAt`. Imported from `imports/accounts/` (written by the sheet converter). An incomplete account's cash is shown but not added to the total.
+`account`, `baseCurrency` (the account's own currency, e.g. `EUR` at IBKR; absent = PLN), `updatedAt`. Imported from `imports/accounts/`. (Until 2026-10-29 also `incomplete`: kinds of assets not tracked yet, from the sheet import; every account has been complete since 2026-10-13.)
 
 ### Transactions
 
@@ -233,7 +233,7 @@ PK = PORTFOLIO              SK = SNAP#<YYYY-MM-DD>
 PK = PORTFOLIO              SK = SNAP#LATEST
 ```
 
-Written by the valuation job: `accounts` (per account: `cash`, `incomplete`), `totals.cash` (complete accounts only), and one holding per **account and instrument** (the same bond in two accounts is two holdings), sorted by account then code. Per holding `account`, `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart, dashboard and Holdings view come from these items. Snapshots written before 2026-10-11 have no `account`; only `SNAP#LATEST` is read per holding, and every valuation run rewrites it.
+Written by the valuation job: `accounts` (per account: `cash`, its `currencies` and `baseCurrency` when it holds others), `totals.cash`, and one holding per **account and instrument** (the same bond in two accounts is two holdings), sorted by account then code. Per holding `account`, `quantity`, `price`, `price_date`, `nominal`, `accrued_interest`, `value_per_unit`, `value`, `cost`, `coupons_received`, `gain`; totals; values per asset type. The UI's history chart, dashboard and Holdings view come from these items. Every snapshot on prod carries `account` (checked 2026-10-29: the ones written before 2026-10-11 have since been rewritten).
 Items stay small: about 25 holdings, well under the 400 KB item limit.
 
 ### History points

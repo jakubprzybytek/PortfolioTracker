@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
 import { listingFromTicker } from "../src/instruments/listing.ts";
 import { adjustForSplits, splitFactorAfter, unadjustSplits } from "../src/prices/splits.ts";
-import { convertSheetRows, type SheetRow } from "../src/transactions/fromSheet.ts";
 import { parseTransactionFile } from "../src/transactions/schema.ts";
 import { cashByAccount } from "../src/valuation/cash.ts";
 import { positionKey, positionsAt } from "../src/valuation/positions.ts";
@@ -105,40 +104,5 @@ describe("ETF positions and valuation", () => {
     const [row] = priceRows([etf], new Map([[SPXS, price("2026-08-14", 13.5)]]), new Map([[SPXS, price("2025-08-14", 1100)]]), "2026-08-14");
     expect(row).toMatchObject({ price: 13.5, yearAgo: { date: "2025-08-14", price: 11 } });
     expect(row!.change1y).toBeCloseTo(13.5 / 11 - 1, 4);
-  });
-});
-
-describe("convertSheetRows: ETFs", () => {
-  const row = (r: Partial<SheetRow>): SheetRow => ({
-    row: 2, account: "Broker Foreign", date: "2025-08-11", ticker: "AMS:SPXS", name: "Invesco S&P 500 UCITS ETF", currency: "EUR",
-    assetClass: "Akcje zagraniczne", type: "Zakup", quantity: 3, price: 1093.04, fee: 40.53, fxRate: 4.261857, nominal: 1, totalPln: 14015.67, comment: "", ...r,
-  });
-  const etfs = new Map([["AMS:SPXS", { isin: SPXS }]]);
-
-  it("converts buys (EUR price, PLN amount and fee, the broker's rate), sells, dividends and splits", () => {
-    const out = convertSheetRows(
-      [
-        row({}),
-        row({ date: "2025-09-23", type: "Sprzedaż", quantity: 2, price: 1129.34, fee: 30, fxRate: 4.263432, totalPln: 9599.8 }),
-        row({ date: "2025-12-15", type: "Split", name: "AMS:SPXS", quantity: 0, price: 1, fee: 0, fxRate: 1, totalPln: 1, splitRatio: 100 }),
-        row({ date: "2026-03-30", type: "Dywidenda / Odsetki", currency: "PLN", quantity: 1, price: 1, fee: 0, fxRate: 1, totalPln: 25.5 }),
-        row({ ticker: "AMS:UNKNOWN", name: "Not in the ETF file" }),
-      ],
-      new Map(),
-      new Map(),
-      etfs,
-    );
-    expect(out.transactions.map((t) => [t.type, t.quantity ?? t.ratio, t.price, t.fxRate, t.amount, t.fee])).toEqual([
-      ["BUY", 3, 1093.04, 4.261857, -13975.14, 40.53],
-      ["SELL", 2, 1129.34, 4.263432, 9599.8, 30],
-      ["SPLIT", 100, undefined, undefined, 0, undefined],
-      ["DIVIDEND", undefined, undefined, undefined, 25.5, undefined],
-    ]);
-    expect(out.etfInstruments).toEqual([
-      { isin: SPXS, code: "SPXS", name: "Invesco S&P 500 UCITS ETF", type: "ETF", currency: "EUR", venue: "XAMS", sourceIds: { yahoo: "SPXS.AS" }, active: true, splits: SPLIT },
-    ]);
-    expect(out.skipped.map((s) => s.ticker)).toEqual(["AMS:UNKNOWN"]);
-    expect(out.accounts).toEqual([{ account: "Broker Foreign", incomplete: ["ETFs"] }]);
-    expect(() => parseTransactionFile(JSON.stringify(out.transactions), "check")).not.toThrow();
   });
 });

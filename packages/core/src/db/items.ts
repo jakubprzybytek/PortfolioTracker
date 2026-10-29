@@ -164,14 +164,13 @@ export interface CouponPeriodItem {
   updatedAt: string;
 }
 
-/** Account metadata: which kinds of assets of this account aren't tracked yet (from the sheet import). */
+/** Account metadata. */
 export interface AccountItem {
   PK: `ACCT#${string}`;
   SK: "META";
   GSI1PK: "ACCOUNT";
   GSI1SK: string; // account
   account: string;
-  incomplete?: string[];
   /** The account's own currency (IBKR: EUR): its summary is also shown in it. Absent: PLN. */
   baseCurrency?: string;
   updatedAt: string;
@@ -270,14 +269,13 @@ export interface HoldingSnapshot {
   assetClass?: AssetClass;
 }
 
-/** An account's cash, and whether all of its assets are tracked (`incomplete` lists what isn't yet). */
+/** An account's cash. */
 export interface AccountSnapshot {
   /** All its cash in PLN (foreign currencies at the NBP mid rate). */
   cash: number;
   /** Per currency, when it holds any other than PLN: the amount, its PLN value (null without a rate) and the rate. */
   currencies?: Record<string, { amount: number; value: number | null; rate?: number }>;
   baseCurrency?: string;
-  incomplete?: string[];
 }
 
 export interface SnapshotItem {

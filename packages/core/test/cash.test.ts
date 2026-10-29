@@ -50,13 +50,13 @@ import { valuePortfolio } from "../src/valuation/valuePortfolio.ts";
 import { toReferenceIndex } from "../src/bonds/izIndex.ts";
 
 describe("cash in the snapshot", () => {
-  it("records cash per account and leaves incomplete accounts out of the total", () => {
+  it("records cash per account and sums it into the total", () => {
     const txs = [
       tx({ date: "2025-01-02", type: "DEPOSIT", amount: 1000 }),
-      tx({ date: "2025-01-02", account: "etf", type: "DEPOSIT", amount: 50000 }), // its ETF buys aren't imported
+      tx({ date: "2025-01-02", account: "etf", type: "DEPOSIT", amount: 50000 }),
     ];
-    const snap = valuePortfolio({ date: "2025-02-01", instruments: [], transactions: txs, prices: new Map(), referenceIndex: toReferenceIndex([]), couponPeriods: new Map(), accounts: [{ account: "etf", incomplete: ["ETFs"] }] });
-    expect(snap.accounts).toEqual({ a: { cash: 1000 }, etf: { cash: 50000, incomplete: ["ETFs"] } });
-    expect(snap.totals.cash).toBe(1000);
+    const snap = valuePortfolio({ date: "2025-02-01", instruments: [], transactions: txs, prices: new Map(), referenceIndex: toReferenceIndex([]), couponPeriods: new Map() });
+    expect(snap.accounts).toEqual({ a: { cash: 1000 }, etf: { cash: 50000 } });
+    expect(snap.totals.cash).toBe(51000);
   });
 });

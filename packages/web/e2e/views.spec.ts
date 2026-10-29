@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // Views against the sample data: accounts "broker" (DS0432, IZ0836), "ike" (DS0432, EDO0935, SAMPLE-APARTMENT),
-// "foreign" (SPXS, an ETF in EUR), "bonds" (KRU0827, a Catalyst bond), "ibkr" (EUR cash, a Bund) and "etf" (incomplete: cash only).
+// "foreign" (SPXS, an ETF in EUR), "bonds" (KRU0827, a Catalyst bond), "ibkr" (EUR cash, a Bund).
 
 test.describe("navigation", () => {
   test("the side menu switches views and keeps the URL in sync", async ({ page }) => {
@@ -32,7 +32,7 @@ test.describe("cached data and Reload", () => {
   test("a view visited before shows its data at once and refetches it in the background", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     await page.getByTestId("nav-dashboard").click();
     await expect(page.getByTestId("total-all")).toBeVisible();
     await page.waitForTimeout(2500); // within 2 s of the last fetch SWR wouldn't fetch again
@@ -40,23 +40,23 @@ test.describe("cached data and Reload", () => {
     await page.route("**/transactions", slow(3000));
     const refetch = page.waitForRequest("**/transactions");
     await page.getByTestId("nav-transactions").click();
-    await expect(rows).toHaveCount(31, { timeout: 1000 }); // from the cache, while the request is held back
+    await expect(rows).toHaveCount(30, { timeout: 1000 }); // from the cache, while the request is held back
     await refetch;
     await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "true");
     await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "false", { timeout: 10_000 });
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
   });
 
   test("Reload refetches the view's data and keeps it on screen meanwhile", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     await page.route("**/transactions", slow(1500));
     const refetch = page.waitForRequest("**/transactions");
     await page.getByTestId("reload").click();
     await refetch;
     await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "true");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "false", { timeout: 10_000 });
   });
 
@@ -82,17 +82,17 @@ test.describe("transactions view", () => {
   test("lists all transactions, newest first", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     const dates = await rows.locator("td:first-child").allTextContents();
     expect(dates).toEqual([...dates].sort().reverse());
     await expect(rows.first()).toContainText("2026-09-30");
-    await expect(page.getByTestId("filters-summary")).toHaveText("31 of 31 transactions");
+    await expect(page.getByTestId("filters-summary")).toHaveText("30 of 30 transactions");
   });
 
   test("rows of one date share a background; the next date has the other one", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     const list = await rows.evaluateAll((trs) => trs.map((tr) => ({ date: tr.querySelector("td")!.textContent, band: tr.className.match(/band-(a|b)/)?.[1] })));
     expect(list[0]!.band).toBe("a");
     for (let i = 1; i < list.length; i++) {
@@ -108,7 +108,7 @@ test.describe("transactions view", () => {
     await page.goto("/#/transactions");
     await expect(page.getByTestId("transactions-table")).toHaveCount(0);
     const rows = page.getByTestId("transactions-list").getByTestId("transaction-row");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     // A buy: date, type and account, the amount; then the instrument, quantity × price.
     const buy = rows.filter({ hasText: "2025-02-05" });
     await expect(buy).toContainText("Buy · broker");
@@ -141,7 +141,7 @@ test.describe("transactions view", () => {
     await expect(page.getByTestId("filters-toggle")).toHaveText("Filters · 1");
     expect((await box("filters-reset")).y).toBeGreaterThan(search.y + search.height); // on the count's line
     await page.getByTestId("filters-reset").click();
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     await expect(page.getByTestId("filters-reset")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
@@ -182,7 +182,7 @@ test.describe("transactions view", () => {
   test("filters by instrument, account and asset type, and keeps filters in the URL", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     // Account first, the search last.
     expect(await page.locator(".filters select, .filters input").evaluateAll((ss) => ss.map((s) => s.getAttribute("data-testid")))).toEqual(["filter-account", "filter-tx-type", "filter-instrument", "filter-type", "filter-text"]);
 
@@ -197,9 +197,9 @@ test.describe("transactions view", () => {
     await expect(rows).toHaveCount(1);
 
     await page.getByTestId("filters-reset").click();
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     await page.getByTestId("filter-type").selectOption({ label: "Cash" });
-    await expect(rows).toHaveCount(14); // the 10 deposits, the closed account's interest and withdrawal, eur's 2 exchanges
+    await expect(rows).toHaveCount(13); // the 9 deposits, the closed account's interest and withdrawal, eur's 2 exchanges
     await expect(rows.first()).toContainText("Deposit");
     // A currency exchange shows both sides
     await page.getByTestId("filter-account").selectOption("eur");
@@ -210,7 +210,7 @@ test.describe("transactions view", () => {
   test("filters by transaction type and free text (instrument, ISIN, account, type, note), kept in the URL", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     await page.getByTestId("filter-tx-type").selectOption({ label: "Buy" });
     await expect(rows).toHaveCount(10);
     await expect(page).toHaveURL(/tx=BUY/);
@@ -233,9 +233,9 @@ test.describe("transactions view", () => {
   test("a row per month; the filters and the header stay at the top while scrolling; tinted rows keep their divider", async ({ page }) => {
     await page.goto("/#/transactions");
     const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(31);
+    await expect(rows).toHaveCount(30);
     const months = page.getByTestId("transactions-table").getByTestId("month-row");
-    await expect(months).toHaveCount(16);
+    await expect(months).toHaveCount(15);
     await expect(months.first()).toHaveText(/^September 2026\s*· 1$/);
     await expect(months.nth(2)).toHaveText(/^May 2026\s*· 3$/);
     // The month row comes right before its first transaction.
@@ -260,7 +260,7 @@ test.describe("transactions view", () => {
   test("a wide screen gets a wider list; a narrower one drops the least needed columns, then becomes a list, instead of scrolling sideways", async ({ page }) => {
     await page.setViewportSize({ width: 1900, height: 900 });
     await page.goto("/#/transactions");
-    await expect(page.getByTestId("transaction-row")).toHaveCount(31);
+    await expect(page.getByTestId("transaction-row")).toHaveCount(30);
     expect((await page.getByTestId("transactions-table").boundingBox())!.width).toBeGreaterThan(1450);
     await expect(page.locator("thead th.col-asset")).toBeVisible();
     // Never wider than its box (it would be cut: the box doesn't scroll, so the header can stick).
@@ -275,7 +275,7 @@ test.describe("transactions view", () => {
     // Narrower still: the list of two-line rows, as on a phone (the filters stay as on a computer).
     await page.setViewportSize({ width: 1000, height: 900 });
     await expect(page.getByTestId("transactions-table")).toHaveCount(0);
-    await expect(page.getByTestId("transactions-list").getByTestId("transaction-row")).toHaveCount(31);
+    await expect(page.getByTestId("transactions-list").getByTestId("transaction-row")).toHaveCount(30);
     await expect(page.getByTestId("filter-account")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1000);
   });
@@ -479,11 +479,9 @@ test.describe("holdings view", () => {
     await expect(page.getByTestId("holdings-total")).toBeVisible();
 
     const groupOrder = await table.locator("tr.group").evaluateAll((rows) => rows.map((r) => r.getAttribute("data-testid")));
-    expect(groupOrder).toEqual(["account-bonds", "account-broker", "account-etf", "account-eur", "account-foreign", "account-ibkr", "account-ike"]);
-    // each account ends with its cash; the incomplete account shows only cash, greyed, with a note
+    expect(groupOrder).toEqual(["account-bonds", "account-broker", "account-eur", "account-foreign", "account-ibkr", "account-ike"]);
+    // each account ends with its cash
     await expect(table.locator('tr[data-testid="cash-row"][data-account="broker"]')).toContainText("5 420,86");
-    await expect(page.getByTestId("account-etf").getByTestId("incomplete")).toContainText("ETFs not tracked yet");
-    await expect(table.locator('tr[data-testid="cash-row"][data-account="etf"]')).toHaveClass(/muted/);
     const broker = table.locator('tr[data-testid="holding-row"][data-account="broker"]');
     await expect(broker).toHaveCount(2);
     expect(await broker.locator("td:first-child strong").allTextContents()).toEqual(["DS0432", "IZ0836"]);
@@ -544,7 +542,7 @@ test.describe("holdings view", () => {
     await page.getByTestId("filter-type").selectOption({ label: "Cash" });
     await expect(rows).toHaveCount(1);
     await expect(rows.first()).toHaveAttribute("data-isin", "ZZWALUTYEUR0");
-    await expect(page.getByTestId("cash-row")).toHaveCount(9); // 6 accounts in PLN, eur in PLN, EUR and USD
+    await expect(page.getByTestId("cash-row")).toHaveCount(8); // 5 accounts in PLN, eur in PLN, EUR and USD
   });
 
   test("filters by asset class; the asset types follow the class", async ({ page }) => {
@@ -569,7 +567,7 @@ test.describe("holdings view", () => {
     await page.getByTestId("filter-class").selectOption({ label: "Cash" });
     await expect(rows).toHaveCount(1);
     await expect(rows.first()).toHaveAttribute("data-isin", "ZZWALUTYEUR0");
-    await expect(page.getByTestId("cash-row")).toHaveCount(9);
+    await expect(page.getByTestId("cash-row")).toHaveCount(8);
     await page.getByTestId("filters-reset").click();
     await expect(page.getByTestId("filter-class")).toHaveValue("");
     await expect(rows).toHaveCount(10);
@@ -817,12 +815,11 @@ test.describe("holdings grouped by instrument", () => {
     await page.getByTestId("expand-DS0432").click();
     await expect(dsRows).toHaveCount(0);
 
-    // Cash: one row (complete accounts summed), expands to one row per account, the incomplete one greyed
-    await expect(page.getByTestId("instrument-cash").locator("td").nth(1)).toHaveText("▸ 7 accounts");
+    // Cash: one row (every account summed), expands to one row per account
+    await expect(page.getByTestId("instrument-cash").locator("td").nth(1)).toHaveText("▸ 6 accounts");
     await expect(page.getByTestId("cash-row")).toHaveCount(0);
     await page.getByTestId("expand-cash").click();
-    await expect(page.getByTestId("cash-row")).toHaveCount(9); // eur: one per currency
-    await expect(table.locator('tr[data-testid="cash-row"][data-account="etf"]')).toHaveClass(/muted/);
+    await expect(page.getByTestId("cash-row")).toHaveCount(8); // eur: one per currency
 
     await page.reload();
     await expect(page.getByTestId("instrument-cash")).toBeVisible();
@@ -870,7 +867,7 @@ test.describe("holdings XIRR and grouped by class", () => {
     await expect(page.getByTestId("class-SHARES")).toContainText("Shares · 1");
     await expect(page.getByTestId("class-BONDS").getByTestId("xirr")).toHaveText(pct);
     await expect(page.getByTestId("class-CASH").getByTestId("xirr")).toHaveCount(0);
-    await expect(page.getByTestId("cash-row")).toHaveCount(9); // every account's cash, eur one per currency
+    await expect(page.getByTestId("cash-row")).toHaveCount(8); // every account's cash, eur one per currency
     const spxs = table.locator('tr[data-testid="holding-row"][data-account="foreign"]');
     await expect(spxs.locator("td").nth(1)).toHaveText("foreign");
     // The class total is the same as the account total
@@ -1386,7 +1383,6 @@ test.describe("cash flows", () => {
     await expect(page).toHaveURL(/year=2025/);
     const closed = page.locator('[data-testid="cf-row"][data-account="closed"]');
     await expect(closed.getByTestId("cf-year-net")).toHaveText("-20");
-    await expect(page.locator('[data-testid="cf-row"][data-account="etf"]')).toHaveCount(0); // its first money came in 2026
     await expect(page.getByTestId("cf-total")).toBeVisible();
 
     await closed.click();

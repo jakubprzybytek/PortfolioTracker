@@ -109,14 +109,14 @@ describe("the account summary", () => {
 });
 
 describe("net deposits per day (the portfolio chart's dashed line)", () => {
-  it("adds deposits and withdrawals up to each day; another currency at NBP D-1; excluded accounts left out", () => {
+  it("adds deposits and withdrawals up to each day; another currency at NBP D-1; every account counts", () => {
     const more = [...txs, tx({ date: "2026-02-01", type: "WITHDRAWAL", amount: -1000 }), tx({ date: "2026-01-03", account: "other", type: "DEPOSIT", amount: 5000 })];
-    const by = netDepositsByDate(more, ["2026-01-01", "2026-01-02", "2026-01-07", "2026-03-01"], fx, new Set(["other"]));
+    const by = netDepositsByDate(more, ["2026-01-01", "2026-01-02", "2026-01-07", "2026-03-01"], fx);
     expect(Object.fromEntries(by)).toEqual({
       "2026-01-01": 0,
       "2026-01-02": 10000,
-      "2026-01-07": 12100, // + 500 EUR at 4.20 (D-1 of 2026-01-07)
-      "2026-03-01": 11100,
+      "2026-01-07": 17100, // + 5000 in "other" + 500 EUR at 4.20 (D-1 of 2026-01-07)
+      "2026-03-01": 16100,
     });
   });
 });
