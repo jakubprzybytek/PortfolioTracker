@@ -339,7 +339,8 @@ export interface JobRunItem {
   job: string;
   startedAt: string;
   finishedAt?: string;
-  status: "ok" | "failed";
+  /** "running" from its start until it ends; one still running after the function's timeout timed out. */
+  status: "running" | "ok" | "failed";
   itemsWritten?: number;
   note?: string;
   ttl: number;

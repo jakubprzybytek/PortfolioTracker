@@ -61,8 +61,15 @@ export default $config({
 
     // Each function links only the tables it needs (Docs/data-storage.md, "Access per function"); every one may alert.
     const link = alerts ? [files, alerts] : [files];
-    // arm64 (Graviton): all the code is plain JS, and it's ~20 % cheaper than x86_64.
-    const defaults = { link: [...link, market], timeout: "5 minutes" as const, memory: "512 MB" as const, architecture: "arm64" as const };
+    // arm64 (Graviton): all the code is plain JS, and it's ~20 % cheaper than x86_64. Logs as JSON (one object per line,
+    // with the request id), so CloudWatch Logs Insights can filter on fields.
+    const defaults = {
+      link: [...link, market],
+      timeout: "5 minutes" as const,
+      memory: "512 MB" as const,
+      architecture: "arm64" as const,
+      logging: { format: "json" as const },
+    };
 
     // IBKR Flex Web Service (mark prices of what's held at IBKR): the token is the `IbkrFlexToken` secret, on dev and
     // prod only (nothing at IBKR is tested on int); the query (Open Positions + Prior Period Positions, XML) isn't
@@ -92,7 +99,8 @@ export default $config({
     // Up to 10 requests waiting together make one run (a FIFO queue allows 10; the handler merges their ranges).
     valuationQueue.subscribe(valuation.arn, { batch: { size: 10 } });
 
-    // Two alarms, within CloudWatch's 10 free ones (one per job function would be ~18): what `runJob` can't report.
+    // Three alarms (with WatchdogSilent below), within CloudWatch's 10 free ones (one per job function would be ~18):
+    // what `runJob` can't report. Other jobs' timeouts are found by the watchdog (a run left "running").
     if (alerts) {
       const notify = { alarmActions: [alerts.arn], okActions: [alerts.arn], treatMissingData: "notBreaching", evaluationPeriods: 1, period: 300 };
       new aws.cloudwatch.MetricAlarm("ValuationErrors", {
@@ -264,6 +272,29 @@ export default $config({
       timezone: WARSAW,
       retries: 2,
     });
+    // Watchdog (jobs/lib/watchdog.ts): runs that timed out, jobs that stopped running, price jobs writing nothing.
+    // Every day, after the morning runs; its problems are e-mailed by runJob, and the alarm below notices if it stops.
+    const watchdog = new sst.aws.Function("Watchdog", { ...defaults, handler: "packages/jobs/src/handlers/watchdog.handler" });
+    new sst.aws.CronV2("WatchdogDaily", { function: watchdog.arn, schedule: "cron(45 8 * * ? *)", timezone: WARSAW, retries: 2 });
+    if (alerts)
+      new aws.cloudwatch.MetricAlarm("WatchdogSilent", {
+        // Named for the deploy role, which may only manage alarms named portfolio-tracker-* (or the older Valuation*).
+        name: `portfolio-tracker-${$app.stage}-watchdog-silent`,
+        alarmActions: [alerts.arn],
+        okActions: [alerts.arn],
+        alarmDescription: "The watchdog hasn't run for two days: the schedules may have stopped firing",
+        namespace: "AWS/Lambda",
+        metricName: "Invocations",
+        dimensions: { FunctionName: watchdog.name },
+        statistic: "Sum",
+        period: 86_400,
+        evaluationPeriods: 2,
+        comparisonOperator: "LessThanThreshold",
+        threshold: 1,
+        // No data at all is the case this alarm is for.
+        treatMissingData: "breaching",
+      });
+
     new sst.aws.CronV2("ValuationEvening", { function: valuation.arn, schedule: "cron(30 22 ? * MON-FRI *)", timezone: WARSAW });
     // Mornings Tuesday to Sunday: the weekend's days get a point too (no Sunday run left 2026-10-25 without one, a dip to 0 in the position charts).
     new sst.aws.CronV2("ValuationMorning", { function: valuation.arn, schedule: "cron(30 7 ? * SUN,TUE-SAT *)", timezone: WARSAW });
@@ -331,7 +362,8 @@ export default $config({
       handler: "packages/jobs/src/handlers/api.handler",
       timeout: "30 seconds" as const,
       // Writes (the "Add transaction" form) queue a revaluation; a new instrument starts its history backfill and FX rates.
-      link: [...link, market, transactions, holdings, valuationQueue, backfill, fx, live],
+      // The dead-letter queue: GET /status shows how many revaluations wait in it.
+      link: [...link, market, transactions, holdings, valuationQueue, valuationDeadLetter, backfill, fx, live],
       environment: { ACCESS_GROUPS: accessGroups($app.stage).join(",") },
     };
     api.route("GET /holdings", apiHandler, auth);

@@ -3,6 +3,7 @@
 // access groups (checked here). The one route without a login, the spreadsheet feed, is a function of its own (feed.ts).
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
+import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import {
   APP_SOURCE,
@@ -77,6 +78,7 @@ import { FX_CURRENCIES } from "./fx.ts";
 import { hasAnyGroup } from "../lib/access.ts";
 import { FEED_TOKEN_SETTING, newFeedToken, type FeedToken } from "../lib/feedToken.ts";
 import { invokeAsync, queueValuation, repo } from "../lib/context.ts";
+import { JOB_NAMES } from "../lib/jobs.ts";
 import { importInstruments, mfTermsByCode } from "./import.ts";
 
 const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({
@@ -133,6 +135,18 @@ async function benchmarkSeries(first: string | undefined) {
 
 /** "Refresh prices" at most this often. */
 const REFRESH_EVERY_MS = 5 * 60_000;
+
+const sqs = new SQSClient({});
+/** Revaluation requests waiting in the dead-letter queue (null when it can't be read). */
+async function deadLetterCount(): Promise<number | null> {
+  try {
+    const res = await sqs.send(new GetQueueAttributesCommand({ QueueUrl: Resource.ValuationDeadLetter.url, AttributeNames: ["ApproximateNumberOfMessages"] }));
+    return Number(res.Attributes?.["ApproximateNumberOfMessages"] ?? 0);
+  } catch (err) {
+    console.error(JSON.stringify({ event: "dead-letter count failed", error: String(err) }));
+    return null;
+  }
+}
 
 /** Comma-separated, set per stage in sst.config.ts (accessGroups). */
 const ACCESS_GROUPS = (process.env["ACCESS_GROUPS"] ?? "portfolio-tracker").split(",");
@@ -676,9 +690,13 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
         // The latest data-quality report (the `quality` job), or null before its first run.
         return json(200, (await repo.getQualityReport()) ?? null);
       case "GET /status": {
-        const jobs = ["eod-gpw", "eod-gpw-recheck", "eod-etf", "eod-catalyst", "eod-bonds", "benchmarks", "quality", "live", "coupons", "fx", "valuation", "backfill", "import", "monthly", "export"];
-        const runs = Object.fromEntries(await Promise.all(jobs.map(async (j) => [j, (await repo.latestJobRun(j)) ?? null])));
-        return json(200, { now: new Date().toISOString(), jobs: runs });
+        // Every job's latest run (lib/jobs.ts), and how many revaluations failed 3 times and wait in the dead-letter
+        // queue (a later successful run doesn't revalue their range).
+        const [runs, deadLetter] = await Promise.all([
+          Promise.all(JOB_NAMES.map(async (j) => [j, (await repo.latestJobRun(j)) ?? null] as const)),
+          deadLetterCount(),
+        ]);
+        return json(200, { now: new Date().toISOString(), jobs: Object.fromEntries(runs), deadLetter });
       }
       default:
         return json(404, { error: `No route ${route}` });

@@ -531,6 +531,15 @@ export class Repository {
     }
   }
 
+  /** The job's runs started at or after `since` (ISO), newest first. */
+  recentJobRuns(job: string, since: string): Promise<JobRunItem[]> {
+    return this.queryAll<JobRunItem>("market", {
+      KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
+      ExpressionAttributeValues: { ":pk": `JOB#${job}`, ":from": `RUN#${since}`, ":to": "RUN#~" },
+      ScanIndexForward: false,
+    });
+  }
+
   /** The job's most recent run (one item read, not its 90 days of runs). */
   async latestJobRun(job: string): Promise<JobRunItem | undefined> {
     const res = await this.doc.send(

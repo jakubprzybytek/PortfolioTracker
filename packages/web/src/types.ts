@@ -22,7 +22,9 @@ export type TransactionRow = Transaction & { instrument: Pick<InstrumentItem, "c
 export type Instrument = InstrumentItem & { backfill?: BackfillItem };
 export interface Status {
   now: string;
-  jobs: Record<string, { status: "ok" | "failed"; finishedAt?: string; note?: string; itemsWritten?: number } | null>;
+  jobs: Record<string, { status: "running" | "ok" | "failed"; startedAt: string; finishedAt?: string; note?: string; itemsWritten?: number } | null>;
+  /** Revaluation requests that failed 3 times and wait in the dead-letter queue (null: couldn't be read). */
+  deadLetter?: number | null;
 }
 export interface Note {
   id: string;

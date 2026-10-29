@@ -17,7 +17,7 @@ export interface Alert {
  * What to send after a run of `job` ended with `status`, given its previous run: a failure after a success (or the first
  * run ever), and a success after a failure. Nothing otherwise.
  */
-export function alertFor(job: string, status: "ok" | "failed", previous: { status: "ok" | "failed"; finishedAt?: string } | undefined, note?: string): Alert | undefined {
+export function alertFor(job: string, status: "ok" | "failed", previous: { status: "running" | "ok" | "failed"; finishedAt?: string } | undefined, note?: string): Alert | undefined {
   if (status === "failed" && previous?.status !== "failed") {
     return {
       subject: `PortfolioTracker: ${job} failed`,

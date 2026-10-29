@@ -72,10 +72,11 @@ describe(`API ${API}`, () => {
     await waitFor(async () => ((await get<{ jobs: Record<string, { status: string } | null> }>("/status")).body.jobs["fx"]?.status === "ok" ? true : undefined), 300_000);
   });
 
-  it("GET /status lists the last run of every job", async () => {
-    const { status, body } = await get<{ now: string; jobs: Record<string, unknown> }>("/status");
+  it("GET /status lists the last run of every job and the dead-letter queue's depth", async () => {
+    const { status, body } = await get<{ now: string; jobs: Record<string, unknown>; deadLetter: number | null }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "export", "fx", "import", "live", "monthly", "quality", "valuation"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "eod-ibkr", "export", "fx", "import", "live", "monthly", "quality", "valuation", "watchdog"]);
+    expect(typeof body.deadLetter).toBe("number");
     expect(body.jobs["fx"]).toMatchObject({ status: "ok" });
     expect(body.jobs["import"]).toMatchObject({ status: "ok" });
   });

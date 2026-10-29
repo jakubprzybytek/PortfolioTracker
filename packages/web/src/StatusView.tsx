@@ -70,6 +70,11 @@ export function StatusView() {
         <span className="muted">{status.loading ? "Loading…" : ""}</span>
       </header>
       {status.error && <p className="error">{status.error}</p>}
+      {!!status.data?.deadLetter && (
+        <p className="error" role="alert" data-testid="dead-letter">
+          {status.data.deadLetter} revaluation request{status.data.deadLetter > 1 ? "s" : ""} failed 3 times and wait{status.data.deadLetter > 1 ? "" : "s"} in the dead-letter queue: the days they cover may be out of date. Run a full revaluation once the cause is fixed.
+        </p>
+      )}
 
       <DataQuality />
 
@@ -89,8 +94,8 @@ export function StatusView() {
             {Object.entries(status.data?.jobs ?? {}).map(([name, j]) => (
               <tr key={name} data-testid={`job-${name}`}>
                 <td className="left">{name}</td>
-                <td className="left muted">{j?.finishedAt?.replace("T", " ").slice(0, 16) ?? "never"}</td>
-                <td className={`left ${j?.status === "failed" ? "status-failed" : j ? "status-ok" : "muted"}`}>{j?.status ?? "–"}</td>
+                <td className="left muted">{(j?.finishedAt ?? j?.startedAt)?.replace("T", " ").slice(0, 16) ?? "never"}</td>
+                <td className={`left ${j?.status === "failed" ? "status-failed" : j?.status === "ok" ? "status-ok" : "muted"}`}>{j?.status ?? "–"}</td>
                 <td className="left muted" style={{ whiteSpace: "normal", maxWidth: 600 }}>
                   {j?.note ?? ""}
                 </td>
