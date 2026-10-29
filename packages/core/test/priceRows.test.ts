@@ -3,7 +3,7 @@ import type { InstrumentItem, PriceItem } from "../src/db/items.ts";
 import { priceRows } from "../src/valuation/priceRows.ts";
 
 const inst = (isin: string, code: string): InstrumentItem =>
-  ({ PK: `INST#${isin}`, SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: isin, isin, code, name: `${code} name`, type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: {}, active: true, live: false, updatedAt: "" }) as InstrumentItem;
+  ({ PK: `INST#${isin}`, SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: isin, isin, code, name: `${code} name`, type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: {}, active: true, updatedAt: "" }) as InstrumentItem;
 const px = (isin: string, date: string, close: number): PriceItem =>
   ({ PK: `INST#${isin}`, SK: `PX#XWAR#${date}`, isin, venue: "XWAR", date, close, open: null, high: null, low: null, volume: 0, trades: 0, turnover: 0, traded: true, currency: "PLN", source: "t", fetchedAt: "", status: "final" }) as PriceItem;
 

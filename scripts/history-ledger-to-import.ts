@@ -81,7 +81,6 @@ const instruments = need("Instruments").map((r) => ({
   venue: text(r["Venue"]),
   sourceIds: {},
   active: yes(r["Active"]),
-  live: yes(r["Live"]),
   ...opt("nominal", num(r["Nominal"])),
 }));
 const prices = need("Prices").map((r) => ({ isin: text(r["ISIN"]), date: day(r["Date"]), price: num(r["Price"])!, currency: text(r["Currency"]), ...opt("note", text(r["Note"])) }));

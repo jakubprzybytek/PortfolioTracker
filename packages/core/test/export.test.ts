@@ -8,7 +8,7 @@ import { parseManualPrices } from "../src/prices/manual.ts";
 import { parseTransactionFile } from "../src/transactions/schema.ts";
 
 const inst = (i: Partial<InstrumentItem> & Pick<InstrumentItem, "isin" | "type">): InstrumentItem =>
-  ({ PK: `INST#${i.isin}`, SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: i.isin, code: i.isin, name: i.isin, currency: "PLN", venue: "XWAR", sourceIds: {}, active: true, live: false, updatedAt: "x", ...i }) as InstrumentItem;
+  ({ PK: `INST#${i.isin}`, SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: i.isin, code: i.isin, name: i.isin, currency: "PLN", venue: "XWAR", sourceIds: {}, active: true, updatedAt: "x", ...i }) as InstrumentItem;
 const tx = (t: Partial<TransactionItem> & Pick<TransactionItem, "id" | "date" | "type" | "amount" | "source">): TransactionItem =>
   ({ PK: "ACCT#broker", SK: `TX#${t.date}#${t.id}`, GSI1PK: "TX", GSI1SK: `${t.date}#${t.id}`, account: "broker", currency: "PLN", ...t }) as TransactionItem;
 

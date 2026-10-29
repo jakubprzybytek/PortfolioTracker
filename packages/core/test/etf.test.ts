@@ -17,7 +17,7 @@ const tx = (t: Partial<TransactionItem> & Pick<TransactionItem, "date" | "type" 
 
 const etf: InstrumentItem = {
   PK: `INST#${SPXS}`, SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: SPXS, isin: SPXS, code: "SPXS", name: "Invesco S&P 500 UCITS ETF", type: "ETF",
-  currency: "EUR", venue: "XAMS", sourceIds: { yahoo: "SPXS.AS" }, active: true, live: false, splits: SPLIT, updatedAt: "",
+  currency: "EUR", venue: "XAMS", sourceIds: { yahoo: "SPXS.AS" }, active: true, splits: SPLIT, updatedAt: "",
 };
 const price = (date: string, close: number): PriceItem => ({
   PK: `INST#${SPXS}`, SK: `PX#XAMS#${date}`, isin: SPXS, venue: "XAMS", date, open: null, high: null, low: null, close,
@@ -135,7 +135,7 @@ describe("convertSheetRows: ETFs", () => {
       ["DIVIDEND", undefined, undefined, undefined, 25.5, undefined],
     ]);
     expect(out.etfInstruments).toEqual([
-      { isin: SPXS, code: "SPXS", name: "Invesco S&P 500 UCITS ETF", type: "ETF", currency: "EUR", venue: "XAMS", sourceIds: { yahoo: "SPXS.AS" }, active: true, live: false, splits: SPLIT },
+      { isin: SPXS, code: "SPXS", name: "Invesco S&P 500 UCITS ETF", type: "ETF", currency: "EUR", venue: "XAMS", sourceIds: { yahoo: "SPXS.AS" }, active: true, splits: SPLIT },
     ]);
     expect(out.skipped.map((s) => s.ticker)).toEqual(["AMS:UNKNOWN"]);
     expect(out.accounts).toEqual([{ account: "Broker Foreign", incomplete: ["ETFs"] }]);

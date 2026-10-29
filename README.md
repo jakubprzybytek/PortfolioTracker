@@ -11,7 +11,6 @@ packages/core   parsers, bond maths, valuation, DynamoDB repository (pure TypeSc
 packages/jobs   Lambda handlers: daily price jobs, live, fx, monthly, valuation, backfill, import, export, api; integration tests
 packages/web    Vite + React dashboard; Playwright E2E tests
 data/           import files (instruments, sample transactions) – see data/README.md
-poc/            the original GPW archive proof of concept
 sst.config.ts   infrastructure (SST v4)
 ```
 

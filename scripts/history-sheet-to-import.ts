@@ -95,7 +95,7 @@ const instrumentsOut: Record<string, unknown>[] = [];
 const pricesOut: { isin: string; date: string; price: number; currency: string; note?: string }[] = [];
 const manual = (code: string, name: string) => {
   const isin = privateAssetId(code);
-  if (!instrumentsOut.some((i) => i["isin"] === isin)) instrumentsOut.push({ isin, code, name, type: "FUND_MANUAL", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: false, live: false });
+  if (!instrumentsOut.some((i) => i["isin"] === isin)) instrumentsOut.push({ isin, code, name, type: "FUND_MANUAL", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: false });
   return isin;
 };
 const unitTrade = (r: Record<string, Cell>, isin: string | undefined) => {
@@ -140,7 +140,6 @@ for (const b of table(tab("Bond prices"), "Bond", ["Bond", "ISIN", "Issuer", "Ki
     venue: "MANUAL",
     sourceIds: {},
     active: false,
-    live: false,
     nominal: num(b["Nominal (PLN)"]),
   });
 }

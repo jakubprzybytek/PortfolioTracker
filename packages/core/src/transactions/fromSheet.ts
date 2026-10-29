@@ -199,7 +199,7 @@ export function convertSheetRows(
     if (r.assetClass === "Inne" && r.currency === "PLN") {
       const isin = privateAssetId(r.ticker);
       if (!manualUsed.has(isin))
-        manualUsed.set(isin, { isin, code: r.ticker.toUpperCase(), name: r.name || r.ticker, type: "FUND_MANUAL", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: true, live: false });
+        manualUsed.set(isin, { isin, code: r.ticker.toUpperCase(), name: r.name || r.ticker, type: "FUND_MANUAL", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: true });
       if (r.type === "Zakup") {
         transactions.push({ date: r.date, account: r.account, type: "BUY", isin, quantity: r.quantity, price: r.price, amount: -round(r.totalPln - r.fee, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
         manualPrices.push({ isin, date: r.date, price: r.price, currency: "PLN", note: "purchase price" });
@@ -214,7 +214,7 @@ export function convertSheetRows(
     if (r.assetClass === "Waluty" && /^Waluty_[A-Z]{3}$/.test(r.ticker)) {
       const ccy = r.ticker.slice(-3);
       const isin = privateAssetId(r.ticker);
-      if (!currencies.has(isin)) currencies.set(isin, { isin, code: ccy, name: `${ccy} cash`, type: "CURRENCY", currency: ccy, venue: "FX", sourceIds: {}, active: true, live: false });
+      if (!currencies.has(isin)) currencies.set(isin, { isin, code: ccy, name: `${ccy} cash`, type: "CURRENCY", currency: ccy, venue: "FX", sourceIds: {}, active: true });
       if (r.type === "Zakup") transactions.push({ date: r.date, account: r.account, type: "BUY", isin, quantity: r.quantity, price: 1, fxRate: r.fxRate, amount: -round(r.totalPln - r.fee, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
       else if (r.type === "Sprzedaż") transactions.push({ date: r.date, account: r.account, type: "SELL", isin, quantity: r.quantity, price: 1, fxRate: r.fxRate, amount: round(r.totalPln, 2), fee: r.fee, currency: "PLN", ...(note ? { note } : {}) });
       else skip(r, `${r.ticker}: unsupported type "${r.type}"`);
@@ -225,7 +225,7 @@ export function convertSheetRows(
     if (r.assetClass === "Obligacje skarbowe zagraniczne" && /^[A-Z]{2}[A-Z0-9]{9}\d$/.test(r.ticker)) {
       const isin = r.ticker;
       const fb = foreignBonds.get(isin) ?? {
-        input: { isin, code: isin, name: r.name, type: "BOND_IBKR", currency: r.currency, venue: "CALC", sourceIds: {}, active: true, live: false, nominal: 1000 },
+        input: { isin, code: isin, name: r.name, type: "BOND_IBKR", currency: r.currency, venue: "CALC", sourceIds: {}, active: true, nominal: 1000 },
         quantity: 0,
         points: [],
       };
@@ -255,7 +255,7 @@ export function convertSheetRows(
     if (corporate) {
       const { isin, nominal } = corporate;
       const used = corporateUsed.get(isin) ?? {
-        input: { isin, code: r.ticker, name: corporate.name, type: "BOND_CORPORATE", currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: r.ticker }, active: true, live: false, nominal },
+        input: { isin, code: r.ticker, name: corporate.name, type: "BOND_CORPORATE", currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: r.ticker }, active: true, nominal },
         quantity: 0,
         tradePrices: [],
       };
@@ -280,7 +280,7 @@ export function convertSheetRows(
     if (etf && listing) {
       const isin = etf.isin;
       const seen = etfUsed.get(isin);
-      const inst: InstrumentInput = seen ?? { isin, code: listing.code, name: r.name, type: "ETF", currency: "PLN", venue: listing.venue, sourceIds: { yahoo: listing.yahoo }, active: true, live: false };
+      const inst: InstrumentInput = seen ?? { isin, code: listing.code, name: r.name, type: "ETF", currency: "PLN", venue: listing.venue, sourceIds: { yahoo: listing.yahoo }, active: true };
       if (inst.name === r.ticker || inst.name === listing.code) inst.name = r.name; // some rows carry only the ticker
       const trade = r.type === "Zakup" || r.type === "Sprzedaż";
       if (trade) inst.currency = r.currency;
@@ -356,7 +356,6 @@ export function convertSheetRows(
       venue: "CALC",
       sourceIds: {},
       active: true,
-      live: false,
       terms: "mf-retail",
     }));
   const incomplete = new Map<string, Set<string>>();

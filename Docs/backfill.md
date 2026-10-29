@@ -64,7 +64,7 @@ Reference data and transactions come first, because they define which instrument
 - About 30 calls in total, well within any plan.
 
 ### 8. GPW treasury bonds
-- **Proven by the PoC** (`poc/gpw-history`): one request per bond (`archiwum-notowan?fetch=1&type=13&instrument=<CODE>&date=`) returns an XLS with the bond's whole daily history since listing.
+- **Proven by the PoC** (`poc/gpw-history`, removed 2026-10-29; now `packages/core/src/gpw`): one request per bond (`archiwum-notowan?fetch=1&type=13&instrument=<CODE>&date=`) returns an XLS with the bond's whole daily history since listing.
 - Columns: date, code, ISIN, currency, OHLC (clean, % of nominal), change, volume, number of trades, turnover (thousand PLN), "Cena nominalna". That last column is unreliable for IZ bonds (mostly 1000 since 2025-09-29), so compute the indexed nominal separately.
 - gpw.pl resets connections after too many requests in a short time. Keep runs to a few requests, 5 s apart.
 - Accrued interest and IZ nominal: computed by the valuation from the bond terms and CPI (see data-sources.md). Nothing to backfill except the MF calculator data (step 5).

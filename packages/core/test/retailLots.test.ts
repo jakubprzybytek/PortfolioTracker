@@ -42,7 +42,7 @@ describe("valueRetailLots", () => {
 
 describe("valuePortfolio with retail bonds", () => {
   it("values a retail position per lot, without a market price", () => {
-    const inst = { PK: "INST#PL0000114518", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "PL0000114518", isin: "PL0000114518", code: "EDO0332", name: "EDO0332", type: "BOND_RETAIL", currency: "PLN", venue: "CALC", sourceIds: {}, active: true, live: false, retail: edo0332, updatedAt: "" } as InstrumentItem;
+    const inst = { PK: "INST#PL0000114518", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "PL0000114518", isin: "PL0000114518", code: "EDO0332", name: "EDO0332", type: "BOND_RETAIL", currency: "PLN", venue: "CALC", sourceIds: {}, active: true, retail: edo0332, updatedAt: "" } as InstrumentItem;
     const transactions = [
       tx({ id: "1", date: "2022-03-01", valueDate: "2022-03-11", type: "BUY", quantity: 10, price: 100, amount: -1000 }),
       tx({ id: "2", date: "2022-03-15", valueDate: "2022-03-16", type: "BUY", quantity: 10, price: 99.9, amount: -999 }),

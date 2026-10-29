@@ -58,7 +58,6 @@ export async function importMfCalculator(content: Buffer, source: string) {
     venue: "NONE",
     sourceIds: {},
     active: false,
-    live: false,
     terms: data.bonds as unknown as BondTerms,
   });
   return { months, series: data.bonds.length };
@@ -111,7 +110,6 @@ export async function importInstruments(json: string) {
       venue: i.venue,
       sourceIds: i.sourceIds,
       active: i.active,
-      live: i.live,
       ...(terms ? { terms } : {}),
       ...(retail ? { retail } : {}),
       ...(i.nominal ? { nominal: i.nominal } : {}),

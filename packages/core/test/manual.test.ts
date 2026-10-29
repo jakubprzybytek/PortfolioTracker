@@ -62,7 +62,6 @@ describe("instruments added from the form", () => {
       venue: "CALC",
       sourceIds: {},
       active: true,
-      live: false,
       terms: "mf-retail",
     });
   });

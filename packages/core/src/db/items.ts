@@ -20,7 +20,6 @@ export interface InstrumentItem {
   venue: string; // XWAR, CATALYST, CALC, MANUAL …
   sourceIds: Record<string, string>; // { gpw: "DS0432" }
   active: boolean;
-  live: boolean;
   terms?: BondTerms;
   /** Bonds without terms (corporate bonds): nominal per bond; prices are % of it, value = clean price × nominal. */
   nominal?: number;

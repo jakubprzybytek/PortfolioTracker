@@ -24,7 +24,7 @@ const TODAY = "2026-10-18";
 const holding = (h: Partial<HoldingSnapshot>): HoldingSnapshot =>
   ({ account: "Broker", isin: "PL0000000001", code: "DS0000", name: "DS", type: "BOND_LISTED", currency: "PLN", quantity: 10, cleanPrice: 100, priceDate: TODAY, nominal: 1000, accruedInterest: 0, valuePerUnit: 1000, value: 10_000, cost: 10_000, couponsReceived: 0, gain: 0, gainPct: 0, flags: [], ...h }) as HoldingSnapshot;
 const instrument = (i: Partial<InstrumentItem>): InstrumentItem =>
-  ({ PK: "INST#x", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "x", isin: "PL0000000001", code: "DS0000", name: "DS", type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: {}, active: true, live: false, updatedAt: "", ...i }) as InstrumentItem;
+  ({ PK: "INST#x", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "x", isin: "PL0000000001", code: "DS0000", name: "DS", type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: {}, active: true, updatedAt: "", ...i }) as InstrumentItem;
 
 /** A fixed 5 % bond with yearly coupons on 25 October, maturing 2028-10-25. */
 const fixedTerms: BondTerms = {

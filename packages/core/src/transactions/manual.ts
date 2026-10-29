@@ -61,7 +61,6 @@ export function retailInstrument(t: Pick<RetailTerms, "series" | "isin" | "kind"
     venue: "CALC",
     sourceIds: {},
     active: true,
-    live: false,
     terms: "mf-retail",
   };
 }
@@ -79,26 +78,25 @@ export function listedTreasuryInstrument(t: Pick<BondTerms, "isin" | "code" | "c
     venue: "XWAR",
     sourceIds: { gpw: t.code },
     active: true,
-    live: false,
     terms: "mf",
   };
 }
 
 /** A corporate bond on Catalyst, priced from BiznesRadar by its code; prices are % of `nominal`. */
 export function corporateInstrument(i: { isin: string; code: string; name: string; nominal: number }): InstrumentInput {
-  return { isin: i.isin, code: i.code, name: i.name, type: "BOND_CORPORATE", currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: i.code }, active: true, live: false, nominal: i.nominal };
+  return { isin: i.isin, code: i.code, name: i.name, type: "BOND_CORPORATE", currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: i.code }, active: true, nominal: i.nominal };
 }
 
 /** An ETF from its exchange ticker ("AMS:VWRL", "FRA:EUNK"): venue and Yahoo symbol from the exchange. Undefined for an unknown exchange. */
 export function etfInstrument(i: { isin: string; ticker: string; name: string; currency: string }): InstrumentInput | undefined {
   const l = listingFromTicker(i.ticker);
   if (!l) return undefined;
-  return { isin: i.isin, code: l.code, name: i.name, type: "ETF", currency: i.currency, venue: l.venue, sourceIds: { yahoo: l.yahoo }, active: true, live: false };
+  return { isin: i.isin, code: l.code, name: i.name, type: "ETF", currency: i.currency, venue: l.venue, sourceIds: { yahoo: l.yahoo }, active: true };
 }
 
 /** An asset valued by hand (a flat, a private loan …): its value comes from manual prices. */
 export function manualInstrument(i: { code: string; name: string }): InstrumentInput {
-  return { isin: privateAssetId(i.code), code: i.code, name: i.name, type: "FUND_MANUAL", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: true, live: false };
+  return { isin: privateAssetId(i.code), code: i.code, name: i.name, type: "FUND_MANUAL", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: true };
 }
 
 /** "Add instrument" from the form: the kind and the few fields it needs (the rest follows from the kind). */

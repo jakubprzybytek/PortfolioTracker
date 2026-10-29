@@ -28,7 +28,6 @@ export function instrumentInput(i: InstrumentItem): InstrumentInput {
     venue: i.venue,
     sourceIds: i.sourceIds,
     active: i.active,
-    live: i.live,
     ...(terms ? { terms } : {}),
     ...(i.nominal ? { nominal: i.nominal } : {}),
     ...(i.pricePath?.length ? { pricePath: i.pricePath } : {}),

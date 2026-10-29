@@ -9,7 +9,7 @@ const KRU = "PLKRK0000713";
 describe("corporate bonds", () => {
   const inst: InstrumentItem = {
     PK: `INST#${KRU}`, SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: KRU, isin: KRU, code: "KRU0827", name: "Kruk S.A.", type: "BOND_CORPORATE",
-    currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: "KRU0827" }, active: true, live: false, nominal: 100, updatedAt: "",
+    currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: "KRU0827" }, active: true, nominal: 100, updatedAt: "",
   };
   const price: PriceItem = {
     PK: `INST#${KRU}`, SK: "PX#CATALYST#2026-10-09", isin: KRU, venue: "CATALYST", date: "2026-10-09", open: null, high: null, low: null, close: 100.45,
@@ -66,8 +66,8 @@ describe("corporate bonds", () => {
       ["SELL", "PLO144500017", 5, 100, 5000, 0],
     ]);
     expect(out.corporateInstruments).toEqual([
-      { isin: KRU, code: "KRU0827", name: "Kruk S.A. (WIBOR 3M + 3.3%)", type: "BOND_CORPORATE", currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: "KRU0827" }, active: true, live: false, nominal: 100 },
-      { isin: "PLO144500017", code: "TPE1025", name: "Tauron Polska Energia S.A. (WIBOR 6M + 1.35%)", type: "BOND_CORPORATE", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: false, live: false, nominal: 1000 },
+      { isin: KRU, code: "KRU0827", name: "Kruk S.A. (WIBOR 3M + 3.3%)", type: "BOND_CORPORATE", currency: "PLN", venue: "CATALYST", sourceIds: { biznesradar: "KRU0827" }, active: true, nominal: 100 },
+      { isin: "PLO144500017", code: "TPE1025", name: "Tauron Polska Energia S.A. (WIBOR 6M + 1.35%)", type: "BOND_CORPORATE", currency: "PLN", venue: "MANUAL", sourceIds: {}, active: false, nominal: 1000 },
     ]);
     expect(out.manualPrices).toEqual([
       { isin: "PLO144500017", date: "2022-10-26", price: 98.5, currency: "PLN", note: "trade price" },

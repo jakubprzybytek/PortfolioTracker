@@ -96,8 +96,8 @@ describe("positionsAt", () => {
 describe("valuePortfolio", () => {
   it("values listed bonds at clean price × nominal + accrued, incl. IZ indexation", () => {
     const instruments: InstrumentItem[] = [
-      { PK: "INST#PL0000117024", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "PL0000117024", isin: "PL0000117024", code: "IZ0836", name: "IZ0836", type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: { gpw: "IZ0836" }, active: true, live: false, terms: iz, updatedAt: "" },
-      { PK: "INST#PL0000113783", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "PL0000113783", isin: "PL0000113783", code: "DS0432", name: "DS0432", type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: { gpw: "DS0432" }, active: true, live: false, terms: ds, updatedAt: "" },
+      { PK: "INST#PL0000117024", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "PL0000117024", isin: "PL0000117024", code: "IZ0836", name: "IZ0836", type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: { gpw: "IZ0836" }, active: true, terms: iz, updatedAt: "" },
+      { PK: "INST#PL0000113783", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "PL0000113783", isin: "PL0000113783", code: "DS0432", name: "DS0432", type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: { gpw: "DS0432" }, active: true, terms: ds, updatedAt: "" },
     ];
     const dayRows = parseGpwHistoryXls(fixture(FIXTURES.day20261009));
     const prices = new Map(gpwRowsToPriceItems(dayRows, "final").map((p) => [p.isin, p]));

@@ -13,7 +13,7 @@ const OAT = "FR0013508470";
 const tx = (t: Partial<TransactionItem> & Pick<TransactionItem, "date" | "type" | "amount">): TransactionItem =>
   ({ PK: "ACCT#IBKR", SK: "TX#", GSI1PK: "TX", GSI1SK: "", id: "x", account: "IBKR", currency: "PLN", source: "t", ...t }) as TransactionItem;
 const inst = (i: Partial<InstrumentItem> & Pick<InstrumentItem, "isin" | "type" | "currency">): InstrumentItem =>
-  ({ PK: `INST#${i.isin}`, SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: i.isin, code: i.isin, name: i.isin, venue: "CALC", sourceIds: {}, active: true, live: false, updatedAt: "", ...i }) as InstrumentItem;
+  ({ PK: `INST#${i.isin}`, SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: i.isin, code: i.isin, name: i.isin, venue: "CALC", sourceIds: {}, active: true, updatedAt: "", ...i }) as InstrumentItem;
 
 describe("price path", () => {
   it("moves at a constant yield between known prices, one price per weekday", () => {
@@ -102,10 +102,10 @@ describe("convertSheetRows: IBKR", () => {
     ]);
     expect(out.ibkrInstruments).toEqual([
       {
-        isin: OAT, code: OAT, name: "FR Govt 0.0 Feb25'27", type: "BOND_IBKR", currency: "EUR", venue: "CALC", sourceIds: {}, active: true, live: false, nominal: 1000,
+        isin: OAT, code: OAT, name: "FR Govt 0.0 Feb25'27", type: "BOND_IBKR", currency: "EUR", venue: "CALC", sourceIds: {}, active: true, nominal: 1000,
         pricePath: [{ date: "2025-10-02", price: 97.22 }, { date: "2027-02-25", price: 100 }],
       },
-      { isin: EUR, code: "EUR", name: "EUR cash", type: "CURRENCY", currency: "EUR", venue: "FX", sourceIds: {}, active: true, live: false },
+      { isin: EUR, code: "EUR", name: "EUR cash", type: "CURRENCY", currency: "EUR", venue: "FX", sourceIds: {}, active: true },
     ]);
     expect(out.skipped).toEqual([]);
     expect(() => parseTransactionFile(JSON.stringify(out.transactions), "check")).not.toThrow();

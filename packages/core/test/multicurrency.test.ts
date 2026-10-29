@@ -64,7 +64,7 @@ describe("a bond bought in EUR", () => {
     const px = { isin: BUND, venue: "CALC", date: "2026-10-12", close: 98 } as PriceItem;
     const snap = valuePortfolio({
       date: "2026-10-12",
-      instruments: [{ isin: BUND, code: BUND, name: "Bund", type: "BOND_IBKR", currency: "EUR", venue: "CALC", sourceIds: {}, active: true, live: false, nominal: 1000 } as unknown as InstrumentItem],
+      instruments: [{ isin: BUND, code: BUND, name: "Bund", type: "BOND_IBKR", currency: "EUR", venue: "CALC", sourceIds: {}, active: true, nominal: 1000 } as unknown as InstrumentItem],
       transactions: txs,
       prices: new Map([[BUND, px]]),
       referenceIndex: new Map(),

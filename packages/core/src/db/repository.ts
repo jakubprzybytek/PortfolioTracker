@@ -7,10 +7,8 @@ import {
   GetCommand,
   PutCommand,
   QueryCommand,
-  ScanCommand,
   UpdateCommand,
   type QueryCommandInput,
-  type ScanCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import type { IsoDate } from "../dates.ts";
 import type { ReferenceIndexMonth } from "../bonds/izIndex.ts";
@@ -113,17 +111,6 @@ export class Repository {
         requested = res.UnprocessedKeys?.[tableName]?.Keys ?? [];
       }
     }
-    return out;
-  }
-
-  private async scanAll<T>(table: Table, input: Omit<ScanCommandInput, "TableName">): Promise<T[]> {
-    const out: T[] = [];
-    let ExclusiveStartKey: Record<string, unknown> | undefined;
-    do {
-      const res = await this.doc.send(new ScanCommand({ TableName: this.tables[table], ...input, ExclusiveStartKey }));
-      out.push(...((res.Items ?? []) as T[]));
-      ExclusiveStartKey = res.LastEvaluatedKey;
-    } while (ExclusiveStartKey);
     return out;
   }
 
@@ -458,13 +445,6 @@ export class Repository {
     return this.batchGet<SnapshotItem>("holdings", dates.map((d) => keys.snapshot(d)));
   }
 
-  querySnapshots(from: IsoDate, to: IsoDate): Promise<SnapshotItem[]> {
-    return this.queryAll<SnapshotItem>("holdings", {
-      KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
-      ExpressionAttributeValues: { ":pk": "PORTFOLIO", ":from": `SNAP#${from}`, ":to": `SNAP#${to}` },
-    });
-  }
-
   // --- history (a chart point per day, one item per position per day) --------------------------
 
   /**
@@ -498,16 +478,6 @@ export class Repository {
     return this.queryAll<HistoryPointItem>("holdings", {
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
       ExpressionAttributeValues: { ":pk": "HISTORY", ":from": from, ":to": to },
-    });
-  }
-
-  /** Every position day in the table (a full scan: for the one-off cleanup of days left by older versions). */
-  scanPositionDays(): Promise<Pick<PositionDayItem, "account" | "isin" | "date">[]> {
-    return this.scanAll<Pick<PositionDayItem, "account" | "isin" | "date">>("holdings", {
-      FilterExpression: "begins_with(PK, :pos)",
-      ExpressionAttributeValues: { ":pos": "POS#" },
-      ProjectionExpression: "account, isin, #d",
-      ExpressionAttributeNames: { "#d": "date" },
     });
   }
 
