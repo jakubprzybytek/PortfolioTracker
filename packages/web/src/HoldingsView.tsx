@@ -641,6 +641,7 @@ export function HoldingsView({
   }, [byInstrument, chartIsin, chartAccount]);
 
   // Keep the clicked row visible above the panel.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reruns when another row is chosen (it finds the selected row in the DOM)
   useEffect(() => {
     if (!chartIsin || panelHeight === 0) return;
     const row = document.querySelector<HTMLElement>("tr.selected");
@@ -980,6 +981,7 @@ export function HoldingsView({
       {/* One control split in two (segmented): the chosen half filled. */}
       <div className="group-by">
         <span className="muted">Group by</span>
+        {/* biome-ignore lint/a11y/useSemanticElements: a segmented control; a <fieldset> would bring its own box and legend */}
         <span
           className="segmented"
           data-testid="group-by"
@@ -1101,8 +1103,7 @@ export function HoldingsView({
             {!snap.data && snap.loading && <SkeletonRows rows={10} cols={11} />}
             {byInstrument && instrumentRows.map(renderInstrument)}
             {byInstrument && cashRows.length === 1 && (
-              <>
-                {cashRows[0]!.cashLines.map((line) => (
+              cashRows[0]!.cashLines.map((line) => (
                   <CashRow
                     key={line.currency ?? "PLN"}
                     account={cashRows[0]!.name}
@@ -1110,8 +1111,7 @@ export function HoldingsView({
                     label={<strong>Cash</strong>}
                     second={cashRows[0]!.name}
                   />
-                ))}
-              </>
+                ))
             )}
             {byInstrument && cashRows.length > 1 && (
               <Fragment key="cash">

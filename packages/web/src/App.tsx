@@ -124,6 +124,7 @@ function Shell({ email }: { email: string }) {
   // Phone: the menu opens over the page from the ☰ button; any navigation, a tap outside or Escape closes it.
   const [menuOpen, setMenuOpen] = useState(false);
   const hash = window.location.hash;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: closes the menu whenever the route changes
   useEffect(() => setMenuOpen(false), [hash, route.view]);
   useEffect(() => {
     if (!menuOpen) return;
@@ -193,6 +194,7 @@ function Shell({ email }: { email: string }) {
               </button>
               <div data-testid="version">
                 Portfolio Tracker {APP_VERSION} ·{" "}
+                {/* biome-ignore lint/a11y/useValidAnchor: a real link (#/status); the click also closes the phone menu */}
                 <a href="#/status" data-testid="nav-status" onClick={() => setMenuOpen(false)}>
                   status
                 </a>

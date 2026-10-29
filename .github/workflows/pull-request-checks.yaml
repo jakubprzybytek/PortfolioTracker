@@ -28,5 +28,6 @@ jobs:
       - name: Registry signatures
         run: npm audit signatures
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run lint
+      - run: npm run test:coverage
       - run: npm run build -w @portfolio/web

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import type { Decision, HoldSellAssumptions, HoldSellSkipped, ReviewRow } from "@portfolio/core";
 import { apiSend } from "./api.ts";
 import { BoughtToday } from "./BoughtToday.tsx";
-import { fmtNum, fmtPln, parseNum, signClass } from "./format.ts";
+import { fmtNum, fmtPln, parseNum } from "./format.ts";
 import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { useNarrow } from "./useNarrow.ts";
@@ -63,9 +63,10 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
   const [done, setDone] = useState<string | null>(null);
   // The form follows the saved assumptions (first load, after a save or a reset), not every background refetch.
   const assumptionsKey = d ? JSON.stringify(d.assumptions) : "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a change of the saved assumptions resets the form
   useEffect(() => {
     if (d) setDraft(draftOf(d.assumptions));
-  }, [assumptionsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [assumptionsKey]);
 
   const send = async (body: unknown, message: string) => {
     setPending(true);

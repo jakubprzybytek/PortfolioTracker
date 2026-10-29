@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
 import { listingFromTicker } from "../src/instruments/listing.ts";
 import { adjustForSplits, splitFactorAfter, unadjustSplits } from "../src/prices/splits.ts";
-import { parseTransactionFile } from "../src/transactions/schema.ts";
 import { cashByAccount } from "../src/valuation/cash.ts";
 import { positionKey, positionsAt } from "../src/valuation/positions.ts";
 import { priceRows } from "../src/valuation/priceRows.ts";

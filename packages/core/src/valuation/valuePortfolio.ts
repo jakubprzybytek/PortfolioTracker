@@ -77,7 +77,7 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
         priceDate: null,
         nominal: r?.nominal ?? null,
         accruedInterest: r?.accruedInterest ?? null,
-        valuePerUnit: r && r.quantity ? round2(r.value / r.quantity) : null,
+        valuePerUnit: r?.quantity ? round2(r.value / r.quantity) : null,
         value,
         gain,
         gainPct: gain === null || p.cost === 0 ? null : round2((gain / p.cost) * 100),
@@ -176,7 +176,8 @@ export function valuePortfolio(ctx: ValuationContext): Omit<SnapshotItem, "PK" |
     totals.cost += h.cost;
     totals.gain += h.gain ?? 0;
     totals.couponsReceived += h.couponsReceived;
-    const t = (byType[h.type] ??= { value: 0, cost: 0 });
+    const t = byType[h.type] ?? { value: 0, cost: 0 };
+    byType[h.type] = t;
     t.value += h.value ?? 0;
     t.cost += h.cost;
   }

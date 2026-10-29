@@ -70,7 +70,7 @@ export function priceRows(
         ...(now?.venue === "MANUAL" ? { manual: true } : {}),
         ...(i.venue === "CALC" ? { calculated: true } : {}),
         yearAgo: then ? { date: then.date, price: then.close } : null,
-        change1y: now && then && then.close ? Math.round((now.close / then.close - 1) * 10_000) / 10_000 : null,
+        change1y: now && then?.close ? Math.round((now.close / then.close - 1) * 10_000) / 10_000 : null,
         ...cls,
       };
     })

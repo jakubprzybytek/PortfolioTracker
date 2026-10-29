@@ -121,7 +121,10 @@ export function CouponPeriods({ isin, code }: { isin: string; code: string }) {
           {pending === key && <span className="spinner" aria-hidden />}
           {pending === key ? "Saving…" : "Save"}
         </button>{" "}
-        <button type="button" onClick={() => (setEditing(null), setDraft(null))} disabled={pending !== null}>
+        <button type="button" onClick={() => {
+            setEditing(null);
+            setDraft(null);
+          }} disabled={pending !== null}>
           Cancel
         </button>
       </td>
@@ -197,7 +200,11 @@ export function CouponPeriods({ isin, code }: { isin: string; code: string }) {
                             ⚠ {SOURCE_LABELS[p.otherRate.source]} shows {fmtRate(p.otherRate.rate)}: use it
                           </button>
                         )}
-                        <button type="button" className="link" onClick={() => (setEditing(p.start), setDraft(draftOf(p)), setError(null))} disabled={pending !== null} data-testid="coupon-edit">
+                        <button type="button" className="link" onClick={() => {
+                          setEditing(p.start);
+                          setDraft(draftOf(p));
+                          setError(null);
+                        }} disabled={pending !== null} data-testid="coupon-edit">
                           Edit
                         </button>
                         <button

@@ -12,7 +12,10 @@ describe("fetchWithTimeout", () => {
 
   it("passes the request through, with a signal", async () => {
     const seen: RequestInit[] = [];
-    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => (seen.push(init), new Response("ok")));
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      seen.push(init);
+      return new Response("ok");
+    });
     const res = await fetchWithTimeout("https://example.test/", { headers: { A: "1" } });
     expect(await res.text()).toBe("ok");
     expect(seen[0]).toMatchObject({ headers: { A: "1" } });

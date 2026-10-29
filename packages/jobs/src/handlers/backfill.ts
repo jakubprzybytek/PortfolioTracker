@@ -1,7 +1,6 @@
 // Backfills one instrument's history. Invoked with { isin } by the import Lambda for an instrument
 // without a backfill status, or manually (see Docs/backfill.md).
 
-import { Resource } from "sst";
 import { queueValuation, repo, runJob } from "../lib/context.ts";
 import { interpolatePricePath, isTradingDay, today, type PriceItem } from "@portfolio/core";
 import { BIZNESRADAR_SOURCE_ID, backfillBiznesradarHistory } from "../lib/catalystJobs.ts";

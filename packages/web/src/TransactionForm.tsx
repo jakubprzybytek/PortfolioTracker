@@ -50,6 +50,7 @@ const priceLabel = (i: Instrument | undefined): string =>
 
 function Field({ label, children, hint, wide }: { label: string; children: ReactNode; hint?: ReactNode; wide?: boolean }) {
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: the control is `children`
     <label className={`form-field${wide ? " wide" : ""}`}>
       <span>{label}</span>
       {children}
@@ -226,6 +227,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const set = (k: keyof typeof fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFields((s) => ({ ...s, [k]: e.target.value }));
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: a click outside the form closes it; Escape does the same from the keyboard
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
       <form
         className="modal"

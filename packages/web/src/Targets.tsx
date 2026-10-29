@@ -56,8 +56,14 @@ export function AssetMixPanel({ snapshot }: { snapshot: Snapshot }) {
   const rows = saved ? rebalance(byClass, saved, "SELL_AND_BUY") : null;
   // Without targets the empty classes are left out; with targets every class with a target shows.
   const shown = ASSET_CLASSES.filter((k) => byClass[k] > 0 || (saved && saved.targets[k] > 0));
+  // A tick where each class's target ends, adding up from the left (none at the right edge).
+  const ticks: { key: (typeof ASSET_CLASSES)[number]; at: number }[] = [];
   let edge = 0;
-  const ticks = saved ? ASSET_CLASSES.filter((k) => saved.targets[k] > 0).map((k) => ({ key: k, at: (edge += saved.targets[k]) })).filter((t) => t.at < 99.95) : [];
+  for (const k of ASSET_CLASSES) {
+    if (!saved || !(saved.targets[k] > 0)) continue;
+    edge += saved.targets[k];
+    if (edge < 99.95) ticks.push({ key: k, at: edge });
+  }
   const toggle = () => {
     writeOpen(!open);
     setOpen(!open);
@@ -139,6 +145,7 @@ function Rebalance({ byClass, saved }: { byClass: Record<AssetClass, number>; sa
   return (
     <div className="targets" data-testid="targets">
       <div className="targets-controls">
+        {/* biome-ignore lint/a11y/useSemanticElements: a segmented control; a <fieldset> would bring its own box and legend */}
         <span className="segmented" role="group" aria-label="Calculator" data-testid="targets-mode">
           {(["NEW_MONEY", "SELL_AND_BUY"] as const).map((m) => (
             <button key={m} type="button" className={m === mode ? "active" : ""} aria-pressed={m === mode} onClick={() => setMode(m)}>

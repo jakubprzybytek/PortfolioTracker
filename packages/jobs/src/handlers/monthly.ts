@@ -2,7 +2,6 @@
 // index ratio against the Ministry of Finance page, and refresh the retail-bond rates from the Ministry file.
 
 import { buildReferenceIndex, indexRatioAt, shiftMonth, toReferenceIndex, today } from "@portfolio/core";
-import { Resource } from "sst";
 import { archiveRaw, queueValuation, repo, runJob } from "../lib/context.ts";
 import { fetchRetailFile } from "../lib/mfRetail.ts";
 import { importRetailRates } from "./import.ts";

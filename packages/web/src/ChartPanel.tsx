@@ -58,6 +58,7 @@ export function ChartPanel({ title, actions, onClose, onHeight, children }: { ti
 
   return (
     <section className="chart-panel" style={{ height }} data-testid="chart-panel" aria-label="Chart">
+      {/* biome-ignore lint/a11y/useSemanticElements: a draggable, focusable resize handle (an <hr> can't be one) */}
       <div
         className="chart-panel-handle"
         role="separator"

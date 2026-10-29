@@ -31,6 +31,7 @@ export function NotesView({ params, setParams }: { params: Record<string, string
   const creating = params["note"] === "new";
   const selected = notes.data?.find((n) => n.id === selectedId);
   const [editing, setEditing] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: another note selected: back to reading it
   useEffect(() => setEditing(creating), [selectedId, creating]);
   const narrow = useNarrow();
   const restored = useRef(false);
@@ -118,6 +119,7 @@ function NoteBody({ note, onEdit, onDeleted }: { note: Note; onEdit: () => void;
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: another note: drop a pending delete confirmation
   useEffect(() => setConfirm(false), [note.id]);
   const remove = async () => {
     setBusy(true);
@@ -177,9 +179,9 @@ function NoteEditor({ note, onSaved, onCancel }: { note?: Note; onSaved: (n: Not
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" aria-label="Title" required maxLength={200} data-testid="note-title-input" />
       <div className="note-editor-panes">
         <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write in Markdown: # heading, **bold**, - list, | table |" aria-label="Text (Markdown)" data-testid="note-body-input" />
-        <div className="note-preview" aria-label="Preview">
+        <section className="note-preview" aria-label="Preview">
           {body.trim() ? <MarkdownText text={body} /> : <p className="faint">Preview</p>}
-        </div>
+        </section>
       </div>
       {error && <p className="error">{error}</p>}
       <div className="note-editor-footer">

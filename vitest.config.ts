@@ -2,6 +2,13 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    // `npm run test:coverage`: unit-test coverage of the code (the integration and E2E tests run against a stage).
+    coverage: {
+      provider: "v8",
+      include: ["packages/core/src/**", "packages/jobs/src/**", "packages/web/src/**"],
+      reporter: ["text-summary", "html"],
+      reportsDirectory: "coverage",
+    },
     projects: [
       {
         test: {

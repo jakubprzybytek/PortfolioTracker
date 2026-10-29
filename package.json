@@ -14,15 +14,19 @@
     "deploy": "sst deploy",
     "shell": "sst shell",
     "typecheck": "tsc -p packages/core && tsc -p packages/jobs && npm run typecheck -w @portfolio/web",
+    "lint": "biome lint .",
     "test": "vitest run --project unit",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
-    "test:e2e": "playwright test -c packages/web/playwright.config.ts"
+    "test:e2e": "playwright test -c packages/web/playwright.config.ts",
+    "test:coverage": "vitest run --project unit --coverage"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.15",
     "@playwright/test": "^1.64.0",
     "@types/aws-lambda": "^8.10.164",
     "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "5.0.3",
     "sst": "^4.17.2",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"

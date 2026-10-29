@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from "react";
 import {
   FilterBar,
@@ -25,7 +24,7 @@ import { InstrumentLabel } from "./InstrumentLabel.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { useStickyToolbar } from "./sticky.tsx";
 import { useTxForm } from "./txForm.ts";
-import { useMedia, useNarrow } from "./useNarrow.ts";
+import { useMedia } from "./useNarrow.ts";
 import type { TransactionRow } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -141,8 +140,8 @@ export function TransactionsView({
 
   // Drawn so far; back to the first rows when the filters change.
   const [limit, setLimit] = useState(PAGE);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the filters changing is the trigger
   useEffect(() => setLimit(PAGE), [instrument, account, type, tx, q]);
-  const narrow = useNarrow();
   // The table needs a wide screen: below it (a phone, a narrow window), a list of two-line rows.
   const list = useMedia("(max-width: 1150px)");
 
@@ -152,6 +151,7 @@ export function TransactionsView({
   const moreRef = (el: HTMLElement | null) => {
     more.current = el;
   };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-observes the "more" marker after each page drawn or a layout change
   useEffect(() => {
     const el = more.current;
     if (!el) return;
@@ -264,6 +264,15 @@ export function TransactionsView({
                 data-id={t.id}
                 className={`tx-item clickable band-${bands[i]}`}
                 onClick={() => form.open(t)}
+                // Keyboard too: Tab to the row, Enter or Space opens it.
+                // biome-ignore lint/a11y/noNoninteractiveTabindex: the row opens the transaction; it must be reachable by Tab
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    form.open(t);
+                  }
+                }}
               >
                 <div className="tx-line">
                   <span className="tx-date" title={interestNote(t)}>

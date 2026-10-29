@@ -1,0 +1,37 @@
+// Biome as the linter (`npm run lint`, in CI). Formatting is left as it is (no formatter: the code is consistent and a
+// reformat of everything would bury the history).
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    // Docs/reference and test/fixtures: saved copies of other sites' pages, not our code; public: the icons.
+    "includes": ["**", "!**/dist", "!**/.sst", "!**/sst-env.d.ts", "!vendor", "!temp", "!**/test-results", "!**/playwright-report", "!**/*.css", "!Docs/reference", "!**/test/fixtures", "!packages/web/public"]
+  },
+  "formatter": { "enabled": false },
+  "assist": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        // With noUncheckedIndexedAccess, `x[i]!` after a bounds check is the normal way to say "it's there".
+        "noNonNullAssertion": "off",
+        "useTemplate": "off"
+      },
+      "complexity": {
+        // noPropertyAccessFromIndexSignature (tsconfig) asks for q["from"] on records.
+        "useLiteralKeys": "off",
+        "useArrowFunction": "off"
+      },
+      "correctness": {
+        // Function declarations inside blocks are fine in ES modules (block-scoped, strict mode).
+        "noInnerDeclarations": "off"
+      },
+      "suspicious": {
+        // Every index key here is a fixed position (month columns, placeholder rows, a table's columns, a sale's
+        // FIFO pairs): never a list that reorders or holds state per row.
+        "noArrayIndexKey": "off"
+      }
+    }
+  }
+}

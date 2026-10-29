@@ -9,7 +9,6 @@ const DS = "PL0000113783";
 const SPXS = "IE00B3YCGJ38"; // sample ETF (EUR, Yahoo), split 100:1 on 2025-12-15
 const KRU = "PLKRK0000713"; // sample Catalyst corporate bond KRU0827 (BiznesRadar), nominal 100
 const BUND = "DE0001102523"; // sample foreign bond at IBKR: calculated prices
-const EUR_CASH = "ZZWALUTYEUR0";
 
 /** The sample's coupon periods of KRU (data/coupons.sample.json). */
 const samplePeriods = JSON.parse(readFileSync(path.join(repoRoot, "data/coupons.sample.json"), "utf8")) as { start: string; end: string; recordDate: string; rate: number }[];

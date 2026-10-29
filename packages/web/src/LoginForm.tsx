@@ -27,6 +27,7 @@ function message(err: unknown): string {
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: the control is `children`
     <label className="field">
       <span>{label}</span>
       {children}
@@ -92,11 +93,13 @@ export function LoginForm({ onSignedIn }: { onSignedIn: () => void }) {
         {info && <p className="muted" data-testid="login-info">{info}</p>}
         {(step === "signIn" || step === "forgot") && (
           <Field label="Email">
+            {/* biome-ignore lint/a11y/noAutofocus: the login form is the whole page; its first field takes the focus */}
             <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} data-testid="login-email" autoFocus />
           </Field>
         )}
         {step === "resetCode" && (
           <Field label="Code from the email">
+            {/* biome-ignore lint/a11y/noAutofocus: the next step's only field */}
             <input inputMode="numeric" autoComplete="one-time-code" required value={code} onChange={(e) => setCode(e.target.value)} data-testid="login-code" autoFocus />
           </Field>
         )}

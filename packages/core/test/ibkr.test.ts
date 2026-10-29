@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
 import { interpolatePricePath } from "../src/prices/pricePath.ts";
-import { parseTransactionFile } from "../src/transactions/schema.ts";
 import { cashByAccount } from "../src/valuation/cash.ts";
 import { positionKey, positionsAt } from "../src/valuation/positions.ts";
 import { valuePortfolio } from "../src/valuation/valuePortfolio.ts";

@@ -49,7 +49,10 @@ export function InstrumentView({ params }: { params: Record<string, string> }) {
   const instruments = useApi<Instrument[]>("/instruments");
   const inst = instruments.data?.find((i) => i.isin === isin);
   // Came from a view of the app: back to it (its open chart included); otherwise to Prices.
-  const back = () => (from ? window.history.back() : (window.location.hash = toHash("prices", { chart: isin || undefined })));
+  const back = () => {
+    if (from) window.history.back();
+    else window.location.hash = toHash("prices", { chart: isin || undefined });
+  };
 
   return (
     <>

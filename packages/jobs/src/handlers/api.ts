@@ -318,6 +318,439 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
   return { ...res, headers: { ...headers, etag } };
 }
 
+/** What a route gets: the request, its query, the ISIN in the path and the date range asked for. */
+interface RouteContext {
+  event: APIGatewayProxyEventV2WithJWTAuthorizer;
+  q: Record<string, string | undefined>;
+  isin: string | undefined;
+  from: IsoDate;
+  to: IsoDate;
+  route: string;
+}
+type Route = (c: RouteContext) => Promise<APIGatewayProxyResultV2>;
+
+/** Every route of the API: its handler, given the request (and its date range, `from`/`to`, checked already). */
+const ROUTES: Record<string, Route> = {
+  "GET /holdings": async ({ q }) => {
+    // `flows`: each position's own cash flows to the snapshot's day (PLN, NBP D-1), for the XIRR of any row or group.
+    // `?closed=1`: also the positions held no more (`closed`: realised gain, coupons, open and close dates).
+    const [snap, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listTransactions()]);
+    if (!snap) return json(404, { error: "No valuation yet" });
+    const fx = await fxHistoryOf(txs, today());
+    const flows = positionFlows(txs, snap.date, fx);
+    if (q["closed"] !== "1") return json(200, { ...snap, flows });
+    const instruments = await repo.listInstruments();
+    const positions = positionsAt(txs, today(), fx);
+    return json(200, { ...snap, flows, closed: closedPositions(positions.values(), instruments) });
+  },
+  "GET /cash-flows": async ({ q }) => {
+    // Deposits and withdrawals per account and month of `?year=` (default this year), and the spreadsheet feed's state.
+    const year = q["year"] ?? today().slice(0, 4);
+    if (!/^\d{4}$/.test(year)) return json(400, { error: "year: four digits" });
+    const [txs, token] = await Promise.all([repo.listTransactions(), repo.getSetting<FeedToken>(FEED_TOKEN_SETTING)]);
+    const report = cashFlows(txs, Number(year), await fxHistoryOf(txs, today()));
+    return json(200, { ...report, feed: token ? { createdAt: token.createdAt, lastUsedAt: token.lastUsedAt ?? null } : null });
+  },
+  "POST /feed-token": async () => {
+    // A new token for the feed, replacing any before it (that one stops working at once); returned only here.
+    const { token, stored } = newFeedToken();
+    await repo.putSetting(FEED_TOKEN_SETTING, stored);
+    return json(201, { token, createdAt: stored.createdAt });
+  },
+  "DELETE /feed-token": async () => {
+    await repo.deleteSetting(FEED_TOKEN_SETTING);
+    return json(200, { feed: null });
+  },
+  "GET /sales": async () => {
+    // Every sale, redemption and write-off with its FIFO pairs (newest first), and per year the PIT-38 summary.
+    const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
+    const sales = salesOf(positionsAt(txs, today(), await fxHistoryOf(txs, today())).values(), instruments);
+    return json(200, { sales, years: pitYears(sales) });
+  },
+  "GET /accounts": async () => {
+    // Per account (latest snapshot): net deposits, value, cash, profit, income, costs, XIRR; total of the complete ones.
+    const [snap, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listTransactions()]);
+    if (!snap) return json(404, { error: "No valuation yet" });
+    // Money in other currencies counts at NBP rates (the day before each transaction; base currencies: today too).
+    const fx = await fxHistoryOf(txs, snap.date, Object.values(snap.accounts ?? {}).map((a) => a.baseCurrency ?? "PLN"));
+    return json(200, { date: snap.date, ...accountSummaries(snap, txs, fx) });
+  },
+  "GET /portfolio/history": async ({ from, to }) => {
+    return json(200, await portfolioHistory(from, to));
+  },
+  "GET /portfolio/years": async () => {
+    // Per calendar year and over the whole history: start and end value, money put in, profit, time-weighted and
+    // money-weighted return, inflation over the same days (CPI: GUS since December, else the monthly chain) and the
+    // real return; plus the CPI levels from the first day on, for the growth of 100 zł chart (`growthOf100`).
+    // Also the income per year (coupons, dividends, interest; PLN at NBP D-1) for "Income by year".
+    const [points, ytd, mom, txs] = await Promise.all([portfolioHistory("2000-01-01", today()), repo.listGusCpi("CPI_YTD"), repo.listReferenceIndex(), repo.listTransactions()]);
+    const levels = cpiLevels(ytd, mom);
+    const start = points[0] ? shiftMonth(points[0].date.slice(0, 7), -1) : "9999-12";
+    const [benchmarks, fx] = await Promise.all([benchmarkSeries(points[0]?.date), fxHistoryOf(txs, today())]);
+    return json(200, { ...yearlyReturns(points, levels), cpi: levels.filter((l) => l.month >= start), benchmarks, income: incomeByYear(txs, fx) });
+  },
+  "GET /instruments": async () => {
+    const items = (await repo.listInstruments()).filter((i) => i.isin !== "MF-TERMS");
+    const statuses = await repo.listBackfillStatuses(items.map((i) => i.isin));
+    const withStatus = items.map((i) => ({ ...i, backfill: statuses.get(i.isin) }));
+    return json(200, withStatus);
+  },
+  "GET /instruments/{isin}/prices": async ({ isin, from, to }) => {
+    if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
+    const inst = await repo.getInstrument(isin);
+    if (!inst) return json(404, { error: "Unknown instrument" });
+    // Retail bonds aren't traded: their line is the calculated value per bond of your lots (nominal 100).
+    if (inst.type === "BOND_RETAIL" && inst.retail) {
+      const txs = (await repo.listTransactions()).filter((t) => t.isin === isin);
+      const points = retailValueHistory(inst.retail, txs, from, to);
+      return json(200, points.map((p) => ({ isin, venue: "CALC", date: p.date, close: p.value, traded: true, currency: inst.currency, calculated: true })));
+    }
+    // On today's share basis: closes before a split are divided by its ratio, so the line has no cliff.
+    const prices = adjustForSplits(await repo.queryPrices(isin, inst.venue, from, to), inst.splits);
+    // Inflation-linked bonds: the indexed nominal per bond on each day (1000 × index ratio), drawn on its own axis.
+    const indexed = inst.terms?.couponType === "INDEXED" ? { terms: inst.terms, referenceIndex: toReferenceIndex(await repo.listReferenceIndex()) } : null;
+    return json(
+      200,
+      prices.map(({ PK: _p, SK: _s, ...rest }) => {
+        if (!indexed) return rest;
+        const v = valueBond(indexed.terms, rest.date, { referenceIndex: indexed.referenceIndex });
+        return { ...rest, nominal: v.problem ? null : v.nominal };
+      }),
+    );
+  },
+  "POST /instruments/{isin}/prices": async ({ event, isin }) => {
+    // A new value of a hand-valued asset (venue MANUAL): { date, price } per unit in the instrument's currency.
+    if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
+    const inst = await repo.getInstrument(isin);
+    if (!inst) return json(404, { error: "Unknown instrument" });
+    if (inst.venue !== "MANUAL") return json(400, { error: `${inst.code} has a price source; only hand-valued assets take a value here` });
+    const body = bodyOf(event) as { date?: unknown; price?: unknown; note?: unknown } | undefined;
+    const date = typeof body?.date === "string" ? body.date : "";
+    const price = typeof body?.price === "number" ? body.price : NaN;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isCalendarDate(date)) return json(400, { error: "date: needs a date (YYYY-MM-DD)" });
+    if (date > addDays(today(), 1)) return json(400, { error: "date: not in the future" }); // a day ahead: UTC vs the user's clock
+    if (!(price > 0)) return json(400, { error: "price: needs a positive number" });
+    const note = typeof body?.note === "string" && body.note.trim() ? body.note.trim() : undefined;
+    const [item] = parseManualPrices(JSON.stringify([{ isin, date, price, currency: inst.currency, ...(note ? { note } : {}) }]), APP_SOURCE);
+    await repo.putPrices([item!]);
+    await queueValuation({ reason: "value entered", from: date });
+    const { PK: _p, SK: _s, ...out } = item!;
+    return json(201, out);
+  },
+  "DELETE /instruments/{isin}/prices/{date}": async ({ event, isin }) => {
+    const date = event.pathParameters?.["date"] ?? "";
+    if (!isin || !ISIN.test(isin) || !isCalendarDate(date)) return json(400, { error: "Needs an ISIN and a date" });
+    const inst = await repo.getInstrument(isin);
+    if (inst?.venue !== "MANUAL") return json(400, { error: "Only values entered by hand can be deleted" });
+    const [existing] = await repo.queryPrices(isin, "MANUAL", date, date);
+    if (!existing) return json(404, { error: `No value on ${date}` });
+    await repo.deletePrice(isin, "MANUAL", date);
+    await queueValuation({ reason: "value deleted", from: date });
+    return json(200, { isin, date });
+  },
+  "PUT /instruments/{isin}/asset-class": async ({ event, isin }) => {
+    // { assetClass }: the class set by hand; the rule's class (or null) clears it. The instrument's days are
+    // revalued from its first transaction, so the allocation charts follow.
+    if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
+    const inst = await repo.getInstrument(isin);
+    if (!inst) return json(404, { error: "Unknown instrument" });
+    const body = bodyOf(event) as { assetClass?: unknown } | undefined;
+    const wanted = body?.assetClass ?? null;
+    if (wanted !== null && !ASSET_CLASSES.includes(wanted as (typeof ASSET_CLASSES)[number])) return json(400, { error: `assetClass: one of ${ASSET_CLASSES.join(", ")} (or null: the rule)` });
+    const rule = defaultAssetClass(inst);
+    const assetClass = wanted === null || wanted === rule ? undefined : (wanted as (typeof ASSET_CLASSES)[number]);
+    if (assetClass === inst.assetClass) return json(200, { isin, assetClass: assetClass ?? rule, set: !!assetClass });
+    const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _gs, updatedAt: _u, assetClass: _a, ...rest } = inst;
+    await repo.putInstrument({ ...rest, ...(assetClass ? { assetClass } : {}) });
+    await queueValuation({ reason: "asset class changed", isins: [isin] });
+    return json(200, { isin, assetClass: assetClass ?? rule, set: !!assetClass });
+  },
+  "GET /instruments/{isin}/coupons": async ({ isin }) => {
+    // The bond's periods (oldest first), with the coupons you received matched to them: the rate each implies and
+    // whether it fits the stored rate.
+    const found = await corporateBond(isin);
+    if ("error" in found) return found.error;
+    const { inst } = found;
+    const [periods, txs] = await Promise.all([repo.listCouponPeriods(inst.isin), repo.listTransactions()]);
+    const own = txs.filter((t) => t.isin === inst.isin);
+    const checks = couponChecks(periods, inst.nominal!, own, inst.isin);
+    return json(200, { isin: inst.isin, code: inst.code, nominal: inst.nominal, periods: periods.map(periodOf), coupons: checks.periods, unmatched: checks.unmatched.map(withoutKeys) });
+  },
+  "POST /instruments/{isin}/coupons": async ({ event, isin }) => {
+    const found = await corporateBond(isin);
+    if ("error" in found) return found.error;
+    const { inst } = found;
+    return await savePeriod(inst, bodyOf(event));
+  },
+  "PUT /instruments/{isin}/coupons/{start}": (c) => ROUTES["DELETE /instruments/{isin}/coupons/{start}"]!(c),
+  "DELETE /instruments/{isin}/coupons/{start}": async ({ event, isin, route }) => {
+    const found = await corporateBond(isin);
+    if ("error" in found) return found.error;
+    const { inst } = found;
+    const start = event.pathParameters?.["start"] ?? "";
+    const existing = (await repo.listCouponPeriods(inst.isin)).find((p) => p.start === start);
+    if (!existing) return json(404, { error: `No period starting ${start}` });
+    if (route.startsWith("PUT")) return await savePeriod(inst, bodyOf(event), periodOf(existing));
+    await repo.deleteCouponPeriod(inst.isin, start);
+    await queueValuation({ reason: "coupon period deleted", from: start });
+    return json(200, periodOf(existing));
+  },
+  "GET /indicators": async () => {
+    // One row per indicator: latest value and the one a year earlier (series via /indicators/{id}).
+    const cpi = (await inflationIndicators()).map((i) => summarize(i, i.points));
+    const fx = await Promise.all(
+      FX_CURRENCIES.map(async (c): Promise<IndicatorSummary> => {
+        const last = await repo.latestFxRate(c, today());
+        const before = last && (await repo.latestFxRate(c, yearBefore(last.date)));
+        return { ...fxIndicator(c), latest: last ? { date: last.date, value: last.mid } : null, yearAgo: before ? { date: before.date, value: before.mid } : null };
+      }),
+    );
+    return json(200, [...cpi, ...fx]);
+  },
+  "GET /indicators/{id}": async ({ event, from, to }) => {
+    // Points in [from, to] (monthly indicators compare by month), oldest first.
+    const id = event.pathParameters?.["id"] ?? "";
+    const currency = fxCurrencyOf(id);
+    if (currency) {
+      if (!FX_CURRENCIES.includes(currency)) return json(404, { error: `No indicator ${id}` });
+      const rates = await repo.queryFxRates(currency, from, to);
+      return json(200, rates.map((r) => ({ date: r.date, value: r.mid })));
+    }
+    if (!CPI_INDICATORS.some((i) => i.id === id)) return json(404, { error: `No indicator ${id}` });
+    const series = (await inflationIndicators()).find((i) => i.id === id)!;
+    // Compared by month (by year for a yearly one).
+    const n = series.frequency === "yearly" ? 4 : 7;
+    return json(200, series.points.filter((p) => p.date >= from.slice(0, n) && p.date <= to.slice(0, n)));
+  },
+  "POST /prices/refresh": async () => {
+    // "Refresh prices": starts the Live job (today's quotes, then a revaluation of today). At most one every few
+    // minutes, so the sources aren't asked over and over; claimed with one conditional write (two quick clicks
+    // can't both start it).
+    const held = await repo.claimRefresh(new Date(), REFRESH_EVERY_MS);
+    const retryAt = held ? Date.parse(held) + REFRESH_EVERY_MS : 0;
+    if (held) return json(429, { error: `Prices were refreshed less than ${REFRESH_EVERY_MS / 60_000} minutes ago.`, retryAt: new Date(retryAt).toISOString() });
+    await invokeAsync(Resource.Live.name, {});
+    return json(202, { now: new Date().toISOString() });
+  },
+  "GET /prices": async ({ q }) => {
+    // Held instruments (latest snapshot): latest price, its date, and the price a year earlier. `?closed=1`: also
+    // the instruments traded but held no more (`closed`), with the year up to their last price; never stale.
+    const withClosed = q["closed"] === "1";
+    const [snap, instruments, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments(), withClosed ? repo.listTransactions() : Promise.resolve([])]);
+    const held = new Set((snap?.holdings ?? []).filter((h) => h.quantity > 0).map((h) => h.isin));
+    const former = formerInstruments(txs, held);
+    // Currencies held (IBKR cash) have no price of their own: their rates are in the Indicators view.
+    const shown = instruments.filter((i) => (held.has(i.isin) || former.has(i.isin)) && i.type !== "CURRENCY");
+    const day = today();
+    const latest = new Map<string, PriceItem>();
+    const yearAgo = new Map<string, PriceItem>();
+    await Promise.all(
+      shown.filter((i) => i.type !== "BOND_RETAIL").map(async (i) => {
+        const now = await repo.latestPrice(i.isin, i.venue, day);
+        const then = await repo.latestPrice(i.isin, i.venue, addDays(former.has(i.isin) && now ? now.date : day, -365));
+        if (now) latest.set(i.isin, now);
+        if (then) yearAgo.set(i.isin, then);
+      }),
+    );
+    const rates = new Map((snap?.holdings ?? []).filter((h) => h.rate).map((h) => [h.isin, h.rate!] as const));
+    return json(
+      200,
+      priceRows(shown, latest, yearAgo, day, 7, rates).map((r) => {
+        const f = former.get(r.isin);
+        return f ? { ...r, stale: false, closed: f } : r;
+      }),
+    );
+  },
+  "GET /holdings/history": async ({ q, from, to }) => {
+    // One position's daily value and cost (`account` + `isin`), or an instrument's total across the accounts
+    // that hold it now (`isin` only).
+    const id = q["isin"];
+    if (!id || !ISIN.test(id)) return json(400, { error: "Invalid ISIN" });
+    // Held nowhere now (a closed position): every account that traded it.
+    const account = accountParam(q);
+    let accounts = account ? [account] : [...new Set(((await repo.getSnapshot("LATEST"))?.holdings ?? []).filter((h) => h.isin === id).map((h) => h.account))];
+    if (accounts.length === 0) accounts = [...new Set((await repo.listTransactions()).filter((t) => t.isin === id).map((t) => t.account))];
+    const byDate = new Map<string, { date: string; value: number; cost: number; quantity: number }>();
+    for (const a of accounts)
+      for (const d of await repo.queryPositionDays(a, id, from, to)) {
+        const p = byDate.get(d.date) ?? { date: d.date, value: 0, cost: 0, quantity: 0 };
+        p.value = Math.round((p.value + (d.value ?? 0)) * 100) / 100;
+        p.cost = Math.round((p.cost + d.cost) * 100) / 100;
+        p.quantity += d.quantity;
+        byDate.set(d.date, p);
+      }
+    // Days it wasn't held (sold out and bought back later): zero, not a line across.
+    return json(200, withZeroGaps([...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))));
+  },
+  "GET /transactions": async () => {
+    // All transactions, newest first, with the instrument's code, name and type (none for cash movements).
+    const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
+    const byIsin = new Map(instruments.map((i) => [i.isin, i]));
+    const rows = txs.map(({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...rest }) => {
+      const inst = rest.isin ? byIsin.get(rest.isin) : undefined;
+      return { ...rest, instrument: inst ? { code: inst.code, name: inst.name, type: inst.type } : null };
+    });
+    rows.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+    return json(200, rows);
+  },
+  "POST /transactions": async ({ event }) => {
+    return await saveTransaction(bodyOf(event), userOf(event));
+  },
+  "PUT /transactions/{id}": (c) => ROUTES["DELETE /transactions/{id}"]!(c),
+  "DELETE /transactions/{id}": async ({ event, q, route }) => {
+    // ?date= (the stored date; the form sends it) makes the lookup one GetItem instead of a read of the account.
+    const id = event.pathParameters?.["id"];
+    const account = accountParam(q);
+    if (!id || !account) return json(400, { error: "Needs the transaction id and ?account=" });
+    const existing = await repo.findTransaction(account, id, q["date"] ? dateParam(q, "date") : undefined);
+    if (!existing) return json(404, { error: `No transaction ${id} in ${account}` });
+    if (route.startsWith("PUT")) return await saveTransaction(bodyOf(event), userOf(event), existing);
+    await repo.deleteTransaction(existing);
+    await repo.putTransactionLog({ at: new Date().toISOString(), action: "deleted", by: userOf(event), before: withoutKeys(existing) });
+    await queueValuation({ reason: "transaction deleted", from: existing.date });
+    return json(200, withoutKeys(existing));
+  },
+  "GET /transactions/log": async ({ q }) => {
+    // The audit trail: the latest changes made in the app (who, when, before and after), newest first.
+    const limit = Math.min(Math.max(Number(q["limit"] ?? 50) || 50, 1), 500);
+    return json(200, (await repo.listTransactionLog(limit)).map(({ PK: _p, SK: _s, ...e }) => e));
+  },
+  "GET /instruments/lookup": async ({ q }) => {
+    // A code typed in the form: an instrument already tracked, or a treasury series to add.
+    const code = (q["code"] ?? "").trim().toUpperCase();
+    if (!code) return json(400, { error: "Needs ?code=" });
+    const tracked = (await repo.listInstruments()).find((i) => i.code.toUpperCase() === code || i.isin === code);
+    if (tracked) return json(200, { tracked: true, instrument: tracked });
+    const found = await treasurySeries(code);
+    return found ? json(200, { tracked: false, instrument: found }) : json(404, { error: `${code}: no such treasury series in the Ministry data` });
+  },
+  "POST /instruments": async ({ event }) => {
+    // Either a full instrument (as in an import file) or { kind, … } from the form, completed here.
+    const body = bodyOf(event) as { kind?: string } | undefined;
+    let input: InstrumentInput | undefined;
+    if (body?.kind) {
+      const n = NewInstrument.safeParse(body);
+      if (!n.success) return json(400, { error: n.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+      const d = n.data;
+      input =
+        d.kind === "treasury" ? await treasurySeries(d.code.toUpperCase()) : d.kind === "etf" ? etfInstrument(d) : d.kind === "corporate" ? corporateInstrument(d) : manualInstrument(d);
+      if (!input) return json(400, { error: d.kind === "treasury" ? `${d.code}: no such treasury series in the Ministry data` : "Unknown exchange: use e.g. AMS:VWRL, FRA:EUNK, LON:CSPX" });
+    } else {
+      const parsed = InstrumentInput.safeParse(body);
+      if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+      input = parsed.data;
+    }
+    if (await repo.getInstrument(input.isin)) return json(409, { error: `${input.code} (${input.isin}) is already tracked` });
+    await importInstruments(JSON.stringify([input])); // starts its price history backfill (and FX rates)
+    return json(201, await repo.getInstrument(input.isin));
+  },
+  "GET /instruments/{isin}/transactions": async ({ isin }) => {
+    if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
+    const txs = (await repo.listTransactions()).filter((t) => t.isin === isin);
+    return json(200, txs.map(withoutKeys));
+  },
+  "GET /notes": async () => {
+    // All notes, the last changed first.
+    const notes = (await repo.listNotes()).map(noteOf);
+    return json(200, notes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+  },
+  "POST /notes": (c) => ROUTES["PUT /notes/{id}"]!(c),
+  "PUT /notes/{id}": async ({ event, route }) => {
+    const parsed = NoteFields.safeParse(bodyOf(event));
+    if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+    const now = new Date().toISOString();
+    let existing: NoteItem | undefined;
+    if (route.startsWith("PUT")) {
+      existing = await repo.getNote(event.pathParameters?.["id"] ?? "");
+      if (!existing) return json(404, { error: "No such note" });
+    }
+    const note = { ...parsed.data, id: existing?.id ?? newNoteId(), createdAt: existing?.createdAt ?? now, updatedAt: now };
+    await repo.putNotes([note]);
+    return json(existing ? 200 : 201, note);
+  },
+  "DELETE /notes/{id}": async ({ event }) => {
+    const existing = await repo.getNote(event.pathParameters?.["id"] ?? "");
+    if (!existing) return json(404, { error: "No such note" });
+    await repo.deleteNote(existing.id);
+    return json(200, noteOf(existing));
+  },
+  "GET /hold-sell": async () => {
+    // Every bond position: buy more, hold or sell (core/holdsell), with the assumptions and the offers used.
+    const [snap, instruments, txs, refIndex, saved] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments(), repo.listTransactions(), repo.listReferenceIndex(), repo.getSetting<HoldSellAssumptions>(HOLD_SELL_SETTING)]);
+    if (!snap) return json(404, { error: "No valuation yet" });
+    const day = snap.date;
+    const offers = await retailOffers(day);
+    // The NBP reference rate by default: the ROR on offer pays it (+ its margin) from its second month.
+    const ror = offers.find((o) => o.kind === "ROR");
+    const defaults: HoldSellAssumptions = { ...DEFAULT_ASSUMPTIONS, ...(ror?.rates[1] != null ? { nbpRate: ror.rates[1] - (ror.margin ?? 0) } : {}) };
+    const assumptions: HoldSellAssumptions = { ...defaults, ...saved };
+    const held = new Set(snap.holdings.map((h) => h.isin));
+    const corporate = instruments.filter((i) => i.type === "BOND_CORPORATE" && held.has(i.isin));
+    const periods = await Promise.all(corporate.map((i) => repo.listCouponPeriods(i.isin)));
+    const input = {
+      today: day,
+      holdings: snap.holdings,
+      instruments: new Map(instruments.map((i) => [i.isin, i])),
+      transactions: txs,
+      couponPeriods: new Map(corporate.map((i, n) => [i.isin, periods[n]!.map(periodOf)])),
+      referenceIndex: toReferenceIndex(refIndex),
+      offers,
+      assumptions,
+    };
+    // Buy, hold or sell: each position kept vs sold today, and one more bought today (core/holdsell); weights of positions + cash.
+    const result = buyHoldOrSell({ ...input, portfolioValue: snap.totals.value + (snap.totals.cash ?? 0) });
+    return json(200, {
+      date: day,
+      assumptions,
+      defaults,
+      saved: !!saved,
+      offers: offers.map((o) => ({ series: o.series, kind: o.kind, termMonths: o.termMonths, firstRate: o.rates[0] ?? null, margin: o.margin ?? null, saleStart: o.saleStart, saleEnd: o.saleEnd })),
+      ...result,
+    });
+  },
+  "PUT /hold-sell/assumptions": async ({ event }) => {
+    // The assumptions to keep; { reset: true } goes back to the defaults.
+    const body = bodyOf(event) as Record<string, unknown> | undefined;
+    if (body?.["reset"] === true) {
+      await repo.deleteSetting(HOLD_SELL_SETTING);
+      return json(200, { reset: true });
+    }
+    const parsed = HoldSellAssumptionsInput.safeParse(body);
+    if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+    await repo.putSetting(HOLD_SELL_SETTING, parsed.data);
+    return json(200, parsed.data);
+  },
+  "GET /targets": async () => {
+    // The target share and band per asset class (road map 8); null until set.
+    return json(200, { targets: (await repo.getSetting<Targets>(TARGETS_SETTING)) ?? null });
+  },
+  "PUT /targets": async ({ event }) => {
+    // The targets to keep; { reset: true } removes them.
+    const body = bodyOf(event) as Record<string, unknown> | undefined;
+    if (body?.["reset"] === true) {
+      await repo.deleteSetting(TARGETS_SETTING);
+      return json(200, { targets: null });
+    }
+    const parsed = TargetsInput.safeParse(body);
+    if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+    await repo.putSetting(TARGETS_SETTING, parsed.data);
+    return json(200, { targets: parsed.data });
+  },
+  "GET /quality": async () => {
+    // The latest data-quality report (the `quality` job), or null before its first run.
+    return json(200, (await repo.getQualityReport()) ?? null);
+  },
+  "GET /status": async () => {
+    // Every job's latest run (lib/jobs.ts), and how many revaluations failed 3 times and wait in the dead-letter
+    // queue (a later successful run doesn't revalue their range).
+    const [runs, deadLetter] = await Promise.all([
+      Promise.all(JOB_NAMES.map(async (j) => [j, (await repo.latestJobRun(j)) ?? null] as const)),
+      deadLetterCount(),
+    ]);
+    return json(200, { now: new Date().toISOString(), jobs: Object.fromEntries(runs), deadLetter });
+  },
+};
+
 async function respond(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
   if (!hasAnyGroup(event.requestContext.authorizer?.jwt?.claims, ACCESS_GROUPS)) return json(403, { error: "This account has no access" });
   const route = event.routeKey; // e.g. "GET /holdings"
@@ -327,425 +760,11 @@ async function respond(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<
   try {
     const from = q["from"] ? dateParam(q, "from") : addDays(today(), -365);
     const to = q["to"] ? dateParam(q, "to") : today();
-    switch (route) {
-      case "GET /holdings": {
-        // `flows`: each position's own cash flows to the snapshot's day (PLN, NBP D-1), for the XIRR of any row or group.
-        // `?closed=1`: also the positions held no more (`closed`: realised gain, coupons, open and close dates).
-        const [snap, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listTransactions()]);
-        if (!snap) return json(404, { error: "No valuation yet" });
-        const fx = await fxHistoryOf(txs, today());
-        const flows = positionFlows(txs, snap.date, fx);
-        if (q["closed"] !== "1") return json(200, { ...snap, flows });
-        const instruments = await repo.listInstruments();
-        const positions = positionsAt(txs, today(), fx);
-        return json(200, { ...snap, flows, closed: closedPositions(positions.values(), instruments) });
-      }
-      case "GET /cash-flows": {
-        // Deposits and withdrawals per account and month of `?year=` (default this year), and the spreadsheet feed's state.
-        const year = q["year"] ?? today().slice(0, 4);
-        if (!/^\d{4}$/.test(year)) return json(400, { error: "year: four digits" });
-        const [txs, token] = await Promise.all([repo.listTransactions(), repo.getSetting<FeedToken>(FEED_TOKEN_SETTING)]);
-        const report = cashFlows(txs, Number(year), await fxHistoryOf(txs, today()));
-        return json(200, { ...report, feed: token ? { createdAt: token.createdAt, lastUsedAt: token.lastUsedAt ?? null } : null });
-      }
-      case "POST /feed-token": {
-        // A new token for the feed, replacing any before it (that one stops working at once); returned only here.
-        const { token, stored } = newFeedToken();
-        await repo.putSetting(FEED_TOKEN_SETTING, stored);
-        return json(201, { token, createdAt: stored.createdAt });
-      }
-      case "DELETE /feed-token": {
-        await repo.deleteSetting(FEED_TOKEN_SETTING);
-        return json(200, { feed: null });
-      }
-      case "GET /sales": {
-        // Every sale, redemption and write-off with its FIFO pairs (newest first), and per year the PIT-38 summary.
-        const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
-        const sales = salesOf(positionsAt(txs, today(), await fxHistoryOf(txs, today())).values(), instruments);
-        return json(200, { sales, years: pitYears(sales) });
-      }
-      case "GET /accounts": {
-        // Per account (latest snapshot): net deposits, value, cash, profit, income, costs, XIRR; total of the complete ones.
-        const [snap, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listTransactions()]);
-        if (!snap) return json(404, { error: "No valuation yet" });
-        // Money in other currencies counts at NBP rates (the day before each transaction; base currencies: today too).
-        const fx = await fxHistoryOf(txs, snap.date, Object.values(snap.accounts ?? {}).map((a) => a.baseCurrency ?? "PLN"));
-        return json(200, { date: snap.date, ...accountSummaries(snap, txs, fx) });
-      }
-      case "GET /portfolio/history":
-        return json(200, await portfolioHistory(from, to));
-      case "GET /portfolio/years": {
-        // Per calendar year and over the whole history: start and end value, money put in, profit, time-weighted and
-        // money-weighted return, inflation over the same days (CPI: GUS since December, else the monthly chain) and the
-        // real return; plus the CPI levels from the first day on, for the growth of 100 zł chart (`growthOf100`).
-        // Also the income per year (coupons, dividends, interest; PLN at NBP D-1) for "Income by year".
-        const [points, ytd, mom, txs] = await Promise.all([portfolioHistory("2000-01-01", today()), repo.listGusCpi("CPI_YTD"), repo.listReferenceIndex(), repo.listTransactions()]);
-        const levels = cpiLevels(ytd, mom);
-        const start = points[0] ? shiftMonth(points[0].date.slice(0, 7), -1) : "9999-12";
-        const [benchmarks, fx] = await Promise.all([benchmarkSeries(points[0]?.date), fxHistoryOf(txs, today())]);
-        return json(200, { ...yearlyReturns(points, levels), cpi: levels.filter((l) => l.month >= start), benchmarks, income: incomeByYear(txs, fx) });
-      }
-      case "GET /instruments": {
-        const items = (await repo.listInstruments()).filter((i) => i.isin !== "MF-TERMS");
-        const statuses = await repo.listBackfillStatuses(items.map((i) => i.isin));
-        const withStatus = items.map((i) => ({ ...i, backfill: statuses.get(i.isin) }));
-        return json(200, withStatus);
-      }
-      case "GET /instruments/{isin}/prices": {
-        if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
-        const inst = await repo.getInstrument(isin);
-        if (!inst) return json(404, { error: "Unknown instrument" });
-        // Retail bonds aren't traded: their line is the calculated value per bond of your lots (nominal 100).
-        if (inst.type === "BOND_RETAIL" && inst.retail) {
-          const txs = (await repo.listTransactions()).filter((t) => t.isin === isin);
-          const points = retailValueHistory(inst.retail, txs, from, to);
-          return json(200, points.map((p) => ({ isin, venue: "CALC", date: p.date, close: p.value, traded: true, currency: inst.currency, calculated: true })));
-        }
-        // On today's share basis: closes before a split are divided by its ratio, so the line has no cliff.
-        const prices = adjustForSplits(await repo.queryPrices(isin, inst.venue, from, to), inst.splits);
-        // Inflation-linked bonds: the indexed nominal per bond on each day (1000 × index ratio), drawn on its own axis.
-        const indexed = inst.terms?.couponType === "INDEXED" ? { terms: inst.terms, referenceIndex: toReferenceIndex(await repo.listReferenceIndex()) } : null;
-        return json(
-          200,
-          prices.map(({ PK: _p, SK: _s, ...rest }) => {
-            if (!indexed) return rest;
-            const v = valueBond(indexed.terms, rest.date, { referenceIndex: indexed.referenceIndex });
-            return { ...rest, nominal: v.problem ? null : v.nominal };
-          }),
-        );
-      }
-      case "POST /instruments/{isin}/prices": {
-        // A new value of a hand-valued asset (venue MANUAL): { date, price } per unit in the instrument's currency.
-        if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
-        const inst = await repo.getInstrument(isin);
-        if (!inst) return json(404, { error: "Unknown instrument" });
-        if (inst.venue !== "MANUAL") return json(400, { error: `${inst.code} has a price source; only hand-valued assets take a value here` });
-        const body = bodyOf(event) as { date?: unknown; price?: unknown; note?: unknown } | undefined;
-        const date = typeof body?.date === "string" ? body.date : "";
-        const price = typeof body?.price === "number" ? body.price : NaN;
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !isCalendarDate(date)) return json(400, { error: "date: needs a date (YYYY-MM-DD)" });
-        if (date > addDays(today(), 1)) return json(400, { error: "date: not in the future" }); // a day ahead: UTC vs the user's clock
-        if (!(price > 0)) return json(400, { error: "price: needs a positive number" });
-        const note = typeof body?.note === "string" && body.note.trim() ? body.note.trim() : undefined;
-        const [item] = parseManualPrices(JSON.stringify([{ isin, date, price, currency: inst.currency, ...(note ? { note } : {}) }]), APP_SOURCE);
-        await repo.putPrices([item!]);
-        await queueValuation({ reason: "value entered", from: date });
-        const { PK: _p, SK: _s, ...out } = item!;
-        return json(201, out);
-      }
-      case "DELETE /instruments/{isin}/prices/{date}": {
-        const date = event.pathParameters?.["date"] ?? "";
-        if (!isin || !ISIN.test(isin) || !isCalendarDate(date)) return json(400, { error: "Needs an ISIN and a date" });
-        const inst = await repo.getInstrument(isin);
-        if (!inst || inst.venue !== "MANUAL") return json(400, { error: "Only values entered by hand can be deleted" });
-        const [existing] = await repo.queryPrices(isin, "MANUAL", date, date);
-        if (!existing) return json(404, { error: `No value on ${date}` });
-        await repo.deletePrice(isin, "MANUAL", date);
-        await queueValuation({ reason: "value deleted", from: date });
-        return json(200, { isin, date });
-      }
-      case "PUT /instruments/{isin}/asset-class": {
-        // { assetClass }: the class set by hand; the rule's class (or null) clears it. The instrument's days are
-        // revalued from its first transaction, so the allocation charts follow.
-        if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
-        const inst = await repo.getInstrument(isin);
-        if (!inst) return json(404, { error: "Unknown instrument" });
-        const body = bodyOf(event) as { assetClass?: unknown } | undefined;
-        const wanted = body?.assetClass ?? null;
-        if (wanted !== null && !ASSET_CLASSES.includes(wanted as (typeof ASSET_CLASSES)[number])) return json(400, { error: `assetClass: one of ${ASSET_CLASSES.join(", ")} (or null: the rule)` });
-        const rule = defaultAssetClass(inst);
-        const assetClass = wanted === null || wanted === rule ? undefined : (wanted as (typeof ASSET_CLASSES)[number]);
-        if (assetClass === inst.assetClass) return json(200, { isin, assetClass: assetClass ?? rule, set: !!assetClass });
-        const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _gs, updatedAt: _u, assetClass: _a, ...rest } = inst;
-        await repo.putInstrument({ ...rest, ...(assetClass ? { assetClass } : {}) });
-        await queueValuation({ reason: "asset class changed", isins: [isin] });
-        return json(200, { isin, assetClass: assetClass ?? rule, set: !!assetClass });
-      }
-      case "GET /instruments/{isin}/coupons": {
-        // The bond's periods (oldest first), with the coupons you received matched to them: the rate each implies and
-        // whether it fits the stored rate.
-        const found = await corporateBond(isin);
-        if ("error" in found) return found.error;
-        const { inst } = found;
-        const [periods, txs] = await Promise.all([repo.listCouponPeriods(inst.isin), repo.listTransactions()]);
-        const own = txs.filter((t) => t.isin === inst.isin);
-        const checks = couponChecks(periods, inst.nominal!, own, inst.isin);
-        return json(200, { isin: inst.isin, code: inst.code, nominal: inst.nominal, periods: periods.map(periodOf), coupons: checks.periods, unmatched: checks.unmatched.map(withoutKeys) });
-      }
-      case "POST /instruments/{isin}/coupons": {
-        const found = await corporateBond(isin);
-        if ("error" in found) return found.error;
-        const { inst } = found;
-        return await savePeriod(inst, bodyOf(event));
-      }
-      case "PUT /instruments/{isin}/coupons/{start}":
-      case "DELETE /instruments/{isin}/coupons/{start}": {
-        const found = await corporateBond(isin);
-        if ("error" in found) return found.error;
-        const { inst } = found;
-        const start = event.pathParameters?.["start"] ?? "";
-        const existing = (await repo.listCouponPeriods(inst.isin)).find((p) => p.start === start);
-        if (!existing) return json(404, { error: `No period starting ${start}` });
-        if (route.startsWith("PUT")) return await savePeriod(inst, bodyOf(event), periodOf(existing));
-        await repo.deleteCouponPeriod(inst.isin, start);
-        await queueValuation({ reason: "coupon period deleted", from: start });
-        return json(200, periodOf(existing));
-      }
-      case "GET /indicators": {
-        // One row per indicator: latest value and the one a year earlier (series via /indicators/{id}).
-        const cpi = (await inflationIndicators()).map((i) => summarize(i, i.points));
-        const fx = await Promise.all(
-          FX_CURRENCIES.map(async (c): Promise<IndicatorSummary> => {
-            const last = await repo.latestFxRate(c, today());
-            const before = last && (await repo.latestFxRate(c, yearBefore(last.date)));
-            return { ...fxIndicator(c), latest: last ? { date: last.date, value: last.mid } : null, yearAgo: before ? { date: before.date, value: before.mid } : null };
-          }),
-        );
-        return json(200, [...cpi, ...fx]);
-      }
-      case "GET /indicators/{id}": {
-        // Points in [from, to] (monthly indicators compare by month), oldest first.
-        const id = event.pathParameters?.["id"] ?? "";
-        const currency = fxCurrencyOf(id);
-        if (currency) {
-          if (!FX_CURRENCIES.includes(currency)) return json(404, { error: `No indicator ${id}` });
-          const rates = await repo.queryFxRates(currency, from, to);
-          return json(200, rates.map((r) => ({ date: r.date, value: r.mid })));
-        }
-        if (!CPI_INDICATORS.some((i) => i.id === id)) return json(404, { error: `No indicator ${id}` });
-        const series = (await inflationIndicators()).find((i) => i.id === id)!;
-        // Compared by month (by year for a yearly one).
-        const n = series.frequency === "yearly" ? 4 : 7;
-        return json(200, series.points.filter((p) => p.date >= from.slice(0, n) && p.date <= to.slice(0, n)));
-      }
-      case "POST /prices/refresh": {
-        // "Refresh prices": starts the Live job (today's quotes, then a revaluation of today). At most one every few
-        // minutes, so the sources aren't asked over and over; claimed with one conditional write (two quick clicks
-        // can't both start it).
-        const held = await repo.claimRefresh(new Date(), REFRESH_EVERY_MS);
-        const retryAt = held ? Date.parse(held) + REFRESH_EVERY_MS : 0;
-        if (held) return json(429, { error: `Prices were refreshed less than ${REFRESH_EVERY_MS / 60_000} minutes ago.`, retryAt: new Date(retryAt).toISOString() });
-        await invokeAsync(Resource.Live.name, {});
-        return json(202, { now: new Date().toISOString() });
-      }
-      case "GET /prices": {
-        // Held instruments (latest snapshot): latest price, its date, and the price a year earlier. `?closed=1`: also
-        // the instruments traded but held no more (`closed`), with the year up to their last price; never stale.
-        const withClosed = q["closed"] === "1";
-        const [snap, instruments, txs] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments(), withClosed ? repo.listTransactions() : Promise.resolve([])]);
-        const held = new Set((snap?.holdings ?? []).filter((h) => h.quantity > 0).map((h) => h.isin));
-        const former = formerInstruments(txs, held);
-        // Currencies held (IBKR cash) have no price of their own: their rates are in the Indicators view.
-        const shown = instruments.filter((i) => (held.has(i.isin) || former.has(i.isin)) && i.type !== "CURRENCY");
-        const day = today();
-        const latest = new Map<string, PriceItem>();
-        const yearAgo = new Map<string, PriceItem>();
-        await Promise.all(
-          shown.filter((i) => i.type !== "BOND_RETAIL").map(async (i) => {
-            const now = await repo.latestPrice(i.isin, i.venue, day);
-            const then = await repo.latestPrice(i.isin, i.venue, addDays(former.has(i.isin) && now ? now.date : day, -365));
-            if (now) latest.set(i.isin, now);
-            if (then) yearAgo.set(i.isin, then);
-          }),
-        );
-        const rates = new Map((snap?.holdings ?? []).filter((h) => h.rate).map((h) => [h.isin, h.rate!] as const));
-        return json(
-          200,
-          priceRows(shown, latest, yearAgo, day, 7, rates).map((r) => {
-            const f = former.get(r.isin);
-            return f ? { ...r, stale: false, closed: f } : r;
-          }),
-        );
-      }
-      case "GET /holdings/history": {
-        // One position's daily value and cost (`account` + `isin`), or an instrument's total across the accounts
-        // that hold it now (`isin` only).
-        const id = q["isin"];
-        if (!id || !ISIN.test(id)) return json(400, { error: "Invalid ISIN" });
-        // Held nowhere now (a closed position): every account that traded it.
-        const account = accountParam(q);
-        let accounts = account ? [account] : [...new Set(((await repo.getSnapshot("LATEST"))?.holdings ?? []).filter((h) => h.isin === id).map((h) => h.account))];
-        if (accounts.length === 0) accounts = [...new Set((await repo.listTransactions()).filter((t) => t.isin === id).map((t) => t.account))];
-        const byDate = new Map<string, { date: string; value: number; cost: number; quantity: number }>();
-        for (const a of accounts)
-          for (const d of await repo.queryPositionDays(a, id, from, to)) {
-            const p = byDate.get(d.date) ?? { date: d.date, value: 0, cost: 0, quantity: 0 };
-            p.value = Math.round((p.value + (d.value ?? 0)) * 100) / 100;
-            p.cost = Math.round((p.cost + d.cost) * 100) / 100;
-            p.quantity += d.quantity;
-            byDate.set(d.date, p);
-          }
-        // Days it wasn't held (sold out and bought back later): zero, not a line across.
-        return json(200, withZeroGaps([...byDate.values()].sort((a, b) => a.date.localeCompare(b.date))));
-      }
-      case "GET /transactions": {
-        // All transactions, newest first, with the instrument's code, name and type (none for cash movements).
-        const [txs, instruments] = await Promise.all([repo.listTransactions(), repo.listInstruments()]);
-        const byIsin = new Map(instruments.map((i) => [i.isin, i]));
-        const rows = txs.map(({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _h, ...rest }) => {
-          const inst = rest.isin ? byIsin.get(rest.isin) : undefined;
-          return { ...rest, instrument: inst ? { code: inst.code, name: inst.name, type: inst.type } : null };
-        });
-        rows.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-        return json(200, rows);
-      }
-      case "POST /transactions":
-        return await saveTransaction(bodyOf(event), userOf(event));
-      case "PUT /transactions/{id}":
-      case "DELETE /transactions/{id}": {
-        // ?date= (the stored date; the form sends it) makes the lookup one GetItem instead of a read of the account.
-        const id = event.pathParameters?.["id"];
-        const account = accountParam(q);
-        if (!id || !account) return json(400, { error: "Needs the transaction id and ?account=" });
-        const existing = await repo.findTransaction(account, id, q["date"] ? dateParam(q, "date") : undefined);
-        if (!existing) return json(404, { error: `No transaction ${id} in ${account}` });
-        if (route.startsWith("PUT")) return await saveTransaction(bodyOf(event), userOf(event), existing);
-        await repo.deleteTransaction(existing);
-        await repo.putTransactionLog({ at: new Date().toISOString(), action: "deleted", by: userOf(event), before: withoutKeys(existing) });
-        await queueValuation({ reason: "transaction deleted", from: existing.date });
-        return json(200, withoutKeys(existing));
-      }
-      case "GET /transactions/log": {
-        // The audit trail: the latest changes made in the app (who, when, before and after), newest first.
-        const limit = Math.min(Math.max(Number(q["limit"] ?? 50) || 50, 1), 500);
-        return json(200, (await repo.listTransactionLog(limit)).map(({ PK: _p, SK: _s, ...e }) => e));
-      }
-      case "GET /instruments/lookup": {
-        // A code typed in the form: an instrument already tracked, or a treasury series to add.
-        const code = (q["code"] ?? "").trim().toUpperCase();
-        if (!code) return json(400, { error: "Needs ?code=" });
-        const tracked = (await repo.listInstruments()).find((i) => i.code.toUpperCase() === code || i.isin === code);
-        if (tracked) return json(200, { tracked: true, instrument: tracked });
-        const found = await treasurySeries(code);
-        return found ? json(200, { tracked: false, instrument: found }) : json(404, { error: `${code}: no such treasury series in the Ministry data` });
-      }
-      case "POST /instruments": {
-        // Either a full instrument (as in an import file) or { kind, … } from the form, completed here.
-        const body = bodyOf(event) as { kind?: string } | undefined;
-        let input: InstrumentInput | undefined;
-        if (body?.kind) {
-          const n = NewInstrument.safeParse(body);
-          if (!n.success) return json(400, { error: n.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
-          const d = n.data;
-          input =
-            d.kind === "treasury" ? await treasurySeries(d.code.toUpperCase()) : d.kind === "etf" ? etfInstrument(d) : d.kind === "corporate" ? corporateInstrument(d) : manualInstrument(d);
-          if (!input) return json(400, { error: d.kind === "treasury" ? `${d.code}: no such treasury series in the Ministry data` : "Unknown exchange: use e.g. AMS:VWRL, FRA:EUNK, LON:CSPX" });
-        } else {
-          const parsed = InstrumentInput.safeParse(body);
-          if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
-          input = parsed.data;
-        }
-        if (await repo.getInstrument(input.isin)) return json(409, { error: `${input.code} (${input.isin}) is already tracked` });
-        await importInstruments(JSON.stringify([input])); // starts its price history backfill (and FX rates)
-        return json(201, await repo.getInstrument(input.isin));
-      }
-      case "GET /instruments/{isin}/transactions": {
-        if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
-        const txs = (await repo.listTransactions()).filter((t) => t.isin === isin);
-        return json(200, txs.map(withoutKeys));
-      }
-      case "GET /notes": {
-        // All notes, the last changed first.
-        const notes = (await repo.listNotes()).map(noteOf);
-        return json(200, notes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
-      }
-      case "POST /notes":
-      case "PUT /notes/{id}": {
-        const parsed = NoteFields.safeParse(bodyOf(event));
-        if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
-        const now = new Date().toISOString();
-        let existing: NoteItem | undefined;
-        if (route.startsWith("PUT")) {
-          existing = await repo.getNote(event.pathParameters?.["id"] ?? "");
-          if (!existing) return json(404, { error: "No such note" });
-        }
-        const note = { ...parsed.data, id: existing?.id ?? newNoteId(), createdAt: existing?.createdAt ?? now, updatedAt: now };
-        await repo.putNotes([note]);
-        return json(existing ? 200 : 201, note);
-      }
-      case "DELETE /notes/{id}": {
-        const existing = await repo.getNote(event.pathParameters?.["id"] ?? "");
-        if (!existing) return json(404, { error: "No such note" });
-        await repo.deleteNote(existing.id);
-        return json(200, noteOf(existing));
-      }
-      case "GET /hold-sell": {
-        // Every bond position: buy more, hold or sell (core/holdsell), with the assumptions and the offers used.
-        const [snap, instruments, txs, refIndex, saved] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments(), repo.listTransactions(), repo.listReferenceIndex(), repo.getSetting<HoldSellAssumptions>(HOLD_SELL_SETTING)]);
-        if (!snap) return json(404, { error: "No valuation yet" });
-        const day = snap.date;
-        const offers = await retailOffers(day);
-        // The NBP reference rate by default: the ROR on offer pays it (+ its margin) from its second month.
-        const ror = offers.find((o) => o.kind === "ROR");
-        const defaults: HoldSellAssumptions = { ...DEFAULT_ASSUMPTIONS, ...(ror?.rates[1] != null ? { nbpRate: ror.rates[1] - (ror.margin ?? 0) } : {}) };
-        const assumptions: HoldSellAssumptions = { ...defaults, ...saved };
-        const held = new Set(snap.holdings.map((h) => h.isin));
-        const corporate = instruments.filter((i) => i.type === "BOND_CORPORATE" && held.has(i.isin));
-        const periods = await Promise.all(corporate.map((i) => repo.listCouponPeriods(i.isin)));
-        const input = {
-          today: day,
-          holdings: snap.holdings,
-          instruments: new Map(instruments.map((i) => [i.isin, i])),
-          transactions: txs,
-          couponPeriods: new Map(corporate.map((i, n) => [i.isin, periods[n]!.map(periodOf)])),
-          referenceIndex: toReferenceIndex(refIndex),
-          offers,
-          assumptions,
-        };
-        // Buy, hold or sell: each position kept vs sold today, and one more bought today (core/holdsell); weights of positions + cash.
-        const result = buyHoldOrSell({ ...input, portfolioValue: snap.totals.value + (snap.totals.cash ?? 0) });
-        return json(200, {
-          date: day,
-          assumptions,
-          defaults,
-          saved: !!saved,
-          offers: offers.map((o) => ({ series: o.series, kind: o.kind, termMonths: o.termMonths, firstRate: o.rates[0] ?? null, margin: o.margin ?? null, saleStart: o.saleStart, saleEnd: o.saleEnd })),
-          ...result,
-        });
-      }
-      case "PUT /hold-sell/assumptions": {
-        // The assumptions to keep; { reset: true } goes back to the defaults.
-        const body = bodyOf(event) as Record<string, unknown> | undefined;
-        if (body?.["reset"] === true) {
-          await repo.deleteSetting(HOLD_SELL_SETTING);
-          return json(200, { reset: true });
-        }
-        const parsed = HoldSellAssumptionsInput.safeParse(body);
-        if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
-        await repo.putSetting(HOLD_SELL_SETTING, parsed.data);
-        return json(200, parsed.data);
-      }
-      case "GET /targets": {
-        // The target share and band per asset class (road map 8); null until set.
-        return json(200, { targets: (await repo.getSetting<Targets>(TARGETS_SETTING)) ?? null });
-      }
-      case "PUT /targets": {
-        // The targets to keep; { reset: true } removes them.
-        const body = bodyOf(event) as Record<string, unknown> | undefined;
-        if (body?.["reset"] === true) {
-          await repo.deleteSetting(TARGETS_SETTING);
-          return json(200, { targets: null });
-        }
-        const parsed = TargetsInput.safeParse(body);
-        if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
-        await repo.putSetting(TARGETS_SETTING, parsed.data);
-        return json(200, { targets: parsed.data });
-      }
-      case "GET /quality":
-        // The latest data-quality report (the `quality` job), or null before its first run.
-        return json(200, (await repo.getQualityReport()) ?? null);
-      case "GET /status": {
-        // Every job's latest run (lib/jobs.ts), and how many revaluations failed 3 times and wait in the dead-letter
-        // queue (a later successful run doesn't revalue their range).
-        const [runs, deadLetter] = await Promise.all([
-          Promise.all(JOB_NAMES.map(async (j) => [j, (await repo.latestJobRun(j)) ?? null] as const)),
-          deadLetterCount(),
-        ]);
-        return json(200, { now: new Date().toISOString(), jobs: Object.fromEntries(runs), deadLetter });
-      }
-      default:
-        return json(404, { error: `No route ${route}` });
-    }
+    const handle = ROUTES[route];
+    if (!handle) return json(404, { error: `No route ${route}` });
+    // Path parameters checked once for every route that has them (the handlers narrow the type again).
+    if (route.includes("{isin}") && !(isin && ISIN.test(isin))) return json(400, { error: "Invalid ISIN" });
+    return await handle({ event, q, isin, from, to, route });
   } catch (err) {
     if (err instanceof BadRequest) return json(400, { error: err.message });
     // The details (table names, SDK messages) stay in the log; the browser gets the request id to find them.

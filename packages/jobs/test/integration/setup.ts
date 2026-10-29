@@ -34,12 +34,17 @@ async function login(): Promise<string> {
   return body.AuthenticationResult.AccessToken;
 }
 let token: Promise<string> | undefined;
+/** The test user's access token, logged in once. */
+const bearer = () => {
+  token ??= login();
+  return token;
+};
 
 /** GET with the test user's token; `{ auth: false }` sends none; `headers` adds others (the response's come back too). */
 export async function get<T = unknown>(path: string, opts: { auth?: boolean; token?: string; headers?: Record<string, string> } = {}): Promise<{ status: number; body: T; headers: Headers }> {
   const headers: Record<string, string> = { ...opts.headers };
   if (opts.token) headers["Authorization"] = `Bearer ${opts.token}`;
-  else if (opts.auth !== false) headers["Authorization"] = `Bearer ${await (token ??= login())}`;
+  else if (opts.auth !== false) headers["Authorization"] = `Bearer ${await bearer()}`;
   const res = await fetch(API + path, { headers });
   const text = await res.text();
   let body: T;
@@ -53,7 +58,7 @@ export async function get<T = unknown>(path: string, opts: { auth?: boolean; tok
 
 /** A write request (POST/PUT/DELETE) with a JSON body (`raw`: this text as the body instead), logged in as the test user. */
 export async function send<T = unknown>(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown, opts: { raw?: string } = {}): Promise<{ status: number; body: T }> {
-  const headers: Record<string, string> = { Authorization: `Bearer ${await (token ??= login())}` };
+  const headers: Record<string, string> = { Authorization: `Bearer ${await bearer()}` };
   const text = opts.raw ?? (body !== undefined ? JSON.stringify(body) : undefined);
   if (text !== undefined) headers["content-type"] = "application/json";
   const res = await fetch(API + path, { method, headers, ...(text !== undefined ? { body: text } : {}) });

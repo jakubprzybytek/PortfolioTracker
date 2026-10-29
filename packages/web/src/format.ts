@@ -11,7 +11,10 @@ export const fmtMoney = (v: number | null | undefined, currency: string): string
   if (v === null || v === undefined || Number.isNaN(v)) return "–";
   if (currency === "PLN") return pln.format(v);
   let f = money.get(currency);
-  if (!f) money.set(currency, (f = new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2, ...always })));
+  if (!f) {
+    f = new Intl.NumberFormat("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2, ...always });
+    money.set(currency, f);
+  }
   return `${f.format(v)} ${currency}`;
 };
 export const fmtNum = (v: number | null | undefined, digits = 2): string =>

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { InstrumentItem, PriceItem, TransactionItem } from "../src/db/items.ts";
-import { parseTransactionFile } from "../src/transactions/schema.ts";
 import { valuePortfolio } from "../src/valuation/valuePortfolio.ts";
 
 const KRU = "PLKRK0000713";

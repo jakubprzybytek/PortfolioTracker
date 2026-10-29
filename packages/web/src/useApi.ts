@@ -46,7 +46,7 @@ const inFlight = (() => {
     get: () => count,
     change(by: number) {
       count += by;
-      listeners.forEach((l) => l());
+      for (const l of listeners) l();
     },
     subscribe(l: () => void) {
       listeners.add(l);
