@@ -29,6 +29,8 @@ export const TransactionInput = z.object({
   amount: z.number(),
   /** In `currency`. */
   fee: z.number().nonnegative().optional(),
+  /** Withheld at source (money in only: coupons, dividends, interest …), in `currency`; `amount` is net of it. */
+  tax: z.number().nonnegative().optional(),
   /** Retail bonds: when interest starts (the purchase date), if not the transaction date. */
   valueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   currency: z.string().length(3).default("PLN"),

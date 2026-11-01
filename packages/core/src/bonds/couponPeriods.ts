@@ -127,7 +127,7 @@ export interface CouponCheck {
   date: IsoDate;
   /** As booked (after tax). */
   amount: number;
-  /** Before tax: the amount plus the tax in its note; in IKE/IKZE the amount; otherwise assumed taxed at 19 %. */
+  /** Before tax: the amount plus its tax (the field, or else its note); in IKE/IKZE the amount; otherwise assumed taxed at 19 %. */
   gross: number;
   taxAssumed: boolean;
   /** Bonds held on the record day. */
@@ -163,7 +163,7 @@ export function couponChecks(periods: InterestPeriod[], nominal: number, transac
       unmatched.push(t);
       continue;
     }
-    const tax = taxFromNote(t.note);
+    const tax = t.tax ?? taxFromNote(t.note);
     const taxFree = tax === undefined && isTaxFreeAccount(t.account);
     const gross = round2(tax !== undefined ? t.amount + tax : taxFree ? t.amount : t.amount / (1 - INTEREST_TAX));
     const taxAssumed = tax === undefined && !taxFree;

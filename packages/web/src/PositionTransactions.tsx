@@ -84,6 +84,7 @@ export function PositionTransactions({
               t.price === undefined ? "" : `Price ${fmtNum(t.price)}`,
               t.note,
               t.fee ? `Fee ${fmtMoney(t.fee, t.currency)}` : "",
+              t.tax ? `Tax paid ${fmtMoney(t.tax, t.currency)}` : "",
             ]
               .filter(Boolean)
               .join(" · ")}

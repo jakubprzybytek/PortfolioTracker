@@ -25,6 +25,7 @@ export * from "./prices/manual.ts";
 export * from "./accounts/schema.ts";
 export * from "./transactions/schema.ts";
 export * from "./transactions/manual.ts";
+export * from "./transactions/taxBackfill.ts";
 export * from "./transactions/nativeLedger.ts";
 export * from "./transactions/ibkrStatement.ts";
 export * from "./instruments/schema.ts";

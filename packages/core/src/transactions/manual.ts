@@ -30,6 +30,9 @@ export type ManualTransaction = z.output<typeof ManualTransaction>;
 /** Types that need an instrument (the rest are cash movements of the account). */
 export const INSTRUMENT_TYPES = new Set(["BUY", "SELL", "COUPON", "REDEMPTION", "DIVIDEND", "SPLIT", "WRITE_OFF"]);
 
+/** Money in that tax can be withheld from (the `tax` field). */
+export const TAXED_TYPES = new Set(["SELL", "COUPON", "DIVIDEND", "INTEREST", "REDEMPTION"]);
+
 /** 2026-02-30 has the right shape but isn't a day. */
 export const isCalendarDate = (d: string): boolean => !Number.isNaN(Date.parse(`${d}T00:00:00Z`)) && new Date(`${d}T00:00:00Z`).toISOString().slice(0, 10) === d;
 
@@ -45,6 +48,7 @@ export function checkManualTransaction(t: ManualTransaction, knownIsins: Set<str
   if ((t.type === "BUY" || t.type === "SELL" || t.type === "WRITE_OFF") && !t.quantity) problems.push(`${t.type} needs a quantity`);
   if (t.type === "WRITE_OFF" && t.amount !== 0) problems.push("WRITE_OFF: nothing comes back, so the amount is 0 (money recovered later is its own transaction)");
   if (t.type === "SPLIT" && !t.ratio) problems.push("SPLIT needs a ratio");
+  if (t.tax && !TAXED_TYPES.has(t.type)) problems.push(`${t.type}: tax withheld only goes with money in (sell, coupon, dividend, interest, redemption)`);
   if (t.type === "EXCHANGE") {
     if (!t.toAmount || !t.toCurrency) problems.push("EXCHANGE needs what came in: toAmount and toCurrency");
     else if (t.toCurrency === t.currency) problems.push("EXCHANGE: the two currencies must differ");

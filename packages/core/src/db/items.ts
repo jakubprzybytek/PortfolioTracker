@@ -216,6 +216,8 @@ export interface TransactionItem {
   valueDate?: IsoDate;
   amount: number; // signed cash effect in `currency`: negative = money out
   fee?: number; // in `currency`
+  /** Withheld at source on money in, in `currency`: `amount` is net of it (gross = amount + tax). */
+  tax?: number;
   /** Currency of `amount` and `fee`: what was actually paid or received (PLN, EUR, USD …). */
   currency: string;
   note?: string;

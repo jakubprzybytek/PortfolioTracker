@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, apiSend } from "./api.ts";
 import { TX_TYPE_LABELS, addDays, fmtMoney, fmtNum, parseNum, today, typeLabel } from "./format.ts";
-import { joinTaxNote, splitTaxNote } from "./taxNote.ts";
 import type { AccountSummary, Instrument, Transaction, TransactionRow } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
@@ -70,12 +69,6 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   // The same request as the Transactions view's, so usually cached already: which instruments each account has had.
   const txs = useApi<TransactionRow[]>("/transactions");
   const accounts = useMemo(() => (summaries.data?.accounts ?? []).map((a) => a.account), [summaries.data]);
-  // Editing a transaction whose note has a "Tax paid" line in its own currency: the form shows the gross and the tax.
-  const [withTax] = useState(() => {
-    if (!editing) return undefined;
-    const s = splitTaxNote(editing.note ?? "");
-    return s.tax !== undefined && s.currency === editing.currency && TAXED.has(editing.type) ? { note: s.note, tax: s.tax } : undefined;
-  });
   const [date, setDate] = useState(editing?.date ?? today());
   const [account, setAccount] = useState(editing?.account ?? accounts[0] ?? "");
   const [newAccount, setNewAccount] = useState("");
@@ -85,8 +78,9 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const [price, setPrice] = useState(str(editing?.price));
   const [fxRate, setFxRate] = useState(str(editing?.fxRate));
   const [fee, setFee] = useState(str(editing?.fee));
-  const [amount, setAmount] = useState(editing ? str(Math.round((Math.abs(editing.amount) + (withTax?.tax ?? 0)) * 100) / 100) : "");
-  const [tax, setTax] = useState(str(withTax?.tax));
+  // With tax withheld the field shows the gross: the stored (net) amount plus the tax.
+  const [amount, setAmount] = useState(editing ? str(Math.round((Math.abs(editing.amount) + (editing.tax ?? 0)) * 100) / 100) : "");
+  const [tax, setTax] = useState(str(editing?.tax));
   const [amountTouched, setAmountTouched] = useState(!!editing);
   const [ratio, setRatio] = useState(str(editing?.ratio));
   // The currency of the amount and the fee (an account's own currency by default); an exchange's other side.
@@ -94,7 +88,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const [currencyTouched, setCurrencyTouched] = useState(!!editing);
   const [toAmount, setToAmount] = useState(str(editing?.toAmount));
   const [toCurrency, setToCurrency] = useState(editing?.toCurrency ?? "");
-  const [note, setNote] = useState(withTax ? withTax.note : (editing?.note ?? ""));
+  const [note, setNote] = useState(editing?.note ?? "");
   const [showAll, setShowAll] = useState(false);
   // A retail bond's interest start (valueDate): empty = the buy's date, so it follows the date until set by hand.
   const [interestFrom, setInterestFrom] = useState(editing?.valueDate && editing.valueDate !== editing.date ? editing.valueDate : "");
@@ -241,7 +235,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
         ...(retailBuy ? { valueDate: interestFrom || date } : {}),
         ...(type === "EXCHANGE" ? { toAmount: got, toCurrency: otherCur } : {}),
         currency: cur,
-        ...(joinTaxNote(note, t || undefined, cur) ? { note: joinTaxNote(note, t || undefined, cur) } : {}),
+        ...(t ? { tax: t } : {}),
+        ...(note.trim() ? { note: note.trim() } : {}),
       };
       if (editing) await apiSend("PUT", `/transactions/${editing.id}`, tx, { account: editing.account, date: editing.date });
       else await apiSend("POST", "/transactions", tx);
@@ -469,7 +464,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 </div>
               </Field>
               {taxed && (
-                <Field label={`Tax paid, ${cur} (optional)`} hint={t ? "Saved: the amount less the tax; the note says how much was paid" : "Withheld at source: give it, and the amount above is the gross"}>
+                <Field label={`Tax paid, ${cur} (optional)`} hint={t ? "Saved: the amount less the tax, and the tax itself" : "Withheld at source: give it, and the amount above is the gross"}>
                   <input inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} data-testid="tx-tax" />
                 </Field>
               )}

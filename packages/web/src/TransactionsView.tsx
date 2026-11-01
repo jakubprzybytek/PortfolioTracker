@@ -28,6 +28,9 @@ import { useMedia } from "./useNarrow.ts";
 import type { TransactionRow } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
+/** The note as shown: its text, then the tax withheld (kept in its own field, not in the note). */
+const noteText = (t: TransactionRow): string => [t.note, t.tax ? `Tax paid: ${fmtMoney(t.tax, t.currency)}` : ""].filter(Boolean).join(" · ");
+
 /** Filter value for transactions without an instrument (deposits, fees …). */
 const NO_INSTRUMENT = "none";
 const assetType = (t: TransactionRow) => t.instrument?.type ?? "CASH";
@@ -110,7 +113,7 @@ export function TransactionsView({
             t.isin,
             t.account,
             TX_TYPE_LABELS[t.type] ?? t.type,
-            t.note,
+            noteText(t),
           ),
       ),
     [all, instrument, account, type, tx, q],
@@ -298,7 +301,7 @@ export function TransactionsView({
                     )}
                   </span>
                 </div>
-                {(t.instrument || t.isin || t.note || t.fee) && (
+                {(t.instrument || t.isin || t.note || t.tax || t.fee) && (
                   <div className="tx-line tx-detail muted">
                     {(t.instrument || t.isin) && (
                       <strong className="tx-code">
@@ -314,13 +317,13 @@ export function TransactionsView({
                     {t.fee ? (
                       <span>fee {fmtMoney(t.fee, t.currency)}</span>
                     ) : null}
-                    {t.note && (
+                    {noteText(t) && (
                       <span
                         className="tx-note"
-                        title={t.note}
+                        title={noteText(t)}
                         data-testid="tx-note-cell"
                       >
-                        {t.note}
+                        {noteText(t)}
                       </span>
                     )}
                   </div>
@@ -434,10 +437,10 @@ export function TransactionsView({
                     </td>
                     <td
                       className="left muted note col-note"
-                      title={t.note}
+                      title={noteText(t)}
                       data-testid="tx-note-cell"
                     >
-                      {t.note ?? ""}
+                      {noteText(t)}
                     </td>
                   </tr>
                 </Fragment>

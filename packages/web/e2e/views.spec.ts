@@ -317,6 +317,43 @@ test.describe("adding transactions", () => {
     await page.keyboard.press("Escape");
   });
 
+  test("tax paid is saved with the transaction: the net as the amount, the tax in the note column, gross and tax again on edit", async ({ page }) => {
+    // Dated far ahead in its own account, as the other saving tests.
+    await page.goto("/#/transactions");
+    await expect(page.getByTestId("transaction-row").first()).toBeVisible();
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-date").fill("2099-04-05");
+    await page.getByTestId("tx-type").selectOption("COUPON");
+    await page.getByTestId("tx-account").selectOption("__new_account__");
+    await page.getByTestId("tx-new-account").fill("e2e-tax");
+    await page.getByTestId("tx-instrument").selectOption("PLKRK0000713");
+    await page.getByTestId("tx-amount").fill("100");
+    await page.getByTestId("tx-tax").fill("19");
+    await page.getByTestId("tx-note").fill("E2E coupon");
+    await page.getByTestId("tx-save").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("Transaction added.");
+
+    const row = page.locator('tr[data-testid="transaction-row"]').filter({ hasText: "e2e-tax" });
+    await expect(row).toHaveCount(1);
+    await expect(row.getByTestId("tx-amount-cell")).toHaveText(/81,00\s*zł/);
+    await expect(row.getByTestId("tx-note-cell")).toHaveText(/^E2E coupon · Tax paid: 19,00\s*zł$/);
+
+    await row.click();
+    await expect(page.getByTestId("tx-amount")).toHaveValue("100");
+    await expect(page.getByTestId("tx-tax")).toHaveValue("19");
+    await expect(page.getByTestId("tx-note")).toHaveValue("E2E coupon");
+    await page.getByTestId("tx-tax").fill("20");
+    await page.getByTestId("tx-save").click();
+    await expect(page.getByTestId("tx-toast")).toContainText("Transaction updated.");
+    await expect(row.getByTestId("tx-amount-cell")).toHaveText(/80,00\s*zł/);
+    await expect(row.getByTestId("tx-note-cell")).toHaveText(/Tax paid: 20,00\s*zł$/);
+
+    await row.click();
+    await page.getByTestId("tx-delete").click();
+    await page.getByTestId("tx-delete-confirm").click();
+    await expect(row).toHaveCount(0);
+  });
+
   test("editing shows the transaction's account while the accounts are still loading", async ({ page }) => {
     await page.goto("/#/transactions");
     const row = page.getByTestId("transaction-row").filter({ hasText: "2025-02-05" }).filter({ hasText: "broker" });
