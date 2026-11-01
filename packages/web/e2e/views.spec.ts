@@ -295,6 +295,28 @@ test.describe("adding transactions", () => {
     await expect(page.getByTestId("tx-form")).toBeHidden();
   });
 
+  test("the instrument list shows the account's own; tax paid takes the gross and keeps the net", async ({ page }) => {
+    await page.goto("/#/transactions");
+    await expect(page.getByTestId("transaction-row").first()).toBeVisible();
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-type").selectOption("COUPON");
+    await page.getByTestId("tx-account").selectOption("broker");
+    const select = page.getByTestId("tx-instrument");
+    // broker has had DS0432 and IZ0836, not the Kruk bond of "bonds".
+    await expect(select.locator("option", { hasText: "DS0432" })).toBeAttached();
+    await expect(select.locator('option[value="PLKRK0000713"]')).toHaveCount(0);
+    await select.selectOption("__other__");
+    await expect(select.locator('option[value="PLKRK0000713"]')).toHaveCount(1);
+    await expect(select.locator('option[value="__other__"]')).toHaveCount(0);
+    await expect(select.locator('option[value="__new__"]')).toHaveCount(1);
+
+    await page.getByTestId("tx-amount").fill("100");
+    await page.getByTestId("tx-tax").fill("19");
+    await expect(page.getByTestId("tx-summary")).toContainText("81,00 zł");
+    await expect(page.getByTestId("tx-summary")).toContainText("100,00 gross − 19,00 tax");
+    await page.keyboard.press("Escape");
+  });
+
   test("editing shows the transaction's account while the accounts are still loading", async ({ page }) => {
     await page.goto("/#/transactions");
     const row = page.getByTestId("transaction-row").filter({ hasText: "2025-02-05" }).filter({ hasText: "broker" });
@@ -371,6 +393,7 @@ test.describe("adding transactions", () => {
     await expect(page.getByTestId("transaction-row").first()).toBeVisible();
     await page.getByTestId("tx-add").click();
     await page.getByTestId("tx-type").selectOption("BUY");
+    await page.getByTestId("tx-account").selectOption("ike"); // has had DS0432 and EDO0935 (the list shows the account's own)
     await page.getByTestId("tx-instrument").selectOption({ label: "DS0432 · Obligacje skarbowe DS0432 (stałe 1,75 %)" });
     await expect(page.getByTestId("tx-interest-from")).toHaveCount(0); // a listed bond: its coupon periods decide
     await page.getByTestId("tx-instrument").selectOption("PL0000118402"); // EDO0935
@@ -418,6 +441,7 @@ test.describe("adding transactions", () => {
     await page.goto("/#/transactions");
     await page.getByTestId("tx-add").click();
     await page.getByTestId("tx-type").selectOption("BUY");
+    await page.getByTestId("tx-account").selectOption("ike"); // has had DS0432 and EDO0935 (the list shows the account's own)
     await page.getByTestId("tx-instrument").selectOption({ label: "DS0432 · Obligacje skarbowe DS0432 (stałe 1,75 %)" });
     await page.getByTestId("tx-quantity").fill("10");
     await page.getByTestId("tx-price").fill("80,5");

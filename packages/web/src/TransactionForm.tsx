@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, apiSend } from "./api.ts";
 import { TX_TYPE_LABELS, addDays, fmtMoney, fmtNum, parseNum, today, typeLabel } from "./format.ts";
-import type { AccountSummary, Instrument, Transaction } from "./types.ts";
+import { joinTaxNote, splitTaxNote } from "./taxNote.ts";
+import type { AccountSummary, Instrument, Transaction, TransactionRow } from "./types.ts";
 import { useApi } from "./useApi.ts";
 
 // The "Add transaction" form (Docs/ui.md): a dialog over the Transactions view, for a new transaction or one
@@ -17,7 +18,11 @@ const NEEDS_INSTRUMENT = new Set<string>(["BUY", "SELL", "COUPON", "DIVIDEND", "
 const HAS_QUANTITY = new Set<string>(["BUY", "SELL", "REDEMPTION"]);
 /** No money moves: a split changes the units, a write-off closes them at 0 (the issuer defaulted). */
 const NO_AMOUNT = new Set<string>(["SPLIT", "WRITE_OFF"]);
+/** Money in that tax can be withheld from: the form takes the gross and the tax, and stores the net. */
+const TAXED = new Set<string>(["SELL", "COUPON", "DIVIDEND", "INTEREST", "REDEMPTION"]);
 const NEW = "__new__";
+/** "Other instrument…": the instrument list shows only the account's own until this is chosen. */
+const OTHER = "__other__";
 const NEW_ACCOUNT = "__new_account__";
 /** The note field: as tall as its text (about 60 characters a line), 3 to 10 lines. */
 const noteRows = (note: string) => Math.min(10, Math.max(3, note.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 60)), 0)));
@@ -62,7 +67,15 @@ function Field({ label, children, hint, wide }: { label: string; children: React
 export function TransactionForm({ editing, onClose, onSaved }: { editing?: Transaction; onClose: () => void; onSaved: (message: string) => void }) {
   const instruments = useApi<Instrument[]>("/instruments");
   const summaries = useApi<{ accounts: AccountSummary[] }>("/accounts");
+  // The same request as the Transactions view's, so usually cached already: which instruments each account has had.
+  const txs = useApi<TransactionRow[]>("/transactions");
   const accounts = useMemo(() => (summaries.data?.accounts ?? []).map((a) => a.account), [summaries.data]);
+  // Editing a transaction whose note has a "Tax paid" line in its own currency: the form shows the gross and the tax.
+  const [withTax] = useState(() => {
+    if (!editing) return undefined;
+    const s = splitTaxNote(editing.note ?? "");
+    return s.tax !== undefined && s.currency === editing.currency && TAXED.has(editing.type) ? { note: s.note, tax: s.tax } : undefined;
+  });
   const [date, setDate] = useState(editing?.date ?? today());
   const [account, setAccount] = useState(editing?.account ?? accounts[0] ?? "");
   const [newAccount, setNewAccount] = useState("");
@@ -72,7 +85,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const [price, setPrice] = useState(str(editing?.price));
   const [fxRate, setFxRate] = useState(str(editing?.fxRate));
   const [fee, setFee] = useState(str(editing?.fee));
-  const [amount, setAmount] = useState(editing ? str(Math.abs(editing.amount)) : "");
+  const [amount, setAmount] = useState(editing ? str(Math.round((Math.abs(editing.amount) + (withTax?.tax ?? 0)) * 100) / 100) : "");
+  const [tax, setTax] = useState(str(withTax?.tax));
   const [amountTouched, setAmountTouched] = useState(!!editing);
   const [ratio, setRatio] = useState(str(editing?.ratio));
   // The currency of the amount and the fee (an account's own currency by default); an exchange's other side.
@@ -80,7 +94,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const [currencyTouched, setCurrencyTouched] = useState(!!editing);
   const [toAmount, setToAmount] = useState(str(editing?.toAmount));
   const [toCurrency, setToCurrency] = useState(editing?.toCurrency ?? "");
-  const [note, setNote] = useState(editing?.note ?? "");
+  const [note, setNote] = useState(withTax ? withTax.note : (editing?.note ?? ""));
+  const [showAll, setShowAll] = useState(false);
   // A retail bond's interest start (valueDate): empty = the buy's date, so it follows the date until set by hand.
   const [interestFrom, setInterestFrom] = useState(editing?.valueDate && editing.valueDate !== editing.date ? editing.valueDate : "");
   // A new instrument, added on save.
@@ -96,13 +111,27 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
     if (!account && accounts.length) setAccount(accounts[0]!);
   }, [account, accounts]);
 
+  // Another account: back to its own instruments.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on the account's change only
+  useEffect(() => setShowAll(false), [account]);
+
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
+    const onKey =(e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, busy]);
 
   const list = useMemo(() => [...(instruments.data ?? [])].sort((a, b) => Number(b.active) - Number(a.active) || a.code.localeCompare(b.code)), [instruments.data]);
+  // Instruments the account has had a transaction in (undefined: a new account, or not known yet).
+  const onAccount = useMemo(() => {
+    if (!txs.data || account === NEW_ACCOUNT) return undefined;
+    const s = new Set<string>();
+    for (const t of txs.data) if (t.account === account && t.isin) s.add(t.isin);
+    return s.size ? s : undefined;
+  }, [txs.data, account]);
+  // The account's own (and the one chosen), unless "Other instrument…" was picked; everything for a new account.
+  const filtered = !showAll && !!onAccount && list.some((i) => !onAccount.has(i.isin) && i.isin !== isin);
+  const shown = filtered ? list.filter((i) => onAccount!.has(i.isin) || i.isin === isin) : list;
   const inst = list.find((i) => i.isin === isin);
   const retailBuy = inst?.type === "BOND_RETAIL" && type === "BUY";
   const needsInstrument = NEEDS_INSTRUMENT.has(type);
@@ -145,7 +174,17 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   }, [inst, type, q, p, fx, f, cur]);
   const amountShown = amountTouched ? amount : str(suggested);
   const size = parseNum(amountShown);
-  const signed = NO_AMOUNT.has(type) ? 0 : size === undefined ? undefined : MONEY_OUT.has(type) ? -Math.abs(size) : Math.abs(size);
+  // With tax paid, the amount typed is the gross and the net is stored.
+  const taxed = TAXED.has(type);
+  const taxPaid = taxed ? parseNum(tax) : undefined;
+  const t = taxPaid !== undefined && Number.isFinite(taxPaid) ? Math.abs(taxPaid) : 0;
+  const signed = NO_AMOUNT.has(type)
+    ? 0
+    : size === undefined
+      ? undefined
+      : MONEY_OUT.has(type)
+        ? -Math.abs(size)
+        : Math.round((Math.abs(size) - t) * 100) / 100;
   const cashEffect = signed === undefined ? undefined : type === "BUY" ? signed - f : signed;
 
   async function lookup() {
@@ -166,9 +205,10 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
     const acct = account === NEW_ACCOUNT ? newAccount.trim() : account;
     if (!acct) return setError("Choose an account");
     if (needsInstrument && !isin) return setError("Choose an instrument");
-    for (const [label, v] of [["Quantity", q], ["Price", p], ["FX rate", fx], ["Fee", parseNum(fee)], ["Amount", size], ["Ratio", parseNum(ratio)]] as const)
+    for (const [label, v] of [["Quantity", q], ["Price", p], ["FX rate", fx], ["Fee", parseNum(fee)], ["Amount", size], ["Tax paid", taxPaid], ["Ratio", parseNum(ratio)]] as const)
       if (v !== undefined && !Number.isFinite(v)) return setError(`${label}: not a number`);
     if (!NO_AMOUNT.has(type) && signed === undefined) return setError("Enter the amount");
+    if (t && signed !== undefined && signed < 0) return setError("Tax paid is more than the gross amount");
     if (type === "WRITE_OFF" && !(q !== undefined && q > 0)) return setError("Enter how many units are written off");
     const got = parseNum(toAmount);
     if (type === "EXCHANGE" && (got === undefined || !Number.isFinite(got) || got <= 0)) return setError("Enter what you got");
@@ -201,7 +241,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
         ...(retailBuy ? { valueDate: interestFrom || date } : {}),
         ...(type === "EXCHANGE" ? { toAmount: got, toCurrency: otherCur } : {}),
         currency: cur,
-        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(joinTaxNote(note, t || undefined, cur) ? { note: joinTaxNote(note, t || undefined, cur) } : {}),
       };
       if (editing) await apiSend("PUT", `/transactions/${editing.id}`, tx, { account: editing.account, date: editing.date });
       else await apiSend("POST", "/transactions", tx);
@@ -274,11 +314,16 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           </Field>
 
           {(needsInstrument || type === "INTEREST") && (
-            <Field label={type === "INTEREST" ? "Instrument (optional)" : "Instrument"} wide>
-              <select value={isin} onChange={(e) => setIsin(e.target.value)} disabled={instruments.loading && !instruments.data} data-testid="tx-instrument">
+            <Field label={type === "INTEREST" ? "Instrument (optional)" : "Instrument"} wide hint={filtered ? `Those ${account} has had; others under "Other instrument…"` : undefined}>
+              <select
+                value={isin}
+                onChange={(e) => (e.target.value === OTHER ? setShowAll(true) : setIsin(e.target.value))}
+                disabled={instruments.loading && !instruments.data}
+                data-testid="tx-instrument"
+              >
                 <option value="">{instruments.loading && !instruments.data ? "Loading…" : "Choose…"}</option>
                 <optgroup label="Tracked">
-                  {list
+                  {shown
                     .filter((i) => i.active)
                     .map((i) => (
                       <option key={i.isin} value={i.isin}>
@@ -287,7 +332,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                     ))}
                 </optgroup>
                 <optgroup label="No longer held">
-                  {list
+                  {shown
                     .filter((i) => !i.active)
                     .map((i) => (
                       <option key={i.isin} value={i.isin}>
@@ -295,6 +340,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                       </option>
                     ))}
                 </optgroup>
+                {filtered && <option value={OTHER}>Other instrument…</option>}
                 {needsInstrument && <option value={NEW}>➕ New instrument…</option>}
               </select>
               {inst && (
@@ -384,7 +430,17 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           ) : type === "WRITE_OFF" ? null : (
             <>
               <Field
-                label={type === "BUY" ? "Amount paid (without the fee)" : type === "SELL" ? "Amount received (after the fee)" : type === "EXCHANGE" ? "You gave" : "Amount"}
+                label={
+                  type === "BUY"
+                    ? "Amount paid (without the fee)"
+                    : type === "SELL"
+                      ? `Amount received (after the fee${t ? ", before tax" : ""})`
+                      : type === "EXCHANGE"
+                        ? "You gave"
+                        : t
+                          ? "Gross amount (before tax)"
+                          : "Amount"
+                }
                 hint={inst && isBond(inst) && type === "BUY" ? "Suggested: price × nominal. Add accrued interest, as on your broker's note." : undefined}
               >
                 <div className="with-currency">
@@ -412,6 +468,11 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                   </select>
                 </div>
               </Field>
+              {taxed && (
+                <Field label={`Tax paid, ${cur} (optional)`} hint={t ? "Saved: the amount less the tax; the note says how much was paid" : "Withheld at source: give it, and the amount above is the gross"}>
+                  <input inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} data-testid="tx-tax" />
+                </Field>
+              )}
               {type === "EXCHANGE" && (
                 <Field label="You got">
                   <div className="with-currency">
@@ -448,6 +509,12 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 </>
               )}
               {(type === "BUY" || type === "EXCHANGE") && f > 0 && <span className="faint"> (incl. fee {fmtNum(f)})</span>}
+              {t > 0 && size !== undefined && (
+                <span className="faint">
+                  {" "}
+                  ({fmtNum(Math.abs(size))} gross − {fmtNum(t)} tax)
+                </span>
+              )}
             </>
           ) : (
             <span className="faint">
