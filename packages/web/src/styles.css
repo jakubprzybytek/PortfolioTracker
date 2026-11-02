@@ -7,14 +7,20 @@
   --faint: #666e7b; /* 4.5:1 or more on every row tint (WCAG AA) */
   --border: #e5e7eb;
   --line: #f0f1f3;
-  --accent: #2563eb;
-  --accent-soft: #eff4ff;
+  /* The accent: the logo's orange, deepened so text and filled buttons stay readable (5.2:1 on white). The logo's own
+     amber (--brand) is for marks only, never text. */
+  --brand: #f59e0b;
+  --accent: #c2410c;
+  --accent-hover: #9a3412;
+  --accent-soft: #fff4ea; /* the active menu item, a chosen option, a selected row */
+  --accent-line: #fdc99b; /* the outline of a chosen option */
+  --on-accent: #ffffff; /* text on an accent fill */
   --pos: #047857;
   --neg: #b91c1c;
   --row: #fafbfc;
   --band: #f1f4f8;
   --band-line: #dde2e9; /* row dividers on the band tint */
-  --cpi: #d97706; /* inflation in charts (amber against the accent's blue) */
+  --cpi: #64748b; /* inflation in charts: a grey reference, beside the accent's return */
   --bench-WIG: #db2777; /* benchmarks in charts: WIG pink, MSCI World teal */
   --bench-MSCI_WORLD: #0d9488;
   --bench-MIX_40_60: #7c3aed; /* 40/60 World/EDO: violet */
@@ -36,14 +42,18 @@
     --faint: #8b94a3;
     --border: #262c38;
     --line: #1f2430;
-    --accent: #60a5fa;
-    --accent-soft: #1b2638;
+    --brand: #fbbf24;
+    --accent: #fb923c;
+    --accent-hover: #fdba74;
+    --accent-soft: #2a1d14;
+    --accent-line: #6b3a17;
+    --on-accent: #1c1206; /* dark text on the light orange */
     --pos: #4ade80;
     --neg: #f87171;
     --row: #1b2029;
     --band: #212733;
     --band-line: #2f3746;
-    --cpi: #e08a0b;
+    --cpi: #94a3b8;
     --bench-WIG: #f472b6;
     --bench-MSCI_WORLD: #2dd4bf;
     --bench-MIX_40_60: #a78bfa;
@@ -57,6 +67,9 @@
 /* No text autosizing ("font boosting") on phones: it rescales text block by block as the width changes, and the layout jumps until it settles. */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:hover { color: var(--accent-hover); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Figures line up in columns (same width for every digit). */
 table, .card .value, .mix-legend, .allocation, .chart-panel { font-variant-numeric: tabular-nums; }
 /* A white surface: tables, cards, charts, allocation. */
@@ -110,7 +123,7 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
 .filters select { width: var(--w, 11rem); text-overflow: ellipsis; }
 .filters input[type="search"] { font: inherit; font-size: 0.9rem; font-weight: 400; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); width: var(--w, 13rem); box-sizing: border-box; }
 .filters button.toggle { height: 34px; white-space: nowrap; }
-.filters button.toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
+.filters button.toggle.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); font-weight: 600; }
 .filters button.reset { display: grid; place-items: center; padding: 0; width: 34px; height: 34px; }
 @media (max-width: 720px) {
   /* Dropdowns side by side; the count goes below, with Clear at its end. */
@@ -129,7 +142,7 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
   .filters.compact .filters-top { display: flex; gap: 6px; align-items: center; }
   .filters.compact .filter.text { flex: 1 1 auto; }
   .filters.compact button.filters-toggle { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 10px; font-size: 0.85rem; }
-  .filters.compact button.filters-toggle.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .filters.compact button.filters-toggle.active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); font-weight: 600; }
   .filters.compact .filters-panel { display: flex; flex-wrap: wrap; gap: 6px; }
   .filters.compact .filters-panel .filter { flex: 1 1 40%; }
   .filters.compact .filters-panel .filter.wide { flex-basis: 100%; }
@@ -143,8 +156,7 @@ h1.brand { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
 table.static th { cursor: default; }
 tr.group td { font-weight: 600; background: var(--row); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 /* Holdings by account: each account's header row stands out, so the accounts are easy to tell apart. */
-tr.account-group td { background: var(--accent-soft); font-size: 0.95rem; font-weight: 700; padding-top: 11px; padding-bottom: 11px; border-top: 2px solid color-mix(in srgb, var(--accent) 35%, var(--border)); }
-tr.account-group td:first-child { box-shadow: inset 4px 0 0 var(--accent); }
+tr.account-group td { background: var(--band); font-size: 0.95rem; font-weight: 700; padding-top: 11px; padding-bottom: 11px; border-top: 1px solid var(--band-line); border-bottom-color: var(--band-line); }
 tbody tr.account-group:first-child td { border-top: 0; }
 /* Transactions: rows of one date share a background, neighbouring dates alternate. */
 tr.band-b td { background: var(--band); }
@@ -235,8 +247,8 @@ tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .range button { font: inherit; font-size: 0.85rem; height: 28px; border: 0; background: transparent; color: var(--fg); padding: 0 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .range button + button { border-left: 1px solid var(--border); }
 .range button:hover:not(.active):not(:disabled) { background: var(--row); }
-.range button.active { background: var(--accent); color: white; }
-.range button.active + button, .range button + button.active { border-left-color: var(--accent); }
+.range button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-line); }
+.range button.active + button, .range button + button.active { border-left-color: var(--accent-line); }
 .table-wrap { overflow-x: auto; padding: 0 4px; }
 .error { color: var(--neg); }
 .status-ok { color: var(--pos); }
@@ -244,7 +256,7 @@ tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .sidebar .user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); }
 button.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
 .gate { max-width: 420px; margin: 15vh auto; padding: 16px; text-align: center; }
-.gate button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: white; cursor: pointer; }
+.gate button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent); cursor: pointer; }
 form.login { display: flex; flex-direction: column; gap: 12px; text-align: left; border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 16px; background: var(--panel); box-shadow: var(--shadow); }
 form.login h2 { margin: 0; }
 form.login p { margin: 0; font-size: 0.9rem; }
@@ -272,9 +284,9 @@ tr.muted td { color: var(--muted); }
 .chart-panel-actions-end button.settings-open, .chart-panel-close { width: 30px; padding: 0; }
 .chart-panel-actions-end button.settings-open { color: var(--muted); }
 .chart-panel-actions-end button:hover:not(.active), .chart-panel-close:hover { background: var(--row); color: var(--fg); }
-.chart-panel-actions-end button.toggle.active { background: var(--accent); color: white; border-color: var(--accent); }
+.chart-panel-actions-end button.toggle.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); font-weight: 600; }
 .chart-panel-actions-end .count { font-size: 0.75rem; line-height: 1.5; background: var(--row); color: var(--muted); border-radius: 9px; padding: 0 6px; }
-.chart-panel-actions-end button.active .count { background: rgba(255, 255, 255, 0.25); color: white; }
+.chart-panel-actions-end button.active .count { background: var(--panel); color: var(--accent); }
 .chart-panel-actions-end .tx-toggle-icon { display: none; }
 @media (max-width: 480px) {
   .chart-panel-actions-end .tx-toggle-icon { display: inline; }
@@ -289,15 +301,15 @@ tr.muted td { color: var(--muted); }
 .segmented button { font: inherit; font-size: 0.9rem; border: 0; background: transparent; color: var(--fg); padding: 4px 14px; cursor: pointer; }
 .segmented button + button { border-left: 1px solid var(--border); }
 .segmented button:hover:not(.active) { background: var(--row); }
-.segmented button.active { background: var(--accent); color: white; }
-.segmented button.active + button, .segmented button + button.active { border-left-color: var(--accent); }
+.segmented button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-line); }
+.segmented button.active + button, .segmented button + button.active { border-left-color: var(--accent-line); }
 /* Instrument view (the cog): one panel per property. */
 .instrument-sections { display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
 .instrument-sections h3 { margin: 0 0 8px; font-size: 1rem; }
 .instrument-sections .hint { margin: 0 0 8px; font-size: 0.85rem; }
 .instrument-sections .manual-list { max-height: none; }
 .instrument-sections .manual-values input, .instrument-sections .manual-values form button { font: inherit; font-size: 0.85rem; padding: 4px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--fg); }
-.instrument-sections .manual-values button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.instrument-sections .manual-values button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; font-size: 0.92rem; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; }
@@ -315,12 +327,12 @@ tr.muted td { color: var(--muted); }
 .hs-field input { font: inherit; width: 4.5rem; height: 34px; box-sizing: border-box; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); }
 .hs-field select { height: 34px; }
 .hs-buttons { display: flex; gap: 8px; align-items: center; }
-.hs-buttons button.primary { font: inherit; height: 34px; padding: 0 14px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: white; cursor: pointer; }
+.hs-buttons button.primary { font: inherit; height: 34px; padding: 0 14px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: var(--on-accent); cursor: pointer; }
 .hs-buttons button.link { font: inherit; border: 0; background: none; color: var(--accent); cursor: pointer; }
 .hs-offers { margin: 10px 0 0; font-size: 0.85rem; }
 .hs-assumptions .error, .hs-assumptions [role="status"] { margin: 8px 0 0; }
 td .sub { font-size: 0.8rem; }
-.flag.verdict.sell { background: var(--accent); border-color: var(--accent); color: white; }
+.flag.verdict.sell { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .flag.verdict.hold { color: var(--pos); }
 .flag.verdict.buy { background: var(--pos); border-color: var(--pos); color: white; }
 .flag.verdict.matures { color: var(--muted); }
@@ -363,7 +375,7 @@ tr.hs-detail > td { background: var(--row); white-space: normal; }
 .manual-values input[type="date"] { width: 9.5rem; }
 .manual-values .with-unit { display: inline-flex; align-items: center; gap: 4px; }
 .manual-values .with-unit input { width: 8rem; }
-.manual-values button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.manual-values button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .manual-values .error { margin: 0; }
 .manual-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 0.85rem; max-height: 4.2em; overflow-y: auto; }
 .manual-list li { display: inline-flex; align-items: center; gap: 6px; }
@@ -416,7 +428,7 @@ tr.skeleton-row:hover { background: none; }
 .chart-busy { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--panel) 55%, transparent); border-radius: 6px; }
 .chart-busy .spinner { width: 28px; height: 28px; border-width: 3px; margin: 0; }
 .spinner { display: inline-block; width: 0.8em; height: 0.8em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -0.1em; margin-right: 6px; color: var(--accent); }
-.range button.active .spinner { color: white; }
+.range button.active .spinner { color: var(--accent); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .range button:disabled { cursor: progress; }
 .range button:disabled:not(.active) { opacity: 0.5; }
@@ -438,7 +450,9 @@ td .ccy { color: var(--muted); font-weight: 400; }
 .mix-legend .muted { color: var(--faint); }
 .mix-legend li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .mix-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-:root { --mix-shares: var(--accent); --mix-bonds: #f59e0b; --mix-cash: #10b981; --mix-other: #a78bfa; }
+/* Asset classes: their own colors, apart from the accent (orange is the app) and from gains (green). */
+:root { --mix-shares: #2563eb; --mix-bonds: #0d9488; --mix-cash: #64748b; --mix-other: #8b5cf6; }
+@media (prefers-color-scheme: dark) { :root { --mix-shares: #60a5fa; --mix-bonds: #2dd4bf; --mix-cash: #94a3b8; --mix-other: #a78bfa; } }
 .mix-SHARES { background: var(--mix-shares); }
 .mix-BONDS { background: var(--mix-bonds); }
 .mix-CASH { background: var(--mix-cash); }
@@ -461,9 +475,10 @@ td .ccy { color: var(--muted); font-weight: 400; }
 }
 /* Buttons: primary action (accent), danger. */
 button.primary, .modal-footer button, .view-header button.primary { font: inherit; font-size: 0.92rem; padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--fg); cursor: pointer; }
-button.primary { background: var(--accent); border-color: var(--accent); color: white; font-weight: 600; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 button.primary:disabled { opacity: 0.7; cursor: progress; }
-button.primary .spinner { color: white; }
+button.primary .spinner { color: var(--on-accent); }
 button.danger { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--neg); background: var(--neg); color: white; cursor: pointer; }
 button.danger-link { font: inherit; background: none; border: 0; padding: 0; color: var(--neg); cursor: pointer; }
 .view-header button.primary { align-self: center; }
@@ -609,7 +624,7 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
 .coupon-periods input { font: inherit; font-size: 0.85rem; padding: 2px 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg); width: 9rem; }
 .coupon-periods input[inputmode="decimal"] { width: 5.5rem; text-align: right; }
 .coupon-periods button { font: inherit; font-size: 0.8rem; padding: 2px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--fg); cursor: pointer; }
-.coupon-periods button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.coupon-periods button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .coupon-periods button.link { border: 0; background: none; color: var(--accent); padding: 0 4px; }
 .coupon-periods button.danger { padding: 1px 8px; }
 .coupon-actions { display: flex; flex-wrap: wrap; gap: 2px 6px; }
