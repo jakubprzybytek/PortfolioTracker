@@ -100,6 +100,7 @@ h1 { font-size: var(--fs-18); margin: 0 0 16px; }
 .topbar { display: flex; align-items: center; gap: 8px; }
 h1.brand { margin: 0; font-size: var(--fs-18); letter-spacing: -0.01em; }
 .brand a { display: flex; align-items: center; gap: 8px; color: var(--fg); text-decoration: none; white-space: nowrap; }
+.brand-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .brand img { flex: none; }
 .brand .light { font-weight: 400; color: var(--faint); }
 .menu-toggle { display: none; margin-left: auto; width: var(--ctl); height: var(--ctl); border-radius: var(--radius); border: 1px solid var(--border); background: transparent; color: var(--fg); cursor: pointer; place-items: center; }
@@ -607,6 +608,12 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   button.add-tx { flex: none; margin: 0 0 0 auto; width: var(--ctl); padding: 0; font-size: var(--fs-24); font-weight: 500; line-height: 1; }
   .add-tx .label { display: none; }
   .topbar .menu-toggle { margin-left: 0; }
+  /* One row, however narrow the phone or large its font (Galaxy: 360 px, a wider font): the name gives way first,
+     cut with "…"; the buttons keep their size. */
+  .topbar { flex-wrap: nowrap; }
+  .topbar > button { flex: none; }
+  h1.brand { flex: 1 1 auto; min-width: 0; font-size: var(--fs-15); }
+  .brand a { min-width: 0; }
   .toast { left: 12px; right: 12px; bottom: 12px; max-width: none; }
 }
 .chart-legend { font-size: var(--fs-12); font-weight: 400; margin-left: 8px; }

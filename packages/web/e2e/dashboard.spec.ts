@@ -356,6 +356,25 @@ test.describe("on a phone", () => {
     await expect(page.getByTestId("tx-form")).toBeVisible();
   });
 
+  test("the top bar stays one row on a narrow phone with a larger font (Galaxy: 360 px)", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto("/");
+    await expect(page.getByTestId("tx-add")).toBeVisible();
+    for (const size of ["15px", "18px"]) {
+      // 18 px: the system font set 20 % larger.
+      await page.evaluate((s) => {
+        document.documentElement.style.fontSize = s;
+      }, size);
+      const [brand, plus, reload, menu] = await Promise.all(
+        [page.locator("h1.brand"), page.getByTestId("tx-add"), page.locator("button.reload"), page.getByTestId("menu-toggle")].map((l) => l.boundingBox()),
+      );
+      for (const b of [plus, reload, menu]) expect(Math.abs(b!.y - menu!.y)).toBeLessThan(2);
+      expect(menu!.y).toBeLessThan(brand!.y + brand!.height);
+      expect(menu!.x + menu!.width).toBeLessThanOrEqual(360);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  });
+
   test("a row chart opens at half the screen height", async ({ page }) => {
     await page.goto("/#/holdings");
     await page.evaluate(() => window.localStorage.removeItem("portfolio-tracker.chartPanel.height.phone"));

@@ -142,7 +142,9 @@ function Shell({ email }: { email: string }) {
             <h1 className="brand">
               <a href="#/">
                 <img src="/favicon.svg" alt="" width={26} height={26} />
-                Portfolio <span className="light">Tracker</span>
+                <span className="brand-name">
+                  Portfolio <span className="light">Tracker</span>
+                </span>
               </a>
             </h1>
             <button type="button" className="primary add-tx" onClick={() => setForm({})} aria-label="Add transaction" data-testid="tx-add">
