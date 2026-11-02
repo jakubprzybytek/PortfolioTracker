@@ -8,6 +8,8 @@ Readability first: a light grey page with white panels (tables, cards, charts, a
 
 **Accent**: the logo's orange, deepened so text on white stays readable (`--accent`, 5.2:1; in dark mode a light orange with dark text on fills). It marks what you act on or have chosen: the primary button (one per screen, "Add transaction", "Save"), links, the focus ring, the active menu item, and a chosen option or a toggle that's on (segmented controls, "Show closed": a soft orange background, orange text, a thin orange outline). The portfolio's own line in charts is orange too. The logo's amber (`--brand`) is for marks only. **Data colours** stay apart from it: asset classes shares blue, bonds teal, cash slate, other violet; inflation is a grey reference beside the return; gains green, losses red. Holdings' account rows are a neutral band.
 
+**Sizes**: one type scale, as CSS variables (`--fs-12` … `--fs-26`): labels and column headers 12 px, notes 13, table rows and controls 14, body 15, section titles 18 (semibold), figures 24, view titles 26 (semibold). Every button, dropdown and field is one height (`--ctl`: 34 px, 38 px on a phone), corners 8 px on controls, 12 px on panels, 6 px on small parts.
+
 Row charts (Holdings, Prices) open in a panel at the bottom: a third of the screen height on a computer, half on a phone; dragging its edge resizes it (remembered per device size). Its controls share the title's row, right-aligned, all the same height: the range, Transactions (Holdings), the cog (⚙, the instrument's settings) and ✕; on a phone the title and ✕ stay on top and the controls take the row below. Chart ranges (1M / 6M / 1Y / ALL, here and on the Dashboard, Performance and Indicators) are one segmented control, as "Group by".
 
 ## Loading
