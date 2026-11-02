@@ -500,7 +500,10 @@ button.danger-link { font: inherit; background: none; border: 0; padding: 0; col
   .modal { border-radius: 0; min-height: 100%; border: 0; box-shadow: none; padding: 14px; }
   .form-grid { grid-template-columns: minmax(0, 1fr); }
   /* Add / Cancel stay in reach while scrolling the form. */
-  .modal-footer { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--border); }
+  /* margin-top: auto keeps them at the screen's bottom on a short form, instead of moving as the summary or note grows. */
+  .modal-footer { position: sticky; bottom: 0; margin-top: auto; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--border); }
+  /* At least 16px: smaller text makes iOS Safari zoom the page in when a field is tapped. */
+  .modal input, .modal select, .modal textarea { font-size: 16px; }
 }
 /* An amount with its currency next to it. */
 .with-currency { display: flex; gap: 6px; }

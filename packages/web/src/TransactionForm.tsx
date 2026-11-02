@@ -335,11 +335,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 {filtered && <option value={OTHER}>Other instrument…</option>}
                 {needsInstrument && <option value={NEW}>➕ New instrument…</option>}
               </select>
-              {inst && (
-                <small className="faint">
-                  {typeLabel(inst.type)} · {inst.isin} · {inst.currency}
-                </small>
-              )}
+              {/* Always there (blank until an instrument is chosen), so choosing one doesn't push the fields below down. */}
+              <small className="faint">{inst ? `${typeLabel(inst.type)} · ${inst.isin} · ${inst.currency}` : " "}</small>
             </Field>
           )}
 
@@ -401,7 +398,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
             </>
           )}
           {retailBuy && (
-            <Field label="Interest from" hint={interestFrom ? "Differs from the date: the bonds were issued later (or a rollover)" : "The date, unless the bonds were issued later"}>
+            <Field label="Interest from" hint={interestFrom ? "Set by hand: issued later, or a rollover" : "The date, unless the bonds were issued later"}>
               <input type="date" value={interestFrom || date} onChange={(e) => setInterestFrom(e.target.value === date ? "" : e.target.value)} required data-testid="tx-interest-from" />
             </Field>
           )}
