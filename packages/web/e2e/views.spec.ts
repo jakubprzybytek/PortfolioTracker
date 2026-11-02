@@ -317,6 +317,46 @@ test.describe("adding transactions", () => {
     await page.keyboard.press("Escape");
   });
 
+  test("on a phone the instrument is chosen in a sheet: the account's own first, a search, Escape closes the sheet only", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/#/transactions");
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-type").selectOption("COUPON");
+    await page.getByTestId("tx-account").selectOption("broker");
+    await expect(page.getByTestId("tx-instrument")).toHaveCount(0); // no native dropdown
+    const trigger = page.getByTestId("tx-instrument-picker");
+    await expect(trigger).toBeEnabled();
+    await expect(trigger).toHaveText(/Choose/);
+    await trigger.click();
+    const sheet = page.getByTestId("instrument-sheet");
+    await expect(sheet).toBeVisible();
+    // broker's own (DS0432, IZ0836) in the first group; the Kruk bond under the other tracked ones.
+    const first = sheet.locator("fieldset").first();
+    await expect(first.locator("legend")).toHaveText("In broker");
+    await expect(first.locator('[data-isin="PLKRK0000713"]')).toHaveCount(0);
+    await expect(first.getByTestId("instrument-option").filter({ hasText: "DS0432" })).toHaveCount(1);
+    await expect(sheet.locator('[data-isin="PLKRK0000713"]')).toHaveCount(1);
+    await expect(sheet.getByTestId("instrument-new")).toBeVisible();
+    // Every row is one line of code and one of name, however long the name.
+    const heights = await sheet.getByTestId("instrument-option").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+    expect(new Set(heights).size).toBe(1);
+    // Search: code, name or ISIN, accents ignored.
+    await page.getByTestId("instrument-search").fill("ds0432");
+    await expect(sheet.getByTestId("instrument-option")).toHaveCount(1);
+    // Escape closes the sheet, not the form.
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+    await expect(page.getByTestId("tx-form")).toBeVisible();
+    // Choosing one closes the sheet and shows it in the field.
+    await trigger.click();
+    await sheet.getByTestId("instrument-option").filter({ hasText: "DS0432" }).click();
+    await expect(sheet).toBeHidden();
+    await expect(trigger).toContainText("DS0432");
+    await expect(page.locator("small.one-line")).toContainText("· PLN"); // the info line: type · ISIN · currency
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("tx-form")).toBeHidden();
+  });
+
   test("tax paid is saved with the transaction: the net as the amount, the tax in the note column, gross and tax again on edit", async ({ page }) => {
     // Dated far ahead in its own account, as the other saving tests.
     await page.goto("/#/transactions");

@@ -506,6 +506,34 @@ button.danger-link { font: inherit; background: none; border: 0; padding: 0; col
   /* At least 16px: smaller text makes iOS Safari zoom the page in when a field is tapped. */
   .modal input, .modal select, .modal textarea { font-size: 16px; }
 }
+/* The instrument on a phone (InstrumentPicker): a field-like button, and a sheet from the bottom with a search and
+   two-line rows (code, type · currency; the name under them). */
+.picker-trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); font: inherit; font-size: 16px; font-weight: 400; text-align: left; cursor: pointer; }
+.picker-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.picker-trigger:disabled { cursor: progress; }
+.picker-value { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-chevron { color: var(--muted); font-size: 0.8em; }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(17, 24, 39, 0.4); display: flex; align-items: flex-end; }
+.sheet { width: 100%; max-height: 85dvh; display: flex; flex-direction: column; background: var(--panel); color: var(--fg); border-radius: 14px 14px 0 0; box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2); padding: 10px 14px 0; outline: none; animation: sheet-up 0.18s ease-out; }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; }
+.sheet-header h3 { margin: 0; font-size: 1.05rem; }
+.sheet-search { font: inherit; font-size: 16px; margin: 8px 0 6px; padding: 8px 10px; width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); }
+.sheet-search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.sheet-list { overflow-y: auto; overscroll-behavior: contain; padding-bottom: max(12px, env(safe-area-inset-bottom)); margin: 0 -14px; }
+.sheet-groupset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.sheet-group { padding: 10px 14px 4px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.sheet-option { display: flex; flex-direction: column; gap: 1px; width: 100%; padding: 8px 14px; border: 0; border-top: 1px solid var(--line); background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.sheet-group + .sheet-option { border-top-color: transparent; }
+.sheet-option:active, .sheet-option:hover { background: var(--row); }
+.sheet-option.selected { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.sheet-option.inactive { color: var(--muted); }
+.opt-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.opt-meta { margin-left: auto; font-size: 0.8rem; color: var(--faint); white-space: nowrap; }
+.opt-name { font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sheet-new { color: var(--accent); font-weight: 600; border-top: 1px solid var(--border); }
+.sheet-empty { padding: 12px 14px; margin: 0; }
 /* An amount with its currency next to it. */
 .with-currency { display: flex; gap: 6px; }
 .with-currency input { flex: 1; }

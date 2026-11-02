@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, apiSend } from "./api.ts";
+import { InstrumentPicker } from "./InstrumentPicker.tsx";
 import { TX_TYPE_LABELS, addDays, fmtMoney, fmtNum, parseNum, today, typeLabel } from "./format.ts";
 import type { AccountSummary, Instrument, Transaction, TransactionRow } from "./types.ts";
 import { useApi } from "./useApi.ts";
+import { useNarrow } from "./useNarrow.ts";
 
 // The "Add transaction" form (Docs/ui.md): a dialog over the Transactions view, for a new transaction or one
 // being edited. The server checks it again (POST/PUT /transactions) and revalues from its date.
@@ -68,6 +70,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const summaries = useApi<{ accounts: AccountSummary[] }>("/accounts");
   // The same request as the Transactions view's, so usually cached already: which instruments each account has had.
   const txs = useApi<TransactionRow[]>("/transactions");
+  // On a phone the instrument is chosen in a sheet of its own (the native dropdown can't be styled).
+  const narrow = useNarrow();
   const accounts = useMemo(() => (summaries.data?.accounts ?? []).map((a) => a.account), [summaries.data]);
   const [date, setDate] = useState(editing?.date ?? today());
   const [account, setAccount] = useState(editing?.account ?? accounts[0] ?? "");
@@ -311,6 +315,19 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
 
           {(needsInstrument || type === "INTEREST") && (
             <Field label={type === "INTEREST" ? "Instrument (optional)" : "Instrument"} wide>
+              {narrow ? (
+                <InstrumentPicker
+                  list={list}
+                  value={isin}
+                  onChange={setIsin}
+                  own={onAccount?.size ? onAccount : undefined}
+                  accountLabel={account === NEW_ACCOUNT ? "this account" : account}
+                  loading={instruments.loading && !instruments.data}
+                  allowNew={needsInstrument}
+                  allowNone={type === "INTEREST"}
+                  newValue={NEW}
+                />
+              ) : (
               <select
                 value={isin}
                 onChange={(e) => (e.target.value === OTHER ? setShowAll(true) : setIsin(e.target.value))}
@@ -335,12 +352,13 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 {filtered && <option value={OTHER}>Other instrument…</option>}
                 {needsInstrument && <option value={NEW}>➕ New instrument…</option>}
               </select>
+              )}
               {/* One line, always there: the chosen instrument, else why the list is short (once the account's
-                  transactions load), else blank. So nothing below moves when either arrives. */}
+                  transactions load; the dropdown on a computer), else blank. So nothing below moves when either arrives. */}
               <small className="faint one-line">
                 {inst
                   ? `${typeLabel(inst.type)} · ${inst.isin} · ${inst.currency}`
-                  : filtered
+                  : filtered && !narrow
                     ? shown.length
                       ? `Only those in ${account === NEW_ACCOUNT ? "this account" : account}; more under "Other instrument…"`
                       : `None in ${account === NEW_ACCOUNT ? "a new account" : account} yet: see "Other instrument…"`
