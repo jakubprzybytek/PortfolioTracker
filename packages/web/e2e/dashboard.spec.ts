@@ -383,6 +383,8 @@ test.describe("on a phone", () => {
       await page.evaluate(() => {
         document.documentElement.style.fontSize = "18px";
       });
+      // A wide font too (Linux's DejaVu Sans in CI is much wider than Segoe UI; spaced letters where it's missing).
+      await page.addStyleTag({ content: "* { font-family: Verdana, 'DejaVu Sans', sans-serif !important; letter-spacing: 0.05em !important; }" });
       expect(await page.evaluate(() => document.documentElement.scrollWidth), view).toBeLessThanOrEqual(360);
     }
   });

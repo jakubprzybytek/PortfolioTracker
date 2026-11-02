@@ -600,8 +600,10 @@ button.reload:hover { background: var(--row); }
   /* The valuation date and "Update prices" (icon only) on the title's row. */
   .view-header { flex-wrap: nowrap; align-items: center; margin-bottom: 14px; }
   .view-header .view-title { margin: 0; }
-  .view-meta { flex: none; gap: 6px; }
-  .view-meta > .muted { font-size: var(--fs-12); white-space: nowrap; }
+  .view-meta { flex: 0 1 auto; min-width: 0; gap: 6px; } /* gives way before the title: the date wraps */
+  .view-meta > .muted { min-width: 0; }
+  .view-meta > button { flex: none; }
+  .view-meta > .muted { font-size: var(--fs-12); text-align: right; } /* "as of" over the date when tight; the date itself stays whole (.nowrap) */
   .view-meta .refresh { width: var(--ctl); padding: 0; justify-content: center; }
   .wide-only { display: none; }
 }
@@ -850,6 +852,8 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 
 /* Read by screen readers only. */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* Text that must not break (a date: its hyphens are break points otherwise). */
+.nowrap { white-space: nowrap; }
 /* A chart's numbers as a table, folded under it. */
 .chart-table { margin: 0.25rem 0 1rem; }
 .chart-table summary { cursor: pointer; color: var(--muted); font-size: 0.9em; }

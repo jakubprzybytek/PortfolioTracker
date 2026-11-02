@@ -108,7 +108,7 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
       <header className="view-header">
         <h2 className="view-title">Buy, hold or sell</h2>
         <span className="muted" data-testid="hs-date">
-          {d ? `as of ${d.date}` : data.loading ? "Loading…" : ""}
+          {d ? <>as of <span className="nowrap">{d.date}</span></> : data.loading ? "Loading…" : ""}
         </span>
       </header>
       <p className="muted hs-intro">

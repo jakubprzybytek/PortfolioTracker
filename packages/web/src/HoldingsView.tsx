@@ -965,7 +965,7 @@ export function HoldingsView({
             {snap.data ? (
               <>
                 <span className="wide-only">Valuation </span>as of{" "}
-                {snap.data.date}
+                <span className="nowrap">{snap.data.date}</span>
               </>
             ) : snap.loading ? (
               "Loading…"

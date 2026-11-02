@@ -65,7 +65,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
         <h2 className="view-title">Prices</h2>
         <span className="view-meta">
           <span className="muted" data-testid="prices-date">
-            {newest ? `as of ${newest}` : rows.loading ? "Loading…" : ""}
+            {newest ? <>as of <span className="nowrap">{newest}</span></> : rows.loading ? "Loading…" : ""}
           </span>
           <RefreshPrices />
         </span>
