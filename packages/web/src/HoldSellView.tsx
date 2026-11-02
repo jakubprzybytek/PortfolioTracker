@@ -116,7 +116,7 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
         more costs today. Sell when keeping it yields less than the alternative; buy more when one more yields more; hold in between. After tax (none in IKE/IKZE), at the
         assumptions below.
       </p>
-      {data.error && <p className="error">{data.error}</p>}
+      {data.error && <p className="error callout">{data.error}</p>}
 
       <section className="panel hs-assumptions" data-testid="hs-assumptions">
         <form

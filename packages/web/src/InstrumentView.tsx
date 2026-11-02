@@ -65,7 +65,7 @@ export function InstrumentView({ params }: { params: Record<string, string> }) {
           {inst && inst.name !== inst.code && <span className="muted instrument-name">{inst.name}</span>}
         </h2>
       </header>
-      {instruments.error && <p className="error">{instruments.error}</p>}
+      {instruments.error && <p className="error callout">{instruments.error}</p>}
       {!inst && !instruments.loading && !instruments.error && <p className="muted">No instrument {isin}.</p>}
       {!inst && instruments.loading && <p className="muted">Loading…</p>}
       {inst && (

@@ -77,7 +77,7 @@ export interface AccountsData {
 
 export function AccountsTable({ data }: { data: AccountsData }) {
   const [showClosed, setShowClosed] = useState(false);
-  if (data.error) return <p className="error">{data.error}</p>;
+  if (data.error) return <p className="error callout">{data.error}</p>;
   const open = data.data?.accounts.filter((a) => !a.closed) ?? [];
   const closed = data.data?.accounts.filter((a) => a.closed) ?? [];
   return (

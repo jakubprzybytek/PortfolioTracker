@@ -58,8 +58,8 @@ export function CashFlowsView({ params, setParams }: { params: Record<string, st
         Money paid into and taken out of each account, per month: a row folds out into deposits and withdrawals. In PLN, another currency at the NBP rate of the day
         before. Transfers between your own accounts count on both sides.
       </p>
-      {data.error && <p className="error">{data.error}</p>}
-      {d?.missingRates && <p className="error">No NBP rate for: {d.missingRates.join("; ")}. Those months are incomplete.</p>}
+      {data.error && <p className="error callout">{data.error}</p>}
+      {d?.missingRates && <p className="error callout">No NBP rate for: {d.missingRates.join("; ")}. Those months are incomplete.</p>}
 
       {narrow ? (
         <ul className="hs-list panel" data-testid="cf-table">

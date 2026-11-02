@@ -89,13 +89,16 @@ export function DashboardView() {
       </header>
 
       {holdings.error && !holdings.loading && (
-        <p className="error" data-testid="holdings-error">
+        <p className="error callout" data-testid="holdings-error">
           {holdings.error}
         </p>
       )}
       {failedJobs.length > 0 && (
-        <p className="error" data-testid="job-errors">
-          Failed jobs: {failedJobs.map(([name, j]) => `${name} (${j?.finishedAt?.slice(0, 16)}): ${j?.note ?? ""}`).join("; ")} · <a href="#/status">Status</a>
+        <p className="error callout" data-testid="job-errors">
+          <span>
+            <strong>{failedJobs.length === 1 ? "A job failed" : `${failedJobs.length} jobs failed`}:</strong>{" "}
+            {failedJobs.map(([name, j]) => `${name} (${j?.finishedAt?.slice(0, 16).replace("T", " ")}): ${j?.note ?? ""}`).join("; ")} · <a href="#/status">Status</a>
+          </span>
         </p>
       )}
 
