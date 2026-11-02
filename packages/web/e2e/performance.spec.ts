@@ -1,11 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { fetchFresh } from "./fresh.ts";
 
 type Bench = { id: string; label: string; short?: string; note: string; points: { date: string; value: number }[] };
 
 /** Replaces the benchmarks in `GET /portfolio/years` (the stage may not have fetched any yet), made from the first day valued. */
 async function withBenchmarks(page: Page, make: (first: string) => Bench[]) {
   await page.route(/\/portfolio\/years/, async (route) => {
-    const response = await route.fetch();
+    const response = await fetchFresh(route);
     const body = await response.json();
     await route.fulfill({ response, json: { ...body, benchmarks: make(body.total?.from ?? "2025-02-03") } });
   });

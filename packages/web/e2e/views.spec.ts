@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { fetchFresh } from "./fresh.ts";
 
 // Views against the sample data: accounts "broker" (DS0432, IZ0836), "ike" (DS0432, EDO0935, SAMPLE-APARTMENT),
 // "foreign" (SPXS, an ETF in EUR), "bonds" (KRU0827, a Catalyst bond), "ibkr" (EUR cash, a Bund).
@@ -1110,7 +1111,7 @@ const withClosed = (path: string) => (url: URL) => url.pathname.endsWith(path) &
 test.describe("show closed", () => {
   test("holdings: closed positions greyed after the open ones, with the realised gain, not in the sums; their chart ranges count back from the close", async ({ page }) => {
     await page.route(withClosed("/holdings"), async (route) => {
-      const res = await route.fetch();
+      const res = await fetchFresh(route);
       const body = await res.json();
       expect(body.closed).toEqual([]); // the sample's own: none
       // Its flows: bought for 700, written off (nothing came back).
@@ -1192,7 +1193,7 @@ test.describe("show closed", () => {
   test("prices: instruments held no more greyed after the others, with their last price; their chart ranges count back from the last trade", async ({ page }) => {
     const oldRow = { isin: OLD_BOND, code: "OLD0513", name: "Old bond (made up)", type: "BOND_CORPORATE", currency: "PLN", price: 48.5, priceDate: "2013-05-30", stale: false, manual: true, yearAgo: { date: "2012-05-30", price: 97 }, change1y: -0.5, closed: { firstDate: "2012-03-01", lastDate: "2013-05-31" }, assetClass: "BONDS" };
     await page.route(withClosed("/prices"), async (route) => {
-      const res = await route.fetch();
+      const res = await fetchFresh(route);
       const body = (await res.json()) as { code: string; closed?: unknown }[];
       expect(body.filter((r) => r.closed)).toEqual([]); // the sample's own: none
       await route.fulfill({ response: res, json: [...body, oldRow] });
@@ -1427,7 +1428,7 @@ const salesResponse = {
 test.describe("sales", () => {
   test("the PIT-38 summary per year; sales newest first, folding out into their FIFO buys; filters in the URL", async ({ page }) => {
     await page.route("**/sales", async (route) => {
-      const res = await route.fetch();
+      const res = await fetchFresh(route);
       expect(await res.json()).toEqual({ sales: [], years: [] }); // the sample's own: none
       await route.fulfill({ response: res, json: salesResponse });
     });
