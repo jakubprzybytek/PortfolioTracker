@@ -310,7 +310,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           </Field>
 
           {(needsInstrument || type === "INTEREST") && (
-            <Field label={type === "INTEREST" ? "Instrument (optional)" : "Instrument"} wide hint={filtered ? (shown.length ? `Those ${account === NEW_ACCOUNT ? "the account" : account} has had; others under "Other instrument…"` : `None in ${account === NEW_ACCOUNT ? "a new account" : account} yet: "Other instrument…" lists them all`) : undefined}>
+            <Field label={type === "INTEREST" ? "Instrument (optional)" : "Instrument"} wide>
               <select
                 value={isin}
                 onChange={(e) => (e.target.value === OTHER ? setShowAll(true) : setIsin(e.target.value))}
@@ -335,8 +335,17 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 {filtered && <option value={OTHER}>Other instrument…</option>}
                 {needsInstrument && <option value={NEW}>➕ New instrument…</option>}
               </select>
-              {/* Always there (blank until an instrument is chosen), so choosing one doesn't push the fields below down. */}
-              <small className="faint">{inst ? `${typeLabel(inst.type)} · ${inst.isin} · ${inst.currency}` : " "}</small>
+              {/* One line, always there: the chosen instrument, else why the list is short (once the account's
+                  transactions load), else blank. So nothing below moves when either arrives. */}
+              <small className="faint one-line">
+                {inst
+                  ? `${typeLabel(inst.type)} · ${inst.isin} · ${inst.currency}`
+                  : filtered
+                    ? shown.length
+                      ? `Only those in ${account === NEW_ACCOUNT ? "this account" : account}; more under "Other instrument…"`
+                      : `None in ${account === NEW_ACCOUNT ? "a new account" : account} yet: see "Other instrument…"`
+                    : " "}
+              </small>
             </Field>
           )}
 

@@ -482,6 +482,7 @@ button.danger-link { font: inherit; background: none; border: 0; padding: 0; col
 .form-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; font-weight: 600; color: var(--muted); min-width: 0; }
 .form-field.wide, .form-grid .wide { grid-column: 1 / -1; }
 .form-field small { font-weight: 400; }
+.form-field small.one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .modal input, .modal select, .modal textarea { font: inherit; font-size: 0.97rem; font-weight: 400; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--fg); min-width: 0; width: 100%; }
 .modal input:focus, .modal select:focus, .modal textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .modal textarea { resize: vertical; line-height: 1.4; }
