@@ -375,6 +375,27 @@ test.describe("on a phone", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   });
 
+  test("no view scrolls sideways on a narrow phone with a larger font (360 px, font 20 % larger)", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    for (const view of ["/", "/#/performance", "/#/holdings", "/#/prices", "/#/hold-sell", "/#/sales", "/#/cash-flows", "/#/indicators", "/#/transactions", "/#/notes", "/#/status"]) {
+      await page.goto(view);
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = "18px";
+      });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth), view).toBeLessThanOrEqual(360);
+    }
+  });
+
+  test("a row chart's ✕ stays on the title's row on a narrow phone", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 780 });
+    await page.goto("/#/holdings");
+    await page.getByTestId("holding-row").first().click();
+    const [title, close] = await Promise.all([page.getByTestId("chart-panel-title").boundingBox(), page.locator(".chart-panel-close").boundingBox()]);
+    expect(close!.y).toBeLessThan(title!.y + title!.height);
+    expect(close!.x + close!.width).toBeLessThanOrEqual(360);
+  });
+
   test("a row chart opens at half the screen height", async ({ page }) => {
     await page.goto("/#/holdings");
     await page.evaluate(() => window.localStorage.removeItem("portfolio-tracker.chartPanel.height.phone"));

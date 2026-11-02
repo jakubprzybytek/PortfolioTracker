@@ -221,7 +221,10 @@ main:has(> .tx-view) { max-width: 1760px; }
 .tx-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; white-space: nowrap; }
 .tx-date { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.85em; }
 .tx-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.tx-amount { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; }
+.tx-amount { flex: none; margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; }
+/* A long amount (an exchange: "-4 300,00 zł → 1 000,00 EUR") goes to a line of its own rather than squeezing the type away. */
+.tx-line:not(.tx-detail) { flex-wrap: wrap; }
+.tx-line:not(.tx-detail) .tx-what { min-width: 5rem; }
 .tx-detail { font-size: var(--fs-13); }
 .tx-detail > * { flex: none; }
 .tx-code { color: var(--fg); }
@@ -230,6 +233,8 @@ tr.band-b:hover td { background: transparent; }
 tr.total td { font-weight: 700; border-top: 2px solid var(--fg); border-bottom: 0; }
 td.indent { padding-left: 26px; }
 td.wrap { white-space: normal; min-width: 160px; }
+/* A phone: a date and time on two lines, so a wrapping column (a note, a change) keeps room to be read. */
+@media (max-width: 720px) { td.when { white-space: normal; width: 6rem; } td.wrap { min-width: 11rem; } }
 /* A note: one line, cut with an ellipsis (all of it in the tooltip). */
 td.note { max-width: 18rem; overflow: hidden; text-overflow: ellipsis; }
 /* Instrument: one line; a long name is cut with "…" (the full name in its tooltip). */
@@ -321,8 +326,8 @@ tr.muted td { color: var(--muted); }
   .chart-panel-actions-end button.toggle { padding: 0 8px; }
 }
 .chart-panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.group-by { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.group-by > .muted { font-size: var(--fs-13); }
+.group-by { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 10px; }
+.group-by > .muted { font-size: var(--fs-13); white-space: nowrap; }
 /* A segmented control: one outlined button split in two, the chosen half filled. */
 .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
 .segmented button { font: inherit; font-size: var(--fs-14); height: calc(var(--ctl) - 2px); border: 0; background: transparent; color: var(--fg); padding: 0 14px; cursor: pointer; }
@@ -420,7 +425,7 @@ tr.clickable { cursor: pointer; }
 @media (max-width: 720px) {
   .chart-panel { left: 0; padding: 0 12px 8px; }
   .chart-panel-header { flex-wrap: wrap; row-gap: 6px; }
-  .chart-panel-title { flex-basis: calc(100% - 44px); }
+  .chart-panel-title { flex-basis: calc(100% - var(--ctl) - 12px); } /* room for ✕ on the same row */
   .chart-panel-actions { order: 3; width: 100%; }
   .chart-panel-actions-end { margin-left: auto; }
   .chart-panel-handle { margin: 0 -12px; }
@@ -596,7 +601,7 @@ button.reload:hover { background: var(--row); }
   .view-header { flex-wrap: nowrap; align-items: center; margin-bottom: 14px; }
   .view-header .view-title { margin: 0; }
   .view-meta { flex: none; gap: 6px; }
-  .view-meta > .muted { font-size: var(--fs-12); }
+  .view-meta > .muted { font-size: var(--fs-12); white-space: nowrap; }
   .view-meta .refresh { width: var(--ctl); padding: 0; justify-content: center; }
   .wide-only { display: none; }
 }

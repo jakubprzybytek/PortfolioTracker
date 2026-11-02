@@ -94,9 +94,9 @@ export function StatusView() {
             {Object.entries(status.data?.jobs ?? {}).map(([name, j]) => (
               <tr key={name} data-testid={`job-${name}`}>
                 <td className="left">{name}</td>
-                <td className="left muted">{(j?.finishedAt ?? j?.startedAt)?.replace("T", " ").slice(0, 16) ?? "never"}</td>
+                <td className="left muted when">{(j?.finishedAt ?? j?.startedAt)?.replace("T", " ").slice(0, 16) ?? "never"}</td>
                 <td className={`left ${j?.status === "failed" ? "status-failed" : j?.status === "ok" ? "status-ok" : "muted"}`}>{j?.status ?? "–"}</td>
-                <td className="left muted" style={{ whiteSpace: "normal", maxWidth: 600 }}>
+                <td className="left muted wrap" style={{ maxWidth: 600 }}>
                   {j?.note ?? ""}
                 </td>
               </tr>
@@ -158,9 +158,9 @@ function TransactionLog() {
             )}
             {log.data?.map((e) => (
               <tr key={`${e.at}/${(e.after ?? e.before)?.id}`} data-testid="tx-log-row">
-                <td className="left muted">{e.at.replace("T", " ").slice(0, 16)}</td>
+                <td className="left muted when">{e.at.replace("T", " ").slice(0, 16)}</td>
                 <td className="left">{e.action}</td>
-                <td className="left" style={{ whiteSpace: "normal" }}>
+                <td className="left wrap">
                   {changes(e)}
                 </td>
               </tr>
