@@ -116,14 +116,15 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   }, [onClose, busy]);
 
   const list = useMemo(() => [...(instruments.data ?? [])].sort((a, b) => Number(b.active) - Number(a.active) || a.code.localeCompare(b.code)), [instruments.data]);
-  // Instruments the account has had a transaction in (undefined: a new account, or not known yet).
+  // Instruments the account has had a transaction in: none for a new account or a cash-only one (undefined: not known yet).
   const onAccount = useMemo(() => {
-    if (!txs.data || account === NEW_ACCOUNT) return undefined;
+    if (account === NEW_ACCOUNT) return new Set<string>();
+    if (!txs.data) return undefined;
     const s = new Set<string>();
     for (const t of txs.data) if (t.account === account && t.isin) s.add(t.isin);
-    return s.size ? s : undefined;
+    return s;
   }, [txs.data, account]);
-  // The account's own (and the one chosen), unless "Other instrument…" was picked; everything for a new account.
+  // The account's own (and the one chosen), unless "Other instrument…" was picked.
   const filtered = !showAll && !!onAccount && list.some((i) => !onAccount.has(i.isin) && i.isin !== isin);
   const shown = filtered ? list.filter((i) => onAccount!.has(i.isin) || i.isin === isin) : list;
   const inst = list.find((i) => i.isin === isin);
@@ -309,7 +310,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           </Field>
 
           {(needsInstrument || type === "INTEREST") && (
-            <Field label={type === "INTEREST" ? "Instrument (optional)" : "Instrument"} wide hint={filtered ? `Those ${account} has had; others under "Other instrument…"` : undefined}>
+            <Field label={type === "INTEREST" ? "Instrument (optional)" : "Instrument"} wide hint={filtered ? (shown.length ? `Those ${account === NEW_ACCOUNT ? "the account" : account} has had; others under "Other instrument…"` : `None in ${account === NEW_ACCOUNT ? "a new account" : account} yet: "Other instrument…" lists them all`) : undefined}>
               <select
                 value={isin}
                 onChange={(e) => (e.target.value === OTHER ? setShowAll(true) : setIsin(e.target.value))}
@@ -317,24 +318,20 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 data-testid="tx-instrument"
               >
                 <option value="">{instruments.loading && !instruments.data ? "Loading…" : "Choose…"}</option>
-                <optgroup label="Tracked">
-                  {shown
-                    .filter((i) => i.active)
-                    .map((i) => (
-                      <option key={i.isin} value={i.isin}>
-                        {i.code} · {i.name}
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="No longer held">
-                  {shown
-                    .filter((i) => !i.active)
-                    .map((i) => (
-                      <option key={i.isin} value={i.isin}>
-                        {i.code} · {i.name}
-                      </option>
-                    ))}
-                </optgroup>
+                {[
+                  { label: "Tracked", items: shown.filter((i) => i.active) },
+                  { label: "No longer held", items: shown.filter((i) => !i.active) },
+                ]
+                  .filter((g) => g.items.length)
+                  .map((g) => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.items.map((i) => (
+                        <option key={i.isin} value={i.isin}>
+                          {i.code} · {i.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
                 {filtered && <option value={OTHER}>Other instrument…</option>}
                 {needsInstrument && <option value={NEW}>➕ New instrument…</option>}
               </select>

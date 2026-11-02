@@ -326,7 +326,11 @@ test.describe("adding transactions", () => {
     await page.getByTestId("tx-type").selectOption("COUPON");
     await page.getByTestId("tx-account").selectOption("__new_account__");
     await page.getByTestId("tx-new-account").fill("e2e-tax");
-    await page.getByTestId("tx-instrument").selectOption("PLKRK0000713");
+    // A new account has had no instruments: none listed, only "Choose…", "Other instrument…" and "New instrument…".
+    const select = page.getByTestId("tx-instrument");
+    await expect(select.locator("option")).toHaveCount(3);
+    await select.selectOption("__other__");
+    await select.selectOption("PLKRK0000713");
     await page.getByTestId("tx-amount").fill("100");
     await page.getByTestId("tx-tax").fill("19");
     await page.getByTestId("tx-note").fill("E2E coupon");
