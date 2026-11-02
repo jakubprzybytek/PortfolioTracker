@@ -472,9 +472,9 @@ td .ccy { color: var(--muted); font-weight: 400; }
 .mix-legend .muted { color: var(--faint); }
 .mix-legend li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .mix-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-/* Asset classes: their own colors, apart from the accent (orange is the app) and from gains (green). */
-:root { --mix-shares: #2563eb; --mix-bonds: #0d9488; --mix-cash: #64748b; --mix-other: #8b5cf6; }
-@media (prefers-color-scheme: dark) { :root { --mix-shares: #60a5fa; --mix-bonds: #2dd4bf; --mix-cash: #94a3b8; --mix-other: #a78bfa; } }
+/* Asset classes: their own colors, apart from the accent (orange is the app). Shares a lime, a yellow-green, so it does not read as a gain's emerald. */
+:root { --mix-shares: #65a30d; --mix-bonds: #2563eb; --mix-cash: #eab308; --mix-other: #8b5cf6; }
+@media (prefers-color-scheme: dark) { :root { --mix-shares: #a3e635; --mix-bonds: #3b82f6; --mix-cash: #facc15; --mix-other: #a78bfa; } }
 .mix-SHARES { background: var(--mix-shares); }
 .mix-BONDS { background: var(--mix-bonds); }
 .mix-CASH { background: var(--mix-cash); }
