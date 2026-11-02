@@ -76,9 +76,16 @@ describe(`API ${API}`, () => {
     expect(status).toBe(200);
     expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "eod-ibkr", "export", "fx", "import", "live", "monthly", "quality", "valuation", "watchdog"]);
     expect(typeof body.deadLetter).toBe("number");
-    expect(body.jobs["fx"]).toMatchObject({ status: "ok" });
-    expect(body.jobs["import"]).toMatchObject({ status: "ok" });
-  });
+    // Each upload in the setup starts an import run, and only the first is waited for: the last one can still be
+    // running here. Wait until both jobs have settled, then they must have gone well.
+    const settled = await waitFor(async () => {
+      const r = await get<{ jobs: Record<string, { status: string } | null> }>("/status");
+      const runs = [r.body.jobs["fx"], r.body.jobs["import"]];
+      return r.status === 200 && runs.every((j) => j && j.status !== "running") ? r.body.jobs : undefined;
+    }, 120_000);
+    expect(settled["fx"]).toMatchObject({ status: "ok" });
+    expect(settled["import"]).toMatchObject({ status: "ok" });
+  }, 150_000);
 
   it("GET /instruments returns the tracked bonds with terms and a finished backfill", async () => {
     const { status, body } = await get<InstrumentOut[]>("/instruments");
