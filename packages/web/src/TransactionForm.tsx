@@ -317,10 +317,10 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
             <Field label={type === "INTEREST" ? "Instrument (optional)" : "Instrument"} wide>
               {narrow ? (
                 <InstrumentPicker
-                  list={list}
+                  list={shown}
                   value={isin}
                   onChange={setIsin}
-                  own={onAccount?.size ? onAccount : undefined}
+                  onShowAll={filtered ? () => setShowAll(true) : undefined}
                   accountLabel={account === NEW_ACCOUNT ? "this account" : account}
                   loading={instruments.loading && !instruments.data}
                   allowNew={needsInstrument}

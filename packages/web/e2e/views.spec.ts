@@ -317,7 +317,7 @@ test.describe("adding transactions", () => {
     await page.keyboard.press("Escape");
   });
 
-  test("on a phone the instrument is chosen in a sheet: the account's own first, a search, Escape closes the sheet only", async ({ page }) => {
+  test("on a phone the instrument is chosen in a sheet: only the account's own, 'Other instrument…' for the rest, a search, Escape closes the sheet only", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/#/transactions");
     await page.getByTestId("tx-add").click();
@@ -330,17 +330,23 @@ test.describe("adding transactions", () => {
     await trigger.click();
     const sheet = page.getByTestId("instrument-sheet");
     await expect(sheet).toBeVisible();
-    // broker's own (DS0432, IZ0836) in the first group; the Kruk bond under the other tracked ones.
-    const first = sheet.locator("fieldset").first();
-    await expect(first.locator("legend")).toHaveText("In broker");
-    await expect(first.locator('[data-isin="PLKRK0000713"]')).toHaveCount(0);
-    await expect(first.getByTestId("instrument-option").filter({ hasText: "DS0432" })).toHaveCount(1);
-    await expect(sheet.locator('[data-isin="PLKRK0000713"]')).toHaveCount(1);
+    // Only broker's own (DS0432, IZ0836), not the Kruk bond of "bonds".
+    await expect(sheet.locator("legend").first()).toHaveText("In broker");
+    await expect(sheet.getByTestId("instrument-option")).toHaveCount(2);
+    await expect(sheet.getByTestId("instrument-option").filter({ hasText: "DS0432" })).toHaveCount(1);
+    await expect(sheet.locator('[data-isin="PLKRK0000713"]')).toHaveCount(0);
     await expect(sheet.getByTestId("instrument-new")).toBeVisible();
     // Every row is one line of code and one of name, however long the name.
     const heights = await sheet.getByTestId("instrument-option").evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
     expect(new Set(heights).size).toBe(1);
-    // Search: code, name or ISIN, accents ignored.
+    // Search: code, name or ISIN, accents ignored; within the account's own.
+    await page.getByTestId("instrument-search").fill("kru0827");
+    await expect(sheet.getByTestId("instrument-empty")).toContainText("in broker");
+    // "Other instrument…": every one, the sheet stays open, the search kept.
+    await sheet.getByTestId("instrument-other").click();
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator('[data-isin="PLKRK0000713"]')).toHaveCount(1);
+    await expect(sheet.getByTestId("instrument-other")).toHaveCount(0);
     await page.getByTestId("instrument-search").fill("ds0432");
     await expect(sheet.getByTestId("instrument-option")).toHaveCount(1);
     // Escape closes the sheet, not the form.
