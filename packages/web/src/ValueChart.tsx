@@ -42,8 +42,8 @@ export function ValueChart({
             </linearGradient>
           </defs>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
-          <YAxis {...(narrow ? narrowYAxis : { width: 80, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={axis.domain} ticks={axis.ticks} interval={0} allowDataOverflow tickFormatter={(v: number) => (narrow ? fmtCompact(v) : Math.round(v).toLocaleString("pl-PL"))} />
+          <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
+          <YAxis {...(narrow ? narrowYAxis : { width: 80, tick: { fontSize: 12 } })} stroke="var(--muted)" domain={axis.domain} ticks={axis.ticks} interval={0} allowDataOverflow tickFormatter={(v: number) => (narrow ? fmtCompact(v) : Math.round(v).toLocaleString("pl-PL"))} />
           <Tooltip
             formatter={(v, name) => [fmtPln(Number(v)), name === "value" ? labels.value : labels.cost]}
             contentStyle={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 }}

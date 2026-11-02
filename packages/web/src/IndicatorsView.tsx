@@ -145,9 +145,9 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
   const axes = (
     <>
       <CartesianGrid stroke="var(--border)" vertical={false} />
-      <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
+      <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
       <YAxis
-        {...(narrow ? narrowYAxis : { width: 56, tick: { fontSize: 11 } })}
+        {...(narrow ? narrowYAxis : { width: 56, tick: { fontSize: 12 } })}
         stroke="var(--muted)"
         domain={pctDomain ?? ["auto", "auto"]}
         ticks={pctDomain && Array.from({ length: (pctDomain[1]! - pctDomain[0]!) / step + 1 }, (_, k) => pctDomain[0]! + k * step)}

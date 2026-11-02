@@ -42,10 +42,10 @@ export function PriceChart({
       <ResponsiveContainer>
         <ComposedChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
-          <YAxis yAxisId="price" {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
+          <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
+          <YAxis yAxisId="price" {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 12 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
           {withNominal && (
-            <YAxis yAxisId="nominal" orientation="right" {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 11 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 0)} />
+            <YAxis yAxisId="nominal" orientation="right" {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 12 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 0)} />
           )}
           <Tooltip
             formatter={(v, name, item) =>
@@ -62,7 +62,7 @@ export function PriceChart({
             <Line yAxisId="nominal" type="linear" dataKey="nominal" stroke="var(--muted)" strokeDasharray="4 3" dot={false} strokeWidth={1.5} isAnimationActive={false} connectNulls={false} />
           )}
           {markers.map((m, i) => (
-            <ReferenceDot key={i} yAxisId="price" x={m.date} y={m.y} r={5} fill={m.type === "BUY" ? "var(--pos)" : "var(--neg)"} stroke="var(--bg)" label={{ value: m.type, position: "top", fontSize: 10 }} />
+            <ReferenceDot key={i} yAxisId="price" x={m.date} y={m.y} r={5} fill={m.type === "BUY" ? "var(--pos)" : "var(--neg)"} stroke="var(--bg)" label={{ value: m.type, position: "top", fontSize: 12 }} />
           ))}
         </ComposedChart>
       </ResponsiveContainer>

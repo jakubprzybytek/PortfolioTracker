@@ -9,7 +9,7 @@ import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
 /** Keeps "−2 %" on one line: recharts wraps axis labels at spaces, and on a phone the axis is 1 px wide. */
 const NBSP = " ";
 const tooltipStyle = { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 };
-const yAxis = (narrow: boolean) => (narrow ? narrowYAxis : { width: 56, tick: { fontSize: 11 } });
+const yAxis = (narrow: boolean) => (narrow ? narrowYAxis : { width: 56, tick: { fontSize: 12 } });
 
 /**
  * How far below its best so far the portfolio was each day (%), on the time-weighted return, so deposits and
@@ -34,7 +34,7 @@ export function DrawdownChart({ history, loading, height = 220 }: { history: His
             </linearGradient>
           </defs>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
+          <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
           <YAxis {...yAxis(narrow)} stroke="var(--muted)" domain={[ticks.at(-1)!, 0]} ticks={ticks} interval={0} tickFormatter={(v: number) => `${fmtNum(v, step < 1 ? 1 : 0)}${NBSP}%`} />
           <Tooltip formatter={(v) => [fmtPct(Number(v)), "Below the best so far"]} contentStyle={tooltipStyle} />
           <Area type="monotone" dataKey="drawdown" baseValue={0} stroke="var(--neg)" fill="url(#drawdown-fill)" dot={false} isAnimationActive={false} />
@@ -62,7 +62,7 @@ export function AllocationChart({ history, loading, height = 220 }: { history: H
       <ResponsiveContainer>
         <AreaChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={40} stroke="var(--muted)" />
+          <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
           <YAxis {...yAxis(narrow)} stroke="var(--muted)" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} interval={0} allowDataOverflow tickFormatter={(v: number) => `${v}${NBSP}%`} />
           <Tooltip
             formatter={(v, name, item) => [`${fmtNum(Number(v), 1)} %  ·  ${fmtPln(Number((item.payload as Record<string, number>)[`${String(name)}_pln`]))}`, CLASS_LABELS[name as keyof typeof CLASS_LABELS]]}

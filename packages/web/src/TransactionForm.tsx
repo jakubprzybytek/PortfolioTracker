@@ -131,6 +131,9 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   // The account's own (and the one chosen), unless "Other instrument…" was picked.
   const filtered = !showAll && !!onAccount && list.some((i) => !onAccount.has(i.isin) && i.isin !== isin);
   const shown = filtered ? list.filter((i) => onAccount!.has(i.isin) || i.isin === isin) : list;
+  // Loading until both the instruments and the account's own are known, so the list never shows every instrument for
+  // a moment before narrowing (if the transactions fail to load, every instrument, as before).
+  const listLoading = (instruments.loading && !instruments.data) || (!onAccount && txs.loading);
   const inst = list.find((i) => i.isin === isin);
   const retailBuy = inst?.type === "BOND_RETAIL" && type === "BUY";
   const needsInstrument = NEEDS_INSTRUMENT.has(type);
@@ -322,7 +325,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                   onChange={setIsin}
                   onShowAll={filtered ? () => setShowAll(true) : undefined}
                   accountLabel={account === NEW_ACCOUNT ? "this account" : account}
-                  loading={instruments.loading && !instruments.data}
+                  loading={listLoading}
                   allowNew={needsInstrument}
                   allowNone={type === "INTEREST"}
                   newValue={NEW}
@@ -331,10 +334,10 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
               <select
                 value={isin}
                 onChange={(e) => (e.target.value === OTHER ? setShowAll(true) : setIsin(e.target.value))}
-                disabled={instruments.loading && !instruments.data}
+                disabled={listLoading}
                 data-testid="tx-instrument"
               >
-                <option value="">{instruments.loading && !instruments.data ? "Loading…" : "Choose…"}</option>
+                <option value="">{listLoading ? "Loading…" : "Choose…"}</option>
                 {[
                   { label: "Tracked", items: shown.filter((i) => i.active) },
                   { label: "No longer held", items: shown.filter((i) => !i.active) },

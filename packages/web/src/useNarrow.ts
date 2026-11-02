@@ -24,7 +24,7 @@ export function useMedia(query: string): boolean {
 export const chartMargin = (narrow: boolean) => (narrow ? { top: 16, right: 0, left: 0, bottom: 0 } : { top: 8, right: 16, left: 8, bottom: 0 });
 
 /** Y axis on a phone: no column of its own; the labels sit inside the plot, just above their grid lines. */
-export const narrowYAxis = { mirror: true, width: 1, axisLine: false, tickLine: false, tick: { fontSize: 10, dy: -7 } } as const;
+export const narrowYAxis = { mirror: true, width: 1, axisLine: false, tickLine: false, tick: { fontSize: 12, dy: -8 } } as const;
 
 /**
  * Y axis of an amount chart (value, cost): 5–7 round ticks with the lowest one labelled, so the bottom of the plot

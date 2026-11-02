@@ -17,6 +17,8 @@
   --on-accent: #ffffff; /* text on an accent fill */
   --pos: #047857;
   --neg: #b91c1c;
+  --on-pos: #ffffff; /* text on a green or red fill (the "buy more" pill, Delete) */
+  --on-neg: #ffffff;
   --row: #fafbfc;
   --band: #f1f4f8;
   --band-line: #dde2e9; /* row dividers on the band tint */
@@ -65,6 +67,8 @@
     --on-accent: #1c1206; /* dark text on the light orange */
     --pos: #4ade80;
     --neg: #f87171;
+    --on-pos: #052e16; /* dark text on the light green and red fills */
+    --on-neg: #2a0a0a;
     --row: #1b2029;
     --band: #212733;
     --band-line: #2f3746;
@@ -357,7 +361,7 @@ tr.muted td { color: var(--muted); }
 td .sub { font-size: var(--fs-12); }
 .flag.verdict.sell { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .flag.verdict.hold { color: var(--pos); }
-.flag.verdict.buy { background: var(--pos); border-color: var(--pos); color: white; }
+.flag.verdict.buy { background: var(--pos); border-color: var(--pos); color: var(--on-pos); }
 .flag.verdict.matures { color: var(--muted); }
 .flag.verdict { white-space: nowrap; }
 a.flag.verdict { text-decoration: none; }
@@ -404,7 +408,7 @@ tr.hs-detail > td { background: var(--row); white-space: normal; }
 .manual-list li { display: inline-flex; align-items: center; gap: 6px; }
 .manual-list button.link { border: 0; background: none; color: var(--muted); padding: 0 2px; }
 .manual-list button.danger { padding: 1px 8px; font-size: var(--fs-12); } /* the app's red button: white "Delete?" on red */
-.manual-list button.danger .spinner { color: white; }
+.manual-list button.danger .spinner { color: var(--on-neg); }
 .manual-list li.pending { opacity: 0.6; }
 .manual-status { margin: 0; font-size: var(--fs-12); min-height: 1.2em; display: flex; align-items: center; gap: 6px; }
 .manual-status .spinner { margin: 0; }
@@ -502,7 +506,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
 button.primary:disabled { opacity: 0.7; cursor: progress; }
 button.primary .spinner { color: var(--on-accent); }
-button.danger { font: inherit; height: var(--ctl); padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--neg); background: var(--neg); color: white; cursor: pointer; }
+button.danger { font: inherit; height: var(--ctl); padding: 0 12px; border-radius: var(--radius); border: 1px solid var(--neg); background: var(--neg); color: var(--on-neg); cursor: pointer; }
 button.danger-link { font: inherit; background: none; border: 0; padding: 0; color: var(--neg); cursor: pointer; }
 .view-header button.primary { align-self: center; }
 /* After saving: a short confirmation, bottom right (above everything but the dialog). */

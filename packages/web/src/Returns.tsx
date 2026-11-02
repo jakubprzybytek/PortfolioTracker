@@ -524,13 +524,13 @@ export function YearsChart({
             <CartesianGrid stroke="var(--border)" vertical={false} />
             <XAxis
               dataKey="year"
-              tick={{ fontSize: 11 }}
+              tick={{ fontSize: 12 }}
               stroke="var(--muted)"
             />
             <YAxis
               {...(narrow
                 ? narrowYAxis
-                : { width: 48, tick: { fontSize: 11 } })}
+                : { width: 48, tick: { fontSize: 12 } })}
               stroke="var(--muted)"
               domain={[ticks[0]!, ticks.at(-1)!]}
               ticks={ticks}
@@ -690,14 +690,14 @@ export function GrowthChart({
             <CartesianGrid stroke="var(--border)" vertical={false} />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 11 }}
+              tick={{ fontSize: 12 }}
               minTickGap={40}
               stroke="var(--muted)"
             />
             <YAxis
               {...(narrow
                 ? narrowYAxis
-                : { width: 48, tick: { fontSize: 11 } })}
+                : { width: 48, tick: { fontSize: 12 } })}
               stroke="var(--muted)"
               domain={[ticks[0]!, ticks.at(-1)!]}
               ticks={ticks}
@@ -806,8 +806,8 @@ export function IncomeChart({ data, loading, height = 220 }: { data?: YearsRespo
         <ResponsiveContainer>
           <ComposedChart data={rows} margin={chartMargin(narrow)} barCategoryGap="28%">
             <CartesianGrid stroke="var(--border)" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted)" />
-            <YAxis {...(narrow ? narrowYAxis : { width: 56, tick: { fontSize: 11 } })} stroke="var(--muted)" tickFormatter={(v: number) => fmtCompact(v)} />
+            <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="var(--muted)" />
+            <YAxis {...(narrow ? narrowYAxis : { width: 56, tick: { fontSize: 12 } })} stroke="var(--muted)" tickFormatter={(v: number) => fmtCompact(v)} />
             <Tooltip
               cursor={{ fill: "var(--band)" }}
               content={({ active, payload }) => {

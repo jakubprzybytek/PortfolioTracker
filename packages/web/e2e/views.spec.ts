@@ -318,6 +318,32 @@ test.describe("adding transactions", () => {
     await page.keyboard.press("Escape");
   });
 
+  test("the instrument list waits for the account's transactions instead of showing every instrument first", async ({ page }) => {
+    // Hold back the transactions (which instruments the account has had) until released.
+    let release!: () => void;
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    await page.route(
+      (url) => url.pathname.endsWith("/transactions"),
+      async (route) => {
+        await held;
+        await route.continue();
+      },
+    );
+    await page.goto("/#/holdings");
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-account").selectOption("broker");
+    const select = page.getByTestId("tx-instrument");
+    await expect(select).toBeDisabled();
+    await expect(select.locator("option").first()).toHaveText("Loading…");
+    release();
+    await expect(select).toBeEnabled();
+    await expect(select.locator('option[value="PLKRK0000713"]')).toHaveCount(0); // broker's own only
+    await expect(select.locator("option", { hasText: "DS0432" })).toBeAttached();
+    await page.keyboard.press("Escape");
+  });
+
   test("on a phone the instrument is chosen in a sheet: only the account's own, 'Other instrument…' for the rest, a search, Escape closes the sheet only", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/#/transactions");
