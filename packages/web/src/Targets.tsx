@@ -39,6 +39,8 @@ const writeOpen = (open: boolean) => {
   }
 };
 
+const LEGEND_ORDER: readonly AssetClass[] = ["BONDS", "SHARES", "CASH", "OTHER"];
+
 /**
  * The asset mix with its targets (road map 8): one bar split into shares, bonds (incl. bond ETFs), cash and other
  * (positions + cash of the fully tracked accounts), with a tick where each class's target ends; the legend gives each
@@ -54,8 +56,9 @@ export function AssetMixPanel({ snapshot }: { snapshot: Snapshot }) {
   const byClass = valueByClass(snapshot);
   const total = ASSET_CLASSES.reduce((s, k) => s + byClass[k], 0);
   const rows = saved ? rebalance(byClass, saved, "SELL_AND_BUY") : null;
-  // Without targets the empty classes are left out; with targets every class with a target shows.
-  const shown = ASSET_CLASSES.filter((k) => byClass[k] > 0 || (saved && saved.targets[k] > 0));
+  // Without targets the empty classes are left out; with targets every class with a target shows. Bonds and shares
+  // first (the left column on a wide screen), then cash and other (the right one).
+  const shown = LEGEND_ORDER.filter((k) => byClass[k] > 0 || (saved && saved.targets[k] > 0));
   // A tick where each class's target ends, adding up from the left (none at the right edge).
   const ticks: { key: (typeof ASSET_CLASSES)[number]; at: number }[] = [];
   let edge = 0;
@@ -85,7 +88,7 @@ export function AssetMixPanel({ snapshot }: { snapshot: Snapshot }) {
           {shown.map((k) => {
             const row = rows?.find((r) => r.assetClass === k);
             return (
-              <li key={k} data-testid={`asset-mix-${k}`} title={fmtPln(byClass[k])}>
+              <li key={k} className={k === "CASH" || k === "OTHER" ? "mix-right" : "mix-left"} data-testid={`asset-mix-${k}`} title={fmtPln(byClass[k])}>
                 <span className="mix-name">
                   <i className={`mix-dot mix-${k}`} aria-hidden /> {CLASS_LABELS[k]}
                 </span>

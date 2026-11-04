@@ -731,10 +731,23 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
   .note-editor textarea { min-height: 260px; }
 }
 
-/* Targets in the asset mix: the legend as aligned rows (share, target, difference, value), two per line; "Rebalance" and
-   "Edit targets" under it; the calculator or the form folds out below a line. */
-.mix-legend.with-targets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 32px; }
+/* Targets in the asset mix: the legend as aligned rows (share, target, difference, value); "Rebalance" and "Edit
+   targets" under it; the calculator or the form folds out below a line.
+   The layout goes by the panel's width, not the window's: next to the sidebar an 800 px window leaves it ~540 px.
+   Two columns (bonds and shares left, cash and other right) only where both rows fit side by side; one class per
+   line below that; and in a phone-narrow panel the value moves to the tooltip. */
+.asset-mix { container: asset-mix / inline-size; }
+.mix-legend.with-targets { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .mix-legend.with-targets li { display: grid; grid-template-columns: 5.5rem 3.8rem 4.4rem 5.2rem auto; justify-content: start; gap: 12px; align-items: baseline; }
+@container asset-mix (min-width: 62rem) {
+  .mix-legend.with-targets { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: row dense; gap: 6px 32px; }
+  .mix-legend.with-targets li.mix-left { grid-column: 1; }
+  .mix-legend.with-targets li.mix-right { grid-column: 2; }
+}
+@container asset-mix (max-width: 32rem) {
+  .mix-legend.with-targets li { grid-template-columns: minmax(0, 1fr) 3.6rem 4.2rem 4.8rem; gap: 6px; }
+  .mix-legend.with-targets .mix-value { display: none; }
+}
 .mix-legend.with-targets li > :not(.mix-name) { text-align: right; }
 .mix-legend .mix-name { display: inline-flex; align-items: center; gap: 6px; }
 /* Without targets "Set targets" ends the legend's line; with them the legend takes the width and the links go below. */
@@ -756,10 +769,6 @@ button.refresh:disabled { cursor: default; color: var(--faint); }
 .targets td .sub { display: block; font-size: 0.8em; }
 .targets .hint { margin: 8px 0 0; font-size: var(--fs-13); }
 @media (max-width: 720px) {
-  /* One class per line, the value in the tooltip. */
-  .mix-legend.with-targets { grid-template-columns: 1fr; gap: 4px; }
-  .mix-legend.with-targets li { grid-template-columns: 1fr 3.6rem 4.2rem 4.8rem; gap: 6px; }
-  .mix-legend.with-targets .mix-value { display: none; }
   .targets table { font-size: var(--fs-13); }
   /* Fixed columns that wrap: the table can't get wider than the screen, whatever the font. */
   .targets table[data-testid="targets-table"] { table-layout: fixed; width: 100%; }

@@ -202,6 +202,21 @@ test.describe("dashboard", () => {
     expect(Math.abs(trades.reduce((s, t) => s + signed(t!), 0))).toBeLessThan(0.05);
     await expect(page.getByTestId("targets-SHARES-after")).toHaveText("60,0 %of 60 %");
 
+    // Wide: bonds and shares in the left column, cash and other in the right one
+    const boxOf = async (k: string) => (await page.getByTestId(`asset-mix-${k}`).boundingBox())!;
+    await page.setViewportSize({ width: 1600, height: 900 });
+    let [bondsRow, sharesRow, cashRow] = [await boxOf("BONDS"), await boxOf("SHARES"), await boxOf("CASH")];
+    expect(Math.abs(bondsRow.x - sharesRow.x)).toBeLessThan(2);
+    expect(sharesRow.y).toBeGreaterThan(bondsRow.y);
+    expect(cashRow.x).toBeGreaterThan(bondsRow.x + bondsRow.width - 1);
+    expect(Math.abs(cashRow.y - bondsRow.y)).toBeLessThan(2);
+    // 800 px: next to the sidebar the panel is too narrow for two columns, one class per line and nothing spills over
+    await page.setViewportSize({ width: 800, height: 900 });
+    [bondsRow, sharesRow, cashRow] = [await boxOf("BONDS"), await boxOf("SHARES"), await boxOf("CASH")];
+    expect(sharesRow.y).toBeGreaterThan(bondsRow.y + bondsRow.height - 1);
+    expect(cashRow.y).toBeGreaterThan(sharesRow.y + sharesRow.height - 1);
+    for (const li of await page.getByTestId("asset-mix").locator("li").all()) expect(await li.evaluate((e) => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
+
     // On a phone the panel fits the screen, also in a wide font (Linux's DejaVu Sans is much wider than Segoe UI); one
     // class per legend line; the switch and the amount share one row
     await page.setViewportSize({ width: 390, height: 844 });
@@ -210,7 +225,7 @@ test.describe("dashboard", () => {
     expect(box.x + box.width).toBeLessThanOrEqual(390);
     expect(await page.getByTestId("asset-mix").evaluate((p) => p.scrollWidth <= p.clientWidth + 1)).toBe(true);
     expect(await page.getByTestId("targets-table").evaluate((t) => t.scrollWidth <= t.parentElement!.clientWidth + 1)).toBe(true);
-    const [a, b] = [(await page.getByTestId("asset-mix-SHARES").boundingBox())!, (await page.getByTestId("asset-mix-BONDS").boundingBox())!];
+    const [a, b] = [await boxOf("BONDS"), await boxOf("SHARES")];
     expect(b.y).toBeGreaterThan(a.y + a.height - 1);
     await page.getByTestId("targets-mode").getByRole("button", { name: "New money" }).click();
     const [mode, amount] = [(await page.getByTestId("targets-mode").boundingBox())!, (await page.getByTestId("targets-amount").boundingBox())!];
