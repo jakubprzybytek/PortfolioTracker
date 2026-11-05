@@ -14,7 +14,7 @@ Status (2026-10-29, `v0.168`): **the whole portfolio is in production** at https
 | [backfill.md](backfill.md) | How history is loaded: triggers and order per source |
 | [ui.md](ui.md) | Visualisation: holdings table and charts |
 | [Development.md](Development.md) | Running locally, checking changes in the browser, tests, continuous delivery (every change goes to prod; when to ask first) |
-| [catalyst.md](catalyst.md) | Catalyst module (proposal): the whole Catalyst bond market with yields, risk premium and liquidity; issuer analysis by an AI agent through a CLI |
+| [catalyst.md](catalyst.md) | Catalyst module (proposal): the whole Catalyst bond market with yields, risk premium and liquidity; issuer analysis (CV's methodology: filed reports read by code, 7-dimension scorecard) with an AI agent working through a CLI |
 | [nfr-analysis.md](nfr-analysis.md) | Non-functional review (observability, resilience, performance, security, durability, maintainability): findings and a suggested order of work |
 | [reference/ReferenceFeatures.md](reference/ReferenceFeatures.md) | Feature inventory of the Google Sheets tracker the app reproduces (with its Apps Script code) |
 
