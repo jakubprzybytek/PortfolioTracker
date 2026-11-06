@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JobRunItem } from "@portfolio/core";
-import { JOB_NAMES, type JobName } from "../../src/lib/jobs.ts";
+import { JOB_NAMES, jobTable, type JobName } from "../../src/lib/jobs.ts";
 import { watchdogIssues } from "../../src/lib/watchdog.ts";
 
 const NOW = new Date("2026-10-29T08:45:00Z");
@@ -40,5 +40,11 @@ describe("watchdog", () => {
     expect(check((r) => r.set("eod-etf", [run("eod-etf", 1, { itemsWritten: 0 }), run("eod-etf", 13)]))).toEqual([]);
     expect(check((r) => r.set("quality", [run("quality", 1, { itemsWritten: 0 })]))).toEqual([]); // not a price job
     expect(check((r) => r.set("eod-bonds", [run("eod-bonds", 1, { itemsWritten: 0, idle: true })]))).toEqual([]); // nothing to price
+  });
+});
+
+describe("jobTable", () => {
+  it("keeps PT's job runs in market unless a job names its table", () => {
+    expect(new Set(JOB_NAMES.map(jobTable))).toEqual(new Set(["market"]));
   });
 });

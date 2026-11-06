@@ -11,6 +11,7 @@ import {
   type QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import type { IsoDate } from "../dates.ts";
+import { JobRunStore } from "./jobRuns.ts";
 import type { ReferenceIndexMonth } from "../bonds/izIndex.ts";
 import {
   keys,
@@ -22,7 +23,6 @@ import {
   type FxRateItem,
   type HistoryPointItem,
   type InstrumentItem,
-  type JobRunItem,
   type NoteItem,
   type PositionDayItem,
   type PriceItem,
@@ -56,9 +56,13 @@ export class Repository {
   private readonly doc: DynamoDBDocumentClient;
   private readonly tables: TableNames;
 
+  /** Runs of the jobs that keep them in `market` (every job but a module's with its own table). */
+  readonly jobRuns: JobRunStore;
+
   constructor(tables: TableNames, client: DynamoDBClient = new DynamoDBClient({})) {
     this.tables = tables;
     this.doc = DynamoDBDocumentClient.from(client, { marshallOptions: { removeUndefinedValues: true } });
+    this.jobRuns = new JobRunStore(this.doc, () => this.tables.market);
   }
 
   // --- generic helpers -------------------------------------------------------------------------
@@ -517,11 +521,6 @@ export class Repository {
     return new Map(items.map((i) => [i.isin, i]));
   }
 
-  async putJobRun(item: Omit<JobRunItem, "PK" | "SK" | "ttl">): Promise<void> {
-    const ttl = Math.floor(Date.now() / 1000) + 90 * 86_400;
-    await this.put("market", { ...keys.jobRun(item.job, item.startedAt), ...item, ttl });
-  }
-
   /**
    * Claims "Update prices" for `everyMs`: one conditional write, so two requests at once can't both start the job.
    * Returns undefined when claimed, or the time of the claim that still holds.
@@ -545,28 +544,5 @@ export class Repository {
       const held = (e as { Item?: Record<string, { S?: string }> }).Item?.["requestedAt"]?.S;
       return held && !Number.isNaN(Date.parse(held)) ? held : at;
     }
-  }
-
-  /** The job's runs started at or after `since` (ISO), newest first. */
-  recentJobRuns(job: string, since: string): Promise<JobRunItem[]> {
-    return this.queryAll<JobRunItem>("market", {
-      KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
-      ExpressionAttributeValues: { ":pk": `JOB#${job}`, ":from": `RUN#${since}`, ":to": "RUN#~" },
-      ScanIndexForward: false,
-    });
-  }
-
-  /** The job's most recent run (one item read, not its 90 days of runs). */
-  async latestJobRun(job: string): Promise<JobRunItem | undefined> {
-    const res = await this.doc.send(
-      new QueryCommand({
-        TableName: this.tables.market,
-        KeyConditionExpression: "PK = :pk AND begins_with(SK, :run)",
-        ExpressionAttributeValues: { ":pk": `JOB#${job}`, ":run": "RUN#" },
-        ScanIndexForward: false,
-        Limit: 1,
-      }),
-    );
-    return res.Items?.[0] as JobRunItem | undefined;
   }
 }

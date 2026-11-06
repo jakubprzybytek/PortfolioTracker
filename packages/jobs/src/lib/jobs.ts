@@ -1,5 +1,9 @@
 // Every job that records its runs (`runJob`), with how long it may go without a successful run before the watchdog
-// says so. The Status page lists the same jobs, so a new job shows there once it's added here.
+// says so, and the table its runs are kept in. The Status page lists the same jobs, so a new job shows there once
+// it's added here.
+
+/** Tables that keep job runs: `market` for PT's jobs; a module with its own table adds it here (Docs/catalyst.md). */
+export type JobTable = "market";
 
 /** Hours between successful runs, at most (the longest gap in its schedule plus slack); none: started on demand. */
 export const JOBS = {
@@ -21,10 +25,13 @@ export const JOBS = {
   live: {},
   backfill: {},
   import: {},
-} satisfies Record<string, { maxAgeHours?: number; prices?: boolean; optional?: boolean }>;
+} satisfies Record<string, { maxAgeHours?: number; prices?: boolean; optional?: boolean; table?: JobTable }>;
 
 export type JobName = keyof typeof JOBS;
 export const JOB_NAMES = Object.keys(JOBS) as JobName[];
+
+/** The table a job's runs are kept in (`market` unless the job says otherwise). */
+export const jobTable = (job: JobName): JobTable => (JOBS[job] as { table?: JobTable }).table ?? "market";
 
 /** A run still marked running after this long has timed out (no function runs longer than 15 minutes). */
 export const RUNNING_LIMIT_MS = 20 * 60_000;

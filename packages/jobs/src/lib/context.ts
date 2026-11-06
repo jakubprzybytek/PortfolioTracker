@@ -6,9 +6,9 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
-import { Repository, type IsoDate } from "@portfolio/core";
+import { Repository, type IsoDate, type JobRunStore } from "@portfolio/core";
 import { alertFor, sendAlert } from "./alerts.ts";
-import type { JobName } from "./jobs.ts";
+import { jobTable, type JobName, type JobTable } from "./jobs.ts";
 
 // Getters: each function links only the tables it needs, and Resource throws for an unlinked one.
 export const repo = new Repository({
@@ -51,6 +51,12 @@ export async function queueValuation(payload: object): Promise<void> {
   await sqs.send(new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: JSON.stringify(payload), MessageGroupId: "valuation", MessageDeduplicationId: randomUUID() }));
 }
 
+// The store of each table that keeps job runs (jobs.ts, JobTable).
+const jobRunStores: Record<JobTable, JobRunStore> = { market: repo.jobRuns };
+
+/** Where `job`'s runs are kept. */
+export const jobRuns = (job: JobName): JobRunStore => jobRunStores[jobTable(job)];
+
 /**
  * Runs a job body and records a JOB#/RUN# item: "running" at the start (so a run the function's timeout cut off
  * stays visible, for the watchdog), then the outcome. Rethrows so Lambda retries apply. Logs one JSON line at the
@@ -59,13 +65,14 @@ export async function queueValuation(payload: object): Promise<void> {
 export async function runJob<T extends { itemsWritten?: number; idle?: boolean; note?: string }>(job: JobName, body: () => Promise<T>): Promise<T> {
   const startedAt = new Date().toISOString();
   // The run before this one decides whether to e-mail (alerts.ts: only when a job starts failing or works again).
-  const previous = await repo.latestJobRun(job).catch(() => undefined);
-  await repo.putJobRun({ job, startedAt, status: "running" });
+  const runs = jobRuns(job);
+  const previous = await runs.latest(job).catch(() => undefined);
+  await runs.put({ job, startedAt, status: "running" });
   console.log(JSON.stringify({ job, event: "start", startedAt }));
   try {
     const result = await body();
     const finishedAt = new Date().toISOString();
-    await repo.putJobRun({ job, startedAt, finishedAt, status: "ok", ...result });
+    await runs.put({ job, startedAt, finishedAt, status: "ok", ...result });
     console.log(JSON.stringify({ job, event: "end", status: "ok", ms: Date.parse(finishedAt) - Date.parse(startedAt), ...result }));
     const alert = alertFor(job, "ok", previous, result.note);
     if (alert) await sendAlert(alert);
@@ -73,7 +80,7 @@ export async function runJob<T extends { itemsWritten?: number; idle?: boolean; 
   } catch (err) {
     const note = String((err as Error).message ?? err);
     const finishedAt = new Date().toISOString();
-    await repo.putJobRun({ job, startedAt, finishedAt, status: "failed", note });
+    await runs.put({ job, startedAt, finishedAt, status: "failed", note });
     console.error(JSON.stringify({ job, event: "end", status: "failed", ms: Date.parse(finishedAt) - Date.parse(startedAt), note, stack: (err as Error).stack }));
     const alert = alertFor(job, "failed", previous, note);
     if (alert) await sendAlert(alert);

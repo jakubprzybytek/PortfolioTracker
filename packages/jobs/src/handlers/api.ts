@@ -80,7 +80,7 @@ import {
 import { FX_CURRENCIES } from "./fx.ts";
 import { hasAnyGroup } from "../lib/access.ts";
 import { FEED_TOKEN_SETTING, newFeedToken, type FeedToken } from "../lib/feedToken.ts";
-import { invokeAsync, queueValuation, repo } from "../lib/context.ts";
+import { invokeAsync, jobRuns, queueValuation, repo } from "../lib/context.ts";
 import { JOB_NAMES } from "../lib/jobs.ts";
 import { importInstruments, mfTermsByCode } from "./import.ts";
 
@@ -749,7 +749,7 @@ const ROUTES: Record<string, Route> = {
     // Every job's latest run (lib/jobs.ts), and how many revaluations failed 3 times and wait in the dead-letter
     // queue (a later successful run doesn't revalue their range).
     const [runs, deadLetter] = await Promise.all([
-      Promise.all(JOB_NAMES.map(async (j) => [j, (await repo.latestJobRun(j)) ?? null] as const)),
+      Promise.all(JOB_NAMES.map(async (j) => [j, (await jobRuns(j).latest(j)) ?? null] as const)),
       deadLetterCount(),
     ]);
     return json(200, { now: new Date().toISOString(), jobs: Object.fromEntries(runs), deadLetter });
