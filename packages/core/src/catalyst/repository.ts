@@ -5,7 +5,8 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, type QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystSessionItem } from "./items.ts";
+import type { InterestPeriod } from "../bonds/couponPeriods.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
 
 /** Batches of 25 written at once, at most. */
 const BATCH_WRITES_AT_ONCE = 4;
@@ -63,6 +64,26 @@ export class CatalystRepository {
 
   putQuotes(items: Omit<CatalystQuoteItem, "PK" | "SK">[]): Promise<number> {
     return this.batchPut(items.map((q) => ({ ...catalystKeys.quote(q.isin, q.date, q.market), ...q })));
+  }
+
+  /** Every bond's terms (one query on the index). */
+  listTerms(): Promise<CatalystTermsItem[]> {
+    return this.queryAll<CatalystTermsItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "TERMS" } });
+  }
+
+  async putTerms(item: Omit<CatalystTermsItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.terms(item.isin), GSI1PK: "TERMS", GSI1SK: item.isin, ...item } }));
+  }
+
+  /** A bond's interest periods, oldest first. */
+  async listCoupons(isin: string): Promise<InterestPeriod[]> {
+    const items = await this.queryAll<CatalystCouponItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :c)", ExpressionAttributeValues: { ":pk": `BOND#${isin}`, ":c": "COUPON#" } });
+    return items.map(({ PK: _p, SK: _s, updatedAt: _u, ...p }) => p);
+  }
+
+  putCoupons(periods: InterestPeriod[]): Promise<number> {
+    const updatedAt = new Date().toISOString();
+    return this.batchPut(periods.map((p) => ({ ...catalystKeys.coupon(p.isin, p.start), ...p, updatedAt })));
   }
 
   getQuoteDay(date: IsoDate): Promise<CatalystQuoteDayItem | undefined> {

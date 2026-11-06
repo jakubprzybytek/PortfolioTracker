@@ -2,7 +2,9 @@
 // portfolio: nothing here refers to transactions or holdings.
 
 import type { IsoDate } from "../dates.ts";
+import type { InterestPeriod } from "../bonds/couponPeriods.ts";
 import type { CatalystSegment } from "../gpw/catalystDailyFile.ts";
+import type { Coupon } from "./terms.ts";
 
 export type CatalystBondStatus = "listed" | "suspended" | "ended";
 
@@ -58,6 +60,8 @@ export const catalystKeys = {
   bond: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "META" as const }),
   session: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `D#${date}#${market}` as const }),
   day: (date: IsoDate) => ({ PK: "DAYS" as const, SK: date }),
+  terms: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "TERMS" as const }),
+  coupon: (isin: string, start: IsoDate) => ({ PK: `BOND#${isin}` as const, SK: `COUPON#${start}` as const }),
   quoteDay: (date: IsoDate) => ({ PK: "QUOTEDAYS" as const, SK: date }),
   quote: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `Q#${date}#${market}` as const }),
 };
@@ -101,3 +105,38 @@ export interface CatalystQuoteDayItem {
   quotes: number;
   fetchedAt: string;
 }
+
+/**
+ * A bond's terms from obligacje.pl (the catalyst-terms job), apart from the bond item, which the daily job rewrites.
+ * `notFound`: the site has no page for the code (tried again after a month).
+ */
+export interface CatalystTermsItem {
+  PK: `BOND#${string}`;
+  SK: "TERMS";
+  GSI1PK: "TERMS";
+  GSI1SK: string; // isin
+  isin: string;
+  code: string;
+  notFound?: true;
+  /** The page's interest periods couldn't be read (its date lists don't add up): kept without them, read again in a month. */
+  periodsProblem?: string;
+  issuer?: string;
+  series?: string;
+  /** "Wartość emisji w obrocie": the amount in circulation when read, and the nominal per bond then. */
+  issueValue?: { amount: number; currency: string; nominal: number };
+  /** "Zabezpieczenie": secured (true), unsecured (false), not said (absent). */
+  secured?: boolean;
+  /** The coupon as published, and as read (core/catalyst/terms.ts). */
+  couponText?: string;
+  coupon: Coupon;
+  /** The current period's annual rate the site shows. */
+  currentRate?: number | null;
+  /** First day of the interest period running when read (a floating bond is read again a week into the next one). */
+  currentPeriodStart?: IsoDate;
+  periods?: number;
+  source: string;
+  fetchedAt: string;
+}
+
+/** One interest period of a bond (dates and rate), as PT's coupon periods (core/bonds/couponPeriods.ts). */
+export type CatalystCouponItem = InterestPeriod & { PK: `BOND#${string}`; SK: `COUPON#${IsoDate}`; updatedAt: string };

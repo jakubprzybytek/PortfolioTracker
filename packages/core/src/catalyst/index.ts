@@ -6,3 +6,4 @@ export * from "./repository.ts";
 export * from "./messages.ts";
 export * from "./daily.ts";
 export * from "./quotes.ts";
+export * from "./terms.ts";

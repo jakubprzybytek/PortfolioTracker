@@ -20,6 +20,13 @@ export interface ObligacjePeriod {
 
 export interface ObligacjeBond {
   isin: string;
+  /** "Emitent", "Seria". */
+  issuer?: string;
+  series?: string;
+  /** "Wartość emisji w obrocie": the amount in circulation (it moves with new tranches and buy-backs). */
+  issueValue?: { amount: number; currency: string };
+  /** "Zabezpieczenie": TAK / NIE. */
+  secured?: boolean;
   nominal: number;
   currency: string;
   /** As published, e.g. "zmienne WIBOR 3M + 3.3%" or "stałe 7.5%". */
@@ -29,6 +36,8 @@ export interface ObligacjeBond {
   /** Fixed-coupon bonds ("stałe 7.5%"): the rate of every period. */
   fixedRate: number | null;
   periods: ObligacjePeriod[];
+  /** Lenient reading only: why the interest periods were left out (the page's date lists don't add up). */
+  periodsProblem?: string;
 }
 
 const text = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
@@ -52,7 +61,7 @@ const pct = (s: string | undefined) => {
  * The bond's terms. The three date lists are paired by position (period i: its first day, record day and payment
  * day); a list of a different length means the page is inconsistent, so it throws.
  */
-export function parseBondPage(html: string): ObligacjeBond {
+export function parseBondPage(html: string, { lenient = false }: { lenient?: boolean } = {}): ObligacjeBond {
   const isin = cell(html, "ISIN:");
   if (!isin || !/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(isin)) throw new Error("obligacje.pl: no ISIN on the page");
   const nominalText = cell(html, "Wartość nominalna:") ?? "";
@@ -61,26 +70,44 @@ export function parseBondPage(html: string): ObligacjeBond {
   const starts = dates(html, "Pierwsze dni okresów odsetkowych");
   const records = dates(html, "Dni ustalenia prawa do odsetek");
   const payments = dates(html, "Dni wypłaty odsetek");
-  if (starts.length !== records.length || starts.length !== payments.length)
-    throw new Error(`obligacje.pl ${isin}: ${starts.length} period starts, ${records.length} record days, ${payments.length} payment days`);
-  const periods = starts.map((start, i): ObligacjePeriod => {
-    const end = starts[i + 1] ?? payments[i]!;
-    const paymentDate = payments[i]!;
-    const record = records[i]!;
-    if (!(start < end && end <= paymentDate)) throw new Error(`obligacje.pl ${isin}: period from ${start} doesn't add up`);
-    // A record day lies a few days before the payment, inside the period.
-    const fits = record > start && record <= paymentDate && daysBetween(record, paymentDate) <= 31;
-    return { start, end, ...(fits ? { recordDate: record } : {}), paymentDate };
-  });
+  // The periods; a page whose lists don't add up throws, or with `lenient` (the Catalyst module, which also wants the
+  // issuer, issue value and coupon) gives no periods and says why.
+  let periods: ObligacjePeriod[] = [];
+  let periodsProblem: string | undefined;
+  try {
+    if (starts.length !== records.length || starts.length !== payments.length)
+      throw new Error(`obligacje.pl ${isin}: ${starts.length} period starts, ${records.length} record days, ${payments.length} payment days`);
+    periods = starts.map((start, i): ObligacjePeriod => {
+      const end = starts[i + 1] ?? payments[i]!;
+      const paymentDate = payments[i]!;
+      const record = records[i]!;
+      if (!(start < end && end <= paymentDate)) throw new Error(`obligacje.pl ${isin}: period from ${start} doesn't add up`);
+      // A record day lies a few days before the payment, inside the period.
+      const fits = record > start && record <= paymentDate && daysBetween(record, paymentDate) <= 31;
+      return { start, end, ...(fits ? { recordDate: record } : {}), paymentDate };
+    });
+  } catch (err) {
+    if (!lenient) throw err;
+    periodsProblem = String((err as Error).message).replace(`obligacje.pl ${isin}: `, "");
+  }
   const couponType = cell(html, "Typ oprocentowania:") ?? "";
+  const issuer = cell(html, "Emitent:");
+  const series = cell(html, "Seria:");
+  const iv = /([\d\s]+(?:[.,]\d+)?)\s*([A-Z]{3})/.exec(cell(html, "Wartość emisji w obrocie:") ?? "");
+  const secured = cell(html, "Zabezpieczenie:");
   return {
     isin,
+    ...(issuer ? { issuer } : {}),
+    ...(series ? { series } : {}),
+    ...(iv ? { issueValue: { amount: Number(iv[1]!.replace(/\s/g, "").replace(",", ".")), currency: iv[2]! } } : {}),
+    ...(secured === "TAK" ? { secured: true } : secured === "NIE" ? { secured: false } : {}),
     nominal: Number(nm[1]!.replace(/\s/g, "").replace(",", ".")),
     currency: nm[2]!,
     couponType,
     fixedRate: /^stałe/i.test(couponType) ? pct(couponType) : null,
     currentRate: pct(cell(html, "Oprocentowanie bieżące:")),
     periods,
+    ...(periodsProblem ? { periodsProblem } : {}),
   };
 }
 

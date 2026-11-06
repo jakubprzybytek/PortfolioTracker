@@ -75,6 +75,9 @@ export function catalystModule({ defaults, link, alerts }: CatalystShared) {
   new sst.aws.CronV2("CatalystQuotes", { function: job("packages/jobs/src/catalyst/handlers/quotes.handler"), schedule: "cron(20 17 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
   new sst.aws.CronV2("CatalystQuotesAm", { function: job("packages/jobs/src/catalyst/handlers/quotes.handler"), schedule: "cron(45 7 ? * TUE-SAT *)", timezone: WARSAW, event: { morning: true }, retries: 2 });
 
+  // Bond terms from obligacje.pl: bonds without terms (150 a run, 2 s apart), floating rates a week into a new period.
+  new sst.aws.CronV2("CatalystTerms", { function: job("packages/jobs/src/catalyst/handlers/terms.handler", "15 minutes"), schedule: "cron(30 9 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
+
   // PT's watchdog and Status page list the Catalyst jobs too: they may read the job runs (JOB#…) of this table only.
   const jobRunsReader = {
     environment: { CATALYST_TABLE: table.name },
