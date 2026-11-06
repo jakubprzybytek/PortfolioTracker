@@ -31,7 +31,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/` | Dashboard (default) |
 | `#/performance?range=1M\|6M\|ALL` | Performance (`range` absent = 1 year) |
 | `#/holdings?group=instrument&account=…&type=…&chart=<ISIN>&chartAccount=…` | Holdings (`group`: absent = by account, `class`, `instrument`; `chart` = the open row chart) |
-| `#/prices?type=…&chart=<ISIN>` | Prices |
+| `#/prices?type=…&chart=<ISIN>&sort=<column>` | Prices (`sort`: `instrument`, `type`, `class`, `price`, `date`, `change`; `-` before it: descending) |
 | `#/hold-sell?row=<account>#<ISIN>` | Buy, hold or sell (`row` = the open breakdown) |
 | `#/sales?year=…&account=…&q=…&sale=<transaction id>` | Sales (`sale` = the one folded out) |
 | `#/cash-flows?year=…&account=…` | Cash flows (`year` absent = this year; `account` = the row folded out) |
