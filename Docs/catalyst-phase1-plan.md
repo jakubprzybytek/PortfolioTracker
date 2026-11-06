@@ -114,7 +114,7 @@ Done when: deployed to prod, the view shows, the Status page lists the Catalyst 
 - `dailyFile.ts`: reads both formats, finds the header row and columns by name (Polish/English labels), the segment from the rows without an ISIN, one record per ISIN and market; values `---` → null; turnover from thousands; fails loudly on a missing column. Also the off-session sheet.
 - `gpwCatalyst.ts`: `fetchDailyFile(date)` (xlsx, then xls; 302 = no file for that day).
 - `handlers/daily.ts`: the last session's file (look back up to 5 trading days, `settlement.ts` holidays), archive raw, upsert bonds (new: `listed`, `firstSeen`; present: current nominal, maturity, rate; markets merged per ISIN), write sessions, mark `ended` the listed bonds absent from the file (`lastSeen`, last close), then queue `{ kind: "metrics" }` (a no-op until M6). Idempotent: re-running a day rewrites the same items.
-- Schedules: 18:30 Mon–Fri, recheck 08:00 Tue–Sat (`retries: 2`).
+- Schedules: 21:00 Mon–Fri (moved from 18:30 on 2026-11-06: GPW publishes the file between about 19:00 and 20:00), recheck 08:00 Tue–Sat (`retries: 2`).
 - Tests: parser on the 2026 xlsx fixture and a 2020 xls fixture (rows, segments, a treasury, a municipal, an EUR bond, a bond without trades: close = reference, `traded` false); the handler with a fake repository (new, changed, ended).
 
 Done when: on dev a week of runs gives ~1,060 bonds and their sessions; the counts match the file's `statystyka` sheet per segment.

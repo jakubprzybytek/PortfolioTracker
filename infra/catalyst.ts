@@ -70,8 +70,9 @@ export function catalystModule({ defaults, link, alerts, market }: CatalystShare
 
   // --- scheduled jobs (Docs/catalyst.md, "Jobs") -----------------------------------------------
   const job = (handler: string, timeout: "5 minutes" | "15 minutes" = "5 minutes") => ({ ...defaults, handler, timeout, link: [...link, table, queue] });
-  // The daily file: after the session, and a morning recheck (a file published late, a day missed).
-  new sst.aws.CronV2("CatalystDaily", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(30 18 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
+  // The daily file: in the evening (GPW publishes it between about 19:00 and 20:00: 19:03 on 2026-11-04, 19:51 on
+  // 11-05), and a morning recheck (a file published late, a day missed).
+  new sst.aws.CronV2("CatalystDaily", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(0 21 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
   // Names short enough that "portfolio-tracker-<stage>-<Name>HandlerFunction-<8>" fits Lambda's 64 characters: a
   // longer one is cut ("portfolio-track-…") and the deploy role, limited to portfolio-tracker-*, can't create it.
   new sst.aws.CronV2("CatalystRecheck", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(0 8 ? * TUE-SAT *)", timezone: WARSAW, event: { morning: true }, retries: 2 });

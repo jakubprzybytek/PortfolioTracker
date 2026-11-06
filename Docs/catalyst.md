@@ -141,7 +141,7 @@ Sizing: ~1,060 bonds × ~250 sessions a year ≈ 265k session items a year; back
 
 | Job | When (Warsaw) | What |
 |---|---|---|
-| `catalyst-daily` | 18:30, recheck 08:00 Tue–Sat | Downloads the day's file (archives it), upserts bonds (new → `listed`; gone from the file → `ended`), writes sessions, updates current nominals. Backfill mode: a date range from the archive, through a queue, a few files per invocation. |
+| `catalyst-daily` | 21:00 (GPW publishes the file between about 19:00 and 20:00), recheck 08:00 Tue–Sat | Downloads the day's file (archives it), upserts bonds (new → `listed`; gone from the file → `ended`), writes sessions, updates current nominals. Backfill mode: a date range from the archive, through a queue, a few files per invocation. |
 | `catalyst-quotes` | 17:20 (after the close), 07:45 Tue–Sat (before the pre-opening) | Reads the six quotes pages (archived), stores the best bid and ask of every known bond that has one, for the session the pages show (`quotesSession`: today's after 09:00 on a trading day, else the trading day before). The morning run fills a session the evening missed. |
 | `catalyst-terms` | 09:30 | obligacje.pl for bonds without terms (up to ~40 per run), then refreshes current coupon rates of floating bonds; adds missing periods, never overwrites a stored date or rate (as PT's `coupons`). New issuer names are resolved against GLEIF (ISIN mapping, then an exact name match); anything else is left `unresolved` for the agent. |
 | `catalyst-exits` | 10:00 | GPW suspensions and exclusions, Catalyst notices and special markings: the reason a bond ended, markings on a company's instruments. Backfill to 2018 once. |
