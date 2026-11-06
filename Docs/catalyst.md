@@ -105,6 +105,25 @@ Sizing: ~1,060 bonds × ~250 sessions a year ≈ 265k session items a year; back
 
 Failures alert as PT's jobs do; `catalyst-quotes` failing after its morning run means that day's bid/ask is lost.
 
+### How jobs run
+
+As PT's jobs: an EventBridge Scheduler schedule (`sst.aws.CronV2`, `timezone: Europe/Warsaw`) invokes a Lambda; one FIFO queue carries the work that doesn't come from a schedule. No Step Functions: CV needed them for the AI analysis (a loop over issuers, steps of up to 10 minutes, a summary e-mail), which now happens outside the app; what's left is short, idempotent jobs whose only chaining ("after the daily file, recompute the metrics") is a queue message. One way of running jobs across PT, with the same job runs, watchdog and alarms.
+
+| Job | Triggered by | Runs as |
+|---|---|---|
+| `catalyst-daily`, `catalyst-quotes`, `catalyst-terms`, `catalyst-exits`, `catalyst-export` | Their schedules (above) | One Lambda invocation each, seconds to ~1.5 min (`catalyst-terms`: at most ~40 pages 2 s apart; the rest waits for the next day). Scheduler retries a failed run (`retries: 2`, as PT) |
+| `catalyst-metrics` | Messages on `CatalystQueue`: from `catalyst-daily` when it finishes, from the API after a change of assumptions or a write to a company (the CLI's writes included) | Lambda subscribed to the queue |
+| Backfill of the 2020+ archive (~1,500 files) | The CLI or the API puts date-range messages on `CatalystQueue` (e.g. 20 sessions each) | The same Lambda, one message at a time |
+
+**Why a queue only for these two.** A scheduled job has one trigger at a known time: it can't pile up or overlap with itself, Scheduler retries it, its job run records it, and it fits in one invocation; a queue in front of it would add a hop and give nothing. The two queued kinds differ:
+
+- **Metrics** has many triggers that can come in bursts (an agent session writes ten companies in minutes). The queue coalesces them (content-based deduplication) and runs them one at a time, so two recomputes never write the same screen rows at once, and no sender needs to know whether a run is going. An asynchronous invoke with concurrency 1 would serialise too, but not coalesce: ten writes would be ten full recomputes.
+- **Backfill** doesn't fit one invocation (~1,500 files at one request every 2 s is about an hour, over Lambda's 15 minutes). The queue holds the chunks, keeps the pace (one at a time), retries a failed chunk on its own and keeps the ones that keep failing in the dead-letter queue, where a Lambda re-invoking itself would lose track of them.
+
+**`CatalystQueue`:** FIFO, one message group (strictly one at a time), content-based deduplication, visibility timeout above the Lambda's timeout, dead-letter queue after 3 failures (14 days' retention). Messages: `{ kind: "metrics", entityId? }` (none: all bonds), `{ kind: "backfill", from, to }`. As PT's `ValuationQueue`.
+
+**Monitoring:** every run writes its job run (`runJob`); the existing watchdog finds runs that didn't happen or didn't finish; a new alarm on the Catalyst dead-letter queue; `catalyst-quotes` failing on its morning run alerts at once (that day's bid/ask can't be fetched later).
+
 ## Market metrics (phase 1, screen row)
 
 - **Yield to maturity, gross and net:** from the bond's cash flows (coupon periods on the current nominal; future floating coupons = assumed base rate + margin; nominal at maturity), bought at the last close + accrued interest to T+2 + commission; net after 19 % tax on interest and on the gain at maturity (PT's `buyMore` logic). Callable bonds also get the yield to the first call date.
