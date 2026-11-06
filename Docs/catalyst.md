@@ -78,6 +78,20 @@ From CV's specification (§1 principle 8, §7), for the jobs, the CLI and the ag
 
 Reachability: PT's data-sources.md noted gpwcatalyst.pl unreachable from the dev machine on 2026-10-12; on 2026-11-05 it answered normally. Check from Lambda (eu-west-1) before building. GPW's move to WATS may change the file and the pages; parsers look columns up by header and fail loudly.
 
+### Checked 2026-11-06
+
+Phase 0 (P7) checks; fixtures in `packages/core/test/fixtures/catalyst/`.
+
+- **Daily file, two layouts.** `.xls` from 2020 (and before) to **2026-10-02**, `.xlsx` from **2026-10-05** (GPW's move to WATS); for a day only one of the two exists (the other answers 302). Sheets `statystyka`, `instrumenty`, `transakcje pozasesyjne`, `legenda` in both. Header rows 1–5 of `instrumenty`, Polish and English labels. Columns A–R are the same in both (maturity, current rate, accrued interest, nominal, market, trading system, segment, ISIN, name, currency, close, reference, change, open, low, high, last); the `.xlsx` adds two average prices (aggregated, order book, cross: S–U instead of S), which moves **number of trades, volume, turnover** from T–V to V–X and block trades from W–X to Y–Z. Columns are therefore found by their labels. Samples of every half-year 2020–2026 share the old layout exactly.
+- **Segments** (rows without an ISIN): corporate, co-operative, municipal and EIB, treasury and BGK, mortgage covered, public covered; convertible bonds until 2021, then "Bank securities" (from 2022).
+- **One ISIN, several rows:** a bond listed on GPW and BondSpot has a row per market (`GPW RR`, `GPW ASO`, `BS RR`, `BS ASO`). BondSpot rows of treasury bonds carry stale reference prices (DS0432 on 2026-11-04: 82.19 on GPW, 99.40 on BondSpot; OK0127 99.48 vs 89.74): sessions are stored per market and **prices, the curve and liquidity use the GPW row**, BondSpot's only for a bond listed on BondSpot alone.
+- **Treasury rows:** DS, PS, WS, OK (zero coupon: no rate), WZ and NZ (floating), IZ (indexed nominal, e.g. 1080.1), EUR (in EUR), BGK, PFR, FPC and others. Fixed-rate DS/PS/WS give the curve; WZ's margin isn't in the file (current rate only).
+- **2026-11-04 by segment:** 307 corporate rows (36 in EUR, 11 on BondSpot only), 566 municipal, 136 treasury and BGK, 41 covered, 2 co-operative, 0 bank securities.
+- **robots.txt of gpwcatalyst.pl** disallows only one NewConnect path: the daily file, quotes pages and instrument pages are allowed.
+- **Quotes pages** (all six fetched; same structure as CV's fixtures of 2026-10-26): one table per currency, a row per bond with **issuer** (link `emitenci-obligacji-karta?nazwa=<issuer>`), code (link `o-instrumentach-instrument?nazwa=<code>`), segment, reference, open, low, high, last trade date/time, last trade volume, last, change, best bid (orders, volume, limit), best ask (limit, volume, orders), trades, volume, turnover. **No session date** on the page: it is the latest last-trade date among the rows. "Bank securities" lists nothing now.
+- **Instrument page** (`o-instrumentach-instrument?nazwa=<code>`): issuer name, authorisation date, first listing, maturity, nominal, **issue value**, coupon type (fixed / floating), current rate, issuer's website. Not the margin, base rate or coupon dates (still obligacje.pl). An allowed source for the issuer and the issue value.
+- **WZ margins:** not checked here (obligacje.pl blocks AI assistants); checked by `catalyst-terms` on dev (plan, M5).
+
 ## Storage: table `catalyst`
 
 On-demand, PITR on, deletion protection on `prod`, TTL attribute `ttl`. Same key schema as PT (`PK`, `SK`, sparse `GSI1PK`/`GSI1SK`). Dates `YYYY-MM-DD`; prices clean in % of nominal; report figures in units of their currency.

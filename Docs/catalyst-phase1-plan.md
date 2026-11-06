@@ -8,6 +8,7 @@ Each milestone is a release: it goes through the usual delivery (int → tests �
 
 - [Decisions this plan makes](#decisions-this-plan-makes)
 - [Code layout](#code-layout)
+- [Phase 0: preparation](#phase-0-preparation)
 - [Milestones](#milestones)
   - [M0 Checks before building](#m0-checks-before-building)
   - [M1 Skeleton ⚠](#m1-skeleton--approval)
@@ -65,11 +66,25 @@ scripts/catalyst-backfill.ts              queues date ranges (run with `npx sst 
 scripts/catalyst-compare-cv.ts            M8: compares with CV's tables
 ```
 
+## Phase 0: preparation
+
+Changes to PT's shared code, done before the milestones so they only add new code. Each is a release with no new resources and no data change. Order: P7, P1, P3, then P2, P4, P6.
+
+| # | Change | Status |
+|---|---|---|
+| P1 | Yield calculation (bond cash flows, `irr`) moved from `holdsell/holdSell.ts` to `core/bonds/yield.ts`, behaviour unchanged | |
+| P2 | Job runs in more than one table: `runJob`, `JOBS`, the watchdog and `GET /status` know each job's store | |
+| P3 | One polite fetch helper in `jobs/lib/http.ts`: one user agent, a pause per site, timeouts | |
+| P4 | Shared parsers of the Catalyst daily statistics file and quotes pages in `core/gpw/` (PT may use them without importing the module) | |
+| P5 | PT's corporate-bond backfill stops reading BiznesRadar's paged history (disallowed by its robots.txt), older history from the daily file | **Deferred** (owner, 2026-11-06) |
+| P6 | Sortable columns in `StickyTable` (header click, sort in the URL) | |
+| P7 | M0's checks and the fixtures (`packages/core/test/fixtures/catalyst/`) | Done 2026-11-06: findings in [catalyst.md](catalyst.md#checked-2026-11-06) |
+
 ## Milestones
 
 ### M0 Checks before building
 
-No deploy. Findings go into `Docs/catalyst.md` (data sources).
+Done in phase 0 (P7); findings in [catalyst.md](catalyst.md#checked-2026-11-06). Item 5 (WZ margins) moved to M5: obligacje.pl blocks AI assistants, so it's checked by the terms job on dev, not by an agent. No deploy. Findings go into `Docs/catalyst.md` (data sources).
 
 1. **Archive formats.** Download one file per year 2020–2026 (`.xls` before the switch, `.xlsx` after; find the switch date) into a scratch directory; compare the `instrumenty` headers and segment rows. Done when every year's layout is known and the parser's header lookup covers them.
 2. **Quotes pages.** Compare today's six pages with CV's fixtures (`CatalystViewer/tests/fixtures/sources/gpwcatalyst/`); note the session date's place on the page.
