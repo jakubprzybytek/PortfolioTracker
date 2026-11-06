@@ -9,6 +9,33 @@ CV's **fundamental analysis specification** (`CatalystViewer/docs/fundamental-an
 | 1 – Market | Daily data of every Catalyst bond; browsing with filters; yield to maturity against an alternative; risk premium over treasury bonds; liquidity |
 | 2 – Issuers | Company identity, filed annual reports read by code, the 7-dimension scorecard with data confidence, refinancing, repayment track record; the work that needs judgement or reading (finding reports, PDFs, the written judgement) done by an AI agent outside the app through a CLI |
 
+## Contents
+
+- [Module boundaries](#module-boundaries)
+- [Rules for every source (hard rules)](#rules-for-every-source-hard-rules)
+- [Data sources](#data-sources)
+- [Storage: table `catalyst`](#storage-table-catalyst)
+  - [Market (phase 1, rebuildable)](#market-phase-1-rebuildable)
+  - [Issuers (phase 2, mostly not rebuildable)](#issuers-phase-2-mostly-not-rebuildable)
+- [Jobs](#jobs)
+  - [How jobs run](#how-jobs-run)
+- [Market metrics (phase 1, screen row)](#market-metrics-phase-1-screen-row)
+- [Issuer analysis (phase 2)](#issuer-analysis-phase-2)
+  - [Reading reports (code, ported from CV)](#reading-reports-code-ported-from-cv)
+  - [Scorecard (app)](#scorecard-app)
+  - [Repayment track record (app)](#repayment-track-record-app)
+  - [Later](#later)
+- [The `catalyst` CLI (the agent's interface)](#the-catalyst-cli-the-agents-interface)
+- [UI](#ui)
+  - [Bonds](#bonds)
+  - [Issuer dialog](#issuer-dialog)
+  - [Issuers](#issuers)
+  - [Settings](#settings)
+- [Testing](#testing)
+- [Migration from CatalystViewer](#migration-from-catalystviewer)
+- [Plan](#plan)
+- [Open questions](#open-questions)
+
 ## Module boundaries
 
 Catalyst is a module of its own: its own table, jobs, API Lambda, view and backup. It doesn't read or change transactions or holdings; the bonds in it are not the ones held in PT.
