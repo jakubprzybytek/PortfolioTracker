@@ -44,7 +44,7 @@ describe("watchdog", () => {
 });
 
 describe("jobTable", () => {
-  it("keeps PT's job runs in market unless a job names its table", () => {
-    expect(new Set(JOB_NAMES.map(jobTable))).toEqual(new Set(["market"]));
+  it("keeps PT's job runs in market and the Catalyst module's in its own table", () => {
+    for (const job of JOB_NAMES) expect([job, jobTable(job)]).toEqual([job, job.startsWith("catalyst-") ? "catalyst" : "market"]);
   });
 });

@@ -1637,3 +1637,15 @@ test.describe("sorting by a column", () => {
     await expect.poll(codes).toEqual(["IZ0836", "DS0432"]);
   });
 });
+
+test.describe("catalyst view", () => {
+  test("in the menu; shows what the module holds and its jobs' latest runs", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("nav-catalyst").click();
+    await expect(page).toHaveURL(/#\/catalyst$/);
+    await expect(page.getByRole("heading", { name: "Catalyst", level: 2 })).toBeVisible();
+    await expect(page.getByTestId("catalyst-bonds")).toHaveText(/^(No data yet\.|[\d\s]+ bonds\.)$/);
+    await expect(page.getByTestId("catalyst-jobs").locator("tbody tr")).toHaveCount(2);
+    await expect(page.getByTestId("catalyst-jobs")).toContainText("catalyst-metrics");
+  });
+});

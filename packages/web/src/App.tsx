@@ -22,6 +22,7 @@ const PerformanceView = lazy(() => import("./PerformanceView.tsx").then((m) => (
 const PricesView = lazy(() => import("./PricesView.tsx").then((m) => ({ default: m.PricesView })));
 const SalesView = lazy(() => import("./SalesView.tsx").then((m) => ({ default: m.SalesView })));
 const StatusView = lazy(() => import("./StatusView.tsx").then((m) => ({ default: m.StatusView })));
+const CatalystView = lazy(() => import("./CatalystView.tsx").then((m) => ({ default: m.CatalystView })));
 const CashFlowsView = lazy(() => import("./CashFlowsView.tsx").then((m) => ({ default: m.CashFlowsView })));
 const TransactionsView = lazy(() => import("./TransactionsView.tsx").then((m) => ({ default: m.TransactionsView })));
 
@@ -221,6 +222,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}
+        {route.view === "catalyst" && <CatalystView />}
         {route.view === "instrument" && <InstrumentView key="instrument" params={route.params} />}
         {route.view === "status" && <StatusView />}
         </Suspense>

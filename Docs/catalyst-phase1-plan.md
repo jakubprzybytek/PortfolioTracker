@@ -97,6 +97,8 @@ Done in phase 0 (P7); findings in [catalyst.md](catalyst.md#checked-2026-11-06).
 
 New resources holding data: the table and the queue.
 
+**Done 2026-11-06.** As below, with: job runs of `catalyst-metrics` and `catalyst-backfill` (on demand) for now, the scheduled jobs register with their milestones (a job in `JOBS` with a maximum age that never ran would make the watchdog fail); PT's watchdog and API read the Catalyst job runs with a `JOB#*`-only Query permission and the table's name (`CATALYST_TABLE`), not a link; the worker merges a batch's metrics requests instead of SQS deduplication (catalyst.md, "How jobs run"); the module's core code is imported as `@portfolio/core/catalyst/index`, never through PT's index.
+
 - `infra/catalyst.ts`: table `Catalyst` (PK/SK, GSI1, TTL `ttl`, PITR, deletion protection on prod), `CatalystQueue` + `CatalystDeadLetter`, `CatalystWorker` subscribed (batch 1), `CatalystApi` with `GET /catalyst/status` (counts, last runs), the dead-letter alarm on prod; called from `sst.config.ts`.
 - `core/src/catalyst/items.ts`, `repository.ts` (put/get/query, batch writes with retry of unprocessed items).
 - `runJob` takes the job-run store; `JOBS` entries for `catalyst-daily`, `catalyst-quotes`, `catalyst-terms`, `catalyst-metrics`, `catalyst-backfill`, `catalyst-export` (`module: "catalyst"`, max ages); watchdog and `GET /status` read each from its table.

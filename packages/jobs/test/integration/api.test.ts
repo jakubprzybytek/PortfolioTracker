@@ -74,7 +74,7 @@ describe(`API ${API}`, () => {
   it("GET /status lists the last run of every job and the dead-letter queue's depth", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown>; deadLetter: number | null }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "eod-ibkr", "export", "fx", "import", "live", "monthly", "quality", "valuation", "watchdog"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "catalyst-backfill", "catalyst-metrics", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "eod-ibkr", "export", "fx", "import", "live", "monthly", "quality", "valuation", "watchdog"]);
     expect(typeof body.deadLetter).toBe("number");
     // Each upload in the setup starts an import run, and only the first is waited for: the last one can still be
     // running here. Wait until both jobs have settled, then they must have gone well.
@@ -605,7 +605,7 @@ describe(`API ${API}`, () => {
   });
 
   it("requires a login: no token or a forged token gets 401", async () => {
-    for (const route of ["/holdings", "/transactions", "/prices", "/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators", "/indicators/fx-eur", "/accounts"]) {
+    for (const route of ["/holdings", "/transactions", "/prices", "/status", "/catalyst/status", `/instruments/${IZ}/prices`, `/holdings/history?isin=${DS}`, "/indicators", "/indicators/fx-eur", "/accounts"]) {
       expect((await get(route, { auth: false })).status, route).toBe(401);
     }
     for (const [method, route] of [["POST", "/transactions"], ["PUT", "/transactions/x?account=a"], ["DELETE", "/transactions/x?account=a"], ["POST", "/instruments"]] as const) {
@@ -769,5 +769,13 @@ describe(`API ${API}`, () => {
     expect((await send("DELETE", "/feed-token")).status).toBe(200);
     expect((await feed(`?year=2025&token=${next.body.token}`)).status).toBe(404);
     expect((await get<{ feed: unknown }>("/cash-flows")).body.feed).toBeNull();
+  });
+
+  it("GET /catalyst/status: the Catalyst module's bonds, its jobs' latest runs and its dead-letter queue", async () => {
+    const { status, body } = await get<{ bonds: number; jobs: Record<string, unknown>; deadLetter: number | null }>("/catalyst/status");
+    expect(status).toBe(200);
+    expect(typeof body.bonds).toBe("number");
+    expect(Object.keys(body.jobs).sort()).toEqual(["catalyst-backfill", "catalyst-metrics"]);
+    expect(typeof body.deadLetter).toBe("number");
   });
 });

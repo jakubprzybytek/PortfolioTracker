@@ -1,7 +1,8 @@
 // Job runs (JOB#<job> / RUN#<startedAt>, Docs/data-storage.md): one store per table, so a module with its own table
 // (Catalyst, Docs/catalyst.md) keeps its jobs' runs there while the Status page and the watchdog read them all.
 
-import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { keys, type JobRunItem } from "./items.ts";
 
 /** What the store needs of a DynamoDB document client (the real one, or a fake in tests). */
@@ -20,6 +21,11 @@ export class JobRunStore {
   constructor(doc: DocumentSender, table: () => string) {
     this.doc = doc;
     this.table = table;
+  }
+
+  /** A store with its own client, for a table whose other items this code doesn't touch. */
+  static forTable(table: () => string): JobRunStore {
+    return new JobRunStore(DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } }), table);
   }
 
   async put(item: Omit<JobRunItem, "PK" | "SK" | "ttl">, now = Date.now()): Promise<void> {

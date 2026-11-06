@@ -6,7 +6,7 @@ import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { randomUUID } from "node:crypto";
 import { gzipSync } from "node:zlib";
-import { Repository, type IsoDate, type JobRunStore } from "@portfolio/core";
+import { JobRunStore, Repository, type IsoDate } from "@portfolio/core";
 import { alertFor, sendAlert } from "./alerts.ts";
 import { jobTable, type JobName, type JobTable } from "./jobs.ts";
 
@@ -52,7 +52,12 @@ export async function queueValuation(payload: object): Promise<void> {
 }
 
 // The store of each table that keeps job runs (jobs.ts, JobTable).
-const jobRunStores: Record<JobTable, JobRunStore> = { market: repo.jobRuns };
+// The Catalyst table: linked in the module's functions; PT's watchdog and API get only its name and the right to read
+// its job runs (CATALYST_TABLE, infra/catalyst.ts).
+const jobRunStores: Record<JobTable, JobRunStore> = {
+  market: repo.jobRuns,
+  catalyst: JobRunStore.forTable(() => process.env["CATALYST_TABLE"] || Resource.Catalyst.name),
+};
 
 /** Where `job`'s runs are kept. */
 export const jobRuns = (job: JobName): JobRunStore => jobRunStores[jobTable(job)];

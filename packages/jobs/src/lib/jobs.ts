@@ -2,8 +2,8 @@
 // says so, and the table its runs are kept in. The Status page lists the same jobs, so a new job shows there once
 // it's added here.
 
-/** Tables that keep job runs: `market` for PT's jobs; a module with its own table adds it here (Docs/catalyst.md). */
-export type JobTable = "market";
+/** Tables that keep job runs: `market` for PT's jobs, `catalyst` for the Catalyst module's (Docs/catalyst.md). */
+export type JobTable = "market" | "catalyst";
 
 /** Hours between successful runs, at most (the longest gap in its schedule plus slack); none: started on demand. */
 export const JOBS = {
@@ -25,6 +25,9 @@ export const JOBS = {
   live: {},
   backfill: {},
   import: {},
+  // The Catalyst module: requests from its queue (metrics, backfill), on demand.
+  "catalyst-metrics": { table: "catalyst" },
+  "catalyst-backfill": { table: "catalyst" },
 } satisfies Record<string, { maxAgeHours?: number; prices?: boolean; optional?: boolean; table?: JobTable }>;
 
 export type JobName = keyof typeof JOBS;

@@ -94,6 +94,11 @@ export default $config({
     const ibkrFlex = ["dev", "prod"].includes($app.stage) ? new sst.Secret("IbkrFlexToken") : undefined;
     const ibkrEnv = { IBKR_FLEX_QUERY_ID: "1688199" };
 
+    // The Catalyst module (Docs/catalyst.md): its own table, queue and worker; its API routes come with PT's below.
+    const { catalystApi, catalystModule } = await import("./infra/catalyst.ts");
+    const catalystShared = { defaults: { timeout: defaults.timeout, memory: defaults.memory, architecture: defaults.architecture, logging: defaults.logging }, link, alerts };
+    const catalyst = catalystModule(catalystShared);
+
     // --- jobs ----------------------------------------------------------------------------------
     // Revaluations requested by imports, backfills, FX and the monthly job go through a FIFO queue with one message group:
     // Lambda then runs them one at a time, in order. Overlapping runs could end with the older data written last
@@ -291,7 +296,7 @@ export default $config({
     });
     // Watchdog (jobs/lib/watchdog.ts): runs that timed out, jobs that stopped running, price jobs writing nothing.
     // Every day, after the morning runs; its problems are e-mailed by runJob, and the alarm below notices if it stops.
-    const watchdog = new sst.aws.Function("Watchdog", { ...defaults, handler: "packages/jobs/src/handlers/watchdog.handler" });
+    const watchdog = new sst.aws.Function("Watchdog", { ...defaults, handler: "packages/jobs/src/handlers/watchdog.handler", ...catalyst.jobRunsReader });
     new sst.aws.CronV2("WatchdogDaily", { function: watchdog.arn, schedule: "cron(45 8 * * ? *)", timezone: WARSAW, retries: 2 });
     if (alerts)
       new aws.cloudwatch.MetricAlarm("WatchdogSilent", {
@@ -381,7 +386,8 @@ export default $config({
       // Writes (the "Add transaction" form) queue a revaluation; a new instrument starts its history backfill and FX rates.
       // The dead-letter queue: GET /status shows how many revaluations wait in it.
       link: [...link, market, transactions, holdings, valuationQueue, valuationDeadLetter, backfill, fx, live],
-      environment: { ACCESS_GROUPS: accessGroups($app.stage).join(",") },
+      environment: { ACCESS_GROUPS: accessGroups($app.stage).join(","), ...catalyst.jobRunsReader.environment },
+      permissions: catalyst.jobRunsReader.permissions,
     };
     api.route("GET /holdings", apiHandler, auth);
     api.route("GET /portfolio/history", apiHandler, auth);
@@ -423,6 +429,8 @@ export default $config({
     api.route("POST /notes", apiHandler, auth);
     api.route("PUT /notes/{id}", apiHandler, auth);
     api.route("DELETE /notes/{id}", apiHandler, auth);
+
+    catalystApi(catalyst, { ...catalystShared, api, auth, accessGroups: accessGroups($app.stage).join(",") });
 
     // The spreadsheet feed (IMPORTDATA can't log in): its own token instead of Cognito, checked by the function. Not
     // linked, since a link grants every action on a table: it reads the transactions (GSI1) and FX rates, and may only

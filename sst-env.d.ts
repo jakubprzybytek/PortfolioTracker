@@ -22,6 +22,22 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Bucket"
     }
+    "Catalyst": {
+      "name": string
+      "type": "sst.aws.Dynamo"
+    }
+    "CatalystDeadLetter": {
+      "type": "sst.aws.Queue"
+      "url": string
+    }
+    "CatalystQueue": {
+      "type": "sst.aws.Queue"
+      "url": string
+    }
+    "CatalystWorker": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "Files": {
       "name": string
       "type": "sst.aws.Bucket"
