@@ -74,7 +74,7 @@ describe(`API ${API}`, () => {
   it("GET /status lists the last run of every job and the dead-letter queue's depth", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown>; deadLetter: number | null }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "catalyst-backfill", "catalyst-metrics", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "eod-ibkr", "export", "fx", "import", "live", "monthly", "quality", "valuation", "watchdog"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "catalyst-backfill", "catalyst-daily", "catalyst-metrics", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "eod-ibkr", "export", "fx", "import", "live", "monthly", "quality", "valuation", "watchdog"]);
     expect(typeof body.deadLetter).toBe("number");
     // Each upload in the setup starts an import run, and only the first is waited for: the last one can still be
     // running here. Wait until both jobs have settled, then they must have gone well.
@@ -775,7 +775,7 @@ describe(`API ${API}`, () => {
     const { status, body } = await get<{ bonds: number; jobs: Record<string, unknown>; deadLetter: number | null }>("/catalyst/status");
     expect(status).toBe(200);
     expect(typeof body.bonds).toBe("number");
-    expect(Object.keys(body.jobs).sort()).toEqual(["catalyst-backfill", "catalyst-metrics"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["catalyst-backfill", "catalyst-daily", "catalyst-metrics"]);
     expect(typeof body.deadLetter).toBe("number");
   });
 });

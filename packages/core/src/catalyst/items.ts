@@ -57,4 +57,17 @@ export interface CatalystSessionItem {
 export const catalystKeys = {
   bond: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "META" as const }),
   session: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `D#${date}#${market}` as const }),
+  day: (date: IsoDate) => ({ PK: "DAYS" as const, SK: date }),
 };
+
+/** A session whose daily file was loaded: the job's look-back skips it, the backfill too. */
+export interface CatalystDayItem {
+  PK: "DAYS";
+  SK: IsoDate;
+  date: IsoDate;
+  rows: number;
+  bonds: number;
+  /** The file's name in the archive, e.g. catalyst_20261104.xlsx. */
+  file: string;
+  fetchedAt: string;
+}

@@ -2,6 +2,8 @@
 // portfolio. Its own table, a FIFO queue for the work that doesn't come from a schedule (metrics, backfill), the worker
 // that runs it, and the module's API routes on PT's API. Called from sst.config.ts with what it shares.
 
+const WARSAW = "Europe/Warsaw";
+
 export interface CatalystShared {
   /** PT's function settings (memory, architecture, logs, timeout), without its table links. */
   defaults: Pick<sst.aws.FunctionArgs, "timeout" | "memory" | "architecture" | "logging">;
@@ -59,6 +61,12 @@ export function catalystModule({ defaults, link, alerts }: CatalystShared) {
       comparisonOperator: "GreaterThanThreshold",
       threshold: 0,
     });
+
+  // --- scheduled jobs (Docs/catalyst.md, "Jobs") -----------------------------------------------
+  const job = (handler: string, timeout: "5 minutes" | "15 minutes" = "5 minutes") => ({ ...defaults, handler, timeout, link: [...link, table, queue] });
+  // The daily file: after the session, and a morning recheck (a file published late, a day missed).
+  new sst.aws.CronV2("CatalystDaily", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(30 18 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
+  new sst.aws.CronV2("CatalystDailyRecheck", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(0 8 ? * TUE-SAT *)", timezone: WARSAW, event: { morning: true }, retries: 2 });
 
   // PT's watchdog and Status page list the Catalyst jobs too: they may read the job runs (JOB#…) of this table only.
   const jobRunsReader = {

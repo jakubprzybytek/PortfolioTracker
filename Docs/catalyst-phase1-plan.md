@@ -109,6 +109,8 @@ Done when: deployed to prod, the view shows, the Status page lists the Catalyst 
 
 ### M2 Daily file
 
+**Done 2026-11-06.** gpwcatalyst.pl answers from Lambda (eu-west-1). The job loads every session of the last 5 not loaded yet (a `DAYS/<date>` item marks a loaded one), oldest first; the planning is pure (`core/catalyst/daily.ts`, `planDailyFile`). First run on dev: 2026-10-30 – 11-05, 932 bonds, ~1,050 rows a session, 19 s; a missing file is a 302 (fetched with `redirect: "manual"`).
+
 - `dailyFile.ts`: reads both formats, finds the header row and columns by name (Polish/English labels), the segment from the rows without an ISIN, one record per ISIN and market; values `---` → null; turnover from thousands; fails loudly on a missing column. Also the off-session sheet.
 - `gpwCatalyst.ts`: `fetchDailyFile(date)` (xlsx, then xls; 302 = no file for that day).
 - `handlers/daily.ts`: the last session's file (look back up to 5 trading days, `settlement.ts` holidays), archive raw, upsert bonds (new: `listed`, `firstSeen`; present: current nominal, maturity, rate; markets merged per ISIN), write sessions, mark `ended` the listed bonds absent from the file (`lastSeen`, last close), then queue `{ kind: "metrics" }` (a no-op until M6). Idempotent: re-running a day rewrites the same items.

@@ -2,10 +2,10 @@
 // functions link only this table.
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, QueryCommand, type QueryCommandInput } from "@aws-sdk/lib-dynamodb";
+import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, type QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystSessionItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystDayItem, type CatalystSessionItem } from "./items.ts";
 
 /** Batches of 25 written at once, at most. */
 const BATCH_WRITES_AT_ONCE = 4;
@@ -59,6 +59,21 @@ export class CatalystRepository {
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
       ExpressionAttributeValues: { ":pk": `BOND#${isin}`, ":from": `D#${from}`, ":to": `D#${to}#~` },
     });
+  }
+
+  /** The sessions loaded from `from` to `to` (inclusive), oldest first. */
+  listDays(from: IsoDate, to: IsoDate): Promise<CatalystDayItem[]> {
+    return this.queryAll<CatalystDayItem>({ KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to", ExpressionAttributeValues: { ":pk": "DAYS", ":from": from, ":to": to } });
+  }
+
+  /** The latest session loaded, if any. */
+  async latestDay(): Promise<CatalystDayItem | undefined> {
+    const res = await this.doc.send(new QueryCommand({ TableName: this.table(), KeyConditionExpression: "PK = :pk", ExpressionAttributeValues: { ":pk": "DAYS" }, ScanIndexForward: false, Limit: 1 }));
+    return res.Items?.[0] as CatalystDayItem | undefined;
+  }
+
+  async putDay(item: Omit<CatalystDayItem, "PK" | "SK">): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.day(item.date), ...item } }));
   }
 
   private async queryAll<T>(input: Omit<QueryCommandInput, "TableName">): Promise<T[]> {

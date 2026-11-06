@@ -17,6 +17,8 @@ export interface SourceRequest {
   /** At most one request per host this often (0: no spacing, for APIs). */
   minIntervalMs?: number;
   headers?: Record<string, string>;
+  /** "manual": a redirect comes back as such (gpwcatalyst.pl answers a missing file with a 302). */
+  redirect?: RequestRedirect;
 }
 
 // When each host may be asked next. Module state: it holds across calls (and warm invocations) in one Lambda.
@@ -32,9 +34,9 @@ async function waitTurn(host: string, intervalMs: number): Promise<void> {
 }
 
 /** A request to a data source: the app's user agent, a timeout and, for scraped sites, the spacing per host. */
-export async function fetchSource(url: string | URL, { timeoutMs = TIMEOUT_MS, minIntervalMs = 0, headers = {} }: SourceRequest = {}): Promise<Response> {
+export async function fetchSource(url: string | URL, { timeoutMs = TIMEOUT_MS, minIntervalMs = 0, headers = {}, redirect }: SourceRequest = {}): Promise<Response> {
   if (minIntervalMs > 0) await waitTurn(new URL(url).host, minIntervalMs);
-  return fetchWithTimeout(url, { headers: { "User-Agent": USER_AGENT, ...headers } }, timeoutMs);
+  return fetchWithTimeout(url, { headers: { "User-Agent": USER_AGENT, ...headers }, ...(redirect ? { redirect } : {}) }, timeoutMs);
 }
 
 /** `fetch` that gives up after `timeoutMs` (a TimeoutError naming the URL). */
