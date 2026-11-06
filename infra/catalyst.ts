@@ -66,7 +66,9 @@ export function catalystModule({ defaults, link, alerts }: CatalystShared) {
   const job = (handler: string, timeout: "5 minutes" | "15 minutes" = "5 minutes") => ({ ...defaults, handler, timeout, link: [...link, table, queue] });
   // The daily file: after the session, and a morning recheck (a file published late, a day missed).
   new sst.aws.CronV2("CatalystDaily", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(30 18 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
-  new sst.aws.CronV2("CatalystDailyRecheck", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(0 8 ? * TUE-SAT *)", timezone: WARSAW, event: { morning: true }, retries: 2 });
+  // Names short enough that "portfolio-tracker-<stage>-<Name>HandlerFunction-<8>" fits Lambda's 64 characters: a
+  // longer one is cut ("portfolio-track-…") and the deploy role, limited to portfolio-tracker-*, can't create it.
+  new sst.aws.CronV2("CatalystRecheck", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(0 8 ? * TUE-SAT *)", timezone: WARSAW, event: { morning: true }, retries: 2 });
 
   // PT's watchdog and Status page list the Catalyst jobs too: they may read the job runs (JOB#…) of this table only.
   const jobRunsReader = {
