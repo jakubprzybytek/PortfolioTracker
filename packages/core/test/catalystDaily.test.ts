@@ -64,6 +64,19 @@ describe("planDailyFile", () => {
     expect(planDailyFile(file, stored, AT, false).ended).toEqual([]);
   });
 
+  it("a backfilled file: bonds seen for the first time have ended there (the backfill goes back from the newest day)", () => {
+    const plan = planDailyFile(file, new Map(), AT, false);
+    expect(new Set(plan.bonds.map((b) => b.status))).toEqual(new Set(["ended"]));
+    expect(plan.bonds[0]).toMatchObject({ firstSeen: "2026-11-04", lastSeen: "2026-11-04" });
+  });
+
+  it("a backfilled day newer than a stored ended bond's last session keeps it ended (only the newest session lists)", () => {
+    const ach = file.rows.find((r) => r.code === "ACH0427")!;
+    const stored = new Map([[ach.isin, bond({ isin: ach.isin, code: "ACH0427", status: "ended", firstSeen: "2026-10-01", lastSeen: "2026-10-30" })]]);
+    expect(planDailyFile(file, stored, AT, false).bonds.find((b) => b.isin === ach.isin)).toMatchObject({ status: "ended", lastSeen: "2026-11-04" });
+    expect(planDailyFile(file, stored, AT, true).bonds.find((b) => b.isin === ach.isin)).toMatchObject({ status: "listed", lastSeen: "2026-11-04" });
+  });
+
   it("an older file only widens the first session, never overwrites newer fields", () => {
     const ach = file.rows.find((r) => r.code === "ACH0427")!;
     const stored = new Map([[ach.isin, bond({ isin: ach.isin, code: "ACH0427", nominal: 500, firstSeen: "2026-11-05", lastSeen: "2026-11-06" })]]);

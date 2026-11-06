@@ -121,6 +121,8 @@ Done when: on dev a week of runs gives ~1,060 bonds and their sessions; the coun
 
 ### M3 Backfill of the archive ⚠ approval
 
+**Dev done 2026-11-06:** 2020-01-02 – 2026-11-05, 1,716 sessions in ~70 min (20-session ranges of ~40 s), 1,769 bonds (931 listed, 838 ended). Checks: KRU0228's nominal 1000 → 850 → 700 → 550 over its instalments, IZ0831 at its indexed nominal, the GetBack bonds ended in 2020–21, recent listings present. One file in the archive is another session's: `catalyst_20250625.xls` repeats 2025-06-24 (same figures), so that session is missing; such a file is skipped and noted, nothing written under the wrong date. Only the newest session lists a bond (backfilled days never change a stored status), so ranges queued again out of order can't mislabel one; a range that fails is recorded and the rest of the batch goes on.
+
 About 1,500 files, ~1.6M items (≈ $2 of writes) into the new table: no PT data touched, but a bulk write on prod.
 
 - `worker.ts` handles `{ kind: "backfill", from, to }`: for each trading day in the range, the file (2 s between downloads), archive, sessions and bonds (a bond's `firstSeen`/`lastSeen` and exit from the history); writes in batches. A range of 20 trading days per message (~1 min).

@@ -29,8 +29,9 @@ function mainRow(rows: CatalystFileRow[]): CatalystFileRow {
 
 /**
  * The writes for one file. `stored`: the bonds in the table, by ISIN. `latest`: the file is the newest session
- * stored (the daily job), so listed bonds missing from it have ended; a backfill of older days passes false and only
- * widens the bonds' first and last sessions.
+ * stored (the daily job), so listed bonds missing from it have ended. A backfill of older days passes false: it only
+ * widens the stored bonds' first sessions, and a bond it sees for the first time has ended (the backfill goes from
+ * the newest day back, so the bond is in no later session), its last session being this one.
  */
 export function planDailyFile(file: CatalystDailyFile, stored: Map<string, CatalystBondItem>, fetchedAt: string, latest: boolean): DailyPlan {
   const byIsin = new Map<string, CatalystFileRow[]>();
@@ -73,7 +74,7 @@ export function planDailyFile(file: CatalystDailyFile, stored: Map<string, Catal
     };
     const old = stored.get(isin);
     if (!old) {
-      bonds.push({ ...now, status: "listed", firstSeen: file.date, lastSeen: file.date });
+      bonds.push({ ...now, status: latest ? "listed" : "ended", firstSeen: file.date, lastSeen: file.date });
       added.push(isin);
       continue;
     }
@@ -81,7 +82,9 @@ export function planDailyFile(file: CatalystDailyFile, stored: Map<string, Catal
     const newer = file.date >= old.lastSeen;
     const next: BondFields = {
       ...(newer ? now : { isin, code: old.code, segment: old.segment, currency: old.currency, markets: old.markets, maturity: old.maturity, nominal: old.nominal }),
-      status: newer ? "listed" : old.status,
+      // Only the newest session lists a bond: a backfilled day never changes a stored status (backfill ranges can run
+      // out of order when one is queued again), and a bond it adds has ended (listed later, the newer day says so).
+      status: newer && latest ? "listed" : old.status,
       firstSeen: file.date < old.firstSeen ? file.date : old.firstSeen,
       lastSeen: newer ? file.date : old.lastSeen,
     };
@@ -122,5 +125,12 @@ function sameBond(a: CatalystBondItem, b: BondFields): boolean {
 export function recentSessions(today: IsoDate, count: number): IsoDate[] {
   const out: IsoDate[] = [];
   for (let d = today; out.length < count; d = addDays(d, -1)) if (isSettlementDay(d)) out.push(d);
+  return out;
+}
+
+/** The trading sessions from `to` back to `from` (both included), newest first. */
+export function sessionsBetween(from: IsoDate, to: IsoDate): IsoDate[] {
+  const out: IsoDate[] = [];
+  for (let d = to; d >= from; d = addDays(d, -1)) if (isSettlementDay(d)) out.push(d);
   return out;
 }
