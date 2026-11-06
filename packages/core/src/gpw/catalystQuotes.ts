@@ -29,6 +29,8 @@ export interface CatalystQuote {
   code: string;
   /** Listed in the Warsaw Sustainable Segment (" /S" after the code). */
   sustainable: boolean;
+  /** The letters the page shows after the code (" /S", " /K /W" …), if any; the code is without them, as in the daily file. */
+  markers?: string[];
   /** "GPW ASO", "GPW RR", "BS RR" … */
   market: string;
   currency: string;
@@ -97,11 +99,14 @@ export function parseCatalystQuotes(html: string): CatalystQuote[] {
       if (bid.length !== 3 || ask.length !== 3 || turnover.length !== 2 || by(4).length !== 1)
         throw new Error(`Quotes row ${name}: unexpected cells (bid ${bid.length}, ask ${ask.length}, turnover ${turnover.length})`);
       const last = by(8)[0] ?? "";
-      const code = name.replace(/\s*\/S$/, "");
+      const suffix = /(\s+\/[A-Z]+)+$/.exec(name);
+      const code = suffix ? name.slice(0, suffix.index) : name;
+      const markers = suffix ? [...suffix[0].matchAll(/\/([A-Z]+)/g)].map((m) => m[1]!) : [];
       out.push({
         issuer,
         code,
-        sustainable: code !== name,
+        sustainable: markers.includes("S"),
+        ...(markers.length ? { markers } : {}),
         market: by(2)[0] ?? "",
         currency,
         reference: num(by(4)[0]),

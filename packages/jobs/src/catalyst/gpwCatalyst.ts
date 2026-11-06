@@ -1,7 +1,7 @@
-// gpwcatalyst.pl: the daily statistics file of a session (Docs/catalyst.md, "Checked 2026-11-06"). Allowed by its
-// robots.txt; one request per 2 s, the app's user agent (fetchSource).
+// gpwcatalyst.pl: the daily statistics file of a session and the quotes pages (Docs/catalyst.md, "Checked
+// 2026-11-06"). Allowed by its robots.txt; one request per 2 s, the app's user agent (fetchSource).
 
-import type { IsoDate } from "@portfolio/core";
+import type { CatalystQuotesPage, IsoDate } from "@portfolio/core";
 import { FILE_TIMEOUT_MS, fetchSource, POLITE_INTERVAL_MS } from "../lib/http.ts";
 
 const BASE = "https://gpwcatalyst.pl/pub/CATALYST/statystyki/statystyki_dzienne/";
@@ -20,4 +20,11 @@ export async function fetchDailyFile(date: IsoDate): Promise<{ content: Uint8Arr
     if (res.status !== 302 && res.status !== 404) throw new Error(`gpwcatalyst.pl ${fileName}: HTTP ${res.status}`);
   }
   return undefined;
+}
+
+/** A quotes page (e.g. "obligacje-korporacyjne"): the session under way, or the last one. */
+export async function fetchQuotesPage(page: CatalystQuotesPage): Promise<string> {
+  const res = await fetchSource(`https://gpwcatalyst.pl/notowania-obligacji-${page}`, { minIntervalMs: POLITE_INTERVAL_MS, timeoutMs: FILE_TIMEOUT_MS });
+  if (!res.ok) throw new Error(`gpwcatalyst.pl ${page}: HTTP ${res.status}`);
+  return res.text();
 }

@@ -70,6 +70,11 @@ export function catalystModule({ defaults, link, alerts }: CatalystShared) {
   // longer one is cut ("portfolio-track-…") and the deploy role, limited to portfolio-tracker-*, can't create it.
   new sst.aws.CronV2("CatalystRecheck", { function: job("packages/jobs/src/catalyst/handlers/daily.handler"), schedule: "cron(0 8 ? * TUE-SAT *)", timezone: WARSAW, event: { morning: true }, retries: 2 });
 
+  // The order books at the end of the session (17:20, after the closing auction), and early the next morning in case
+  // the evening run missed it (07:45, before the pre-opening: the pages still show the last session).
+  new sst.aws.CronV2("CatalystQuotes", { function: job("packages/jobs/src/catalyst/handlers/quotes.handler"), schedule: "cron(20 17 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
+  new sst.aws.CronV2("CatalystQuotesAm", { function: job("packages/jobs/src/catalyst/handlers/quotes.handler"), schedule: "cron(45 7 ? * TUE-SAT *)", timezone: WARSAW, event: { morning: true }, retries: 2 });
+
   // PT's watchdog and Status page list the Catalyst jobs too: they may read the job runs (JOB#…) of this table only.
   const jobRunsReader = {
     environment: { CATALYST_TABLE: table.name },

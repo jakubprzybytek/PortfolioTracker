@@ -331,7 +331,7 @@ test.describe("dashboard", () => {
     const rows = page.getByTestId("jobs-table").locator("tbody tr");
     // Every job, once loaded (the 9 placeholder rows before that aren't job rows)
     await expect(page.getByTestId("job-valuation")).toBeVisible();
-    await expect(rows).toHaveCount(20); // lib/jobs.ts (17 of PT, 3 of the Catalyst module)
+    await expect(rows).toHaveCount(21); // lib/jobs.ts (17 of PT, 4 of the Catalyst module)
     await expect(page.getByTestId("job-benchmarks")).toBeVisible();
     await expect(page.getByTestId("jobs-table")).toContainText("ok");
   });

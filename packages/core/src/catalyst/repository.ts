@@ -5,7 +5,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, type QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystDayItem, type CatalystSessionItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystSessionItem } from "./items.ts";
 
 /** Batches of 25 written at once, at most. */
 const BATCH_WRITES_AT_ONCE = 4;
@@ -58,6 +58,26 @@ export class CatalystRepository {
     return this.queryAll<CatalystSessionItem>({
       KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
       ExpressionAttributeValues: { ":pk": `BOND#${isin}`, ":from": `D#${from}`, ":to": `D#${to}#~` },
+    });
+  }
+
+  putQuotes(items: Omit<CatalystQuoteItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut(items.map((q) => ({ ...catalystKeys.quote(q.isin, q.date, q.market), ...q })));
+  }
+
+  getQuoteDay(date: IsoDate): Promise<CatalystQuoteDayItem | undefined> {
+    return this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.quoteDay(date) })).then((r) => r.Item as CatalystQuoteDayItem | undefined);
+  }
+
+  async putQuoteDay(item: Omit<CatalystQuoteDayItem, "PK" | "SK">): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.quoteDay(item.date), ...item } }));
+  }
+
+  /** A bond's end-of-session quotes from `from` to `to` (inclusive), every market, oldest first. */
+  listQuotes(isin: string, from: IsoDate, to: IsoDate): Promise<CatalystQuoteItem[]> {
+    return this.queryAll<CatalystQuoteItem>({
+      KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to",
+      ExpressionAttributeValues: { ":pk": `BOND#${isin}`, ":from": `Q#${from}`, ":to": `Q#${to}#~` },
     });
   }
 

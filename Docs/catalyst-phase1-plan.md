@@ -135,6 +135,8 @@ Done when: dev holds the full history; spot checks of 5 bonds (an amortising one
 
 ### M4 Quotes and the monthly export
 
+**Done 2026-11-06, without the export.** Quotes are their own items (`Q#<date>#<market>`), not fields of the session: at 17:20 the day's file isn't loaded yet. The morning run is at 07:45 (before the pre-opening, when new orders could appear) and only fills a session the evening missed (`QUOTEDAYS/<date>`). Codes on the pages can carry up to two marker letters (" /S", " /K", " /W" …), stripped to match the daily file. The export moves to M7, when there are settings to back up: the quotes pages are archived raw (versioned bucket) and can be parsed again. On dev: 931 rows, 256 with a bid or an ask, 14 s.
+
 - `quotesPage.ts`: the six segment pages, read by position as CV does, checked by the count of cells per row; the session date from the page.
 - `handlers/quotes.ts` at 17:20 Mon–Fri and 08:30 Tue–Sat: archive, then bid, ask, their volumes and order counts into the session item of the page's date (only when that session exists or the date is the latest trading day; otherwise the run notes it and writes nothing).
 - `handlers/export.ts` (1st of the month 04:30): settings and saved views (once there are any), and the month's bid/ask as JSON lines, to `exports/<date>/catalyst/`.

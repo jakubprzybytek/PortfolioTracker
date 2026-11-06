@@ -104,7 +104,7 @@ describe("parseCatalystQuotes", () => {
   it("carries the issuer down its bonds' rows, marks the sustainable segment, dates older last trades", () => {
     const q = parseCatalystQuotes(readFileSync(new URL("fixtures/catalyst/quotes-obligacje-korporacyjne.html", import.meta.url), "utf8"));
     expect(q.find((x) => x.code === "ALE0630")?.issuer).toBe("ALLEGRO.EU");
-    expect(q.find((x) => x.code === "ANW1126")).toMatchObject({ issuer: "ANWIM", sustainable: true, lastTrade: { date: "2026-08-25" }, bid: null, ask: null, trades: 0 });
+    expect(q.find((x) => x.code === "ANW1126")).toMatchObject({ issuer: "ANWIM", sustainable: true, markers: ["S"], lastTrade: { date: "2026-08-25" }, bid: null, ask: null, trades: 0 });
     expect(q.find((x) => x.code === "ACH0628")).toMatchObject({ bid: { price: 101.5, volume: 35, orders: 1 }, ask: { price: 105.18, volume: 6, orders: 1 }, lastTrade: { date: "2026-10-21" } });
   });
 

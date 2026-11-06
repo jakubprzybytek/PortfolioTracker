@@ -27,6 +27,7 @@ export const JOBS = {
   import: {},
   // The Catalyst module: the daily file (evenings, morning recheck); requests from its queue (metrics, backfill).
   "catalyst-daily": { maxAgeHours: 78, prices: true, table: "catalyst" },
+  "catalyst-quotes": { maxAgeHours: 78, prices: true, table: "catalyst" },
   "catalyst-metrics": { table: "catalyst" },
   "catalyst-backfill": { table: "catalyst" },
 } satisfies Record<string, { maxAgeHours?: number; prices?: boolean; optional?: boolean; table?: JobTable }>;

@@ -1645,7 +1645,7 @@ test.describe("catalyst view", () => {
     await expect(page).toHaveURL(/#\/catalyst$/);
     await expect(page.getByRole("heading", { name: "Catalyst", level: 2 })).toBeVisible();
     await expect(page.getByTestId("catalyst-bonds")).toHaveText(/^(No data yet\.|[\d\s]+ bonds\.)$/);
-    await expect(page.getByTestId("catalyst-jobs").locator("tbody tr")).toHaveCount(3);
+    await expect(page.getByTestId("catalyst-jobs").locator("tbody tr")).toHaveCount(4);
     await expect(page.getByTestId("catalyst-jobs")).toContainText("catalyst-metrics");
   });
 });

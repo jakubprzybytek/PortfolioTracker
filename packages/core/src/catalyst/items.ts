@@ -58,6 +58,8 @@ export const catalystKeys = {
   bond: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "META" as const }),
   session: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `D#${date}#${market}` as const }),
   day: (date: IsoDate) => ({ PK: "DAYS" as const, SK: date }),
+  quoteDay: (date: IsoDate) => ({ PK: "QUOTEDAYS" as const, SK: date }),
+  quote: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `Q#${date}#${market}` as const }),
 };
 
 /** A session whose daily file was loaded: the job's look-back skips it, the backfill too. */
@@ -69,5 +71,33 @@ export interface CatalystDayItem {
   bonds: number;
   /** The file's name in the archive, e.g. catalyst_20261104.xlsx. */
   file: string;
+  fetchedAt: string;
+}
+
+/**
+ * The order book of one bond on one market at the end of a session (the quotes pages, after the close): the best bid
+ * and ask. Its own item, apart from the session (the daily file comes later in the evening). Only rows with a bid or
+ * an ask are stored; none for a session means no quotes.
+ */
+export interface CatalystQuoteItem {
+  PK: `BOND#${string}`;
+  SK: `Q#${IsoDate}#${string}`; // Q#<date>#<market>
+  isin: string;
+  date: IsoDate;
+  market: string;
+  bid?: { price: number; volume: number; orders: number };
+  ask?: { price: number; volume: number; orders: number };
+  /** The session's trades as the page counted them (the daily file's are the reference). */
+  trades: number;
+  source: string;
+  fetchedAt: string;
+}
+
+/** A session whose end-of-day quotes were stored (the morning run only fills a session the evening missed). */
+export interface CatalystQuoteDayItem {
+  PK: "QUOTEDAYS";
+  SK: IsoDate;
+  date: IsoDate;
+  quotes: number;
   fetchedAt: string;
 }
