@@ -44,6 +44,8 @@ export function catalystModule({ defaults, link, alerts }: CatalystShared) {
 
   if (alerts)
     new aws.cloudwatch.MetricAlarm("CatalystDeadLetterNotEmpty", {
+      // Named with the app's prefix: the deploy role may only create alarms named so (infra/github/README.md).
+      name: `portfolio-tracker-${$app.stage}-catalyst-dead-letter`,
       alarmActions: [alerts.arn],
       okActions: [alerts.arn],
       treatMissingData: "notBreaching",
