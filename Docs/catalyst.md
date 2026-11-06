@@ -346,7 +346,7 @@ CV's methodology document moves to `Docs/catalyst-methodology.md` with the code 
 
 ## Plan
 
-Each step goes to prod on its own.
+Each step goes to prod on its own. Phase 1 (steps 1–7) in detail: [catalyst-phase1-plan.md](catalyst-phase1-plan.md).
 
 1. Table, `catalyst-api` skeleton, empty view in the menu.
 2. `catalyst-daily` + backfill from the 2020+ archive.
