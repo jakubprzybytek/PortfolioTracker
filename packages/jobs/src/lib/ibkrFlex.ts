@@ -5,10 +5,9 @@
 
 import { isFlexStatement, parseFlexReply, type IsoDate } from "@portfolio/core";
 import { Resource } from "sst";
-import { fetchWithTimeout } from "./http.ts";
+import { fetchSource } from "./http.ts";
 
 const SEND = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/SendRequest";
-const HEADERS = { "User-Agent": "portfolio-tracker/1.0 (personal use)" }; // IBKR refuses requests without one
 const TIMEOUT_MS = 30_000;
 /** Errors worth waiting for: statement being generated (1019), too many requests (1018), service busy (1001, 1021). */
 const RETRY_CODES = new Set(["1001", "1018", "1019", "1021"]);
@@ -26,7 +25,7 @@ const compact = (d: IsoDate) => d.replaceAll("-", "");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function get(url: string): Promise<string> {
-  const res = await fetchWithTimeout(url, { headers: HEADERS }, TIMEOUT_MS);
+  const res = await fetchSource(url, { timeoutMs: TIMEOUT_MS }); // IBKR refuses requests without a user agent
   if (!res.ok) throw new Error(`IBKR Flex: HTTP ${res.status}`);
   return res.text();
 }

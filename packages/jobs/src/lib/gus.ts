@@ -6,11 +6,10 @@
 // roku = 100" (returns by year against inflation, Indicators) and "Analogiczny miesiąc poprzedniego roku = 100"
 // (12-month inflation, Indicators). Months not published yet have an empty value.
 
-import { FILE_TIMEOUT_MS, fetchWithTimeout } from "./http.ts";
+import { FILE_TIMEOUT_MS, fetchSource } from "./http.ts";
 
 const PAGE =
   "https://stat.gov.pl/obszary-tematyczne/ceny-handel/wskazniki-cen/wskazniki-cen-towarow-i-uslug-konsumpcyjnych-pot-inflacja-/miesieczne-wskazniki-cen-towarow-i-uslug-konsumpcyjnych-od-1982-roku/";
-const HEADERS = { "User-Agent": "portfolio-tracker (personal use)" };
 const MONTH_ON_MONTH = "poprzedni miesiąc = 100";
 const SINCE_DECEMBER = "grudzień poprzedniego roku = 100";
 const YEAR_ON_YEAR = "analogiczny miesiąc poprzedniego roku = 100";
@@ -54,12 +53,12 @@ export function decodeCpiCsv(content: Uint8Array): string {
 }
 
 export async function fetchGusCpiFile(): Promise<{ url: string; content: Uint8Array }> {
-  const page = await fetchWithTimeout(PAGE, { headers: HEADERS });
+  const page = await fetchSource(PAGE);
   if (!page.ok) throw new Error(`GUS CPI page: HTTP ${page.status}`);
   const link = findCpiCsvLink(await page.text());
   if (!link) throw new Error("GUS CPI page: no link to the CSV (page layout changed?)");
   const url = new URL(link, "https://stat.gov.pl").toString();
-  const res = await fetchWithTimeout(url, { headers: HEADERS }, FILE_TIMEOUT_MS);
+  const res = await fetchSource(url, { timeoutMs: FILE_TIMEOUT_MS });
   if (!res.ok) throw new Error(`GUS CPI file: HTTP ${res.status}`);
   return { url, content: new Uint8Array(await res.arrayBuffer()) };
 }

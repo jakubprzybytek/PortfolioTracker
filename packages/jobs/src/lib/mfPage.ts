@@ -1,13 +1,13 @@
 // Reads the Ministry of Finance page with daily index ratios for IZ bonds
 // (https://www.gov.pl/web/finanse/wspolczynniki-indeksacji2). HTML table, current and next month only.
 
-import { fetchWithTimeout } from "./http.ts";
+import { fetchSource } from "./http.ts";
 
 const URL = "https://www.gov.pl/web/finanse/wspolczynniki-indeksacji2";
 
 /** Returns bond code → (date → ratio). Dates in ISO. */
 export async function fetchMfIndexRatios(): Promise<Map<string, Map<string, number>>> {
-  const res = await fetchWithTimeout(URL, { headers: { "User-Agent": "portfolio-tracker (personal use)" } });
+  const res = await fetchSource(URL);
   if (!res.ok) throw new Error(`MF page: HTTP ${res.status}`);
   return parseMfIndexRatios(await res.text());
 }

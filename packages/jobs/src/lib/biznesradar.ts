@@ -5,10 +5,9 @@
 // Prices are % of nominal (clean). A bond that left the market answers 404.
 
 import type { IsoDate } from "@portfolio/core";
-import { fetchWithTimeout } from "./http.ts";
+import { fetchSource, POLITE_INTERVAL_MS } from "./http.ts";
 
 const BASE = "https://www.biznesradar.pl";
-const HEADERS = { "User-Agent": "Mozilla/5.0 (portfolio-tracker, personal use)" };
 
 export interface BrBar {
   date: IsoDate;
@@ -61,7 +60,7 @@ export function parseQuotePage(html: string): BrBar | undefined {
 }
 
 async function get(path: string): Promise<string | undefined> {
-  const res = await fetchWithTimeout(BASE + path, { headers: HEADERS });
+  const res = await fetchSource(BASE + path, { minIntervalMs: POLITE_INTERVAL_MS });
   if (res.status === 404) return undefined;
   if (!res.ok) throw new Error(`BiznesRadar ${path}: HTTP ${res.status}`);
   return res.text();

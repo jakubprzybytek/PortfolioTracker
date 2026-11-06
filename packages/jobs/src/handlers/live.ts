@@ -19,8 +19,6 @@ import { fetchSnapshot } from "../lib/onvista.ts";
 import { ONVISTA_SOURCE_ID, onvistaInstruments } from "../lib/onvistaJobs.ts";
 import { fetchYahooDaily } from "../lib/yahoo.ts";
 
-const PAUSE_MS = 2000;
-const pause = () => new Promise((r) => setTimeout(r, PAUSE_MS));
 
 type Bar = BrBar;
 
@@ -61,9 +59,7 @@ export async function handler(event: { date?: IsoDate } = {}) {
     const failed: string[] = [];
     let notToday = 0;
     let final = 0;
-    let fetched = 0;
     for (const inst of tracked) {
-      if (pages.includes(inst) && fetched++ > 0) await pause();
       try {
         const { bar, source } = await quote(inst, day);
         if (!bar) {

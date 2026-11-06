@@ -1,13 +1,11 @@
 // Catalyst corporate bonds from BiznesRadar, shared by the backfill and the daily job. Clean prices, % of nominal.
+// The BiznesRadar client keeps 2 s between requests (http.ts, fetchSource).
 
 import type { InstrumentItem, IsoDate, PriceItem, PriceStatus } from "@portfolio/core";
 import { archiveRaw, repo } from "./context.ts";
 import { fetchHistoryPage, fetchQuotePage, parseHistoryPage, parseQuotePage, type BrBar } from "./biznesradar.ts";
 
 export const BIZNESRADAR_SOURCE_ID = "biznesradar";
-const PAUSE_MS = 2000; // be gentle: one page every 2 s
-
-const pause = () => new Promise((r) => setTimeout(r, PAUSE_MS));
 
 export function catalystInstruments(instruments: InstrumentItem[]): InstrumentItem[] {
   return instruments.filter((i) => i.active && i.sourceIds[BIZNESRADAR_SOURCE_ID]);
@@ -44,7 +42,6 @@ export async function backfillBiznesradarHistory(inst: InstrumentItem, today: Is
   const { bars, lastPage } = parseHistoryPage(first, code);
   const all = [...bars];
   for (let page = 2; page <= lastPage; page++) {
-    await pause();
     const html = await fetchHistoryPage(code, page);
     if (!html) break;
     all.push(...parseHistoryPage(html, code).bars);
@@ -65,7 +62,6 @@ export async function ingestBiznesradarRecent(inst: InstrumentItem, today: IsoDa
   const page = await fetchHistoryPage(code);
   if (!page) throw new Error(`BiznesRadar has no page for ${code} (no longer listed?)`);
   const bars = parseHistoryPage(page, code).bars;
-  await pause();
   const quotePage = await fetchQuotePage(code);
   const quote = quotePage ? parseQuotePage(quotePage) : undefined;
   const items = toPriceItems(inst, bars, "final");

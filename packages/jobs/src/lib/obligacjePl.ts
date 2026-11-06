@@ -5,10 +5,9 @@
 // suggestion: it fills a period that has no rate yet and never replaces one (core/bonds/couponPeriods.ts).
 
 import { daysBetween, type IsoDate } from "@portfolio/core";
-import { fetchWithTimeout } from "./http.ts";
+import { fetchSource, POLITE_INTERVAL_MS } from "./http.ts";
 
 const BASE = "https://obligacje.pl/pl/obligacja/";
-const HEADERS = { "User-Agent": "Mozilla/5.0 (portfolio-tracker, personal use)" };
 
 export interface ObligacjePeriod {
   start: IsoDate;
@@ -87,7 +86,7 @@ export function parseBondPage(html: string): ObligacjeBond {
 
 /** The bond's page, or undefined when obligacje.pl doesn't know the code. */
 export async function fetchBondPage(code: string): Promise<string | undefined> {
-  const res = await fetchWithTimeout(BASE + encodeURIComponent(code), { headers: HEADERS });
+  const res = await fetchSource(BASE + encodeURIComponent(code), { minIntervalMs: POLITE_INTERVAL_MS });
   if (res.status === 404) return undefined;
   if (!res.ok) throw new Error(`obligacje.pl ${code}: HTTP ${res.status}`);
   return res.text();
