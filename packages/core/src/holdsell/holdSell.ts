@@ -313,6 +313,30 @@ export function commissionRate(transactions: TransactionItem[], account: string,
   return rates.length ? Math.round(rates[Math.floor(rates.length / 2)]! * 1e5) / 1e5 : DEFAULT_COMMISSION;
 }
 
+/**
+ * The retail series on sale on `day` (the alternatives): each kind's series of this month, or of the month before
+ * when this month's isn't in the Ministry file yet (the monthly job brings it). `getSeries`: a series' terms by code.
+ */
+export async function retailOffers(day: IsoDate, getSeries: (code: string) => Promise<RetailTerms | undefined>): Promise<RetailTerms[]> {
+  const month = day.slice(0, 7);
+  const found = await Promise.all(
+    RETAIL_OFFER_TERMS.map(async ({ kind, months }) => {
+      for (const m of [month, shiftMonth(month, -1)]) {
+        const s = await getSeries(offerSeriesCode(kind, months, m));
+        if (s) return s;
+      }
+      return undefined;
+    }),
+  );
+  return found.filter((t): t is RetailTerms => !!t);
+}
+
+/** The NBP reference rate the ROR on offer implies (it pays the rate + its margin from its second month), if known. */
+export function nbpRateFromOffers(offers: RetailTerms[]): number | undefined {
+  const ror = offers.find((o) => o.kind === "ROR");
+  return ror?.rates[1] != null ? ror.rates[1] - (ror.margin ?? 0) : undefined;
+}
+
 /** The retail series on offer with the term nearest to `years`. */
 export function nearestOffer(offers: RetailTerms[], years: number): RetailTerms | undefined {
   return [...offers].sort((a, b) => Math.abs(a.termMonths / 12 - years) - Math.abs(b.termMonths / 12 - years) || a.termMonths - b.termMonths)[0];

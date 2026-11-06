@@ -6,7 +6,8 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import type { ScreenRow } from "./screen.ts";
 
 /** Batches of 25 written at once, at most. */
 const BATCH_WRITES_AT_ONCE = 4;
@@ -84,6 +85,35 @@ export class CatalystRepository {
   putCoupons(periods: InterestPeriod[]): Promise<number> {
     const updatedAt = new Date().toISOString();
     return this.batchPut(periods.map((p) => ({ ...catalystKeys.coupon(p.isin, p.start), ...p, updatedAt })));
+  }
+
+  /** Every screen row (one query on the index; ended bonds' last rows too: the bond's status decides). */
+  listScreen(): Promise<CatalystScreenItem[]> {
+    return this.queryAll<CatalystScreenItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "SCREEN" } });
+  }
+
+  putScreen(rows: ScreenRow[]): Promise<number> {
+    const computedAt = new Date().toISOString();
+    return this.batchPut(rows.map((r) => ({ ...catalystKeys.screen(r.isin), GSI1PK: "SCREEN", GSI1SK: r.code, ...r, computedAt })));
+  }
+
+  async putCurve(item: Omit<CatalystCurveItem, "PK" | "SK">): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.curve(item.date), ...item } }));
+  }
+
+  /** The latest curve, if any. */
+  async latestCurve(): Promise<CatalystCurveItem | undefined> {
+    const res = await this.doc.send(new QueryCommand({ TableName: this.table(), KeyConditionExpression: "PK = :pk", ExpressionAttributeValues: { ":pk": "CURVE#PLGOV" }, ScanIndexForward: false, Limit: 1 }));
+    return res.Items?.[0] as CatalystCurveItem | undefined;
+  }
+
+  async getSetting<T>(name: string): Promise<T | undefined> {
+    const res = await this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.setting(name) }));
+    return res.Item?.["value"] as T | undefined;
+  }
+
+  async putSetting(name: string, value: unknown): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.setting(name), value, updatedAt: new Date().toISOString() } }));
   }
 
   getQuoteDay(date: IsoDate): Promise<CatalystQuoteDayItem | undefined> {

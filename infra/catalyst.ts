@@ -10,10 +10,12 @@ export interface CatalystShared {
   /** What every function may use: the files bucket and, on prod, the alerts topic. */
   link: unknown[];
   alerts?: sst.aws.SnsTopic;
+  /** PT's market table: the worker reads the retail-bond series on offer (SERIES#…) and nothing else. */
+  market: { name: $util.Input<string>; arn: $util.Input<string> };
 }
 
 /** The table, the queue and its worker; and what PT's watchdog and Status page need to read the Catalyst job runs. */
-export function catalystModule({ defaults, link, alerts }: CatalystShared) {
+export function catalystModule({ defaults, link, alerts, market }: CatalystShared) {
   const prod = $app.stage === "prod";
 
   // --- storage ---------------------------------------------------------------------------------
@@ -40,7 +42,11 @@ export function catalystModule({ defaults, link, alerts }: CatalystShared) {
     ...defaults,
     handler: "packages/jobs/src/catalyst/handlers/worker.handler",
     timeout: "15 minutes",
+    // CPU grows with memory: the metrics read ~1,000 bonds' sessions and compute their yields.
+    memory: "1 GB",
     link: [...link, table, queue],
+    environment: { MARKET_TABLE: market.name },
+    permissions: [{ actions: ["dynamodb:GetItem"], resources: [market.arn], conditions: [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["SERIES#*"] }] }],
   });
   queue.subscribe(worker.arn, { batch: { size: 10 } });
 

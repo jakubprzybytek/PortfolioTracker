@@ -42,8 +42,9 @@ import {
   DEFAULT_ASSUMPTIONS,
   HoldSellAssumptionsInput,
   buyHoldOrSell,
+  nbpRateFromOffers,
   offerSeriesCode,
-  RETAIL_OFFER_TERMS,
+  retailOffers,
   type HoldSellAssumptions,
   type RetailTerms,
   TargetsInput,
@@ -226,26 +227,14 @@ const HOLD_SELL_SETTING = "holdSell";
 /** Where the target allocation is kept (settings). */
 const TARGETS_SETTING = "targets";
 
-/**
- * The retail series on sale on `day` (the alternatives): each kind's series of this month, or of the month before
- * when this month's isn't in the Ministry file yet (the monthly job brings it).
- */
-async function retailOffers(day: string): Promise<RetailTerms[]> {
-  const month = day.slice(0, 7);
-  const found = await Promise.all(
-    RETAIL_OFFER_TERMS.map(async ({ kind, months }) => {
-      for (const m of [month, shiftMonth(month, -1)]) {
-        const s = await repo.getRetailSeries(offerSeriesCode(kind, months, m));
-        if (s) {
-          const { PK: _p, SK: _s, source: _src, updatedAt: _u, ...terms } = s;
-          return terms;
-        }
-      }
-      return undefined;
-    }),
-  );
-  return found.filter((t): t is RetailTerms => !!t);
-}
+/** The retail series on sale on `day` (core/holdsell, retailOffers), from the Ministry file's series in `market`. */
+const retailOffersOn = (day: string): Promise<RetailTerms[]> =>
+  retailOffers(day, async (code) => {
+    const s = await repo.getRetailSeries(code);
+    if (!s) return undefined;
+    const { PK: _p, SK: _s, source: _src, updatedAt: _u, ...terms } = s;
+    return terms;
+  });
 
 async function corporateBond(isin: string | undefined): Promise<{ inst: InstrumentItem } | { error: APIGatewayProxyResultV2 }> {
   if (!isin || !ISIN.test(isin)) return { error: json(400, { error: "Invalid ISIN" }) };
@@ -684,10 +673,10 @@ const ROUTES: Record<string, Route> = {
     const [snap, instruments, txs, refIndex, saved] = await Promise.all([repo.getSnapshot("LATEST"), repo.listInstruments(), repo.listTransactions(), repo.listReferenceIndex(), repo.getSetting<HoldSellAssumptions>(HOLD_SELL_SETTING)]);
     if (!snap) return json(404, { error: "No valuation yet" });
     const day = snap.date;
-    const offers = await retailOffers(day);
+    const offers = await retailOffersOn(day);
     // The NBP reference rate by default: the ROR on offer pays it (+ its margin) from its second month.
-    const ror = offers.find((o) => o.kind === "ROR");
-    const defaults: HoldSellAssumptions = { ...DEFAULT_ASSUMPTIONS, ...(ror?.rates[1] != null ? { nbpRate: ror.rates[1] - (ror.margin ?? 0) } : {}) };
+    const nbpRate = nbpRateFromOffers(offers);
+    const defaults: HoldSellAssumptions = { ...DEFAULT_ASSUMPTIONS, ...(nbpRate !== undefined ? { nbpRate } : {}) };
     const assumptions: HoldSellAssumptions = { ...defaults, ...saved };
     const held = new Set(snap.holdings.map((h) => h.isin));
     const corporate = instruments.filter((i) => i.type === "BOND_CORPORATE" && held.has(i.isin));

@@ -175,7 +175,7 @@ As PT's jobs: an EventBridge Scheduler schedule (`sst.aws.CronV2`, `timezone: Eu
 - **Vs alternative:** net yield − net yield of the alternative over the same term (pp). The alternative is the retail bond on offer with the nearest term (from `SERIES#`) or a rate set by you.
 - **Premium vs gov (gross):** fixed coupon: yield − treasury curve at the same maturity; floating: price-adjusted margin − WZ margin of a similar maturity. Blank for non-PLN bonds and bonds without a trade in 90 days.
 - **Liquidity (30 and 90 days):** share of sessions with trades, median turnover on traded days, number of trades, median bid/ask spread, order depth at best bid; "days to sell 10 000 zł" assuming 20 % of the median daily turnover. Level: high (traded ≥ 80 % of sessions and median turnover ≥ 20 000 zł), medium (≥ 40 %), low (less), none (no trade in 30 days). Thresholds to be calibrated on the backfilled history.
-- **Flags:** stale price, callable, amortising (nominal fell), suspended, GPW marking, no terms yet.
+- **Flags:** stale (no trade in 30 sessions: no premium), no terms yet, no periods (the page's dates don't add up), periods extended (obligacje.pl lists them only up to the current one: the rest repeat the last period's length to maturity, projected), amortising (nominal below the issue's), matures soon (under 90 days: no yield), indexed (IZ: not computed).
 
 ## Issuer analysis (phase 2)
 

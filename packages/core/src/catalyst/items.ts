@@ -5,6 +5,8 @@ import type { IsoDate } from "../dates.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
 import type { CatalystSegment } from "../gpw/catalystDailyFile.ts";
 import type { Coupon } from "./terms.ts";
+import type { CurvePoint } from "./curve.ts";
+import type { ScreenRow } from "./screen.ts";
 
 export type CatalystBondStatus = "listed" | "suspended" | "ended";
 
@@ -63,6 +65,9 @@ export const catalystKeys = {
   terms: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "TERMS" as const }),
   coupon: (isin: string, start: IsoDate) => ({ PK: `BOND#${isin}` as const, SK: `COUPON#${start}` as const }),
   quoteDay: (date: IsoDate) => ({ PK: "QUOTEDAYS" as const, SK: date }),
+  screen: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "SCREEN" as const }),
+  curve: (date: IsoDate) => ({ PK: "CURVE#PLGOV" as const, SK: date }),
+  setting: (name: string) => ({ PK: `SETTING#${name}` as const, SK: "META" as const }),
   quote: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `Q#${date}#${market}` as const }),
 };
 
@@ -140,3 +145,16 @@ export interface CatalystTermsItem {
 
 /** One interest period of a bond (dates and rate), as PT's coupon periods (core/bonds/couponPeriods.ts). */
 export type CatalystCouponItem = InterestPeriod & { PK: `BOND#${string}`; SK: `COUPON#${IsoDate}`; updatedAt: string };
+
+/** A listed bond's screen row (core/catalyst/screen.ts), recomputed by the metrics; listed on the index as `SCREEN`. */
+export type CatalystScreenItem = ScreenRow & { PK: `BOND#${string}`; SK: "SCREEN"; GSI1PK: "SCREEN"; GSI1SK: string; computedAt: string };
+
+/** The State's curves of a session (core/catalyst/curve.ts): fixed-rate yields and WZ price-adjusted margins. */
+export interface CatalystCurveItem {
+  PK: "CURVE#PLGOV";
+  SK: IsoDate;
+  date: IsoDate;
+  fixed: CurvePoint[];
+  wz: CurvePoint[];
+  computedAt: string;
+}

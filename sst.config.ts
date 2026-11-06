@@ -96,7 +96,7 @@ export default $config({
 
     // The Catalyst module (Docs/catalyst.md): its own table, queue and worker; its API routes come with PT's below.
     const { catalystApi, catalystModule } = await import("./infra/catalyst.ts");
-    const catalystShared = { defaults: { timeout: defaults.timeout, memory: defaults.memory, architecture: defaults.architecture, logging: defaults.logging }, link, alerts };
+    const catalystShared = { defaults: { timeout: defaults.timeout, memory: defaults.memory, architecture: defaults.architecture, logging: defaults.logging }, link, alerts, market: { name: market.name, arn: market.arn } };
     const catalyst = catalystModule(catalystShared);
 
     // --- jobs ----------------------------------------------------------------------------------
