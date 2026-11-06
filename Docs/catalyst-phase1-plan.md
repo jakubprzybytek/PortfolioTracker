@@ -72,10 +72,10 @@ Changes to PT's shared code, done before the milestones so they only add new cod
 
 | # | Change | Status |
 |---|---|---|
-| P1 | Yield calculation (bond cash flows, `irr`) moved from `holdsell/holdSell.ts` to `core/bonds/yield.ts`, behaviour unchanged | |
-| P2 | Job runs in more than one table: `runJob`, `JOBS`, the watchdog and `GET /status` know each job's store | |
-| P3 | One polite fetch helper in `jobs/lib/http.ts`: one user agent, a pause per site, timeouts | |
-| P4 | Shared parsers of the Catalyst daily statistics file and quotes pages in `core/gpw/` (PT may use them without importing the module) | |
+| P1 | Yield calculation (bond cash flows, `irr`) moved from `holdsell/holdSell.ts` to `core/bonds/yield.ts`, behaviour unchanged | Done 2026-11-06 |
+| P2 | Job runs in more than one table: `runJob`, `JOBS`, the watchdog and `GET /status` know each job's store | Done 2026-11-06: `JobRunStore` (`core/db/jobRuns.ts`), `JobTable` and `jobTable()` in `jobs.ts`, `jobRuns(job)` in `context.ts` |
+| P3 | One polite fetch helper in `jobs/lib/http.ts`: one user agent, a pause per site, timeouts | Done 2026-11-06: `fetchSource` (`USER_AGENT`, `POLITE_INTERVAL_MS`), used by every source client |
+| P4 | Shared parsers of the Catalyst daily statistics file and quotes pages in `core/gpw/` (PT may use them without importing the module) | Done 2026-11-06: `parseCatalystDailyFile` (both layouts), `parseCatalystQuotes` |
 | P5 | PT's corporate-bond backfill stops reading BiznesRadar's paged history (disallowed by its robots.txt), older history from the daily file | **Deferred** (owner, 2026-11-06) |
 | P6 | Sortable columns in `StickyTable` (header click, sort in the URL) | |
 | P7 | M0's checks and the fixtures (`packages/core/test/fixtures/catalyst/`) | Done 2026-11-06: findings in [catalyst.md](catalyst.md#checked-2026-11-06) |

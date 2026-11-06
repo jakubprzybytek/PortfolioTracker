@@ -3,6 +3,8 @@ export * from "./settlement.ts";
 export * from "./gpw/parseHistory.ts";
 export * from "./gpw/archive.ts";
 export * from "./gpw/toPriceItems.ts";
+export * from "./gpw/catalystDailyFile.ts";
+export * from "./gpw/catalystQuotes.ts";
 export * from "./bonds/terms.ts";
 export * from "./bonds/izIndex.ts";
 export * from "./bonds/accrued.ts";
