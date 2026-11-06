@@ -175,6 +175,11 @@ h1.brand { margin: 0; font-size: var(--fs-18); letter-spacing: -0.01em; }
   .filter select option { color: var(--fg); }
 }
 table.static th { cursor: default; }
+/* Sortable headers (SortTh): the label is a button, styled as the header text; the sorted column darker, with its arrow. */
+th.sortable .sort-button { all: unset; cursor: pointer; display: inline-flex; align-items: baseline; gap: 3px; }
+th.sortable .sort-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+th.sorted { color: var(--fg); }
+th.sortable .sort-mark { display: inline-block; width: 0.8em; font-size: 0.85em; }
 tr.group td { font-weight: 600; background: var(--row); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 /* Holdings by account: each account's header row stands out, so the accounts are easy to tell apart. */
 tr.account-group td { background: var(--band); font-size: var(--fs-14); font-weight: 700; padding-top: 11px; padding-bottom: 11px; border-top: 1px solid var(--band-line); border-bottom-color: var(--band-line); }

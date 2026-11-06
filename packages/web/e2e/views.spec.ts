@@ -1600,3 +1600,40 @@ test.describe("sticky filters and header (Holdings, Prices)", () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       });
 });
+
+test.describe("sorting by a column", () => {
+  test("prices: a header click sorts, again reverses, a third goes back; kept in the URL; empty values last", async ({ page }) => {
+    await page.goto("/#/prices");
+    const codes = () => page.getByTestId("prices-table").locator("tbody tr td:first-child strong").allTextContents();
+    const byCode = ["DE0001102523", "DS0432", "EDO0935", "IZ0836", "KRU0827", "SAMPLE-APARTMENT", "SPXS"];
+    await expect(page.getByTestId("prices-table").locator("tbody tr")).toHaveCount(7);
+    expect(await codes()).toEqual(byCode);
+
+    await page.getByTestId("sort-instrument").click();
+    await expect(page).toHaveURL(/#\/prices\?sort=instrument$/);
+    await expect(page.getByTestId("prices-table").getByRole("columnheader", { name: /Instrument/ })).toHaveAttribute("aria-sort", "ascending");
+    expect(await codes()).toEqual(byCode);
+
+    await page.getByTestId("sort-instrument").click();
+    await expect(page).toHaveURL(/#\/prices\?sort=-instrument$/);
+    await expect.poll(codes).toEqual([...byCode].reverse());
+
+    await page.getByTestId("sort-instrument").click();
+    await expect(page).toHaveURL(/#\/prices$/);
+    await expect.poll(codes).toEqual(byCode);
+
+    // "1 year" starts with the highest; instruments without a year of history come last either way.
+    await page.getByTestId("sort-change").click();
+    await expect(page).toHaveURL(/#\/prices\?sort=-change$/);
+    const changes = await page.getByTestId("prices-table").locator("tbody tr td:nth-child(6)").allTextContents();
+    // A change reads "+1,23 %"; "–" (none) and a retail bond's "6,00 % before" (its rate, not a change) have no value.
+    const values = changes.map((t) => (/^[+−-]?[\d\s]+,\d+\s%$/.test(t.trim()) ? Number(t.replace(/[^\d,−-]/g, "").replace(",", ".").replace("−", "-")) : null));
+    const known = values.filter((v): v is number => v !== null);
+    expect(known).toEqual([...known].sort((a, b) => b - a));
+    expect(values.slice(known.length).every((v) => v === null)).toBe(true);
+
+    // The sort survives a reload and a filter.
+    await page.goto("/#/prices?sort=-instrument&type=BOND_LISTED");
+    await expect.poll(codes).toEqual(["IZ0836", "DS0432"]);
+  });
+});

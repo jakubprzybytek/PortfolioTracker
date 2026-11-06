@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { HeaderCopy } from "./SortTh.tsx";
 import { useNarrow } from "./useNarrow.ts";
 
 /**
@@ -27,6 +28,7 @@ export function useStickyToolbar(): [(el: HTMLDivElement | null) => void, CSSPro
  * phone, a narrow window): a box that scrolls sideways would hold a sticky header in it, so a copy of the header
  * (`head`: its one row) floats above the box instead, with the real header's column widths and following its
  * sideways scroll. The real header stays under the copy and sizes the columns. Header cells must not span columns.
+ * Sortable headers (SortTh) work in both: the copy takes the clicks, the real one the keyboard (HeaderCopy).
  */
 export function StickyTable({ head, className, testId, children }: { head: ReactNode; className?: string; testId?: string; children: ReactNode }) {
   const wrap = useRef<HTMLDivElement | null>(null);
@@ -69,7 +71,9 @@ export function StickyTable({ head, className, testId, children }: { head: React
               ))}
             </colgroup>
           )}
-          <thead>{head}</thead>
+          <thead>
+            <HeaderCopy.Provider value={true}>{head}</HeaderCopy.Provider>
+          </thead>
         </table>
       </div>
       <div className="table-wrap sticky-body" ref={wrap} onScroll={follow} style={{ marginTop: -size.height }}>

@@ -77,7 +77,7 @@ Changes to PT's shared code, done before the milestones so they only add new cod
 | P3 | One polite fetch helper in `jobs/lib/http.ts`: one user agent, a pause per site, timeouts | Done 2026-11-06: `fetchSource` (`USER_AGENT`, `POLITE_INTERVAL_MS`), used by every source client |
 | P4 | Shared parsers of the Catalyst daily statistics file and quotes pages in `core/gpw/` (PT may use them without importing the module) | Done 2026-11-06: `parseCatalystDailyFile` (both layouts), `parseCatalystQuotes` |
 | P5 | PT's corporate-bond backfill stops reading BiznesRadar's paged history (disallowed by its robots.txt), older history from the daily file | **Deferred** (owner, 2026-11-06) |
-| P6 | Sortable columns in `StickyTable` (header click, sort in the URL) | |
+| P6 | Sortable columns in `StickyTable` (header click, sort in the URL) | Done 2026-11-06: `SortTh` and `sort.ts` (`sort=<column>` / `-<column>`, empty values last, Polish order); used by Prices. Holdings not yet (its grouped rows need their own rule) |
 | P7 | M0's checks and the fixtures (`packages/core/test/fixtures/catalyst/`) | Done 2026-11-06: findings in [catalyst.md](catalyst.md#checked-2026-11-06) |
 
 ## Milestones

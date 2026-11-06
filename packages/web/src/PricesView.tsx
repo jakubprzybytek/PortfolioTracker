@@ -12,18 +12,42 @@ import type { Price, PriceRow, Transaction } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
 import { useShowClosed } from "./showClosed.ts";
+import { parseSort, sortParam, sortRows, type Sort, type SortValue } from "./sort.ts";
+import { SortTh } from "./SortTh.tsx";
 import { StickyTable, useStickyToolbar } from "./sticky.tsx";
 
 /** Bonds are priced in % of nominal; other instruments in their currency; retail bonds show their interest rate. */
 const fmtPrice = (r: PriceRow) =>
   r.rate ? `${fmtNum(r.rate.current * 100)} % p.a.` : r.price === null ? "–" : r.type.startsWith("BOND") ? `${fmtNum(r.price)} %` : `${fmtNum(r.price)} ${r.currency}`;
 
+const SORT_KEYS = ["instrument", "type", "class", "price", "date", "change"] as const;
+
+/** The value a column sorts by (retail bonds by their rate, which is what their price column shows). */
+function sortValue(r: PriceRow, key: string): SortValue {
+  switch (key) {
+    case "instrument":
+      return r.code;
+    case "type":
+      return typeLabel(r.type);
+    case "class":
+      return CLASS_LABELS[r.assetClass];
+    case "price":
+      return r.rate ? r.rate.current * 100 : r.price;
+    case "date":
+      return r.priceDate;
+    case "change":
+      return r.change1y;
+  }
+  return null;
+}
+
 /**
  * Held instruments: asset class, latest price, its date, change over a year. Filter by asset type, class and free text (name or code). Clicking a row shows its price
  * chart in a resizable panel docked to the bottom (as in Holdings); the open chart and the filter are in the URL.
  * "Show closed" (shared with Holdings while the app is open) adds the instruments traded but held no more, greyed, after the others: their last price
  * and the year up to it; their chart ranges count back from a month after the last transaction (ALL: from a month before the first).
- * The filters and the table's header stay at the top while the list scrolls (as in Transactions).
+ * The filters and the table's header stay at the top while the list scrolls (as in Transactions). A header click sorts by
+ * that column (`sort` in the URL), the closed instruments still after the held ones.
  */
 export function PricesView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const [showClosed, setShowClosed] = useShowClosed();
@@ -32,6 +56,8 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const cls = params["class"] ?? "";
   const text = params["q"] ?? "";
   const selected = params["chart"] ?? null;
+  const sort = parseSort(params["sort"], SORT_KEYS);
+  const setSort = (s: Sort | null) => setParams({ ...params, sort: sortParam(s) });
   const [range, setRange] = useState<RangeKey>("1Y");
   const [panelHeight, setPanelHeight] = useState(0);
   const all = rows.data ?? [];
@@ -42,7 +68,9 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
   const prices = useApi<Price[]>(selected ? `/instruments/${selected}/prices` : null, span && spanEnd ? { from: rangeBefore(range, spanEnd, addDays(span.firstDate, -31)), to: spanEnd } : { from: rangeFrom(range), to: today() });
   const txs = useApi<Transaction[]>(selected ? `/instruments/${selected}/transactions` : null);
   // Held ones by code, then the closed ones by code.
-  const shown = all.filter((r) => (!type || r.type === type) && (!cls || r.assetClass === cls) && matchesText(text, r)).sort((a, b) => Number(!!a.closed) - Number(!!b.closed) || a.code.localeCompare(b.code));
+  const byCode = all.filter((r) => (!type || r.type === type) && (!cls || r.assetClass === cls) && matchesText(text, r)).sort((a, b) => Number(!!a.closed) - Number(!!b.closed) || a.code.localeCompare(b.code));
+  // A chosen column orders the held ones, then the closed ones.
+  const shown = [...sortRows(byCode.filter((r) => !r.closed), sort, sortValue), ...sortRows(byCode.filter((r) => r.closed), sort, sortValue)];
   const closedCount = shown.filter((r) => r.closed).length;
   const types = useMemo(() => uniqueOptions(all, (r) => ({ value: r.type, label: typeLabel(r.type) })), [all]);
   const classes = useMemo(() => uniqueOptions(all, (r) => ({ value: r.assetClass, label: CLASS_LABELS[r.assetClass] })), [all]);
@@ -78,7 +106,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
         activeCount={[type, cls].filter(Boolean).length + (showClosed ? 1 : 0)}
         search={<FilterText label="Instrument" value={text} onChange={(v) => setParams({ ...params, q: v || undefined })} testId="filter-text" />}
         active={!!(type || cls || text)}
-        onReset={() => setParams({ chart: selected ?? undefined })}
+        onReset={() => setParams({ chart: selected ?? undefined, sort: sortParam(sort) })}
         summary={rows.loading ? "Loading…" : `${shown.length - closedCount} of ${all.filter((r) => !r.closed).length} instruments${showClosed ? ` + ${closedCount} closed` : ""}`}
       >
         <FilterSelect label="Asset type" value={type} options={types} onChange={(v) => setParams({ ...params, type: v || undefined })} testId="filter-type" />
@@ -89,15 +117,14 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
 
       <StickyTable
         testId="prices-table"
-        className="static"
         head={
           <tr>
-            <th className="left">Instrument</th>
-            <th className="left">Type</th>
-            <th className="left">Class</th>
-            <th>Price</th>
-            <th>Price date</th>
-            <th>1 year</th>
+            <SortTh label="Instrument" sortKey="instrument" sort={sort} onSort={setSort} className="left" />
+            <SortTh label="Type" sortKey="type" sort={sort} onSort={setSort} className="left" />
+            <SortTh label="Class" sortKey="class" sort={sort} onSort={setSort} className="left" />
+            <SortTh label="Price" sortKey="price" sort={sort} onSort={setSort} />
+            <SortTh label="Price date" sortKey="date" sort={sort} onSort={setSort} firstDesc />
+            <SortTh label="1 year" sortKey="change" sort={sort} onSort={setSort} firstDesc />
           </tr>
         }
       >
