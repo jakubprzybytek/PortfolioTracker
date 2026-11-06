@@ -10,7 +10,6 @@ import {
   buyMore,
   holdOrSell,
   ibkrTerms,
-  irr,
   nearestOffer,
   offerSeriesCode,
   retailOfferYield,
@@ -68,11 +67,6 @@ const base = (over: Partial<HoldSellInput>): HoldSellInput => ({
 });
 
 describe("helpers", () => {
-  it("irr: the annual rate that prices the flows", () => {
-    expect(irr(100, [{ t: 1, amount: 110 }])).toBeCloseTo(0.1, 5);
-    expect(irr(100, [{ t: 0.5, amount: 5 }, { t: 1, amount: 105 }])).toBeCloseTo(0.1025, 3);
-  });
-
   it("offerSeriesCode: the kind and its maturity month", () => {
     expect(offerSeriesCode("EDO", 120, "2026-10")).toBe("EDO1036");
     expect(offerSeriesCode("TOS", 36, "2026-10")).toBe("TOS1029");

@@ -9,10 +9,11 @@
 
 import { z } from "zod";
 import { couponOf } from "../bonds/accrued.ts";
-import { couponPerBond, INTEREST_TAX, isTaxFreeAccount, type InterestPeriod } from "../bonds/couponPeriods.ts";
+import { INTEREST_TAX, isTaxFreeAccount, type InterestPeriod } from "../bonds/couponPeriods.ts";
 import { indexRatioAt, type ReferenceIndex } from "../bonds/izIndex.ts";
 import { grosz, lotSeries, publishedRatePeriods, valueRetailBond, type RetailRatePeriod } from "../bonds/retail.ts";
 import type { BondTerms } from "../bonds/terms.ts";
+import { irr, periodFlows, yearlyCouponFlows, yearsBetween, type BondFlow } from "../bonds/yield.ts";
 import { daysBetween, shiftMonth, type IsoDate } from "../dates.ts";
 import type { HoldingSnapshot, InstrumentItem, TransactionItem } from "../db/items.ts";
 import type { RetailKind, RetailTerms } from "../mf/retailRates.ts";
@@ -128,7 +129,6 @@ export interface HoldSellInput {
 }
 
 const BOND_TYPES = new Set(["BOND_LISTED", "BOND_CORPORATE", "BOND_RETAIL", "BOND_IBKR"]);
-const yearsBetween = (a: IsoDate, b: IsoDate) => daysBetween(a, b) / 365.25;
 const round = (x: number, d = 2) => Math.round(x * 10 ** d) / 10 ** d;
 const pct = (x: number) => `${(x * 100).toFixed(2).replace(".", ",")} %`;
 
@@ -174,15 +174,6 @@ function projectedPeriods(terms: RetailTerms, valueDate: IsoDate, a: HoldSellAss
     return q;
   });
   return { periods, projected };
-}
-
-/** A flow of one bond: its amount and the part of it that's taxed. */
-interface BondFlow {
-  date: IsoDate;
-  kind: HoldFlow["kind"];
-  perBond: number;
-  taxBase: number;
-  projected?: boolean;
 }
 
 interface PerBond {
@@ -287,22 +278,10 @@ export function wiborMargin(name: string): number | undefined {
 
 function corporateBond(inst: InstrumentItem, periods: InterestPeriod[], today: IsoDate, a: HoldSellAssumptions): { flows: PerBond["flows"]; maturity: IsoDate; floating: boolean } | string {
   if (!inst.nominal) return "no nominal";
-  if (periods.length === 0) return "no coupon periods (the instrument's settings)";
-  const sorted = [...periods].sort((x, y) => x.start.localeCompare(y.start));
-  const settle = settlementDate(today);
   const margin = wiborMargin(inst.name);
-  const lastRate = [...sorted].reverse().find((p) => p.rate !== undefined)?.rate;
-  const flows: PerBond["flows"] = [];
-  for (const p of sorted) {
-    if (p.end <= settle) continue;
-    const rate = p.rate ?? (margin !== undefined ? a.wibor + margin : lastRate);
-    if (rate === undefined) return `no rate for the period from ${p.start}`;
-    const coupon = couponPerBond(inst.nominal, { ...p, rate })!;
-    flows.push({ date: p.paymentDate, kind: "coupon", perBond: coupon, taxBase: coupon, ...(p.rate === undefined ? { projected: true } : {}) });
-  }
-  const maturity = sorted.at(-1)!.paymentDate;
-  flows.push({ date: maturity, kind: "redemption", perBond: inst.nominal, taxBase: 0 });
-  return { flows, maturity, floating: margin !== undefined };
+  const lastRate = [...periods].sort((x, y) => x.start.localeCompare(y.start)).reverse().find((p) => p.rate !== undefined)?.rate;
+  const projected = periodFlows(inst.nominal, periods, settlementDate(today), () => (margin !== undefined ? a.wibor + margin : lastRate));
+  return typeof projected === "string" ? projected : { ...projected, floating: margin !== undefined };
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -319,34 +298,11 @@ export function ibkrTerms(inst: Pick<InstrumentItem, "name" | "pricePath">): { c
 function ibkrBond(inst: InstrumentItem, today: IsoDate): { flows: PerBond["flows"]; maturity: IsoDate } | string {
   const t = ibkrTerms(inst);
   if (!t) return "maturity unknown";
-  const nominal = inst.nominal ?? 1000;
-  const flows: PerBond["flows"] = [];
   // Yearly coupons on the maturity's day.
-  if (t.coupon > 0)
-    for (let y = Number(t.maturity.slice(0, 4)); ; y--) {
-      const d = `${y}${t.maturity.slice(4)}`;
-      if (d <= today) break;
-      flows.unshift({ date: d, kind: "coupon", perBond: nominal * t.coupon, taxBase: nominal * t.coupon });
-    }
-  flows.push({ date: t.maturity, kind: "redemption", perBond: nominal, taxBase: 0 });
-  return { flows, maturity: t.maturity };
+  return { flows: yearlyCouponFlows(inst.nominal ?? 1000, t.coupon, t.maturity, today), maturity: t.maturity };
 }
 
 // --- the comparison -------------------------------------------------------------------------------------
-
-/** The annual rate at which `flows` (t in years) are worth `price` today; bisection, as flows are all positive. */
-export function irr(price: number, flows: { t: number; amount: number }[]): number {
-  if (price <= 0 || flows.length === 0) return 0;
-  const pv = (y: number) => flows.reduce((s, f) => s + f.amount / (1 + y) ** f.t, 0);
-  let lo = -0.99;
-  let hi = 2;
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2;
-    if (pv(mid) > price) lo = mid;
-    else hi = mid;
-  }
-  return Math.round(((lo + hi) / 2) * 1e6) / 1e6;
-}
 
 /** An account's commission on bond trades: the median fee / amount of its bond trades with a fee, else the default. */
 export function commissionRate(transactions: TransactionItem[], account: string, bondIsins: ReadonlySet<string>): number {
