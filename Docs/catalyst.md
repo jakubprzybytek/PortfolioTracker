@@ -71,13 +71,13 @@ From CV's specification (§1 principle 8, §7), for the jobs, the CLI and the ag
 | End of day, every bond | gpwcatalyst.pl daily statistics file `pub/CATALYST/statystyki/statystyki_dzienne/catalyst_YYYYMMDD.xlsx` (older days `.xls`) | Sheet `instrumenty`, ~1,060 rows (corporate, municipal, cooperative, bank, covered, treasury): maturity, current coupon rate, accrued interest, **current nominal**, market, trading system, ISIN, code, currency, close, reference price, open/low/high/last, average prices, number of trades, volume, turnover (thousands). **Archived by date: 2020-01-02, 2022, 2023, 2025 and 2026 checked, all download** (2026-11-05), so history can be backfilled. Close = reference price on a day without trades: "traded" comes from the number of trades. The nominal changes (instalment redemptions; IZ indexation, at the settlement day T+2): read it from the file every day, never once at listing (§4). |
 | Bid/ask, order book | gpwcatalyst.pl quotes pages, one per segment (`notowania-obligacji-obligacje-korporacyjne`, `-skarbowe`, `-komunalne`, `-spoldzielcze`, `-bankowe-papiery-wartosciowe`, `-listy-zastawne`) | Snapshot of the current session only: a missed day is lost. Cells have sub-values, read by position (CV's `CorporateBondsQuotesPage.ts`). |
 | Terms | obligacje.pl bond page (app job only) | Issuer name as listed, issue value ("Wartość emisji w obrocie", with the nominal on the day it was read), coupon type ("zmienne WIBOR 6M + 3.85%"), first days of interest periods, record and payment days, current rate. Known errors: record days a period early (PLY1227), rates lagging a few days (§4). |
-| Exits | GPW suspensions and exclusions page, Catalyst notices, special markings of instruments | Why a bond left trading (redemption, early redemption, exclusion), markings `/1`–`/23` (bankruptcy, restructuring …). GPW's robots.txt allows it (§11). |
+| Exits | GPW's suspensions and exclusions (current page and the archive since 2018, one page each), Catalyst's special markings of instruments | Why a bond stopped trading early or was suspended, with the issuer's LEI; markings `/1`–`/23` (bankruptcy, restructuring …). Redemptions at maturity aren't listed: they come from the daily-file archive. GPW's robots.txt allows it. Checked 2026-11-07 (below). |
 | Treasury curve | The daily file (treasury segment) | Fixed-rate DS/PS/WS pay a constant coupon (the file's rate) yearly on the maturity's day and month, so their yields need no other source; WZ margins from the series' terms. |
 | Alternative | PT `market`: `SERIES#` (Ministry retail-bond file) | The retail bond on offer with the nearest term, or a rate you set. |
 | WIBOR / WIRON | None (assumption in the settings) | No free fixings source; floating coupons not yet set use the assumed rate + margin. |
 | Identity | GLEIF API (ISIN → LEI, name search, LEI record, parent), KRS register API `api-krs.ms.gov.pl/api/krs/OdpisAktualny/<KRS>` | Open; resolved 192 of 208 CV issuer names automatically (§5). |
 | Annual reports | KRS repository (by hand), issuers' investor-relations sites, Bankier.pl mirrors of ESPI reports (listed companies; assistants allowed; attachments 404 after about a year), filings.xbrl.org (ESEF by LEI; Polish filings stop at FY2022, foreign issuers later) | Formats and reading below; CV §7. |
-| Interim reports | Issuers' investor-relations sites, Bankier.pl mirrors of ESPI/EBI periodic reports | Quarterly (companies with listed shares) or half-year reports; not in the KRS repository and not ESEF-tagged, so in practice PDFs. Which issuers publish what: open questions. |
+| Interim reports | Issuers' investor-relations sites, Bankier.pl mirrors of ESPI/EBI periodic reports | Every Catalyst bond issuer publishes a half-year report (within 3 months); companies with shares on the regulated market also Q1 and Q3. Not in the KRS repository and not ESEF-tagged, so in practice PDFs. Checked 2026-11-07 (below). |
 
 Reachability: PT's data-sources.md noted gpwcatalyst.pl unreachable from the dev machine on 2026-10-12; on 2026-11-05 it answered normally. Check from Lambda (eu-west-1) before building. GPW's move to WATS may change the file and the pages; parsers look columns up by header and fail loudly.
 
@@ -96,6 +96,31 @@ Phase 0 (P7) checks; fixtures in `packages/core/test/fixtures/catalyst/`.
 - **Instrument page** (`o-instrumentach-instrument?nazwa=<code>`): issuer name, authorisation date, first listing, maturity, nominal, **issue value**, coupon type (fixed / floating), current rate, issuer's website. Not the margin, base rate or coupon dates (still obligacje.pl). An allowed source for the issuer and the issue value.
 - **WZ margins:** checked by `catalyst-terms` on dev (2026-11-06; obligacje.pl blocks AI assistants, so not by an agent): every WZ series is "zmienne WIBOR 6M + 0%"; the NZ series are "zmienne POLSTR 6M + 0%" (a new reference rate).
 - **obligacje.pl's pages aren't always consistent:** 17 of the first 444 have date lists that don't add up (e.g. 13 record days for 12 periods, a period whose dates are in the wrong order); one code's page is another bond's (GRU1138). The terms job keeps what it can (issuer, issue value, coupon) and records the problem.
+
+### Checked 2026-11-07 (phase 2, N0)
+
+- **GPW's exits** ([gpw.pl/zawieszenia-i-wykluczenia](https://www.gpw.pl/zawieszenia-i-wykluczenia)): robots.txt (gpw.pl and gpwcatalyst.pl) disallows only one NewConnect path.
+  - **The current page** lists the 129 measures in force.
+  - **The archive** (`zawieszenia-i-wykluczenia-archiwum`) is **one page**: 2.2 MB, 3,269 rows from 2018-01-04, no paging.
+  - **Columns of both:** published, action (suspension, lifting, exclusion), reason, from, to, in force, MIC, issuer, **issuer LEI**, ISIN(s) (comma-separated, one row can cover a whole series), code(s), notes.
+  - **Catalyst rows** (MIC `WBON`, `WMTF`, `BOSP`): 1,253, for 623 ISINs, every one with an LEI.
+  - **Ordinary redemptions at maturity aren't listed.** The exclusions are 37 early redemptions, 10 redemptions/cancellations, 7 at the issuer's request, 4 bankruptcies. The suspensions are mostly routine: at the issuer's request before a redemption (533), missing interest data for settlement (441). Some are signals: in the participants' interest (74), at the KNF's demand (31).
+  - **So the track record** = the daily-file archive (when a bond stopped trading, its last price) + this archive (why it stopped early or was suspended) + markings.
+- **Special markings** ([gpwcatalyst.pl/szczegolne-oznaczenia-instrumentow-finansowych](https://gpwcatalyst.pl/szczegolne-oznaczenia-instrumentow-finansowych)): a small table (issuer, marking); today one issuer (Kancelaria Medius, `/8`). It shows the current state only, so the job keeps its own history from its first run.
+- **Board resolutions** (`gpwcatalyst.pl/uchwaly-zarzadu`): 10 a page, each with its own page, about 1,500 a year (mostly municipal suspensions before redemption). Not used: the exits archive covers the same events with the ISIN and the LEI in one request.
+- **GLEIF:** `api.gleif.org/api/v1/lei-records?filter[isin]=<ISIN>` found the LEI for 36 of 40 randomly chosen listed corporate bonds (dev, 297 listed corporate). The LEI record gives the legal name, **the KRS number** (`registeredAs`), legal form, status and parent. 0.2–0.3 s a request from the dev machine; Lambda is checked on N2's first dev run. The exits archive adds the LEI of 623 bonds' issuers, ended ones included.
+- **KRS register API:** `api-krs.ms.gov.pl/api/krs/OdpisAktualny/<KRS>?rejestr=P&format=json` (open, 0.3 s) gives name, legal form, PKD (business activity: e.g. a developer's "realizacja projektów budowlanych …") and `dzial6` (liquidation, dissolution, merger/division/transformation).
+- **Periodic reports of Catalyst bond issuers:**
+  - **Bond issuers on the Catalyst alternative system** must publish **a half-year report within 3 months of 30 June and an annual report within 5 months of the year end** (GPW, Annex 4 to the Alternative System's rules, § 11–15). Group (consolidated) ones when the issuer is a parent. Exempt from the half-year: issuers of bonds with a nominal of at least EUR 100,000 whose parent is listed on GPW's regulated market (the parent's reports instead). Municipalities: budget reports instead.
+  - **Companies whose shares are on the regulated market** report quarterly (Q1, H1, Q3) and annually under the Ministry of Finance regulation.
+  - **So every corporate issuer** has at least a half-year report, mostly as a PDF in EBI and on its website.
+- **CatalystViewer's issuer data** (prod, read only):
+  - 171 identities (all confirmed) and 172 profiles (11 industries);
+  - 128 financial years of 43 companies: 85 ESEF, 27 PDF read by transcript, 16 KRS XML; 113 group, 15 single; all 12 months; FY2023–2025;
+  - 43 companies with a latest analysis (88 analyses in all, May–November 2026);
+  - its filings bucket holds 85 originals (49 ESEF packages, 19 PDFs, 11 KRS XML, 6 xhtml).
+
+  The PDF years' lines (label, page, amounts) are stored, so their transcripts can be rebuilt.
 
 ## Storage: table `catalyst`
 
@@ -190,7 +215,7 @@ The procedure is CV's (§3): bond → company → industry and rule set → repo
 | 1 Bond, amount owed | App | Daily file + terms |
 | 2 Company | App, then agent | GLEIF ISIN mapping and exact name match in `catalyst-terms`; the rest (renames, mergers, financing vehicles, legal-name mismatches) by the agent through the CLI, confirmed by hand where §5 says so |
 | 3 Industry, rule set | Agent; finance sub-types and overrides by you | Industry from the fixed list, with a summary and website; a Finance company has no scorecard until you give its sub-type (hand-reviewed map, §6) |
-| 4 Getting reports | Agent; KRS repository downloads by you | `catalyst work` lists reports due (annual: year end + 9 months; interim, for issuers that publish them: quarter end + 2 months, half-year end + 3 months); the agent fetches what robots.txt allows (issuer sites, Bankier, filings.xbrl.org) and adds the rest to the checklist for you |
+| 4 Getting reports | Agent; KRS repository downloads by you | `catalyst work` lists reports due (annual: year end + 5 months, Catalyst's deadline; half-year: 30 June + 3 months; quarterly, for companies with listed shares: quarter end + 2 months); the agent fetches what robots.txt allows (issuer sites, Bankier, filings.xbrl.org) and adds the rest to the checklist for you |
 | 5 Reading | Code; PDFs copied by the agent | KRS XML, ESEF package and IFRS text are parsed by code; a PDF's statement lines (annual or interim) are copied by the agent and checked by code (below) |
 | 6 Fallback figures | Agent | Only operating companies without a report; marked, confidence medium at most |
 | 7–9 Scorecard, refinancing, confidence | App | Computed on read |
@@ -328,7 +353,7 @@ A financial company's sub-type (collector, leasing …) is proposed to you; you 
 
 **4. The report.**
 - `catalyst entity 0000123456` lists the stored years and the files already held. These include CatalystViewer's 85 originals, migrated, so they're never downloaded again.
-- `catalyst work` names what's due: annual reports at year end + 9 months, group accounts first.
+- `catalyst work` names what's due: annual reports at year end + 5 months (Catalyst's deadline), group accounts first.
 
 The URL isn't guessed; the agent finds it as a person would:
 
@@ -493,5 +518,4 @@ Each step goes to prod on its own. Phase 1 (steps 1–7) in detail: [catalyst-ph
 - Is passing the app's computed bond results (amounts owed, maturities) to the agent compatible with obligacje.pl's `ai-input=no`? Proposed: yes for figures the app derived, never the site's text; to be confirmed.
 - Companies without an LEI or a KRS number (WB Electronics has no LEI): a private id (`ZZ:<name>`), as PT's `ZZ` ISINs.
 - WIRON: which bonds reference it and what the assumption should be.
-- Interim reports: which periodic reports bond-only issuers must publish (GPW main market vs the Catalyst alternative system; half-year at least?), checked in the rules before the interim step is planned; and how many of the issuers in scope publish quarterly reports.
 - A free source of WIBOR/WIRON fixings, for floating coupons and the premium of floaters.

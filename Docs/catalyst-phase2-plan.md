@@ -112,6 +112,12 @@ Small changes before the milestones. None of them adds resources or changes data
 
 ### N0 Checks before building
 
+**Done 2026-11-07.** Findings in [catalyst.md](catalyst.md#checked-2026-11-07-phase-2-n0):
+- **Exits:** GPW's exits archive is one page since 2018 with the issuer's LEI on every row, but it lists only early ends and suspensions. Ends at maturity come from the daily-file archive. Board resolutions aren't needed.
+- **Identity:** GLEIF's ISIN mapping found 36 of 40 sampled issuers, and the KRS API gives PKD codes and liquidation entries.
+- **Interim reports:** every Catalyst bond issuer must publish a half-year report (3 months) and an annual one (5 months); companies with listed shares also publish quarterly.
+- **CatalystViewer:** 171 identities, 128 years of 43 companies, 85 originals.
+
 No deploy. Findings go into `Docs/catalyst.md` (data sources, open questions).
 
 1. **GPW exits:** the suspensions and exclusions page, Catalyst notices and special markings (`/1`–`/23`): their URLs, layout and depth back to 2018; robots.txt (CV §11 says allowed).
@@ -125,8 +131,8 @@ Done when: each item has an answer in the design doc, and N8's go/no-go is put t
 
 Design step 8: the `catalyst-exits` job and the track record, per issuer name until N2 joins names to companies.
 
-- `exits.ts`: GPW's pages → per bond: the date, the reason (redemption, early redemption, exclusion, suspension) and markings with their dates.
-- `handlers/exits.ts` at 10:00 Mon–Fri: archive raw, write the exit on the bond item, markings as `BOND#<isin>/MARK#<date>`; a one-off backfill to 2018 through the queue (`{ kind: "exits-backfill" }`).
+- `exits.ts`: GPW's current and archive pages (one request each; a row can name several ISINs) → per bond: the date, the action, the reason, the issuer's LEI; the markings page → markings, whose history the job keeps from its first run.
+- `handlers/exits.ts` at 10:00 Mon–Fri: archive raw, write the exit on the bond item, markings as `BOND#<isin>/MARK#<date>`; the archive page is the backfill to 2018 (one request, no queue). An LEI found there is offered to N2's identity.
 - `trackRecord.ts`: for a set of bonds, the number repaid at maturity, redeemed early, ended below par (last close < 98 within 10 sessions of the end), still listed past maturity, and unknown; red flags (a marking, an extension, a buy-back below par); the period covered. Inferred facts are labelled as inferred.
 - Bond panel: a *History* line (how and when a past bond ended); the bonds table gets a "marked" tag.
 - Tests: the parser on stored pages; the track record on synthetic and real cases (a GetBack bond, a bond repaid early, an extension).
@@ -200,7 +206,7 @@ This adds a new way into the API (access).
 
 - Agent token: create, revoke and "last used" in the Catalyst settings (`POST`/`DELETE /catalyst/agent-token`, shown once). `/catalyst/agent/{proxy+}` has the token check and the allow-list. The allowed writes are names, companies (not sub-types or overrides), filings, collected figures, analyses and checklist entries. Every write records `enteredBy`.
 - `packages/cli`: the commands in the design's table, JSON output by default, `--table`, and `--dry-run` on every write. Parsing, checks, PDF pages, GLEIF/KRS and the scorecard preview run locally; the API only for reading stored rows and writing results. `catalyst login --stage` stores the token in the user's profile, outside the repo. `catalyst schema <kind>` prints the zod schemas as JSON Schema.
-- `catalyst work`: names to resolve, reports due (year end + 9 months), companies on fallback figures, Finance companies without a sub-type, judgements older than the latest report, new markings and bonds ending below par.
+- `catalyst work`: names to resolve, reports due (annual: year end + 5 months; half-year: + 3 months), companies on fallback figures, Finance companies without a sub-type, judgements older than the latest report, new markings and bonds ending below par.
 - `.claude/skills/catalyst-analyst/SKILL.md`: the design's eight steps, the limits (N companies a session, never market data, never `--force` without asking) and the robots.txt rules (obligacje.pl and the KRS repository never fetched by the agent).
 - Tests: integration on `int` with a test token (each allowed write, each refused route, a revoked token, no PT route reachable); the CLI against `int`.
 
