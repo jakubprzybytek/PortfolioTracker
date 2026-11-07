@@ -1,0 +1,13 @@
+{
+  "name": "@portfolio/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "`catalyst`: the Catalyst module's command line, the AI agent's interface (Docs/catalyst.md, \"The catalyst CLI\")",
+  "bin": {
+    "catalyst": "./src/main.ts"
+  },
+  "dependencies": {
+    "@portfolio/core": "0.1.0"
+  }
+}

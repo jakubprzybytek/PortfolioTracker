@@ -102,11 +102,11 @@ scripts/catalyst-migrate-cv.ts                 N5 (read only on CV)
 
 Small changes before the milestones. None of them adds resources or changes data.
 
-| # | Change |
-|---|---|
-| Q1 | Dependencies: `fast-xml-parser` in core, `pdfjs-dist` in the CLI only (versions as CV's, checked for advisories); a zip reader (CV's own `zip.ts`, no new package) |
-| Q2 | `CatalystView.tsx` (≈ 800 lines) split into `web/src/catalyst/` (table, filters, panel, chart, settings) before the issuer columns and dialog are added |
-| Q3 | `packages/cli` workspace skeleton: `npx catalyst --version`, the API client with the Cognito login for you (tests use the test user) |
+| # | Change | Status |
+|---|---|---|
+| Q1 | Dependencies: `fast-xml-parser` in core, `pdfjs-dist` in the CLI only (versions as CV's, checked for advisories); a zip reader (CV's own `zip.ts`, no new package) | Moved to N3, so each dependency comes with the code that uses it |
+| Q2 | `CatalystView.tsx` (≈ 800 lines) split into `web/src/catalyst/` (table, filters, panel, chart, settings) before the issuer columns and dialog are added | Done 2026-11-07: `catalyst/` with `CatalystView.tsx`, `types.ts`, `labels.ts`, `filters.ts`, `parts.tsx`, `YieldChart.tsx`, `BondPanel.tsx`, `ViewsMenu.tsx`, `AssumptionsPanel.tsx` |
+| Q3 | `packages/cli` workspace skeleton: `npx catalyst --version` | Done 2026-11-07: `npx catalyst --version`, `--help`, `where --stage` (the stage's API, the settings directory in the user's profile); unit tests; in `typecheck`. The token login comes with N7 |
 
 ## Milestones
 

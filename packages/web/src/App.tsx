@@ -22,7 +22,7 @@ const PerformanceView = lazy(() => import("./PerformanceView.tsx").then((m) => (
 const PricesView = lazy(() => import("./PricesView.tsx").then((m) => ({ default: m.PricesView })));
 const SalesView = lazy(() => import("./SalesView.tsx").then((m) => ({ default: m.SalesView })));
 const StatusView = lazy(() => import("./StatusView.tsx").then((m) => ({ default: m.StatusView })));
-const CatalystView = lazy(() => import("./CatalystView.tsx").then((m) => ({ default: m.CatalystView })));
+const CatalystView = lazy(() => import("./catalyst/CatalystView.tsx").then((m) => ({ default: m.CatalystView })));
 const CashFlowsView = lazy(() => import("./CashFlowsView.tsx").then((m) => ({ default: m.CashFlowsView })));
 const TransactionsView = lazy(() => import("./TransactionsView.tsx").then((m) => ({ default: m.TransactionsView })));
 

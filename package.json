@@ -13,7 +13,7 @@
     "dev": "sst dev",
     "deploy": "sst deploy",
     "shell": "sst shell",
-    "typecheck": "tsc -p packages/core && tsc -p packages/jobs && npm run typecheck -w @portfolio/web",
+    "typecheck": "tsc -p packages/core && tsc -p packages/jobs && tsc -p packages/cli && npm run typecheck -w @portfolio/web",
     "lint": "biome lint .",
     "test": "vitest run --project unit",
     "test:unit": "vitest run --project unit",

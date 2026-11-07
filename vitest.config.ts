@@ -5,7 +5,7 @@ export default defineConfig({
     // `npm run test:coverage`: unit-test coverage of the code (the integration and E2E tests run against a stage).
     coverage: {
       provider: "v8",
-      include: ["packages/core/src/**", "packages/jobs/src/**", "packages/web/src/**"],
+      include: ["packages/core/src/**", "packages/jobs/src/**", "packages/web/src/**", "packages/cli/src/**"],
       reporter: ["text-summary", "html"],
       reportsDirectory: "coverage",
     },
@@ -13,7 +13,7 @@ export default defineConfig({
       {
         test: {
           name: "unit",
-          include: ["packages/core/test/**/*.test.ts", "packages/jobs/test/unit/**/*.test.ts", "packages/web/test/**/*.test.ts"],
+          include: ["packages/core/test/**/*.test.ts", "packages/jobs/test/unit/**/*.test.ts", "packages/web/test/**/*.test.ts", "packages/cli/test/**/*.test.ts"],
         },
       },
       {
