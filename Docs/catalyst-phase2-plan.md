@@ -54,7 +54,8 @@ These settle details the design leaves open. Where the design differs, the desig
 1. **obligacje.pl's `ai-input=no` and the CLI.** Agreed (2026-11-07): the agent sees only figures the app derived (amount owed, maturity, coupon as numbers, yields), never the site's text or pages.
 2. **Agent runs:** by hand in Claude Code only, for now (2026-11-07). No scheduled routine.
 3. **CatalystViewer:** not switched off for now, at all (2026-11-07). N9 is on hold; CV keeps running alongside.
-4. **Interim reports:** go or no-go after N0's check of which issuers publish what (N8).
+4. **Interim reports:** go (2026-11-07), as suggested: the half-year balance sheet, on demand (bonds due within 24 months, a yellow or red in debt service, liquidity or refinancing, or asked); trailing 12 months later, if useful.
+5. **AI analysis per company** (new requirement, 2026-11-07): off by default, shown as "AI analysis off" instead of the scorecard, switched on by you in the issuer dialog; only then does `catalyst work` list the company. On from the start: issuers of bonds you hold, and companies with reports (CV's 43). Design: "AI analysis per company".
 
 ## What is ported from CatalystViewer
 
@@ -144,7 +145,8 @@ Done when: every bond that ended since 2020 has a reason or "unknown". On dev, G
 - Items: `NAME#`, `ENTITY#`; `entityId` on the bond.
 - `gleif.ts`, `krs.ts` in core (fetch-based, used by the terms job and the CLI; the job archives responses under `raw/catalyst-identity/`); `identity.ts` ported: ISIN → LEI mapping, exact name match, LEI record and parent, KRS extract.
 - `catalyst-terms` resolves new issuer names on its runs (design, "Jobs"). A one-off run resolves the names already in the table. Names that aren't resolved stay `unresolved`; a legal name that differs from the listed one stays `review`.
-- API (read): `GET /catalyst/entities`, `GET /catalyst/entities/{id}`, `GET /catalyst/names`. API (write, you): `PUT /catalyst/names/{name}` (link, confirm) and `PUT /catalyst/entities/{id}` (short name, industry, sub-type, override).
+- API (read): `GET /catalyst/entities`, `GET /catalyst/entities/{id}`, `GET /catalyst/names`. API (write, you): `PUT /catalyst/names/{name}` (link, confirm), `PUT /catalyst/entities/{id}` (short name, industry, sub-type, override) and `PUT /catalyst/entities/{id}/ai` / `PUT /catalyst/names/{name}/ai` (the AI analysis switch, with who and when; a name's passes to its company when linked).
+- AI analysis on from the start for the issuers of bonds you hold: a script reads PT's holdings once (read only) and switches their companies on.
 - The export gains names and companies.
 - Tests: CV's identity tests; the job resolving on fixture responses; the routes (401, validation).
 
@@ -179,7 +181,7 @@ This writes data on prod that exists nowhere else (design, "Migration from Catal
 
 - `scripts/catalyst-migrate-cv.ts` (read only on CV, `--dry-run` by default):
   - identities, with confirmed ones kept confirmed, become names and companies;
-  - profiles, the finance map and overrides go onto the companies, marked as yours;
+  - profiles, the finance map and overrides go onto the companies, marked as yours; every company with reports gets AI analysis on;
   - every original in CV's filings bucket (85) is copied and re-imported through N3, never downloaded again; a PDF from a transcript rebuilt from CV's stored lines (label, page, amounts) and checked against the PDF; each year compared with CV's `IssuerFinancials` row;
   - `expected.json` becomes known answers, and CV's checklist becomes checklist entries;
   - analyses become judgements and their figures become collected figures, both marked as from CV's agent.
@@ -193,6 +195,7 @@ Done when: prod holds every company CV analysed, each scorecard equals CV's or i
 Design, "UI": "Issuer dialog" and "Issuers".
 
 - Bonds view: the issuer column (six dots and the trend arrows, rule set, confidence; faded when low; "no report yet", "not scored"), the issuer filters (industry, rule set, scorecard, confidence, scored only, track record without red flags, judgement age) and the chart coloured by one chosen dimension.
+- The AI analysis switch: "AI analysis off · Enable" in place of the scorecard (table cell, dialog), the switch in the dialog's header and the Issuers view's rows, the filter.
 - Issuer dialog (`?issuer=<entityId>`): header, source line, scorecard with metrics, bonds falling due against cash, track record, judgement; tabs *Bonds*, *Financials* (years, lines behind a figure, full statements, review status with the buttons to mark a year `hand-checked` or `flagged`), *Track record*, *Judgements*, *Documents*. It's full screen on a phone.
 - `#/catalyst/issuers`: one row per company, with the columns, filters and the *needs work* column; the *Reports checklist* tab.
 - Docs: `ui.md`.
@@ -204,9 +207,9 @@ Done when: on prod you can go from a bond to its company's scorecard and the lin
 
 This adds a new way into the API (access).
 
-- Agent token: create, revoke and "last used" in the Catalyst settings (`POST`/`DELETE /catalyst/agent-token`, shown once). `/catalyst/agent/{proxy+}` has the token check and the allow-list. The allowed writes are names, companies (not sub-types or overrides), filings, collected figures, analyses and checklist entries. Every write records `enteredBy`.
+- Agent token: create, revoke and "last used" in the Catalyst settings (`POST`/`DELETE /catalyst/agent-token`, shown once). `/catalyst/agent/{proxy+}` has the token check and the allow-list. The allowed writes are names, companies (not sub-types, overrides or the AI analysis switch), filings, collected figures, analyses and checklist entries. Every write records `enteredBy`.
 - `packages/cli`: the commands in the design's table, JSON output by default, `--table`, and `--dry-run` on every write. Parsing, checks, PDF pages, GLEIF/KRS and the scorecard preview run locally; the API only for reading stored rows and writing results. `catalyst login --stage` stores the token in the user's profile, outside the repo. `catalyst schema <kind>` prints the zod schemas as JSON Schema.
-- `catalyst work`: names to resolve, reports due (annual: year end + 5 months; half-year: + 3 months), companies on fallback figures, Finance companies without a sub-type, judgements older than the latest report, new markings and bonds ending below par.
+- `catalyst work`: only companies and names with AI analysis on; names to resolve, reports due (annual: year end + 5 months; half-year: + 3 months), companies on fallback figures, Finance companies without a sub-type, judgements older than the latest report, new markings and bonds ending below par.
 - `.claude/skills/catalyst-analyst/SKILL.md`: the design's eight steps, the limits (N companies a session, never market data, never `--force` without asking) and the robots.txt rules (obligacje.pl and the KRS repository never fetched by the agent).
 - Tests: integration on `int` with a test token (each allowed write, each refused route, a revoked token, no PT route reachable); the CLI against `int`.
 
@@ -214,11 +217,11 @@ Done when: an agent session in Claude Code takes one item from `catalyst work` t
 
 ### N8 Interim reports
 
-Design, "Interim reports". It goes ahead only on N0's answer and your go.
+Design, "Interim reports". Go (2026-11-07): step 1 for the companies that need it (on demand), step 2 only if step 1 proves useful.
 
 1. **Interim balance sheet:** `INT#` rows; the transcript states the period, the months and the columns; the checks also confirm that the columns are labelled with their periods. The scorecard takes the point-in-time items from the latest interim period newer than the year when the scope and standard match. The confidence notes "unaudited", and the source line names the period.
 2. **Trailing 12 months:** `ttm.ts` (full year + year to date − the comparative), used in debt service and profitability when every input is present. There's a flag when the next audited year differs by more than 5 %. The *Financials* tab gets the TTM column.
-3. `catalyst work` lists interim reports due (quarter + 2 months, half-year + 3 months) for issuers that publish them. `filings sort` names them `<year>Q<n>` or `<year>H1`.
+3. `catalyst work` lists the half-year report (30 June + 3 months) for companies with AI analysis on that need it (bonds due within 24 months; debt service, liquidity or refinancing yellow or red; or asked), and quarterly ones only when asked. `filings sort` names them `<year>Q<n>` or `<year>H1`.
 
 Tests: TTM on hand-computed cases (including a part year that must be refused and a scope mismatch); the scorecard switching sources and back once the next year arrives.
 

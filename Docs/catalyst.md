@@ -24,6 +24,7 @@ CV's **fundamental analysis specification** (`CatalystViewer/docs/fundamental-an
   - [Reading reports (code, ported from CV)](#reading-reports-code-ported-from-cv)
   - [Scorecard (app)](#scorecard-app)
   - [Repayment track record (app)](#repayment-track-record-app)
+  - [AI analysis per company (on/off)](#ai-analysis-per-company-onoff)
   - [Interim reports](#interim-reports)
   - [Later](#later)
 - [The `catalyst` CLI (the agent's interface)](#the-catalyst-cli-the-agents-interface)
@@ -148,7 +149,7 @@ Bonds are joined to reports **through the company's identity, never by matching 
 | Item | PK / SK | GSI1 | Contents |
 |---|---|---|---|
 | Issuer name | `NAME#<issuer name as listed>` / `META` | `NAME` / `<name>` | `entityId`, `financialsEntityId` (a financing vehicle points at its group: PEU (FIN) PLC → Pepco Group N.V.), evidence (ISIN mapping, exact name match, by hand), status (`resolved`, `confirmed`, `review`, `unresolved`). Several names can point at one company (Orlen / PKN Orlen; Kredyt Inkaso → Best) |
-| Company | `ENTITY#<entityId>` / `META` | `ENTITY` / `<short name>` | `entityId` = the KRS number for a Polish company, else `LEI:<lei>`; **short name** (shown everywhere, e.g. "Kruk"), legal name, country, KRS, LEI, LEI status (`ISSUED`/`LAPSED`/…), register, category, parent; industry (fixed list, §6), business summary, website; finance sub-type (`collector`/`leasing`/`investment`/`out`) and rule-set override with its reason; year end; notes and exceptions (§16) |
+| Company | `ENTITY#<entityId>` / `META` | `ENTITY` / `<short name>` | `entityId` = the KRS number for a Polish company, else `LEI:<lei>`; **short name** (shown everywhere, e.g. "Kruk"), legal name, country, KRS, LEI, LEI status (`ISSUED`/`LAPSED`/…), register, category, parent; industry (fixed list, §6), business summary, website; finance sub-type (`collector`/`leasing`/`investment`/`out`) and rule-set override with its reason; year end; **`aiAnalysis`** (`off` default / `on`, by whom and when; see "AI analysis per company"); notes and exceptions (§16) |
 | Financial year | `ENTITY#<entityId>` / `FIN#<period end>#<GROUP\|SINGLE>` | – | CV's `IssuerFinancials` row (§15): period, months, currency, standard, presented unit, line signs, `lines` (every line of the three statements: label, value, code or XBRL concept, anchor, parent, page, standard item), `items` (item totals, `debtDueWithinYear`), `figures` (each with its sources), `review` (`parsed`/`hand-checked`/`flagged`), `column` (current/previous), `reportPeriodEnd`, `filing` (S3 key, sha256, format, schema, checks, notes, extraction: who read it), `enteredBy`, `importedAt` |
 | Interim period | `ENTITY#<entityId>` / `INT#<period end>#<GROUP\|SINGLE>` | – | A quarterly or half-year report's statements, as a financial year's row (lines, items, figures, review, filing, `enteredBy`) plus `months` (year to date: 3, 6 or 9; a quarter-only column is kept in the lines but not used), the fiscal year it belongs to, `audit` (`none`/`reviewed`/`audited`), and the prior-year comparative column (needed for trailing 12 months) |
 | Collected figures | `ENTITY#<entityId>` / `AIFIG#<collectedAt>` | – | Fallback figures collected from the web by an agent when no report is available (§9): marked as such, never for lenders, confidence medium at most |
@@ -251,9 +252,22 @@ As CV's specification, §10 to §12:
 
 Planned in CV (§11); here the data is at hand from the start: the daily-file archive since 2020 gives every bond's last session and last price, `catalyst-exits` gives GPW's reason (back to 2018) and markings. Per company: bonds repaid at maturity, redeemed early, ended below par, still listed past maturity, unknown; the period covered ("since 2020-01"), so a short record isn't read as a clean one; red flags (a missed payment, a marking, an extension, a buy-back below par). Inferred facts are labelled as inferred; confirmation of payment comes from issuers' current reports, read by the agent. Shown next to the scorecard, not as an eighth colour.
 
+### AI analysis per company (on/off)
+
+The agent works only on companies you switch on. Each company has `aiAnalysis`: `off` (the default), or `on` with who switched it and when.
+
+- **Off:** the bond table's issuer column and the issuer dialog show **"AI analysis off"** where the scorecard would be, with **Enable** (the dialog and the Issuers view; the table's cell opens the dialog). Identity resolution by code (GLEIF, KRS) and the track record still run: they need no agent.
+- **On:** `catalyst work` lists the company (identity, reports due, judgement), and the scorecard shows once there's a report.
+- **Switched off again:** the agent stops; what was stored stays and the scorecard is still shown, marked "AI analysis off since <date>: not kept current". Nothing is deleted.
+- **A listed name not yet linked to a company** can be switched on too: the switch is kept on the name and passes to the company once the identity is set. Its first item in `catalyst work` is resolving the identity.
+- **Only you switch it**, in the app (Cognito); the agent token can't (it's outside its allow-list).
+- **On from the start:**
+  - companies that issued bonds you hold in PT (read once from PT's holdings when the companies are created; later purchases are switched on by you);
+  - companies that already have reports: CatalystViewer's 43, migrated.
+
 ### Interim reports
 
-After the annual path works, in two steps (the first is cheap and the most valuable):
+Decided 2026-11-07: the half-year balance sheet, on demand (below); trailing 12 months later, if the balance sheet proves useful. After the annual path works, in two steps (the first is cheap and the most valuable):
 
 1. **Interim balance sheet.** The latest interim balance sheet newer than the last full year replaces the year end's point-in-time items (debt, cash, debt due within a year, equity, assets) in Debt burden, Liquidity, Asset coverage and Refinancing. A year end can be up to 15 months old when its report arrives; a quarter is at most 5.
 2. **Trailing 12 months (TTM) for flows.** Revenue, EBIT, EBITDA, interest, net profit and cash flows over the 12 months to the interim's end = the last full year + this year to date − the same period a year earlier (the interim report's comparative column). Never quarters added up into a "year" (CV §7: Dadelo's "2026" was Q1 only). Used in Debt service and Profitability; Financial trend keeps comparing full years.
@@ -266,6 +280,7 @@ Rules:
 - **Seasonality:** TTM handles flows; a single quarter's balance sheet (developers before handovers, retailers before the season) is shown with its date, and the judgement reads it with care.
 - **Shown as:** the source line "FY2025 + H1 2026 (TTM to 2026-06-30, unaudited)"; each metric says whether it uses the year, the interim balance sheet or TTM.
 - **Reading:** the PDF route (copied by the agent, checked by code): the same checks as an annual report, plus that year to date and comparative columns are labelled with their periods. KRS XML and ESEF don't cover interim periods.
+- **On demand:** an interim report is fetched only for a company with AI analysis on that has bonds due within 24 months, or debt service, liquidity or refinancing yellow or red, or when you ask. Every Catalyst bond issuer publishes a half-year report (Checked 2026-11-07), so it exists for all of them.
 - **Cost:** two to four documents a year per publishing issuer instead of one, all copied by the agent. Monitoring (a dimension changing colour mid-year, a covenant ratio worsening) builds on it.
 
 ### Later
@@ -280,12 +295,12 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 - **Location:** `packages/cli` in this repo, TypeScript, run with `npx catalyst …`. It uses `core`'s zod schemas and parsers (the same ones the API uses); `catalyst schema <kind>` prints an input as JSON Schema.
 - **Where the work runs:** on your machine. The CLI imports `core`'s parsers, checks, scorecard and identity clients, so none of these needs the backend: sorting files, finding PDF pages, parsing, the checks, GLEIF and KRS lookups, and a dry run (with the scorecard the import would give). The app is called only to read a company's stored rows and to write results.
 - **Transport:** only the API (`/api/catalyst/agent/*`), never DynamoDB directly. The server checks what it receives (the zod schemas, the arithmetic checks re-run on the submitted lines, the original's SHA-256) and stores the original; it doesn't parse files. `filings check` re-parses the stored originals locally against the known answers at any time. JSON output by default, `--table` for people, `--dry-run` on every write.
-- **Auth:** an agent token (same pattern as the spreadsheet feed token: 32 random bytes shown once, only the SHA-256 stored, one at a time, revocable), made in the Catalyst view. It allows reads of `/api/catalyst/*` and writes of names, companies (not finance sub-types or overrides), filings, collected figures, analyses and checklist entries; not market data, settings or anything of PT. `catalyst login --stage <stage>` stores it outside the repo. Tests use the test user on `int`, never prod.
+- **Auth:** an agent token (same pattern as the spreadsheet feed token: 32 random bytes shown once, only the SHA-256 stored, one at a time, revocable), made in the Catalyst view. It allows reads of `/api/catalyst/*` and writes of names, companies (not finance sub-types, overrides or the AI analysis switch), filings, collected figures, analyses and checklist entries; not market data, settings or anything of PT. `catalyst login --stage <stage>` stores it outside the repo. Tests use the test user on `int`, never prod.
 - **Review:** everything the agent writes records `enteredBy` and keeps history (analyses are append-only; a replaced financial year keeps the previous version). Imported years start as `parsed`; you mark them `hand-checked` or `flagged`. Identities whose legal name differs from the listed name stay `review` until you confirm them.
 
 | Command | Purpose |
 |---|---|
-| `catalyst work` | What needs doing: names `unresolved`/`review`; companies in scope without a report for a year that is due, or without an interim report that is due (for those that publish them); companies on fallback figures; Finance companies without a sub-type; analyses older than their latest report; new markings or bonds ending below par |
+| `catalyst work` | What needs doing, **only for companies (and names) with AI analysis on**: names `unresolved`/`review`; companies in scope without a report for a year that is due, or without an interim report that is due (for those that publish them); companies on fallback figures; Finance companies without a sub-type; analyses older than their latest report; new markings or bonds ending below par |
 | `catalyst bonds [--entity] [--filter …]`, `catalyst bond <code>` | Screen rows, amounts owed, liquidity (no obligacje.pl content) |
 | `catalyst entity <id>` | Identity, names, bonds, financial years with lines, scorecard, refinancing, confidence, track record, latest analysis |
 | `catalyst identity resolve [<name>]` | GLEIF and KRS lookups, made by the CLI itself (ISIN mapping, exact name match, by KRS or LEI, parent), printed with the evidence |
@@ -331,7 +346,7 @@ How one company goes from "analyse it" to a scorecard in the app. The example is
    - **refused:** market data, settings, finance sub-types and PT.
 4. You can revoke the token in the settings. Dev and prod have separate tokens.
 
-**1. The decision.** You ask ("analyse the issuer of ABC1227", "work through the list"), and the agent runs one of:
+**1. The decision.** You switch AI analysis on for the company (or its listed name) in the issuer dialog: it is off by default ("AI analysis per company"). Then you ask ("analyse the issuer of ABC1227", "work through the list"), and the agent runs one of:
 - `catalyst work`: what needs doing, i.e. unresolved names, reports due, judgements older than the latest report, new markings;
 - `catalyst bond ABC1227`: ISIN, the issuer name as listed, the company id if known, amount owed, maturity, coupon as numbers, yields and liquidity. These are figures the app derived, never obligacje.pl's text.
 
@@ -431,7 +446,7 @@ PKO0829  PKO BP   ⓘ   W6M+1,0  2,8 y   100,05  4,90 · −0,31     0,9 pp   �
 | Yield net | Net yield to maturity · vs alternative (pp, green above, red below) | Gross yield, the alternative and its net yield, base rate assumed |
 | Premium vs gov | pp over the treasury curve (floating: over WZ) | How it was derived |
 | Liquidity | Three dots: high, medium, low; none = empty | Sessions traded, median turnover, spread, days to sell 10 000 zł |
-| Issuer | **Six dots** in a fixed order (debt burden, debt service, liquidity, profitability, asset coverage, refinancing), trend arrows beside them, the rule set and the confidence; faded when confidence is low; "no report yet", "not scored: bank" | Each dimension's metrics with values and colours, notes; source line ("annual report, ESEF, group accounts, FY2025"); the judgement's first line and its date |
+| Issuer | **"AI analysis off"** (the default) until you switch it on; then **six dots** in a fixed order (debt burden, debt service, liquidity, profitability, asset coverage, refinancing), trend arrows beside them, the rule set and the confidence; faded when confidence is low; "no report yet", "not scored: bank" | Each dimension's metrics with values and colours, notes; source line ("annual report, ESEF, group accounts, FY2025"); the judgement's first line and its date |
 
 More columns (bid/ask, accrued interest, amount owed, gross yield, yield to call, track record) under "Columns" in the More filters panel.
 
@@ -445,7 +460,7 @@ More columns (bid/ask, accrued interest, amount owed, gross yield, yield to call
 
 ### Issuer dialog
 
-Opened from any issuer name (`?issuer=<entityId>`); full screen on a phone.
+Opened from any issuer name (`?issuer=<entityId>`); full screen on a phone. The **AI analysis** switch sits in its header; while it's off, "AI analysis off · Enable" stands where the scorecard is.
 
 ```
 Kruk                     Kruk S.A. · Poland · KRS 0000… · LEI 2594…   collector rules · high confidence  ✕
@@ -467,7 +482,7 @@ Judgement: …  Red flags: none found in FY2025 report, auditor's report.  Watch
 
 ### Issuers
 
-One row per company with listed bonds. Columns: short name, industry (and kind of financial company), rule set, bonds, amount owed on Catalyst, due in 12 months, median premium, the six dots and trend arrows, confidence, latest financial year, track record, judgement date, **needs work** (what `catalyst work` lists for it). Filters: industry, rule set, scorecard, confidence, scored / not scored / no report, needs work. A row opens the issuer dialog.
+One row per company with listed bonds. Columns: short name, AI analysis (off / on, switchable in the row), industry (and kind of financial company), rule set, bonds, amount owed on Catalyst, due in 12 months, median premium, the six dots and trend arrows, confidence, latest financial year, track record, judgement date, **needs work** (what `catalyst work` lists for it). Filters: AI analysis on / off, industry, rule set, scorecard, confidence, scored / not scored / no report, needs work. A row opens the issuer dialog.
 
 **Reports checklist** (a tab in Issuers): the reports waiting to be downloaded by hand from the KRS repository, with company, KRS number (copyable), year, scope and status; the place to start a download session.
 
