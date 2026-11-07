@@ -104,7 +104,7 @@ On-demand, PITR on, deletion protection on `prod`, TTL attribute `ttl`. Same key
 |---|---|---|---|
 | Bond | `BOND#<isin>` / `META` | `BOND` / `<code>` | code, name, type (segment), markets (GPW, BondSpot: one ISIN counted once), currency, current nominal, issued nominal, issue value, maturity, coupon type (`FIXED`/`FLOATING`/`ZERO`/`INDEXED`), base rate, margin, callable, amortising, `issuerName` (as listed), `entityId` (once resolved), status (`listed`/`suspended`/`ended`), first and last session seen, exit (date, reason, source, last price before it) |
 | Session | `BOND#<isin>` / `D#<date>#<market>` | – | close, reference, open, low, high, last, trades, volume, turnover, block trades, nominal, rate, accrued interest (the daily file) |
-| End-of-session quotes | `BOND#<isin>` / `Q#<date>#<market>` | – | best bid and ask (price, volume, orders) and the page's trades; only bonds with a bid or an ask (the quotes pages; its own item, as the quotes come before the daily file in the evening) |
+| End-of-session quotes | `BOND#<isin>` / `Q#<date>#<market>` | – | best bid and ask (price, volume, orders) and the page's trades; only bonds with a bid or an ask (the quotes pages; its own item, as the quotes come before the daily file in the evening). Before 2026-11-06: CatalystViewer's history (2023-12 on, source `catalystviewer`: snapshots during the session, no order sizes) |
 | Loaded sessions | `DAYS` / `<date>`, `QUOTEDAYS` / `<date>` | – | a daily file loaded (rows, bonds, file); a session's quotes stored |
 | Coupon period | `BOND#<isin>` / `COUPON#<start>` | – | As PT's `CouponPeriodItem` |
 | Screen row | `BOND#<isin>` / `SCREEN` | `SCREEN` / `<code>` | Computed metrics (below), the issuer's signals copied for one-query reads, `computedAt` |

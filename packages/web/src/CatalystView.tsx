@@ -117,6 +117,7 @@ const LEVELS: Level[] = ["none", "low", "medium", "high"];
 const LEVEL_LABEL: Record<Level, string> = { high: "high", medium: "medium", low: "low", none: "none" };
 const FLAG_LABEL: Record<string, string> = {
   stale: "stale",
+  "new-listing": "new",
   "no-terms": "no terms yet",
   "no-periods": "no periods",
   "periods-extended": "periods extended",
@@ -126,6 +127,7 @@ const FLAG_LABEL: Record<string, string> = {
 };
 const FLAG_TITLE: Record<string, string> = {
   stale: "No trade in the last 30 sessions: the price is the exchange's reference price; no premium",
+  "new-listing": "Listed under 10 sessions ago: its liquidity rests on a few days",
   "no-terms": "obligacje.pl not read yet (new bonds: within a week) or no page for it: no yield",
   "no-periods": "obligacje.pl's interest periods don't add up: no yield",
   "periods-extended": "obligacje.pl lists the periods only up to the current one: the rest repeat its length to maturity (projected)",

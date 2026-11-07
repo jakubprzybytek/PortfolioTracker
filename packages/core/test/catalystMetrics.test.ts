@@ -151,6 +151,13 @@ describe("screenRow", () => {
     expect(r.projected).toBe(true);
   });
 
+  it("a bond listed under 10 sessions ago is flagged new (its liquidity rests on a few days)", () => {
+    const b = bond({ code: "NEW1129", firstSeen: "2026-11-04" });
+    const recent = sessions(b, 100, () => 1).slice(-2);
+    expect(screenRow(input({ bond: b, sessions: recent })).flags).toContain("new-listing");
+    expect(screenRow(input({ bond: b, sessions: sessions(b, 100) })).flags).not.toContain("new-listing");
+  });
+
   it("an amortising bond (nominal below the issue's) is flagged", () => {
     const b = bond({ code: "AMO1129", nominal: 550 });
     const t = { ...terms(b, { kind: "FIXED" as const, rate: 0.06 }), issueValue: { amount: 1e8, currency: "PLN", nominal: 1000 } };
