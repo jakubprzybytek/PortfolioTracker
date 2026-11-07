@@ -7,7 +7,7 @@ CV's **fundamental analysis specification** (`CatalystViewer/docs/fundamental-an
 | Phase | Contents |
 |---|---|
 | 1 – Market | Daily data of every Catalyst bond; browsing with filters; yield to maturity against an alternative; risk premium over treasury bonds; liquidity |
-| 2 – Issuers | Company identity, filed annual reports read by code, the 7-dimension scorecard with data confidence, refinancing, repayment track record; the work that needs judgement or reading (finding reports, PDFs, the written judgement) done by an AI agent outside the app through a CLI |
+| 2 – Issuers | Company identity, filed annual reports read by code (then interim ones: quarterly and half-year, for a fresher balance sheet and trailing 12 months), the 7-dimension scorecard with data confidence, refinancing, repayment track record; the work that needs judgement or reading (finding reports, PDFs, the written judgement) done by an AI agent outside the app through a CLI |
 
 ## Contents
 
@@ -24,6 +24,7 @@ CV's **fundamental analysis specification** (`CatalystViewer/docs/fundamental-an
   - [Reading reports (code, ported from CV)](#reading-reports-code-ported-from-cv)
   - [Scorecard (app)](#scorecard-app)
   - [Repayment track record (app)](#repayment-track-record-app)
+  - [Interim reports](#interim-reports)
   - [Later](#later)
 - [The `catalyst` CLI (the agent's interface)](#the-catalyst-cli-the-agents-interface)
 - [UI](#ui)
@@ -75,6 +76,7 @@ From CV's specification (§1 principle 8, §7), for the jobs, the CLI and the ag
 | WIBOR / WIRON | None (assumption in the settings) | No free fixings source; floating coupons not yet set use the assumed rate + margin. |
 | Identity | GLEIF API (ISIN → LEI, name search, LEI record, parent), KRS register API `api-krs.ms.gov.pl/api/krs/OdpisAktualny/<KRS>` | Open; resolved 192 of 208 CV issuer names automatically (§5). |
 | Annual reports | KRS repository (by hand), issuers' investor-relations sites, Bankier.pl mirrors of ESPI reports (listed companies; assistants allowed; attachments 404 after about a year), filings.xbrl.org (ESEF by LEI; Polish filings stop at FY2022, foreign issuers later) | Formats and reading below; CV §7. |
+| Interim reports | Issuers' investor-relations sites, Bankier.pl mirrors of ESPI/EBI periodic reports | Quarterly (companies with listed shares) or half-year reports; not in the KRS repository and not ESEF-tagged, so in practice PDFs. Which issuers publish what: open questions. |
 
 Reachability: PT's data-sources.md noted gpwcatalyst.pl unreachable from the dev machine on 2026-10-12; on 2026-11-05 it answered normally. Check from Lambda (eu-west-1) before building. GPW's move to WATS may change the file and the pages; parsers look columns up by header and fail loudly.
 
@@ -122,6 +124,7 @@ Bonds are joined to reports **through the company's identity, never by matching 
 | Issuer name | `NAME#<issuer name as listed>` / `META` | `NAME` / `<name>` | `entityId`, `financialsEntityId` (a financing vehicle points at its group: PEU (FIN) PLC → Pepco Group N.V.), evidence (ISIN mapping, exact name match, by hand), status (`resolved`, `confirmed`, `review`, `unresolved`). Several names can point at one company (Orlen / PKN Orlen; Kredyt Inkaso → Best) |
 | Company | `ENTITY#<entityId>` / `META` | `ENTITY` / `<short name>` | `entityId` = the KRS number for a Polish company, else `LEI:<lei>`; **short name** (shown everywhere, e.g. "Kruk"), legal name, country, KRS, LEI, LEI status (`ISSUED`/`LAPSED`/…), register, category, parent; industry (fixed list, §6), business summary, website; finance sub-type (`collector`/`leasing`/`investment`/`out`) and rule-set override with its reason; year end; notes and exceptions (§16) |
 | Financial year | `ENTITY#<entityId>` / `FIN#<period end>#<GROUP\|SINGLE>` | – | CV's `IssuerFinancials` row (§15): period, months, currency, standard, presented unit, line signs, `lines` (every line of the three statements: label, value, code or XBRL concept, anchor, parent, page, standard item), `items` (item totals, `debtDueWithinYear`), `figures` (each with its sources), `review` (`parsed`/`hand-checked`/`flagged`), `column` (current/previous), `reportPeriodEnd`, `filing` (S3 key, sha256, format, schema, checks, notes, extraction: who read it), `enteredBy`, `importedAt` |
+| Interim period | `ENTITY#<entityId>` / `INT#<period end>#<GROUP\|SINGLE>` | – | A quarterly or half-year report's statements, as a financial year's row (lines, items, figures, review, filing, `enteredBy`) plus `months` (year to date: 3, 6 or 9; a quarter-only column is kept in the lines but not used), the fiscal year it belongs to, `audit` (`none`/`reviewed`/`audited`), and the prior-year comparative column (needed for trailing 12 months) |
 | Collected figures | `ENTITY#<entityId>` / `AIFIG#<collectedAt>` | – | Fallback figures collected from the web by an agent when no report is available (§9): marked as such, never for lenders, confidence medium at most |
 | Filing | `ENTITY#<entityId>` / `FILING#<sha256>` | – | Original document: format, fiscal year, scope, source URL, S3 key, import result |
 | Analysis | `ENTITY#<entityId>` / `ANALYSIS#<ts>`, mirror `ANALYSIS#LATEST` | – | The agent's written judgement (§13, §14 layout), red flags with source and quote, what to watch, sources read, model, and the scorecard version it saw |
@@ -131,7 +134,7 @@ Bonds are joined to reports **through the company's identity, never by matching 
 
 **Derived values aren't stored on the company** (as in CV): the scorecard, refinancing and confidence are computed from the rows when read, so a rule change reaches every company at once. `catalyst-metrics` copies the signals into the screen rows for the bond table's filters, and recomputes a company's bonds whenever its rows change.
 
-**The most recent report wins** (§7): a year that appears in two reports keeps the newer report's figures; a row is written only if none exists or the stored row's report is not newer. Exceptions per company (Vindexus FY2024 keeps its own report).
+**The most recent report wins** (§7): a year that appears in two reports keeps the newer report's figures; a row is written only if none exists or the stored row's report is not newer. Exceptions per company (Vindexus FY2024 keeps its own report). The same holds for interim periods; an annual report replaces nothing of the interim rows, which are simply superseded once a full year ends later than them.
 
 Sizing: ~1,060 bonds × ~250 sessions a year ≈ 265k session items a year; backfill from 2020 ≈ 1.6M items (one-off write cost ≈ $2). The screen is ~600 items. Issuers: ~200 names, ~100 companies, a few hundred financial years.
 
@@ -186,8 +189,8 @@ The procedure is CV's (§3): bond → company → industry and rule set → repo
 | 1 Bond, amount owed | App | Daily file + terms |
 | 2 Company | App, then agent | GLEIF ISIN mapping and exact name match in `catalyst-terms`; the rest (renames, mergers, financing vehicles, legal-name mismatches) by the agent through the CLI, confirmed by hand where §5 says so |
 | 3 Industry, rule set | Agent; finance sub-types and overrides by you | Industry from the fixed list, with a summary and website; a Finance company has no scorecard until you give its sub-type (hand-reviewed map, §6) |
-| 4 Getting reports | Agent; KRS repository downloads by you | `catalyst work` lists reports due (year end + 9 months); the agent fetches what robots.txt allows (issuer sites, Bankier, filings.xbrl.org) and adds the rest to the checklist for you |
-| 5 Reading | Code; PDFs copied by the agent | KRS XML, ESEF package and IFRS text are parsed by code; a PDF's statement lines are copied by the agent and checked by code (below) |
+| 4 Getting reports | Agent; KRS repository downloads by you | `catalyst work` lists reports due (annual: year end + 9 months; interim, for issuers that publish them: quarter end + 2 months, half-year end + 3 months); the agent fetches what robots.txt allows (issuer sites, Bankier, filings.xbrl.org) and adds the rest to the checklist for you |
+| 5 Reading | Code; PDFs copied by the agent | KRS XML, ESEF package and IFRS text are parsed by code; a PDF's statement lines (annual or interim) are copied by the agent and checked by code (below) |
 | 6 Fallback figures | Agent | Only operating companies without a report; marked, confidence medium at most |
 | 7–9 Scorecard, refinancing, confidence | App | Computed on read |
 | Repayment track record | App | From exits and the session history (below) |
@@ -221,10 +224,27 @@ As CV's specification, §10 to §12:
 
 Planned in CV (§11); here the data is at hand from the start: the daily-file archive since 2020 gives every bond's last session and last price, `catalyst-exits` gives GPW's reason (back to 2018) and markings. Per company: bonds repaid at maturity, redeemed early, ended below par, still listed past maturity, unknown; the period covered ("since 2020-01"), so a short record isn't read as a clean one; red flags (a missed payment, a marking, an extension, a buy-back below par). Inferred facts are labelled as inferred; confirmation of payment comes from issuers' current reports, read by the agent. Shown next to the scorecard, not as an eighth colour.
 
+### Interim reports
+
+After the annual path works, in two steps (the first is cheap and the most valuable):
+
+1. **Interim balance sheet.** The latest interim balance sheet newer than the last full year replaces the year end's point-in-time items (debt, cash, debt due within a year, equity, assets) in Debt burden, Liquidity, Asset coverage and Refinancing. A year end can be up to 15 months old when its report arrives; a quarter is at most 5.
+2. **Trailing 12 months (TTM) for flows.** Revenue, EBIT, EBITDA, interest, net profit and cash flows over the 12 months to the interim's end = the last full year + this year to date − the same period a year earlier (the interim report's comparative column). Never quarters added up into a "year" (CV §7: Dadelo's "2026" was Q1 only). Used in Debt service and Profitability; Financial trend keeps comparing full years.
+
+Rules:
+
+- **Same scope, same standard:** an interim period is used only when it has the same scope (group or single) and standard as the full year it extends; otherwise the scorecard stays on the full year and says why.
+- **Complete inputs or none:** TTM needs the year to date and its comparative for the same items; a missing one leaves that metric on the full year (never part TTM, part year).
+- **Unaudited:** most interim statements are neither audited nor reviewed (half-years of listed companies are reviewed). Data confidence notes it; a flag when the next audited year differs from the interim figures it replaces by more than 5 %.
+- **Seasonality:** TTM handles flows; a single quarter's balance sheet (developers before handovers, retailers before the season) is shown with its date, and the judgement reads it with care.
+- **Shown as:** the source line "FY2025 + H1 2026 (TTM to 2026-06-30, unaudited)"; each metric says whether it uses the year, the interim balance sheet or TTM.
+- **Reading:** the PDF route (copied by the agent, checked by code): the same checks as an annual report, plus that year to date and comparative columns are labelled with their periods. KRS XML and ESEF don't cover interim periods.
+- **Cost:** two to four documents a year per publishing issuer instead of one, all copied by the agent. Monitoring (a dimension changing colour mid-year, a covenant ratio worsening) builds on it.
+
 ### Later
 
 - **Risk vs premium:** with the scorecard, confidence and track record next to each bond's premium, the bond table and chart already show mismatches (a high premium with greens, a low one with reds). A "does the premium pay for the risk" verdict (expected loss from default probabilities) waits for the calibration on past Catalyst defaults (§18 item 8: GetBack 2018 and others; the 2020+ archive and the exits give a first set).
-- CV's §18 list: notes read with checked quotes (debt schedule, covenants, collateral, auditor's opinion), more lender metrics, developers' escrow and land bank, undrawn credit lines, trailing 12 months, holding-company flag.
+- CV's §18 list: notes read with checked quotes (debt schedule, covenants, collateral, auditor's opinion), more lender metrics, developers' escrow and land bank, undrawn credit lines, holding-company flag (trailing 12 months: above, Interim reports).
 
 ## The `catalyst` CLI (the agent's interface)
 
@@ -237,17 +257,17 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 
 | Command | Purpose |
 |---|---|
-| `catalyst work` | What needs doing: names `unresolved`/`review`; companies in scope without a report for a year that is due; companies on fallback figures; Finance companies without a sub-type; analyses older than their latest report; new markings or bonds ending below par |
+| `catalyst work` | What needs doing: names `unresolved`/`review`; companies in scope without a report for a year that is due, or without an interim report that is due (for those that publish them); companies on fallback figures; Finance companies without a sub-type; analyses older than their latest report; new markings or bonds ending below par |
 | `catalyst bonds [--entity] [--filter …]`, `catalyst bond <code>` | Screen rows, amounts owed, liquidity (no obligacje.pl content) |
 | `catalyst entity <id>` | Identity, names, bonds, financial years with lines, scorecard, refinancing, confidence, track record, latest analysis |
 | `catalyst identity resolve [<name>]` | GLEIF and KRS lookups (ISIN mapping, exact name match, by KRS or LEI, parent), printed with the evidence |
 | `catalyst identity set <name> --entity <id> [--financials <id>] --evidence "…"` | Link a listed name to a company (and a financing vehicle to its group) |
 | `catalyst entity set <id> --file entity.json` | Short name, industry, summary, website, notes |
 | `catalyst checklist [--add <id> <year> <scope> --where "…"]` | Reports to download by hand from the KRS repository, and their state |
-| `catalyst filings sort <folder> [--copy\|--move]` | Identify hand-downloaded files (zips, signed XML, PDFs: company, KRS, year, scope, duplicates, part years, drafts), check them against the checklist, file them as `sorted/<KRS>-<company>/FY<year>-<scope>.<ext>` |
+| `catalyst filings sort <folder> [--copy\|--move]` | Identify hand-downloaded files (zips, signed XML, PDFs: company, KRS, year, scope, duplicates, part years, drafts), check them against the checklist, file them as `sorted/<KRS>-<company>/FY<year>-<scope>.<ext>` (interim: `<year>Q<n>-<scope>` or `<year>H1-<scope>`) |
 | `catalyst filings import <file> [--entity <id>] [--dry-run] [--force]` | Upload and import a KRS XML, ESEF or IFRS text report; prints the figures, the checks and what was kept (most recent report wins) |
 | `catalyst filings pages <pdf> --out pages.txt` | The statement pages and the copying instructions for a PDF |
-| `catalyst filings import <pdf> --transcript t.json --by "<model or name>"` | Import a PDF from the agent's transcript; code checks every amount |
+| `catalyst filings import <pdf> --transcript t.json --by "<model or name>"` | Import a PDF from the agent's transcript, annual or interim (the transcript states the period and months); code checks every amount |
 | `catalyst filings check [--entity <id>]` | Compare stored rows and fresh parses with the known answers |
 | `catalyst known put <id> --file known.json` | Hand-read figures of a report, for `filings check` |
 | `catalyst figures put <id> --file fig.json` | Fallback figures from the web (operating companies only), marked as collected |
@@ -259,7 +279,7 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 1. `catalyst work` → pick an item.
 2. Identity: `identity resolve`; renames, mergers, financing vehicles (guarantee in the bond terms?) by the §5 rules; `identity set`.
 3. Industry and summary: `entity set`. A Finance company: propose the sub-type to you, don't set it.
-4. Reports: latest full year, group first. Issuer site, Bankier (listed), filings.xbrl.org; download into a new directory, 2 s apart; the KRS repository only through `checklist --add` for you.
+4. Reports: latest full year, group first; then the interim reports after it (quarterly or half-year, same scope), once the annual path is in place. Issuer site, Bankier (listed), filings.xbrl.org; download into a new directory, 2 s apart; the KRS repository only through `checklist --add` for you.
 5. `filings import --dry-run`, then import; a PDF via `filings pages` → transcript (copy, never compute) → import. Refused? Read the checks, fix the transcript, never `--force` without asking.
 6. No report available and an operating company: `figures put`, avoiding §9's failure modes (part years, today's date, units, the wrong company).
 7. `entity <id>`: read the scorecard against the rule set (§13); read the auditor's opinion, going-concern notes, covenants, security, related parties, current reports for red flags, each with a source and quote.
@@ -316,7 +336,7 @@ Opened from any issuer name (`?issuer=<entityId>`); full screen on a phone.
 
 ```
 Kruk                     Kruk S.A. · Poland · KRS 0000… · LEI 2594…   collector rules · high confidence  ✕
-Annual report (ESEF, IFRS), group accounts, FY2025 and 2 earlier · judgement 2026-11-02
+Annual report (ESEF, IFRS), group accounts, FY2025 and 2 earlier + Q3 2026 (TTM, unaudited) · judgement 2026-11-02
 ┌ Scorecard ──────────────────────────────────────┐ ┌ Bonds falling due vs cash ──────────────┐
 │ ● Debt burden    net debt / equity 1,2×         │ │ ▇▇ ▇ ▇▇▇ ▇  ▇▇   12 m: 1,1 bn · cash 0,9│
 │ ● Debt service   pre-tax interest cover 2,9×    │ └─────────────────────────────────────────┘
@@ -327,7 +347,7 @@ Judgement: …  Red flags: none found in FY2025 report, auditor's report.  Watch
 ```
 
 - **Bonds:** its bonds (all its names and financing vehicles) with maturity, amount owed, net yield, premium, liquidity; "Show in table" filters the bonds view to the company.
-- **Financials:** up to six years with the source per year (link to the original); a figure opens the lines behind it; *Full statements*: a year's lines as printed; review status per year (parsed / hand-checked / flagged), with buttons to mark it; collected figures marked, and years where collected and filed figures differ by more than 2 %.
+- **Financials:** up to six years with the source per year (link to the original), and the interim periods after the last year with the TTM column; a figure opens the lines behind it; *Full statements*: a year's lines as printed; review status per year (parsed / hand-checked / flagged), with buttons to mark it; collected figures marked, and years where collected and filed figures differ by more than 2 %.
 - **Track record:** past bonds with how and when they ended, last price, source.
 - **Judgements:** the latest in full, earlier ones by date.
 - **Documents:** filings and their import results.
@@ -385,4 +405,5 @@ Each step goes to prod on its own. Phase 1 (steps 1–7) in detail: [catalyst-ph
 - Is passing the app's computed bond results (amounts owed, maturities) to the agent compatible with obligacje.pl's `ai-input=no`? Proposed: yes for figures the app derived, never the site's text; to be confirmed.
 - Companies without an LEI or a KRS number (WB Electronics has no LEI): a private id (`ZZ:<name>`), as PT's `ZZ` ISINs.
 - WIRON: which bonds reference it and what the assumption should be.
+- Interim reports: which periodic reports bond-only issuers must publish (GPW main market vs the Catalyst alternative system; half-year at least?), checked in the rules before the interim step is planned; and how many of the issuers in scope publish quarterly reports.
 - A free source of WIBOR/WIRON fixings, for floating coupons and the premium of floaters.
