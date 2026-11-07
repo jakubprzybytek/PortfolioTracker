@@ -3,7 +3,7 @@
 // periods. Run by the worker when the daily job, a backfill or a change of assumptions asks for it.
 
 import {
-  DEFAULT_CATALYST_ASSUMPTIONS,
+  catalystAssumptions,
   fixedCurve,
   recentSessions,
   screenRow,
@@ -12,16 +12,28 @@ import {
   type CatalystSessionItem,
   type TreasuryQuote,
 } from "@portfolio/core/catalyst/index";
-import { nbpRateFromOffers, Repository, retailOffers } from "@portfolio/core";
+import { Repository, retailOffers, type RetailTerms } from "@portfolio/core";
 import { catalystRepo } from "./context.ts";
 
 /** Bonds read at once (each two or three queries). */
 const AT_ONCE = 16;
 /** Where the assumptions are kept (the module's settings). */
 export const ASSUMPTIONS_SETTING = "assumptions";
+/** Where the saved views of the screen are kept. */
+export const VIEWS_SETTING = "views";
 
 // PT's market table, read-only and only its retail-bond series (infra/catalyst.ts): the alternatives on offer.
 const market = new Repository({ market: process.env["MARKET_TABLE"] ?? "", transactions: "", holdings: "" });
+
+/** The retail series on sale on `date` (the alternatives), from PT's market table. */
+export function offersOn(date: string): Promise<RetailTerms[]> {
+  return retailOffers(date, async (code) => {
+    const s = await market.getRetailSeries(code);
+    if (!s) return undefined;
+    const { PK: _p, SK: _s, source: _src, updatedAt: _u, ...rest } = s;
+    return rest;
+  });
+}
 
 async function inBatches<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = [];
@@ -38,14 +50,8 @@ export async function computeMetrics(): Promise<{ itemsWritten: number; note: st
   const quotesFrom = window[Math.min(29, window.length - 1)]!;
 
   const [bonds, terms, saved] = await Promise.all([catalystRepo.listBonds(), catalystRepo.listTerms(), catalystRepo.getSetting<Partial<CatalystAssumptions>>(ASSUMPTIONS_SETTING)]);
-  const offers = await retailOffers(date, async (code) => {
-    const s = await market.getRetailSeries(code);
-    if (!s) return undefined;
-    const { PK: _p, SK: _s, source: _src, updatedAt: _u, ...rest } = s;
-    return rest;
-  });
-  const nbpRate = nbpRateFromOffers(offers);
-  const assumptions: CatalystAssumptions = { ...DEFAULT_CATALYST_ASSUMPTIONS, ...(nbpRate !== undefined ? { nbpRate, wiron: nbpRate } : {}), ...saved };
+  const offers = await offersOn(date);
+  const { assumptions } = catalystAssumptions(saved, offers);
   const termsBy = new Map(terms.map((t) => [t.isin, t]));
   const listed = bonds.filter((b) => b.status === "listed");
 

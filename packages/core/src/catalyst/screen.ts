@@ -8,7 +8,7 @@ import type { InterestPeriod } from "../bonds/couponPeriods.ts";
 import { INTEREST_TAX } from "../bonds/couponPeriods.ts";
 import { irr, periodFlows, yearlyCouponFlows, yearsBetween, type BondFlow } from "../bonds/yield.ts";
 import { addDays, type IsoDate } from "../dates.ts";
-import { DEFAULT_ASSUMPTIONS, DEFAULT_COMMISSION, nearestOffer, retailOfferYield, type HoldSellAssumptions } from "../holdsell/holdSell.ts";
+import { DEFAULT_ASSUMPTIONS, DEFAULT_COMMISSION, nbpRateFromOffers, nearestOffer, retailOfferYield, type HoldSellAssumptions } from "../holdsell/holdSell.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
 import { settlementDate } from "../settlement.ts";
 import { curveAt, priceAdjustedMargin, type CurvePoint } from "./curve.ts";
@@ -36,6 +36,19 @@ export const CatalystAssumptionsInput = z.object({
 });
 
 export const DEFAULT_CATALYST_ASSUMPTIONS: CatalystAssumptions = { ...DEFAULT_ASSUMPTIONS, wiron: 0.04, euribor: 0.02 };
+
+/** Saved views of the bonds screen: a name and the view's URL parameters (filters, sort). */
+export const CatalystViewsInput = z
+  .array(z.object({ name: z.string().trim().min(1).max(60), params: z.record(z.string(), z.string().max(200)) }))
+  .max(30);
+export type CatalystViews = z.output<typeof CatalystViewsInput>;
+
+/** The defaults on `offers`' day (the NBP rate and WIRON from the ROR on offer), with what was saved over them. */
+export function catalystAssumptions(saved: Partial<CatalystAssumptions> | undefined, offers: RetailTerms[]): { defaults: CatalystAssumptions; assumptions: CatalystAssumptions } {
+  const nbpRate = nbpRateFromOffers(offers);
+  const defaults: CatalystAssumptions = { ...DEFAULT_CATALYST_ASSUMPTIONS, ...(nbpRate !== undefined ? { nbpRate, wiron: nbpRate } : {}) };
+  return { defaults, assumptions: { ...defaults, ...saved } };
+}
 
 /** Under this many days to maturity no yield is shown (a few weeks' yield, annualised, says nothing). */
 export const MATURES_SOON_DAYS = 90;

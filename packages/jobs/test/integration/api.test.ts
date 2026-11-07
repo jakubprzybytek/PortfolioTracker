@@ -74,7 +74,7 @@ describe(`API ${API}`, () => {
   it("GET /status lists the last run of every job and the dead-letter queue's depth", async () => {
     const { status, body } = await get<{ now: string; jobs: Record<string, unknown>; deadLetter: number | null }>("/status");
     expect(status).toBe(200);
-    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "catalyst-backfill", "catalyst-daily", "catalyst-metrics", "catalyst-quotes", "catalyst-terms", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "eod-ibkr", "export", "fx", "import", "live", "monthly", "quality", "valuation", "watchdog"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["backfill", "benchmarks", "catalyst-backfill", "catalyst-daily", "catalyst-export", "catalyst-metrics", "catalyst-quotes", "catalyst-terms", "coupons", "eod-bonds", "eod-catalyst", "eod-etf", "eod-gpw", "eod-gpw-recheck", "eod-ibkr", "export", "fx", "import", "live", "monthly", "quality", "valuation", "watchdog"]);
     expect(typeof body.deadLetter).toBe("number");
     // Each upload in the setup starts an import run, and only the first is waited for: the last one can still be
     // running here. Wait until both jobs have settled, then they must have gone well.
@@ -775,7 +775,30 @@ describe(`API ${API}`, () => {
     const { status, body } = await get<{ bonds: number; jobs: Record<string, unknown>; deadLetter: number | null }>("/catalyst/status");
     expect(status).toBe(200);
     expect(typeof body.bonds).toBe("number");
-    expect(Object.keys(body.jobs).sort()).toEqual(["catalyst-backfill", "catalyst-daily", "catalyst-metrics", "catalyst-quotes", "catalyst-terms"]);
+    expect(Object.keys(body.jobs).sort()).toEqual(["catalyst-backfill", "catalyst-daily", "catalyst-export", "catalyst-metrics", "catalyst-quotes", "catalyst-terms"]);
     expect(typeof body.deadLetter).toBe("number");
+  });
+
+  it("Catalyst: the screen, a bond, the assumptions and the saved views", async () => {
+    const screen = await get<{ date: string | null; rows: unknown[]; curve: unknown }>("/catalyst/bonds");
+    expect(screen.status).toBe(200);
+    expect(Array.isArray(screen.body.rows)).toBe(true);
+    expect((await get("/catalyst/bonds/NOT-AN-ISIN")).status).toBe(400);
+    expect((await get("/catalyst/bonds/PL0000000000")).status).toBe(404);
+
+    const a = await get<{ assumptions: { wibor: number; alternative: string }; defaults: { wibor: number } }>("/catalyst/settings/assumptions");
+    expect(a.status).toBe(200);
+    expect(typeof a.body.assumptions.wibor).toBe("number");
+    expect((await send("PUT", "/catalyst/settings/assumptions", { cpi: 0.03 })).status).toBe(400);
+    const saved = await send<{ saved: { wibor: number } }>("PUT", "/catalyst/settings/assumptions", { cpi: 0.03, wibor: 0.05, nbpRate: 0.04, wiron: 0.04, euribor: 0.02, alternative: "retail" });
+    expect(saved.status).toBe(200);
+    expect(saved.body.saved.wibor).toBe(0.05);
+    expect((await send<{ saved: unknown }>("PUT", "/catalyst/settings/assumptions", { reset: true })).body.saved).toBeNull();
+
+    const views = [{ name: "Liquid", params: { liq: "medium", sort: "-yield" } }];
+    expect((await send("PUT", "/catalyst/views", { views })).status).toBe(200);
+    expect((await get<{ views: unknown }>("/catalyst/views")).body.views).toEqual(views);
+    expect((await send("PUT", "/catalyst/views", { views: [{ name: "", params: {} }] })).status).toBe(400);
+    expect((await send("PUT", "/catalyst/views", { views: [] })).status).toBe(200);
   });
 });

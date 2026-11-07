@@ -86,17 +86,25 @@ export function catalystModule({ defaults, link, alerts, market }: CatalystShare
   new sst.aws.CronV2("CatalystTerms", { function: job("packages/jobs/src/catalyst/handlers/terms.handler", "15 minutes"), schedule: "cron(30 9 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
 
   // PT's watchdog and Status page list the Catalyst jobs too: they may read the job runs (JOB#…) of this table only.
+  const seriesReader = {
+    environment: { MARKET_TABLE: market.name },
+    permissions: [{ actions: ["dynamodb:GetItem"], resources: [market.arn], conditions: [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["SERIES#*"] }] }],
+  };
+
+  // The monthly backup of what exists nowhere else (the settings): exports/<date>/catalyst/ in the files bucket.
+  new sst.aws.CronV2("CatalystExport", { function: job("packages/jobs/src/catalyst/handlers/export.handler"), schedule: "cron(30 4 1 * ? *)", timezone: WARSAW, retries: 2 });
+
   const jobRunsReader = {
     environment: { CATALYST_TABLE: table.name },
     permissions: [{ actions: ["dynamodb:Query"], resources: [table.arn], conditions: [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["JOB#*"] }] }],
   };
 
-  return { table, queue, deadLetter, worker, jobRunsReader };
+  return { table, queue, deadLetter, worker, jobRunsReader, seriesReader };
 }
 
 /** The module's API routes on PT's API (same login and groups). */
 export function catalystApi(
-  { table, queue, deadLetter }: ReturnType<typeof catalystModule>,
+  { table, queue, deadLetter, seriesReader }: ReturnType<typeof catalystModule>,
   { defaults, link, api, auth, accessGroups }: CatalystShared & { api: sst.aws.ApiGatewayV2; auth: sst.aws.ApiGatewayV2RouteArgs; accessGroups: string },
 ) {
   const apiHandler = {
@@ -104,7 +112,17 @@ export function catalystApi(
     handler: "packages/jobs/src/catalyst/handlers/api.handler",
     timeout: "30 seconds" as const,
     link: [...link, table, queue, deadLetter],
-    environment: { ACCESS_GROUPS: accessGroups },
+    environment: { ACCESS_GROUPS: accessGroups, ...seriesReader.environment },
+    permissions: seriesReader.permissions,
   };
-  api.route("GET /catalyst/status", apiHandler, auth);
+  for (const route of [
+    "GET /catalyst/status",
+    "GET /catalyst/bonds",
+    "GET /catalyst/bonds/{isin}",
+    "GET /catalyst/settings/assumptions",
+    "PUT /catalyst/settings/assumptions",
+    "GET /catalyst/views",
+    "PUT /catalyst/views",
+  ])
+    api.route(route, apiHandler, auth);
 }

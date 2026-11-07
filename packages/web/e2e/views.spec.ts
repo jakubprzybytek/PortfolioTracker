@@ -1639,13 +1639,124 @@ test.describe("sorting by a column", () => {
 });
 
 test.describe("catalyst view", () => {
-  test("in the menu; shows what the module holds and its jobs' latest runs", async ({ page }) => {
+  // The screen as the API serves it (int holds no Catalyst data): three listed bonds and a stale one.
+  const liq = (level: string, traded30: number) => ({ level, traded30, traded90: traded30, medianTurnover30: 25_000, trades30: 12, medianSpread30: 0.4, bid: { price: 100, volume: 50 }, daysToSell10k: 2 });
+  const row = (code: string, over: Record<string, unknown>) => ({
+    isin: `PL${code}`.padEnd(11, "0") + "1",
+    code,
+    segment: "corporate",
+    currency: "PLN",
+    markets: ["GPW ASO"],
+    maturity: "2029-08-12",
+    nominal: 1000,
+    issuer: "Kruk S.A.",
+    coupon: { kind: "FLOATING", base: "WIBOR 3M", margin: 0.033 },
+    couponText: "zmienne WIBOR 3M + 3.3%",
+    date: "2026-11-05",
+    market: "GPW ASO",
+    price: 101,
+    lastTraded: "2026-11-05",
+    accruedInterest: 5.1,
+    years: 2.75,
+    yieldGross: 0.075,
+    yieldNet: 0.061,
+    projected: true,
+    alternative: { label: "TOS1129 (retail, 3 y)", yieldNet: 0.039 },
+    vsAlternative: 0.022,
+    premium: 0.029,
+    premiumBasis: "wz",
+    liquidity: liq("high", 0.9),
+    flags: [],
+    ...over,
+  });
+  const screen = {
+    date: "2026-11-05",
+    computedAt: "2026-11-05T20:00:00Z",
+    curve: { fixed: [{ years: 1, value: 0.04, code: "PS1127" }, { years: 5, value: 0.055, code: "DS1031" }], wz: [] },
+    rows: [
+      row("KRU0829", {}),
+      row("ABC1227", { issuer: "Abc S.A.", coupon: { kind: "FIXED", rate: 0.09 }, couponText: "stałe 9%", years: 1.1, yieldNet: 0.074, vsAlternative: 0.035, premium: 0.045, premiumBasis: "fixed-curve", projected: false, liquidity: liq("low", 0.1), nominal: 100 }),
+      row("WAW0130", { segment: "municipal", issuer: null, coupon: undefined, couponText: null, yieldNet: null, yieldGross: null, vsAlternative: null, premium: null, liquidity: liq("medium", 0.5), flags: ["no-terms"] }),
+      row("OLD0828", { issuer: "Old S.A.", yieldNet: 0.2, liquidity: liq("none", 0), flags: ["stale"] }),
+    ],
+  };
+  let views: { name: string; params: Record<string, string> }[] = [];
+  test.beforeEach(async ({ page }) => {
+    views = [];
+    await page.route("**/catalyst/bonds", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(screen) }));
+    await page.route("**/catalyst/bonds/PL*", (r) =>
+      r.fulfill({ contentType: "application/json", body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: { issuer: "Kruk S.A.", secured: false }, coupons: [{ start: "2026-08-12", end: "2026-11-12", paymentDate: "2026-11-12", rate: 0.0713 }], market: "GPW ASO", sessions: [{ date: "2026-11-04", close: 100.9, trades: 2, turnover: 20000, nominal: 1000 }, { date: "2026-11-05", close: 101, trades: 1, turnover: 10000, nominal: 1000 }], quotes: [{ date: "2026-11-05", bid: { price: 100.8 }, ask: { price: 101.2 } }] }) }),
+    );
+    await page.route("**/catalyst/views", async (r) => {
+      if (r.request().method() === "PUT") views = (JSON.parse(r.request().postData() ?? "{}") as { views: typeof views }).views;
+      await r.fulfill({ contentType: "application/json", body: JSON.stringify({ views }) });
+    });
+  });
+
+  test("in the menu; every listed bond but the stale ones, the best net yield first", async ({ page }) => {
     await page.goto("/");
     await page.getByTestId("nav-catalyst").click();
     await expect(page).toHaveURL(/#\/catalyst$/);
     await expect(page.getByRole("heading", { name: "Catalyst", level: 2 })).toBeVisible();
-    await expect(page.getByTestId("catalyst-bonds")).toHaveText(/^(No data yet\.|[\d\s]+ bonds\.)$/);
-    await expect(page.getByTestId("catalyst-jobs").locator("tbody tr")).toHaveCount(5);
-    await expect(page.getByTestId("catalyst-jobs")).toContainText("catalyst-metrics");
+    await expect(page.getByTestId("catalyst-date")).toContainText("2026-11-05");
+    const rows = page.getByTestId("catalyst-table").locator("tbody tr");
+    await expect(rows).toHaveCount(3);
+    expect(await rows.evaluateAll((trs) => trs.map((tr) => tr.getAttribute("data-code")))).toEqual(["ABC1227", "KRU0829", "WAW0130"]);
+    await expect(page.getByTestId("filters-summary")).toContainText("3 of 4 bonds (+ 1 stale, hidden)");
+    const kru = rows.filter({ hasText: "KRU0829" });
+    await expect(kru).toContainText("6,10 %");
+    await expect(kru).toContainText("+2,2 %");
+    await expect(kru).toContainText("WIBOR 3M".replace("WIBOR ", "W"));
+    await expect(rows.filter({ hasText: "WAW0130" })).toContainText("no terms yet");
+
+    await page.getByTestId("catalyst-stale").click();
+    await expect(rows).toHaveCount(4);
+  });
+
+  test("filters and the sort are in the URL; a view saves them", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    const rows = page.getByTestId("catalyst-table").locator("tbody tr");
+    await expect(rows).toHaveCount(3);
+    await page.getByTestId("catalyst-nom").selectOption("100");
+    await expect(rows).toHaveCount(1); // only ABC1227 has a nominal of 100
+    await page.getByTestId("catalyst-nom").selectOption("");
+    await page.getByTestId("catalyst-liq").selectOption("medium");
+    await expect(rows).toHaveCount(2); // KRU0829 (high) and WAW0130 (medium), not ABC1227 (low)
+    await expect(page).toHaveURL(/liq=medium/);
+    await page.getByTestId("sort-premium").click();
+    await expect(page).toHaveURL(/sort=-premium/);
+    await page.getByTestId("catalyst-view-new").click();
+    await page.getByTestId("catalyst-view-name").fill("Liquid, small");
+    await page.getByTestId("catalyst-view-save").click();
+    await expect.poll(() => views.map((v) => [v.name, v.params["liq"], v.params["sort"]])).toEqual([["Liquid, small", "medium", "-premium"]]);
+    await page.getByTestId("filters-reset").click();
+    await expect(rows).toHaveCount(3);
+    await page.getByTestId("catalyst-view").selectOption("Liquid, small");
+    await expect(rows).toHaveCount(2);
+  });
+
+  test("a row opens its panel: price and liquidity, the yield's make-up, the coupons", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).click();
+    await expect(page.getByTestId("catalyst-panel-title")).toContainText("KRU0829");
+    await expect(page.getByTestId("catalyst-liquidity")).toContainText("best bid 100,00 for 50 bonds");
+    await page.getByTestId("catalyst-tab-yield").click();
+    await expect(page.getByTestId("catalyst-yield-facts")).toContainText("TOS1129 (retail, 3 y)");
+    await page.getByTestId("catalyst-tab-coupons").click();
+    await expect(page.getByTestId("catalyst-coupons").locator("tbody tr")).toHaveCount(1);
+    await expect(page).toHaveURL(/tab=coupons/);
+  });
+
+  test("the chart: the filtered bonds against the State's curve", async ({ page }) => {
+    await page.goto("/#/catalyst?chart=1");
+    await expect(page.getByTestId("catalyst-chart").locator(".recharts-scatter-symbol, .recharts-symbols, circle")).not.toHaveCount(0);
+  });
+
+  test("on a phone: three-line rows", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/#/catalyst");
+    await expect(page.getByTestId("catalyst-row")).toHaveCount(3);
+    await page.getByTestId("catalyst-row").first().getByRole("button").click();
+    await expect(page.getByTestId("catalyst-panel-title")).toBeVisible();
   });
 });

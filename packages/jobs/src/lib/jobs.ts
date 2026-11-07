@@ -29,6 +29,7 @@ export const JOBS = {
   "catalyst-daily": { maxAgeHours: 78, prices: true, table: "catalyst" },
   "catalyst-quotes": { maxAgeHours: 78, prices: true, table: "catalyst" },
   "catalyst-terms": { maxAgeHours: 78, table: "catalyst" },
+  "catalyst-export": { maxAgeHours: 32 * 24, table: "catalyst" },
   "catalyst-metrics": { table: "catalyst" },
   "catalyst-backfill": { table: "catalyst" },
 } satisfies Record<string, { maxAgeHours?: number; prices?: boolean; optional?: boolean; table?: JobTable }>;

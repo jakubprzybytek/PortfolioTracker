@@ -38,6 +38,7 @@ Hash routes, so the static site stays one page (no CloudFront rewrites) and ever
 | `#/indicators?chart=<id>&range=1Y\|10Y\|ALL` | Indicators (`range` absent = 5 years) |
 | `#/transactions?account=…&tx=<type>&instrument=<ISIN or none>&type=<asset type>&q=<text>` | Transactions (`tx`: BUY, COUPON …; `q`: the search) |
 | `#/notes?note=<id or new>` | Notes (`note` = the open note; `new` = writing one) |
+| `#/catalyst?q=…&type=…&base=…&mat=…&nom=…&liq=…&yield=…&prem=…&cur=…&stale=1&chart=1&sort=…&bond=<ISIN>&tab=yield\|coupons` | Catalyst: the bond market (filters, `sort` as in Prices, `bond` = the open panel) |
 | `#/status` | Status: the jobs (not in the menu; a link next to the app's version and in the failed-jobs banner) |
 
 Changing a filter replaces the history entry, so "back" goes to the previous view, not the previous filter. Filter dropdowns have a fixed width (no jump when their options load); on a phone they share rows of two (Transactions: Account and Asset type, then the instrument on a row of its own, wide enough for its value), the label shown inside the dropdown while nothing is picked, the count below with a "Clear" link (funnel ✕) at its end while any filter is set. On a computer "clear filters" is a button after the filters (a funnel with ✕, so it isn't taken for a refresh). No router library: `packages/web/src/route.ts`.
@@ -196,6 +197,18 @@ Free notes in Markdown (`NotesView.tsx`), e.g. trading checklists. Not linked to
 - **Markdown:** GitHub flavour (`react-markdown` + `remark-gfm`): headings, lists, task lists, tables, links, code, quotes. Raw HTML in a note is shown as text, never run.
 - **New note / Edit:** a title (required) and the text, with a live preview next to it (below it on a phone). **Delete** asks to confirm.
 - Stored in the `transactions` table (your input) and in the monthly backup (`notes.json`).
+
+## Catalyst
+
+The Catalyst module (Docs/catalyst.md): every bond listed on Catalyst, apart from the portfolio. `CatalystView.tsx`, API `/api/catalyst/*` (Lambda `catalyst-api`).
+
+- **One row per listed bond** (`GET /catalyst/bonds`: the screen rows the metrics compute after each daily file): bond (code; tags EUR, periods extended, amortising, no terms yet …), issuer (from obligacje.pl), type, coupon (`7,50 %`, `W6M+3,85`), years to maturity, price (% of nominal; last trade and accrued interest on hover), **yield net** (to maturity after 19 % tax and the commission; * = future coupons at the assumed base rate; before tax on hover), **vs alt.** (pp over the retail bond on offer with the nearest term, or your rate), **premium** (pp over the State: fixed coupons against the fixed-rate curve, floating ones their price-adjusted margin against WZ's), liquidity (three dots: high, medium, low; the measures on hover). The best net yield first; every column sorts (`sort` in the URL).
+- **Filters** (in the URL): bond (code, issuer or ISIN), type, coupon (fixed, zero, WIBOR 3M/6M, WIRON, POLSTR, EURIBOR), maturity (up to 1, 1–3, 3–5, over 5 years), nominal (≤ 100, ≤ 1 000, ≤ 10 000), liquidity (at least low, medium, high), net yield and premium at least, currency; **Show stale** adds the bonds without a trade in 30 sessions (hidden by default; their count is in the summary). On a phone the filters fold into the search and a Filters button.
+- **Views:** the filters and the sort saved under a name (`PUT /catalyst/views`, in the module's table and its monthly backup); choosing one applies it; "Delete" removes the one shown.
+- **Chart** (toggle): yield before tax against years to maturity of the PLN bonds shown, dots coloured by liquidity, the State's fixed-rate curve as a line, cut where the bonds end; a click opens the bond's panel.
+- **Row panel** (docked at the bottom, as in Holdings): *Price & liquidity* (a year of closes on traded days, the reference price, bid and ask, turnover bars; the liquidity measures and the best bid), *Yield* (price, accrued interest, years, yields before and after tax, the alternative, the premium and how it's measured, coupon, issue in circulation, security, notes), *Coupons* (the interest periods with record and payment days and rates). The tab is in the URL.
+- **Assumptions** (the cog): WIBOR, WIRON/POLSTR, EURIBOR, CPI, NBP rate, the alternative (retail bond on offer or a rate), commission; "Defaults" goes back (the NBP rate and WIRON from the ROR on offer). Saving recomputes the screen (about 20 s; the view reloads).
+- **On a phone:** three-line rows (code, issuer, liquidity / coupon, years, price / net yield, vs alt., premium), each a button opening the panel.
 
 ## API (Lambda `api`)
 

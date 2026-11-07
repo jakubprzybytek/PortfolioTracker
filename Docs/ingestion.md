@@ -39,6 +39,10 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 
 The jobs group into a few short windows a day. With DynamoDB this doesn't matter for cost; it keeps the schedule easy to follow.
 
+## Catalyst module
+
+Its own jobs, schedules and queue (Docs/catalyst.md, "Jobs" and "How jobs run"): `catalyst-daily` (21:00, recheck 08:00), `catalyst-quotes` (17:20, 07:45), `catalyst-terms` (09:30), `catalyst-export` (1st, 04:30), and `catalyst-metrics` and `catalyst-backfill` from its queue. Their runs are in its own table and on the Status page.
+
 ## Live prices (on demand, 2026-10-14)
 
 - **Trigger:** "Update prices" in the app → `POST /prices/refresh` → the `Live` function (async). At most one run every 5 minutes (the API answers 429 with `retryAt`), so the sources aren't asked over and over.

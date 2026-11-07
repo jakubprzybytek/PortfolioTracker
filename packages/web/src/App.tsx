@@ -222,7 +222,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}
-        {route.view === "catalyst" && <CatalystView />}
+        {route.view === "catalyst" && <CatalystView key="catalyst" params={route.params} setParams={setParams} />}
         {route.view === "instrument" && <InstrumentView key="instrument" params={route.params} />}
         {route.view === "status" && <StatusView />}
         </Suspense>
