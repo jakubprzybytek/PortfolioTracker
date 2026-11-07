@@ -3,7 +3,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, 
 import { apiSend } from "./api.ts";
 import { ChartPanel } from "./ChartPanel.tsx";
 import { FilterBar, FilterSelect, FilterText, FilterToggle, matchesAny, type Option } from "./Filters.tsx";
-import { fmtInt, fmtNum, fmtPct } from "./format.ts";
+import { fmtInt, fmtMoney, fmtNum, fmtPct, today } from "./format.ts";
 import { Icon } from "./Icons.tsx";
 import { SkeletonRows } from "./Placeholders.tsx";
 import { parseSort, sortParam, sortRows, type SortValue } from "./sort.ts";
@@ -97,7 +97,7 @@ interface BondDetail {
   coupons: { start: string; end: string; recordDate?: string; paymentDate: string; rate?: number }[];
   market: string;
   sessions: { date: string; close: number | null; trades: number; turnover: number; nominal: number | null }[];
-  quotes: { date: string; bid?: { price: number }; ask?: { price: number } }[];
+  quotes: { date: string; bid?: { price: number; volume: number }; ask?: { price: number; volume: number } }[];
 }
 
 // --- labels and formats ------------------------------------------------------------------------------------------
@@ -136,12 +136,12 @@ const FLAG_TITLE: Record<string, string> = {
   indexed: "Inflation-indexed (IZ): not computed here",
 };
 
-const pct = (v: number | null | undefined, d = 2) => (v === null || v === undefined ? "–" : `${fmtNum(v * 100, d)} %`);
-const pp = (v: number | null | undefined) => (v === null || v === undefined ? "–" : fmtPct(v * 100));
+const pct = (v: number | null | undefined, d = 2) => (v === null || v === undefined ? "–" : `${fmtNum(v * 100, d)}%`);
+const pp = (v: number | null | undefined) => (v === null || v === undefined ? "–" : fmtPct(v * 100).replace(" %", "%"));
 const couponLabel = (r: BondRow) => {
   const c = r.coupon;
   if (!c) return r.segment === "treasury" && /^(DS|PS|WS)\d/.test(r.code) ? "fixed" : r.segment === "treasury" && /^OK\d/.test(r.code) ? "zero" : "–";
-  if (c.kind === "FIXED") return c.rate !== undefined ? `${fmtNum(c.rate * 100)} %` : "fixed";
+  if (c.kind === "FIXED") return c.rate !== undefined ? `${fmtNum(c.rate * 100)}%` : "fixed";
   if (c.kind === "FLOATING") return `${(c.base ?? "").replace("WIBOR ", "W")}+${fmtNum((c.margin ?? 0) * 100)}`;
   if (c.kind === "ZERO") return "zero";
   return "–";
@@ -193,7 +193,7 @@ const LIQUIDITY: Option[] = [
   { value: "medium", label: "Medium or better" },
   { value: "high", label: "High" },
 ];
-const MIN_YIELD: Option[] = ["3", "4", "5", "6", "7", "8"].map((v) => ({ value: v, label: `≥ ${v} % net` }));
+const MIN_YIELD: Option[] = ["3", "4", "5", "6", "7", "8"].map((v) => ({ value: v, label: `≥ ${v}% net` }));
 const MIN_PREMIUM: Option[] = ["0", "1", "2", "3", "5"].map((v) => ({ value: v, label: `≥ ${v} pp` }));
 /** The URL parameters that are filters (a saved view keeps these and the sort). */
 const FILTER_KEYS = ["q", "type", "cur", "base", "mat", "nom", "liq", "yield", "prem", "stale", "sort"] as const;
@@ -326,7 +326,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
               <SortTh label="Coupon" sortKey="coupon" sort={sort} onSort={(s) => set("sort", sortParam(s))} className="left" firstDesc />
               <SortTh label="Maturity" sortKey="maturity" sort={sort} onSort={(s) => set("sort", sortParam(s))} />
               <SortTh label="Price" sortKey="price" sort={sort} onSort={(s) => set("sort", sortParam(s))} />
-              <SortTh label="Yield net" sortKey="yield" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc title="Yield to maturity after 19 % tax and the commission" />
+              <SortTh label="Yield net" sortKey="yield" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc title="Yield to maturity after 19% tax and the commission" />
               <SortTh label="Vs alt." sortKey="vsalt" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc title="Net yield − the alternative's net yield (percentage points)" />
               <SortTh label="Premium" sortKey="premium" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc title="Over the State: fixed coupons, yield − the curve at the same maturity; floating, margin adjusted for price − WZ's" />
               <SortTh label="Liquidity" sortKey="liquidity" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc />
@@ -365,7 +365,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
                   {pp(r.vsAlternative)}
                 </td>
                 <td title={r.premiumBasis === "wz" ? "Floating: margin adjusted for price − WZ's" : r.premiumBasis === "fixed-curve" ? "Fixed: yield before tax − the State's curve" : ""}>{pp(r.premium)}</td>
-                <td title={liquidityTitle(r.liquidity)}>
+                <td title={liquidityTitle(r.liquidity, r.currency)}>
                   <LiquidityDots level={r.liquidity.level} />
                 </td>
               </tr>
@@ -393,14 +393,16 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
   );
 }
 
-function liquidityTitle(l: Liquidity): string {
+/** The liquidity measures in a line, statements separated by " • ". */
+function liquidityTitle(l: Liquidity, currency: string): string {
   const parts = [
-    `traded on ${Math.round(l.traded30 * 100)} % of the last 30 sessions (${Math.round(l.traded90 * 100)} % of 90)`,
-    l.medianTurnover30 !== null ? `median turnover ${fmtInt(Math.round(l.medianTurnover30))}` : "",
+    `traded on ${Math.round(l.traded30 * 100)}% of the last 30 sessions (${Math.round(l.traded90 * 100)}% of 90)`,
+    l.medianTurnover30 !== null ? `median turnover ${fmtMoney(Math.round(l.medianTurnover30), currency).replace(",00", "")}` : "",
     l.medianSpread30 !== null ? `bid–ask spread ${fmtNum(l.medianSpread30)} pp` : "",
-    l.daysToSell10k !== null ? `selling 10 000 ≈ ${l.daysToSell10k} sessions` : "",
+    // Sessions to buy or sell bonds worth 10 000 when taking at most a fifth of an average session's turnover.
+    l.daysToSell10k !== null ? `trading 10 000 ${currency === "PLN" ? "zł" : currency} ≈ ${l.daysToSell10k} sessions` : "",
   ];
-  return `${LEVEL_LABEL[l.level]}: ${parts.filter(Boolean).join("; ")}`;
+  return `${LEVEL_LABEL[l.level]}: ${parts.filter(Boolean).join(" • ")}`;
 }
 
 function LiquidityDots({ level }: { level: Level }) {
@@ -443,14 +445,14 @@ function YieldChart({ rows, curve, onPick }: { rows: BondRow[]; curve: CurvePoin
         <ComposedChart margin={chartMargin(narrow)}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
           <XAxis type="number" dataKey="x" domain={[0, maxX]} unit=" y" allowDecimals={false} allowDataOverflow allowDuplicatedCategory={false} />
-          <YAxis type="number" unit=" %" domain={["auto", "auto"]} width={narrow ? 40 : 48} />
+          <YAxis type="number" unit="%" domain={["auto", "auto"]} width={narrow ? 40 : 48} />
           <Tooltip
             content={({ payload }) => {
               const p = payload?.[0]?.payload as { code?: string; x: number; y?: number; curve?: number } | undefined;
               if (!p) return null;
               return (
                 <div className="chart-tip">
-                  {p.code ? `${p.code}: ${fmtNum(p.y ?? 0)} % at ${fmtNum(p.x, 1)} y` : `State: ${fmtNum(p.curve ?? 0)} % at ${fmtNum(p.x, 1)} y`}
+                  {p.code ? `${p.code}: ${fmtNum(p.y ?? 0)}% at ${fmtNum(p.x, 1)} y` : `State: ${fmtNum(p.curve ?? 0)}% at ${fmtNum(p.x, 1)} y`}
                 </div>
               );
             }}
@@ -501,11 +503,13 @@ function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondDetail |
   const quotes = new Map(detail.quotes.map((q) => [q.date, q]));
   const data = detail.sessions.map((s) => ({ date: s.date, close: s.trades > 0 ? s.close : null, reference: s.close, turnover: s.turnover, bid: quotes.get(s.date)?.bid?.price ?? null, ask: quotes.get(s.date)?.ask?.price ?? null }));
   const l = row.liquidity;
+  // The latest quoted session: the ask is what a buyer pays, the bid what a seller gets.
+  const last = [...detail.quotes].reverse().find((q) => q.bid || q.ask);
+  const side = (label: string, s: { price: number; volume: number } | undefined) => (s ? `${label} ${fmtNum(s.price)} for ${fmtInt(s.volume)} bonds` : `no ${label}`);
   return (
     <div className="cat-price">
       <p className="muted cat-facts" data-testid="catalyst-liquidity">
-        {liquidityTitle(l)}
-        {l.bid ? `; best bid ${fmtNum(l.bid.price)} for ${fmtInt(l.bid.volume)} bonds` : ""}. Market {detail.market}.
+        {liquidityTitle(l, row.currency)}.{last ? ` Quotes on ${last.date}: ${side("ask", last.ask)} • ${side("bid", last.bid)}.` : ""} Market {detail.market}.
       </p>
       <div className="cat-chart">
       <ResponsiveContainer width="100%" height="100%">
@@ -531,7 +535,7 @@ function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondDetail |
 function YieldTab({ row, detail }: { row: BondRow; detail: BondDetail | undefined }) {
   const t = detail?.terms;
   const items: [string, string][] = [
-    ["Price", row.price === null ? "–" : `${fmtNum(row.price)} % of ${fmtInt(row.nominal ?? 0)} ${row.currency} (session ${row.date}${row.lastTraded && row.lastTraded !== row.date ? `; last trade ${row.lastTraded}` : ""})`],
+    ["Price", row.price === null ? "–" : `${fmtNum(row.price)}% of ${fmtInt(row.nominal ?? 0)} ${row.currency} (session ${row.date}${row.lastTraded && row.lastTraded !== row.date ? `; last trade ${row.lastTraded}` : ""})`],
     ["Accrued interest", row.accruedInterest === null ? "–" : `${fmtNum(row.accruedInterest)} ${row.currency} per bond`],
     ["Years to maturity", row.years === null ? "–" : `${fmtNum(row.years, 2)} (${row.maturity})`],
     ["Yield before tax", pct(row.yieldGross)],
@@ -552,17 +556,18 @@ function YieldTab({ row, detail }: { row: BondRow; detail: BondDetail | undefine
           <dd>{v}</dd>
         </div>
       ))}
-      <p className="muted">Bought at the session's price + accrued interest + commission, held to maturity, coupons reinvested at the same yield; tax 19 % on coupons (less the accrued interest paid) and on the gain at maturity. A corporate bond's yield is what's promised; the premium is the pay for the issuer's risk.</p>
+      <p className="muted">Bought at the session's price + accrued interest + commission, held to maturity, coupons reinvested at the same yield; tax 19% on coupons (less the accrued interest paid) and on the gain at maturity. A corporate bond's yield is what's promised; the premium is the pay for the issuer's risk.</p>
     </dl>
   );
 }
 
 function CouponsTab({ detail, loading }: { detail: BondDetail | undefined; loading: boolean }) {
   if (!detail) return <p className="muted">{loading ? "Loading…" : ""}</p>;
+  const now = today();
   if (detail.coupons.length === 0) return <p className="muted">{detail.terms?.periodsProblem ? `obligacje.pl's periods don't add up: ${detail.terms.periodsProblem}.` : "No interest periods (terms not read yet, or a treasury series: yearly coupons)."}</p>;
   return (
     <div className="table-wrap">
-      <table className="static" data-testid="catalyst-coupons">
+      <table className="static coupon-periods" data-testid="catalyst-coupons">
         <thead>
           <tr>
             <th className="left">From</th>
@@ -575,7 +580,7 @@ function CouponsTab({ detail, loading }: { detail: BondDetail | undefined; loadi
         <tbody>
           {/* The latest period first. */}
           {[...detail.coupons].sort((a, b) => b.start.localeCompare(a.start)).map((c) => (
-            <tr key={c.start}>
+            <tr key={c.start} className={c.start <= now && now < c.end ? "current" : undefined} title={c.start <= now && now < c.end ? "The current period" : undefined}>
               <td className="left">{c.start}</td>
               <td className="left">{c.end}</td>
               <td className="left">{c.recordDate ?? "–"}</td>

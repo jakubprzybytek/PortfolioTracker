@@ -1685,7 +1685,7 @@ test.describe("catalyst view", () => {
     views = [];
     await page.route("**/catalyst/bonds", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(screen) }));
     await page.route("**/catalyst/bonds/PL*", (r) =>
-      r.fulfill({ contentType: "application/json", body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: { issuer: "Kruk S.A.", secured: false }, coupons: [{ start: "2026-08-12", end: "2026-11-12", paymentDate: "2026-11-12", rate: 0.0713 }], market: "GPW ASO", sessions: [{ date: "2026-11-04", close: 100.9, trades: 2, turnover: 20000, nominal: 1000 }, { date: "2026-11-05", close: 101, trades: 1, turnover: 10000, nominal: 1000 }], quotes: [{ date: "2026-11-05", bid: { price: 100.8 }, ask: { price: 101.2 } }] }) }),
+      r.fulfill({ contentType: "application/json", body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: { issuer: "Kruk S.A.", secured: false }, coupons: [{ start: "2020-08-12", end: "2020-11-12", paymentDate: "2020-11-12", rate: 0.07 }, { start: "2020-11-12", end: "2099-11-12", paymentDate: "2099-11-12", rate: 0.0713 }], market: "GPW ASO", sessions: [{ date: "2026-11-04", close: 100.9, trades: 2, turnover: 20000, nominal: 1000 }, { date: "2026-11-05", close: 101, trades: 1, turnover: 10000, nominal: 1000 }], quotes: [{ date: "2026-11-05", bid: { price: 100.8, volume: 50 }, ask: { price: 101.2, volume: 12 } }] }) }),
     );
     await page.route("**/catalyst/views", async (r) => {
       if (r.request().method() === "PUT") views = (JSON.parse(r.request().postData() ?? "{}") as { views: typeof views }).views;
@@ -1704,8 +1704,8 @@ test.describe("catalyst view", () => {
     expect(await rows.evaluateAll((trs) => trs.map((tr) => tr.getAttribute("data-code")))).toEqual(["ABC1227", "KRU0829", "WAW0130"]);
     await expect(page.getByTestId("filters-summary")).toContainText("3 of 4 bonds (+ 1 stale, hidden)");
     const kru = rows.filter({ hasText: "KRU0829" });
-    await expect(kru).toContainText("6,10 %");
-    await expect(kru).toContainText("+2,2 %");
+    await expect(kru).toContainText("6,10%");
+    await expect(kru).toContainText("+2,2%");
     await expect(kru).toContainText("WIBOR 3M".replace("WIBOR ", "W"));
     await expect(rows.filter({ hasText: "WAW0130" })).toContainText("no terms yet");
 
@@ -1746,11 +1746,16 @@ test.describe("catalyst view", () => {
     await page.goto("/#/catalyst");
     await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).click();
     await expect(page.getByTestId("catalyst-panel-title")).toContainText("KRU0829");
-    await expect(page.getByTestId("catalyst-liquidity")).toContainText("best bid 100,00 for 50 bonds");
+    await expect(page.getByTestId("catalyst-liquidity")).toContainText("ask 101,20 for 12 bonds • bid 100,80 for 50 bonds");
     await page.getByTestId("catalyst-tab-yield").click();
     await expect(page.getByTestId("catalyst-yield-facts")).toContainText("TOS1129 (retail, 3 y)");
     await page.getByTestId("catalyst-tab-coupons").click();
-    await expect(page.getByTestId("catalyst-coupons").locator("tbody tr")).toHaveCount(1);
+    const periods = page.getByTestId("catalyst-coupons").locator("tbody tr");
+    await expect(periods).toHaveCount(2);
+    // The latest period first, and it's the current one.
+    await expect(periods.first()).toContainText("2099-11-12");
+    await expect(periods.first()).toHaveClass(/current/);
+    await expect(periods.nth(1)).not.toHaveClass(/current/);
     await expect(page).toHaveURL(/tab=coupons/);
   });
 
