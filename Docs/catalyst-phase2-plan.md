@@ -1,6 +1,6 @@
 # Catalyst phase 2: implementation plan
 
-Status: plan (2026-11-07). Phase 2 of the [Catalyst module](catalyst.md): who stands behind each bond and whether they can pay. It covers company identity, filed reports read by code, the 7-dimension scorecard with refinancing and data confidence, the repayment track record, and the CLI through which an AI agent does the work that needs reading or judgement. It ends with interim (quarterly, half-year) reports. Design steps 8–12 ([catalyst.md](catalyst.md#plan)), plus [Interim reports](catalyst.md#interim-reports).
+Status: plan (2026-11-07). Phase 2 of the [Catalyst module](catalyst.md): who stands behind each bond and whether they can pay. It covers company identity, filed reports read by code, the 6-dimension scorecard with refinancing and data confidence, the repayment track record, and the CLI through which an AI agent does the work that needs reading or judgement. It ends with interim (quarterly, half-year) reports. Design steps 8–12 ([catalyst.md](catalyst.md#plan)), plus [Interim reports](catalyst.md#interim-reports).
 
 Phase 1 is done (v0.204, [catalyst-phase1-plan.md](catalyst-phase1-plan.md)). CatalystViewer (CV) keeps running its issuer analysis until this phase replaces it; nothing of CV is switched off or deleted without the owner (AGENTS.md).
 
@@ -34,11 +34,13 @@ These settle details the design leaves open. Where the design differs, the desig
 
 | Topic | Decision | Why |
 |---|---|---|
-| Order | Data and computation first (exits, identity, reading, scorecard), then CV's data (N5), then the UI (N6), then the CLI and agent (N7) | The scorecard is checked against CV's on the same companies before anyone relies on it. The UI opens on real data. CV's agent keeps working until N7, so nothing goes stale in between. |
+| Order | Data and computation first (exits, identity, reading, scorecard), then CV's data (N5), then the UI (N6), then the CLI and agent (N7) | The scorecard is checked against CV's on the same companies before anyone relies on it. The UI opens on real data. CV keeps running throughout (owner, 2026-11-07); its data is migrated once (N5), not kept in sync. |
 | Code | `core/src/catalyst/issuers/` (identity, scope, scorecard, refinancing, confidence, track record) and `core/src/catalyst/filings/` (parsers, statement lines, checks, import), imported as `@portfolio/core/catalyst/…`; PT never imports them | Module boundary, as phase 1 |
-| Filings function | `CatalystFilings`, a separate Lambda (1 GB, 29 s, routes `/catalyst/filings/*`) | PDF text extraction (`pdfjs-dist`) and ESEF packages need memory and a bundle the other routes shouldn't carry |
-| Uploads | The CLI or UI asks for a presigned PUT to `catalyst/uploads/<uuid>`, uploads, then calls `POST /catalyst/filings/import { key, … }`; the original is copied to `catalyst/filings/<entityId>/<sha256>.<ext>` on import | API Gateway's 10 MB payload limit; ESEF packages run to 30 MB |
-| PDF reading | Only the transcript route (the agent copies the lines, code checks each amount on its page, re-extracting the text server-side). CV's Bedrock extractor (`AiPdfExtractor`) is not ported. | The app has no AI (design). The transcript route has been CV's default since 2026-11-04. |
+| Reading in the CLI | Parsing, the checks, PDF pages, GLEIF/KRS lookups and the scorecard preview run in the CLI on your machine (it imports `core`). The API receives parsed rows: it checks the schema, re-runs the arithmetic checks on the lines, compares the original's SHA-256, and stores. No file parsing in Lambda, no `pdfjs-dist` in any function. | An analysis needs the backend only to read stored rows and write results; fast, works offline up to the write. A wrong row can't pass the arithmetic checks, and `filings check` re-parses the stored originals at any time. |
+| Uploads | The CLI asks for a presigned PUT to `catalyst/uploads/<uuid>`, uploads, then sends `POST /catalyst/filings { key, sha256, rows, … }`; the original is copied to `catalyst/filings/<entityId>/<sha256>.<ext>` | API Gateway's 10 MB payload limit; ESEF packages run to 30 MB |
+| PDF reading | Only the transcript route: the agent copies the lines, and the CLI checks each amount on its page. CV's Bedrock extractor (`AiPdfExtractor`) is not ported. | The app has no AI (design). The transcript route has been CV's default since 2026-11-04. |
+| Six dimensions | Debt burden, debt service, liquidity, profitability, asset coverage, refinancing. CV's Financial trend becomes arrows on the dimensions its metrics describe (net debt / EBITDA slope on debt burden; margin slope and revenue growth on profitability). | Trend is a direction, not a state: as a colour it repeated what the other dimensions say and couldn't be read on its own (catalyst.md, "Scorecard") |
+| CV's reports | CV's 85 originals (43 companies) are copied in N3 for testing on dev and migrated in N5; `catalyst work` never asks for a report already held | Not downloaded again |
 | Agent access | Routes `/catalyst/agent/{proxy+}` without the Cognito authorizer; the function checks the token (`Authorization: Bearer`, SHA-256 against `SETTING#agentToken`, as the spreadsheet feed's), then dispatches to the same handlers through an allow-list of reads and writes | One token check in one place; the agent can never reach PT's routes or the module's settings and market data |
 | Computed on read | Scorecard, refinancing, confidence and track record computed by pure functions from the rows; `catalyst-metrics` runs them once per company per run and copies the signals into the screen rows | Design ("Derived values aren't stored"); the bond table's filters need them in one query |
 | After a company write | The API queues `{ kind: "metrics" }`; the worker coalesces a burst into one full run (12 s today) | No per-company path to maintain; one run is cheap |
@@ -65,7 +67,7 @@ As of CV `7e8a24c` (2026-11-05). This is functionality, not CV's storage or func
 | `IfrsTextParser.ts` | 305 | `filings/ifrsText.ts` | Best effort, only when the balance sheet ties |
 | `pdfText.ts`, the transcript half of `AiPdfExtractor.ts` | ~250 | `filings/pdf.ts`, `transcript.ts` | Statement pages, the copying prompt, amount checks |
 | `statementLines.ts`, `filedYears.ts`, `importFiling.ts` | 620 | `filings/lines.ts`, `years.ts`, `import.ts` | Standard items, checks, most recent report wins |
-| `scorecard.ts`, `scope.ts`, `confidence.ts`, `maturities.ts` | 750 | `issuers/scorecard.ts`, `scope.ts`, `confidence.ts`, `refinancing.ts` | Rule sets, finance map and overrides, thresholds |
+| `scorecard.ts`, `scope.ts`, `confidence.ts`, `maturities.ts` | 750 | `issuers/scorecard.ts`, `scope.ts`, `confidence.ts`, `refinancing.ts` | Rule sets, finance map and overrides, thresholds; Financial trend turned into arrows (six dimensions) |
 | `bonds/issuers/identity.ts`, `resolveIssuerIdentity.ts` | 230 | `issuers/identity.ts`, `jobs/catalyst/gleif.ts`, `krs.ts` | GLEIF and KRS lookups |
 | `scripts/sort-filings`, `check-filings` (+ `expected.json`, 40 reports), `import-filing`, `reparse-filings` | 680 | CLI commands, known answers | |
 | Their tests and fixtures | ~1,900 | `core/test/catalyst/filings/`, `issuers/` | They come with the code and must pass unchanged in substance |
@@ -75,20 +77,20 @@ Not ported: Step Functions and Bedrock analysis (`analyzeIssuer`, `classifyIssue
 ## Code layout
 
 ```
-infra/catalyst.ts                              + CatalystFilings, exits schedule, agent routes, uploads prefix
+infra/catalyst.ts                              + exits schedule, agent routes, uploads prefix
 packages/core/src/catalyst/
   items.ts                                     + NameItem, EntityItem, FinancialYearItem, InterimItem, FilingItem,
                                                  AnalysisItem, CheckItem, KnownItem, CollectedFiguresItem, ExitItem
   repository.ts                                + their reads and writes (history kept: a replaced year's previous version)
   exits.ts                                     parser of GPW's suspension/exclusion pages and markings
-  issuers/identity.ts, scope.ts, scorecard.ts, refinancing.ts, confidence.ts, trackRecord.ts, ttm.ts (N8)
-  filings/krsXml.ts, krsLines.ts, esef.ts, ifrsText.ts, zip.ts, pdf.ts, transcript.ts, lines.ts, years.ts, import.ts
+  issuers/identity.ts, gleif.ts, krs.ts, scope.ts, scorecard.ts, refinancing.ts, confidence.ts, trackRecord.ts, ttm.ts (N8)
+  filings/krsXml.ts, krsLines.ts, esef.ts, ifrsText.ts, zip.ts, pdf.ts, transcript.ts, lines.ts, years.ts, checks.ts
+                                                 (checks.ts also used by the API on received rows)
   schemas.ts                                   zod schemas of every CLI input (also `catalyst schema <kind>`)
 packages/jobs/src/catalyst/
-  gleif.ts, krs.ts                             identity clients (polite fetch)
-  handlers/exits.ts, filings.ts                the exits job; the filings function
-  handlers/api.ts                              + entities, names, checklist, analyses, figures, agent dispatch
-packages/cli/                                  `catalyst` (bin), commands, login, API client, --table output
+  handlers/exits.ts                            the exits job
+  handlers/api.ts                              + entities, names, filings (rows), checklist, analyses, figures, agent dispatch
+packages/cli/                                  `catalyst` (bin), commands, login, API client, --table output; parsing and checks via core
 packages/web/src/catalyst/
   IssuersView.tsx, IssuerDialog.tsx, Scorecard.tsx, Financials.tsx, Checklist.tsx
 .claude/skills/catalyst-analyst/SKILL.md       the agent's procedure (design, "Agent skill")
@@ -102,7 +104,7 @@ Small changes before the milestones. None of them adds resources or changes data
 
 | # | Change |
 |---|---|
-| Q1 | Dependencies: `fast-xml-parser` and `pdfjs-dist` in core (versions as CV's, checked for advisories); a zip reader (CV's own `zip.ts`, no new package) |
+| Q1 | Dependencies: `fast-xml-parser` in core, `pdfjs-dist` in the CLI only (versions as CV's, checked for advisories); a zip reader (CV's own `zip.ts`, no new package) |
 | Q2 | `CatalystView.tsx` (≈ 800 lines) split into `web/src/catalyst/` (table, filters, panel, chart, settings) before the issuer columns and dialog are added |
 | Q3 | `packages/cli` workspace skeleton: `npx catalyst --version`, the API client with the Cognito login for you (tests use the test user) |
 
@@ -134,7 +136,7 @@ Done when: every bond that ended since 2020 has a reason or "unknown". On dev, G
 ### N2 Identity: names and companies
 
 - Items: `NAME#`, `ENTITY#`; `entityId` on the bond.
-- `gleif.ts`, `krs.ts` (polite fetch; responses archived under `raw/catalyst-identity/`); `identity.ts` ported: ISIN → LEI mapping, exact name match, LEI record and parent, KRS extract.
+- `gleif.ts`, `krs.ts` in core (fetch-based, used by the terms job and the CLI; the job archives responses under `raw/catalyst-identity/`); `identity.ts` ported: ISIN → LEI mapping, exact name match, LEI record and parent, KRS extract.
 - `catalyst-terms` resolves new issuer names on its runs (design, "Jobs"). A one-off run resolves the names already in the table. Names that aren't resolved stay `unresolved`; a legal name that differs from the listed one stays `review`.
 - API (read): `GET /catalyst/entities`, `GET /catalyst/entities/{id}`, `GET /catalyst/names`. API (write, you): `PUT /catalyst/names/{name}` (link, confirm) and `PUT /catalyst/entities/{id}` (short name, industry, sub-type, override).
 - The export gains names and companies.
@@ -144,13 +146,14 @@ Done when: on dev at least 90 % of the corporate issuer names are resolved autom
 
 ### N3 Reading reports
 
-The ported parsers and the import, without the CLI (N7). Imports in this milestone come from scripts and the tests.
+The ported parsers, run locally, and the API that stores their result. The CLI's commands come in N7; until then a script (`scripts/catalyst-import-filing.ts`) parses locally and writes through the repository inside `sst shell`, as phase 1's scripts.
 
-- `filings/*` ported with their tests and fixtures; the PDF transcript route with server-side re-extraction of each page's text.
-- `CatalystFilings`: `POST /catalyst/filings/upload-url`, `POST /catalyst/filings/import { key, entityId?, transcript?, dryRun }` returns the figures, the checks, and what was kept or replaced. `GET /catalyst/filings/{sha}` returns the import result.
+- `filings/*` ported with their tests and fixtures; the PDF transcript route with the amounts checked against each page's text, locally.
+- CV's originals (85 files, 43 companies) copied from its prod bucket (read only) into dev's `catalyst/filings/`: the test corpus, not downloaded again.
+- API: `POST /catalyst/filings/upload-url`; `POST /catalyst/filings { key, sha256, entityId, rows, extraction }` checks the schema, re-runs `checks.ts` on the lines, compares the SHA-256, stores the original and the rows, and returns what was kept or replaced. `GET /catalyst/filings/{sha}` returns the stored result.
 - Rows: `FIN#…` with `filing`, `review: parsed`, `enteredBy`; history kept (`FIN#…#V<n>` for a replaced version); most recent report wins with the per-company exceptions (§16).
 - Known answers (`KNOWN#`) and `filings check` as a script (`scripts/catalyst-filings-check.ts`) until the CLI has it.
-- Tests: CV's parser tests unchanged in substance; the import refusing each failed check; most recent wins (Indos's restated 2024); the 40 known answers.
+- Tests: CV's parser tests unchanged in substance; the API refusing rows that fail a check or whose SHA-256 doesn't match; most recent wins (Indos's restated 2024); the 40 known answers.
 
 Done when: every one of CV's 40 known-answer reports imports on dev with the same figures as `expected.json`, and a refused import says which check failed.
 
@@ -158,11 +161,11 @@ Done when: every one of CV's 40 known-answer reports imports on dev with the sam
 
 - `scope.ts`, `scorecard.ts`, `refinancing.ts`, `confidence.ts` ported. Rule sets (general, developer, contractor, consumer and services, collector, leasing and factoring, investment firm) with their thresholds; the finance map and overrides now live on the company items.
 - `GET /catalyst/entities/{id}` adds the scorecard, refinancing, confidence and track record, computed on read.
-- `catalyst-metrics`: per company, once a run, the signals (seven colours, rule set, confidence, "no report", "not scored") copied into its bonds' screen rows. A company write queues the metrics.
+- `catalyst-metrics`: per company, once a run, the signals (six colours, trend arrows, rule set, confidence, "no report", "not scored") copied into its bonds' screen rows. A company write queues the metrics.
 - `Docs/catalyst-methodology.md` moved from CV (state v1.75) with section numbers kept; the design's "§" references point to it.
 - Tests: CV's scorecard tests (sectors, finance, confidence, maturities) unchanged in substance; a screen row carrying its company's signals.
 
-Done when: for the companies imported in N3, every dimension's colour and metric equals CV's for the same year, or the difference is explained (fresher bonds data from phase 1, for example) and written down.
+Done when: for the companies imported in N3, every dimension's colour and metric equals CV's for the same year (CV's trend colour against the arrows), or the difference is explained (fresher bonds data from phase 1, for example) and written down.
 
 ### N5 Migration of CatalystViewer's issuer data ⚠ approval
 
@@ -171,7 +174,7 @@ This writes data on prod that exists nowhere else (design, "Migration from Catal
 - `scripts/catalyst-migrate-cv.ts` (read only on CV, `--dry-run` by default):
   - identities, with confirmed ones kept confirmed, become names and companies;
   - profiles, the finance map and overrides go onto the companies, marked as yours;
-  - every original in CV's filings bucket is re-imported through N3 (PDFs from their stored transcripts) and compared with CV's `IssuerFinancials` row;
+  - every original in CV's filings bucket (85) is copied and re-imported through N3, never downloaded again; a PDF from a transcript rebuilt from CV's stored lines (label, page, amounts) and checked against the PDF; each year compared with CV's `IssuerFinancials` row;
   - `expected.json` becomes known answers, and CV's checklist becomes checklist entries;
   - analyses become judgements and their figures become collected figures, both marked as from CV's agent.
 - A report: per company, the years imported, the years that differ from CV (with the reason) and the files without an original.
@@ -183,7 +186,7 @@ Done when: prod holds every company CV analysed, each scorecard equals CV's or i
 
 Design, "UI": "Issuer dialog" and "Issuers".
 
-- Bonds view: the issuer column (seven dots, rule set, confidence; faded when low; "no report yet", "not scored"), the issuer filters (industry, rule set, scorecard, confidence, scored only, track record without red flags, judgement age) and the chart coloured by one chosen dimension.
+- Bonds view: the issuer column (six dots and the trend arrows, rule set, confidence; faded when low; "no report yet", "not scored"), the issuer filters (industry, rule set, scorecard, confidence, scored only, track record without red flags, judgement age) and the chart coloured by one chosen dimension.
 - Issuer dialog (`?issuer=<entityId>`): header, source line, scorecard with metrics, bonds falling due against cash, track record, judgement; tabs *Bonds*, *Financials* (years, lines behind a figure, full statements, review status with the buttons to mark a year `hand-checked` or `flagged`), *Track record*, *Judgements*, *Documents*. It's full screen on a phone.
 - `#/catalyst/issuers`: one row per company, with the columns, filters and the *needs work* column; the *Reports checklist* tab.
 - Docs: `ui.md`.
@@ -196,12 +199,12 @@ Done when: on prod you can go from a bond to its company's scorecard and the lin
 This adds a new way into the API (access).
 
 - Agent token: create, revoke and "last used" in the Catalyst settings (`POST`/`DELETE /catalyst/agent-token`, shown once). `/catalyst/agent/{proxy+}` has the token check and the allow-list. The allowed writes are names, companies (not sub-types or overrides), filings, collected figures, analyses and checklist entries. Every write records `enteredBy`.
-- `packages/cli`: the commands in the design's table, JSON output by default, `--table`, and `--dry-run` on every write. `catalyst login --stage` stores the token in the user's profile, outside the repo. `catalyst schema <kind>` prints the zod schemas as JSON Schema.
+- `packages/cli`: the commands in the design's table, JSON output by default, `--table`, and `--dry-run` on every write. Parsing, checks, PDF pages, GLEIF/KRS and the scorecard preview run locally; the API only for reading stored rows and writing results. `catalyst login --stage` stores the token in the user's profile, outside the repo. `catalyst schema <kind>` prints the zod schemas as JSON Schema.
 - `catalyst work`: names to resolve, reports due (year end + 9 months), companies on fallback figures, Finance companies without a sub-type, judgements older than the latest report, new markings and bonds ending below par.
 - `.claude/skills/catalyst-analyst/SKILL.md`: the design's eight steps, the limits (N companies a session, never market data, never `--force` without asking) and the robots.txt rules (obligacje.pl and the KRS repository never fetched by the agent).
 - Tests: integration on `int` with a test token (each allowed write, each refused route, a revoked token, no PT route reachable); the CLI against `int`.
 
-Done when: an agent session in Claude Code takes one item from `catalyst work` through to a stored judgement on dev, then on prod after your approval of the token's scope. CV's agent can stop after that (N9).
+Done when: an agent session in Claude Code takes one item from `catalyst work` through to a stored judgement on dev, then on prod after your approval of the token's scope. From then on analyses are made in PT; CV keeps running (N9 on hold).
 
 ### N8 Interim reports
 
@@ -243,10 +246,10 @@ Each step is your call. This plan only prepares them: it checks that every CV ta
 | Scorecard differs from CV's | Doubt about which one is right | N4 compares company by company; every difference explained in writing before N5 |
 | The agent writes wrong data | Wrong judgement or figures | Dry run on every write; checks refuse bad imports; `review` states and the hand-checked mark; append-only analyses; replaced years kept |
 | A token leak | Writes to the issuer data | Only the hash stored; narrow allow-list; no market data, settings or PT; revocable; "last used" shown |
-| Large PDFs or ESEF packages time out | Import fails | A separate function with 1 GB; uploads through S3; scanned PDFs refused early |
+| Rows sent by the CLI don't match the file they claim | Wrong figures stored | The token is yours and narrow; the API re-runs the arithmetic checks and the SHA-256; `filings check` re-parses the stored originals; review states |
 | GPW or GLEIF change their pages or API | Exits or identity stop | Raw responses archived; loud failures; alerts as the other jobs |
 | obligacje.pl's `ai-input=no` | A rule broken by the CLI | Owner decision 1 before N7; the CLI returns derived figures only |
-| CV and PT both running the agent during the hand-over | Two places with diverging judgements | CV's agent stops when N7's done; CV's data is read only after N5 |
+| CV keeps running beside PT (owner, 2026-11-07) | Two places with diverging judgements | CV's data is migrated once (N5) and not synced; analyses are made in PT from N7 on; CV's later results aren't imported |
 | Interim reports cost too much reading | Agent time | N8 is optional and comes last: balance sheet first, TTM after, publishing issuers only |
 
 ## Done when

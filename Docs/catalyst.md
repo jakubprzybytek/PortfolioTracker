@@ -7,7 +7,7 @@ CV's **fundamental analysis specification** (`CatalystViewer/docs/fundamental-an
 | Phase | Contents |
 |---|---|
 | 1 – Market | Daily data of every Catalyst bond; browsing with filters; yield to maturity against an alternative; risk premium over treasury bonds; liquidity |
-| 2 – Issuers | Company identity, filed annual reports read by code (then interim ones: quarterly and half-year, for a fresher balance sheet and trailing 12 months), the 7-dimension scorecard with data confidence, refinancing, repayment track record; the work that needs judgement or reading (finding reports, PDFs, the written judgement) done by an AI agent outside the app through a CLI |
+| 2 – Issuers | Company identity, filed annual reports read by code (then interim ones: quarterly and half-year, for a fresher balance sheet and trailing 12 months), the 6-dimension scorecard (with trend arrows) and data confidence, refinancing, repayment track record; the work that needs judgement or reading (finding reports, PDFs, the written judgement) done by an AI agent outside the app through a CLI |
 
 ## Contents
 
@@ -27,6 +27,7 @@ CV's **fundamental analysis specification** (`CatalystViewer/docs/fundamental-an
   - [Interim reports](#interim-reports)
   - [Later](#later)
 - [The `catalyst` CLI (the agent's interface)](#the-catalyst-cli-the-agents-interface)
+- [An analysis, end to end](#an-analysis-end-to-end)
 - [UI](#ui)
   - [Bonds](#bonds)
   - [Issuer dialog](#issuer-dialog)
@@ -198,7 +199,7 @@ The procedure is CV's (§3): bond → company → industry and rule set → repo
 
 ### Reading reports (code, ported from CV)
 
-The parsers move from CV (`packages/core/src/bonds/fundamentals/filings/`) into `core/src/catalyst/filings/`, used by the API (import) and the CLI (sort, dry run):
+The parsers move from CV (`packages/core/src/bonds/fundamentals/filings/`) into `core/src/catalyst/filings/`. They run in the CLI on your machine (sort, pages, parse, checks, dry run); the API only re-runs the arithmetic checks on the lines it receives:
 
 | Format | Who files it | Reading |
 |---|---|---|
@@ -213,7 +214,8 @@ Every line keeps its source and gets a **standard item** from one vocabulary (§
 
 As CV's specification, §10 to §12:
 
-- **Seven dimensions:** Debt burden, Debt service, Liquidity, Profitability, Asset coverage, Financial trend, Refinancing; each green / yellow / red / n/a with its metrics and notes. **No aggregate score** (§1 principle 1): the reader sees the dimensions, helped by the written judgement.
+- **Six dimensions:** Debt burden, Debt service, Liquidity, Profitability, Asset coverage, Refinancing; each green / yellow / red / n/a with its metrics and notes.
+- **Trend is an arrow, not a colour.** This changes CV v1.75, where Financial trend was dimension 6. Its metrics, over at least three years, sit on the dimension they describe: the slope of net debt / EBITDA on Debt burden; the EBITDA margin's slope and revenue growth on Profitability. The arrows are ↑ better, → flat, ↓ worse, and none under three years. An arrow doesn't change a colour; the judgement weighs it (§13: a borderline year at the end of a three-year slide reads worse than its colour). **No aggregate score** (§1 principle 1): the reader sees the dimensions, helped by the written judgement.
 - **Rule sets** with their own metrics and thresholds: general, developer, contractor, consumer and services; for lenders debt collector, leasing and factoring, investment firm. Chosen by the finance map, then a per-company override, then the industry (§6, §10).
 - **Out of scope:** banks, mortgage banks, insurers, state bodies, municipalities: no colours, but identity, bonds and refinancing data.
 - **No data is n/a, never a colour**; a dimension coloured by one metric where it has more is "thin".
@@ -251,7 +253,8 @@ Rules:
 The app has no AI. It stores, parses, checks, computes and shows. Finding and reading documents, resolving hard identities and writing judgements is done by an AI agent (Claude Code or another chat) through the CLI.
 
 - **Location:** `packages/cli` in this repo, TypeScript, run with `npx catalyst …`. It uses `core`'s zod schemas and parsers (the same ones the API uses); `catalyst schema <kind>` prints an input as JSON Schema.
-- **Transport:** only the API (`/api/catalyst/*`), never DynamoDB directly; the server re-parses and re-checks every import. JSON output by default, `--table` for people, `--dry-run` on every write.
+- **Where the work runs:** on your machine. The CLI imports `core`'s parsers, checks, scorecard and identity clients, so none of these needs the backend: sorting files, finding PDF pages, parsing, the checks, GLEIF and KRS lookups, and a dry run (with the scorecard the import would give). The app is called only to read a company's stored rows and to write results.
+- **Transport:** only the API (`/api/catalyst/agent/*`), never DynamoDB directly. The server checks what it receives (the zod schemas, the arithmetic checks re-run on the submitted lines, the original's SHA-256) and stores the original; it doesn't parse files. `filings check` re-parses the stored originals locally against the known answers at any time. JSON output by default, `--table` for people, `--dry-run` on every write.
 - **Auth:** an agent token (same pattern as the spreadsheet feed token: 32 random bytes shown once, only the SHA-256 stored, one at a time, revocable), made in the Catalyst view. It allows reads of `/api/catalyst/*` and writes of names, companies (not finance sub-types or overrides), filings, collected figures, analyses and checklist entries; not market data, settings or anything of PT. `catalyst login --stage <stage>` stores it outside the repo. Tests use the test user on `int`, never prod.
 - **Review:** everything the agent writes records `enteredBy` and keeps history (analyses are append-only; a replaced financial year keeps the previous version). Imported years start as `parsed`; you mark them `hand-checked` or `flagged`. Identities whose legal name differs from the listed name stay `review` until you confirm them.
 
@@ -260,12 +263,12 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 | `catalyst work` | What needs doing: names `unresolved`/`review`; companies in scope without a report for a year that is due, or without an interim report that is due (for those that publish them); companies on fallback figures; Finance companies without a sub-type; analyses older than their latest report; new markings or bonds ending below par |
 | `catalyst bonds [--entity] [--filter …]`, `catalyst bond <code>` | Screen rows, amounts owed, liquidity (no obligacje.pl content) |
 | `catalyst entity <id>` | Identity, names, bonds, financial years with lines, scorecard, refinancing, confidence, track record, latest analysis |
-| `catalyst identity resolve [<name>]` | GLEIF and KRS lookups (ISIN mapping, exact name match, by KRS or LEI, parent), printed with the evidence |
+| `catalyst identity resolve [<name>]` | GLEIF and KRS lookups, made by the CLI itself (ISIN mapping, exact name match, by KRS or LEI, parent), printed with the evidence |
 | `catalyst identity set <name> --entity <id> [--financials <id>] --evidence "…"` | Link a listed name to a company (and a financing vehicle to its group) |
 | `catalyst entity set <id> --file entity.json` | Short name, industry, summary, website, notes |
 | `catalyst checklist [--add <id> <year> <scope> --where "…"]` | Reports to download by hand from the KRS repository, and their state |
 | `catalyst filings sort <folder> [--copy\|--move]` | Identify hand-downloaded files (zips, signed XML, PDFs: company, KRS, year, scope, duplicates, part years, drafts), check them against the checklist, file them as `sorted/<KRS>-<company>/FY<year>-<scope>.<ext>` (interim: `<year>Q<n>-<scope>` or `<year>H1-<scope>`) |
-| `catalyst filings import <file> [--entity <id>] [--dry-run] [--force]` | Upload and import a KRS XML, ESEF or IFRS text report; prints the figures, the checks and what was kept (most recent report wins) |
+| `catalyst filings import <file> [--entity <id>] [--dry-run] [--force]` | Parse and check a KRS XML, ESEF or IFRS text report locally; print the figures, the checks, what would be kept (most recent report wins) and the scorecard it would give. Without `--dry-run`: upload the original and store the rows |
 | `catalyst filings pages <pdf> --out pages.txt` | The statement pages and the copying instructions for a PDF |
 | `catalyst filings import <pdf> --transcript t.json --by "<model or name>"` | Import a PDF from the agent's transcript, annual or interim (the transcript states the period and months); code checks every amount |
 | `catalyst filings check [--entity <id>]` | Compare stored rows and fresh parses with the known answers |
@@ -283,9 +286,94 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 5. `filings import --dry-run`, then import; a PDF via `filings pages` → transcript (copy, never compute) → import. Refused? Read the checks, fix the transcript, never `--force` without asking.
 6. No report available and an operating company: `figures put`, avoiding §9's failure modes (part years, today's date, units, the wrong company).
 7. `entity <id>`: read the scorecard against the rule set (§13); read the auditor's opinion, going-concern notes, covenants, security, related parties, current reports for red flags, each with a source and quote.
-8. `analysis put` in the §14 layout: header (company, identity, industry, rule set), bonds and amounts due, figures and confidence, the 7 dimensions, judgement (2–5 sentences), red flags (or "none found in <documents read>"), what to watch, sources.
+8. `analysis put` in the §14 layout: header (company, identity, industry, rule set), bonds and amounts due, figures and confidence, the 6 dimensions and trend arrows, judgement (2–5 sentences), red flags (or "none found in <documents read>"), what to watch, sources.
 
 Limits: at most N companies per session; never touch bonds or market data. It runs by hand in Claude Code, or later as a scheduled cloud routine with the token as a secret (the KRS checklist then waits for you).
+
+## An analysis, end to end
+
+How one company goes from "analyse it" to a scorecard in the app. The example is a made-up bond ABC1227 of "ABC Development S.A."; the commands are the CLI's (above). Who does what:
+- **you** decide and review;
+- **the agent** (Claude Code, run by hand, with the `catalyst-analyst` skill) finds and reads;
+- **the CLI** parses, checks and computes on your machine;
+- **the app** stores, recomputes the bonds' signals and shows them.
+
+**0. The agent's access (once per stage).**
+1. You create an agent token in the Catalyst settings. It's shown once; the app keeps only its SHA-256.
+2. In Claude Code you type `! npx catalyst login --stage prod` and paste the token at a hidden prompt. The CLI stores it in your user profile, outside the repo, and prints only its last four characters, so the agent never sees it.
+3. Every call the CLI makes sends `Authorization: Bearer <token>` to `/api/catalyst/agent/…`. The function compares the hash and applies an allow-list:
+   - **allowed:** reads, and writes of names, company descriptions, filings, collected figures, analyses and checklist entries;
+   - **refused:** market data, settings, finance sub-types and PT.
+4. You can revoke the token in the settings. Dev and prod have separate tokens.
+
+**1. The decision.** You ask ("analyse the issuer of ABC1227", "work through the list"), and the agent runs one of:
+- `catalyst work`: what needs doing, i.e. unresolved names, reports due, judgements older than the latest report, new markings;
+- `catalyst bond ABC1227`: ISIN, the issuer name as listed, the company id if known, amount owed, maturity, coupon as numbers, yields and liquidity. These are figures the app derived, never obligacje.pl's text.
+
+**2. Identity.** `catalyst identity resolve "ABC Development S.A."`: the CLI itself queries:
+- **GLEIF:** the bond's ISIN → LEI, then the LEI record: legal name, KRS number, status, parent;
+- **the KRS register API:** legal form, registered name, PKD codes.
+
+It prints the candidates with the evidence. The agent applies §5 (renames, mergers, a financing vehicle guaranteed by its group) and links the name: `catalyst identity set "ABC Development S.A." --entity 0000123456 --evidence "…"`. A legal name that differs from the listed one stays `review` until you confirm it.
+
+*Extracted:* KRS, LEI, legal name, parent, register status.
+
+**3. The company.** The agent reads the company's website (where robots.txt allows) and its PKD codes, then writes `catalyst entity set 0000123456 --file entity.json`:
+- short name;
+- industry from the fixed list, which picks the rule set (e.g. developer);
+- a two-line summary;
+- website.
+
+A financial company's sub-type (collector, leasing …) is proposed to you; you set it in the app.
+
+**4. The report.**
+- `catalyst entity 0000123456` lists the stored years and the files already held. These include CatalystViewer's 85 originals, migrated, so they're never downloaded again.
+- `catalyst work` names what's due: annual reports at year end + 9 months, group accounts first.
+
+The URL isn't guessed; the agent finds it as a person would:
+
+| Issuer | Where | How the URL is found |
+|---|---|---|
+| Shares listed on GPW | ESEF package (`.zip`) on the investor-relations site; ESPI reports mirrored on Bankier.pl; filings.xbrl.org by LEI (Polish filings to FY2022) | Website → investor relations → periodic reports → the year's annual report; or a web search ("ABC Development raport roczny 2025"); or filings.xbrl.org's API by LEI |
+| Bond-only issuer | PDF annual report published through EBI and on the IR site | The same navigation or search |
+| Unlisted, Polish accounting act | KRS financial documents repository (XML) | **You download it.** The repository has no API and bot protection, so the agent never touches it. The agent adds `catalyst checklist --add 0000123456 2025 group --where "KRS repository, KRS 0000123456"`; the entry shows in the app's Reports checklist with the KRS number to copy. Then `catalyst filings sort <folder>` identifies and files what you downloaded. |
+
+When the agent downloads, it checks robots.txt first, uses an honest user agent, waits 2 s between requests and saves into a new empty directory. It never fetches obligacje.pl or the KRS repository.
+
+**5. Reading (on your machine).** `catalyst filings import FY2025-GROUP.zip --entity 0000123456 --dry-run`: the CLI parses the file with the ported code (ESEF, KRS XML or IFRS text) and, without calling the app, prints:
+- period, months, scope (group/single), currency and unit, standard;
+- every line of the three statements (label, value, code or XBRL concept, parent) and its standard item (`revenue`, `ebit`, `netProfit`, `totalAssets`, `equity`, `debtBonds`, `debtBank`, `debtLeases`, `cash`, `operatingCashFlow`, `interestPaid`, `debtDueWithinYear` …);
+- the checks: assets = equity + liabilities, assets = non-current + current, profit agrees between statements, children add up to their parents;
+- the years it would keep: FY2025, plus FY2024 from the comparative column, which replaces a stored FY2024 only if this report is newer;
+- the scorecard the company would get with them.
+
+Without `--dry-run`, the CLI uploads the original (through a presigned S3 URL) and sends the rows. The app checks the schema, re-runs the arithmetic checks on the lines and checks the file's SHA-256, stores the year as `parsed`, and queues the metrics.
+
+A PDF goes through three steps:
+1. `catalyst filings pages report.pdf --out pages.txt`: code finds the statement pages and prints their text with the copying rules.
+2. The agent writes `t.json`: each line's label, page, amounts per column exactly as printed, and its standard item. It copies; it computes nothing.
+3. `catalyst filings import report.pdf --transcript t.json --by "<model>" --dry-run` checks that every amount appears on its page and that the sums tie.
+
+If the import is refused, the agent fixes the transcript; it never uses `--force` without asking you.
+
+**6. The scorecard (code).** `catalyst entity 0000123456` (or the dry run) shows what the app computes from the stored years:
+- the rule set;
+- the six dimensions (debt burden, debt service, liquidity, profitability, asset coverage, refinancing), each green / yellow / red / n/a with its metrics, plus the trend arrows;
+- the confidence, e.g. "high: audited group report, FY2025, 0 years behind, 14 of 15 metrics";
+- the repayment track record from the exits, e.g. "since 2020-01: 4 repaid, 1 early, no red flags".
+
+**7. The judgement (agent).** The agent reads what code doesn't judge: the auditor's opinion, going-concern notes, covenants, security, related parties, and the last year's current reports (ESPI/EBI) for red flags. It writes:
+- `judgement.md`: 2–5 sentences, red flags (or "none found in …"), what to watch;
+- `meta.json`: each red flag's source and quote, the sources read, the model, and the scorecard version it saw.
+
+Then it runs `catalyst analysis put 0000123456 --file judgement.md --meta meta.json`, with a dry run first. Analyses are append-only.
+
+**8. In the app.**
+- The queued metrics copy the company's signals into its bonds' rows: ABC1227 shows six dots, "developer · high", and the judgement's first line on hover.
+- The issuer dialog shows the scorecard, bonds falling due against cash, the track record and the judgement. In *Financials*, each figure opens the lines behind it and the original file.
+- You mark FY2025 `hand-checked` (or `flagged`) and confirm an identity left in `review`.
+
+Every write records who made it.
 
 ## UI
 
@@ -300,10 +388,10 @@ Catalyst · Bonds                                     as of 2026-11-04 · 612 bo
 [Search code / issuer] [Type ▾] [Coupon ▾] [Maturity 1–4 y] [Nominal ≤ 1000]
 [Liquidity ≥ medium ▾] [Scorecard: no red ▾] [+ More filters] [Views ▾] ✕
 47 of 612 bonds · Chart ◻
-BOND     ISSUER       COUPON   MATUR.  PRICE   YIELD NET        PREMIUM  LIQ  ISSUER (B S L P A T R)
+BOND     ISSUER       COUPON   MATUR.  PRICE   YIELD NET        PREMIUM  LIQ  ISSUER (B S L P A R)
                                                bond · vs alt    vs gov
-KRU0829  Kruk     ⓘ   W6M+3,0  2,8 y   101,20  6,41 · +1,22     3,6 pp   ●●●  ●●●●●●● collector · high
-ACH0628  Archicom ⓘ   W3M+3,9  1,6 y   103,01  6,02 · +0,83     3,9 pp   ●○○  ●●●●●●● developer · high
+KRU0829  Kruk     ⓘ   W6M+3,0  2,8 y   101,20  6,41 · +1,22     3,6 pp   ●●●  ●●●●●● collector · high
+ACH0628  Archicom ⓘ   W3M+3,9  1,6 y   103,01  6,02 · +0,83     3,9 pp   ●○○  ●●●●●● developer · high
 PCR0827  Pragma   ⓘ   9,0 %    0,8 y    99,10  8,33 · +3,14     5,1 pp   ●○○  ○ no report yet
 PKO0829  PKO BP   ⓘ   W6M+1,0  2,8 y   100,05  4,90 · −0,31     0,9 pp   ●●○  – bank, not scored
 ```
@@ -318,7 +406,7 @@ PKO0829  PKO BP   ⓘ   W6M+1,0  2,8 y   100,05  4,90 · −0,31     0,9 pp   �
 | Yield net | Net yield to maturity · vs alternative (pp, green above, red below) | Gross yield, the alternative and its net yield, base rate assumed |
 | Premium vs gov | pp over the treasury curve (floating: over WZ) | How it was derived |
 | Liquidity | Three dots: high, medium, low; none = empty | Sessions traded, median turnover, spread, days to sell 10 000 zł |
-| Issuer | **Seven dots** in a fixed order (debt burden, debt service, liquidity, profitability, asset coverage, trend, refinancing), the rule set and the confidence; faded when confidence is low; "no report yet", "not scored: bank" | Each dimension's metrics with values and colours, notes; source line ("annual report, ESEF, group accounts, FY2025"); the judgement's first line and its date |
+| Issuer | **Six dots** in a fixed order (debt burden, debt service, liquidity, profitability, asset coverage, refinancing), trend arrows beside them, the rule set and the confidence; faded when confidence is low; "no report yet", "not scored: bank" | Each dimension's metrics with values and colours, notes; source line ("annual report, ESEF, group accounts, FY2025"); the judgement's first line and its date |
 
 More columns (bid/ask, accrued interest, amount owed, gross yield, yield to call, track record) under "Columns" in the More filters panel.
 
@@ -328,7 +416,7 @@ More columns (bid/ask, accrued interest, amount owed, gross yield, yield to call
 
 **Row panel** (bottom, as Holdings): tabs *Price & liquidity* (close, bid/ask, turnover bars; 1M/6M/1Y/ALL), *Yield* (cash flows, tax, commission, the alternative, as PT's Buy-more breakdown), *Coupons* (periods, rates, record and payment days, call terms).
 
-**Phone:** three-line rows (code, issuer, seven dots / coupon, maturity, liquidity / net yield, vs alternative, premium); filters folded into the search and a Filters button; the chart full width above the list.
+**Phone:** three-line rows (code, issuer, six dots / coupon, maturity, liquidity / net yield, vs alternative, premium); filters folded into the search and a Filters button; the chart full width above the list.
 
 ### Issuer dialog
 
@@ -354,7 +442,7 @@ Judgement: …  Red flags: none found in FY2025 report, auditor's report.  Watch
 
 ### Issuers
 
-One row per company with listed bonds. Columns: short name, industry (and kind of financial company), rule set, bonds, amount owed on Catalyst, due in 12 months, median premium, the seven dots, confidence, latest financial year, track record, judgement date, **needs work** (what `catalyst work` lists for it). Filters: industry, rule set, scorecard, confidence, scored / not scored / no report, needs work. A row opens the issuer dialog.
+One row per company with listed bonds. Columns: short name, industry (and kind of financial company), rule set, bonds, amount owed on Catalyst, due in 12 months, median premium, the six dots and trend arrows, confidence, latest financial year, track record, judgement date, **needs work** (what `catalyst work` lists for it). Filters: industry, rule set, scorecard, confidence, scored / not scored / no report, needs work. A row opens the issuer dialog.
 
 **Reports checklist** (a tab in Issuers): the reports waiting to be downloaded by hand from the KRS repository, with company, KRS number (copyable), year, scope and status; the place to start a download session.
 
@@ -374,7 +462,7 @@ CV's prod data that exists nowhere else moves once, as a data change (dry run, t
 |---|---|
 | `IssuerProfiles` identities (`#IDENTITY`, confirmed ones kept confirmed) | Names and companies |
 | Profiles (industry, summary, website), `FINANCE_RULE_SETS`, `RULE_SET_OVERRIDES` | Companies (sub-types and overrides as yours) |
-| Filings bucket originals | Re-imported through the ported parsers (and PDFs from their stored transcripts), compared with CV's `IssuerFinancials` rows and the known answers before switching |
+| Filings bucket originals (prod, 2026-11-07: 85 files of 43 companies: 49 ESEF packages, 19 PDFs, 11 KRS XML, 6 xhtml) | Copied, never downloaded again, and re-imported through the ported parsers. A PDF is re-imported from a transcript rebuilt from CV's stored lines (label, page, amounts) and checked against the PDF again. Compared with CV's `IssuerFinancials` rows and the known answers |
 | `expected.json` (known answers), the checklist | Known answers, checklist entries |
 | AI analyses with their figures | Collected figures (marked) and judgements (marked as from CV's agent) |
 | `BondStatistics` (bid/ask since 2023) | Sessions (bid/ask only; the rest comes from the file archive) |
