@@ -21,7 +21,7 @@ function Bars({ title, slices, testId }: { title: string; slices: Slice[]; testI
             <span className="alloc-bar" aria-hidden>
               <span style={{ width: `${(share * 100).toFixed(2)}%` }} />
             </span>
-            <span className="alloc-pct">{fmtNum(share * 100, 1)} %</span>
+            <span className="alloc-pct">{fmtNum(share * 100, 1)}%</span>
             <span className="alloc-value muted">{fmtPln(s.value)}</span>
           </div>
         );

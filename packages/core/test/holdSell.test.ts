@@ -25,7 +25,7 @@ const holding = (h: Partial<HoldingSnapshot>): HoldingSnapshot =>
 const instrument = (i: Partial<InstrumentItem>): InstrumentItem =>
   ({ PK: "INST#x", SK: "META", GSI1PK: "INSTRUMENT", GSI1SK: "x", isin: "PL0000000001", code: "DS0000", name: "DS", type: "BOND_LISTED", currency: "PLN", venue: "XWAR", sourceIds: {}, active: true, updatedAt: "", ...i }) as InstrumentItem;
 
-/** A fixed 5 % bond with yearly coupons on 25 October, maturing 2028-10-25. */
+/** A fixed 5% bond with yearly coupons on 25 October, maturing 2028-10-25. */
 const fixedTerms: BondTerms = {
   isin: "PL0000000001",
   code: "DS1028",
@@ -84,7 +84,7 @@ describe("helpers", () => {
 
   it("reads a floating bond's margin and an IBKR bond's coupon and maturity from their names", () => {
     expect(wiborMargin("Kruk S.A. (WIBOR 3M + 3.3%)")).toBeCloseTo(0.033, 6);
-    expect(wiborMargin("Fixed 7,5 %")).toBeUndefined();
+    expect(wiborMargin("Fixed 7,5%")).toBeUndefined();
     expect(ibkrTerms({ name: "DE Govt 0.0 Nov15'27 (sample holding)" })).toEqual({ coupon: 0, maturity: "2027-11-15" });
     expect(ibkrTerms({ name: "FR Govt 2.5 May24'30" })).toEqual({ coupon: 0.025, maturity: "2030-05-24" });
     expect(ibkrTerms({ name: "Some bill", pricePath: [{ date: "2026-01-01", price: 97 }, { date: "2027-03-01", price: 100 }] })).toEqual({ coupon: 0, maturity: "2027-03-01" });
@@ -109,7 +109,7 @@ describe("helpers", () => {
     expect(nearestOffer(offers, 0.4)!.series).toBe("ROR1027");
   });
 
-  it("retailOfferYield: a TOS at 5 % held 3 years is 5 % before tax, ~4,1 % after; redeemed after a year the fee comes off", () => {
+  it("retailOfferYield: a TOS at 5% held 3 years is 5% before tax, ~4,1% after; redeemed after a year the fee comes off", () => {
     const offer = tos("TOS1029", "2026-10-01", 0.05);
     expect(retailOfferYield(offer, TODAY, "2029-10-18", true, DEFAULT_ASSUMPTIONS)).toBeCloseTo(0.05, 3);
     const taxed = retailOfferYield(offer, TODAY, "2029-10-18", false, DEFAULT_ASSUMPTIONS);
@@ -142,7 +142,7 @@ describe("holdOrSell", () => {
     expect(r!.alternative.yield).toBeCloseTo(0.05, 6);
   });
 
-  it("the same bond at 90 % yields more than 5 % kept: hold; and at 110 %: sell", () => {
+  it("the same bond at 90% yields more than 5% kept: hold; and at 110%: sell", () => {
     const cheap = holdOrSell(listed(90)).rows[0]!;
     expect(cheap.verdict).toBe("HOLD");
     expect(cheap.yieldIfHeld).toBeGreaterThan(0.1);
@@ -153,19 +153,19 @@ describe("holdOrSell", () => {
     expect(dear.holdAtMaturity - dear.sellAtMaturity).toBeCloseTo(dear.difference, 1);
   });
 
-  it("outside IKE: 19 % on coupons and on the gain over cost; a sale pays commission and the tax due now", () => {
+  it("outside IKE: 19% on coupons and on the gain over cost; a sale pays commission and the tax due now", () => {
     const input = listed(100, "Broker");
     input.holdings[0]!.cost = 9000; // bought at 90
     input.assumptions = { ...input.assumptions, commission: 0.002 };
     const r = holdOrSell(input).rows[0]!;
     expect(r.taxFree).toBe(false);
-    expect(r.flows[0]!.tax).toBe(95); // 19 % of 500
-    expect(r.flows.at(-1)!.tax).toBe(190); // 19 % of 10 000 − 9 000
+    expect(r.flows[0]!.tax).toBe(95); // 19% of 500
+    expect(r.flows.at(-1)!.tax).toBe(190); // 19% of 10 000 − 9 000
     expect(r.sellNow).toEqual({ value: 10493.15, commission: 20.99, fee: 0, tax: 279.71, net: 10192.45 });
     expect(r.alternative.yield).toBeCloseTo(0.05 * 0.81, 6);
   });
 
-  it("a retail TOS bought at 6 % against a TOS on offer at 5 %: hold; selling = early redemption with its fee", () => {
+  it("a retail TOS bought at 6% against a TOS on offer at 5%: hold; selling = early redemption with its fee", () => {
     const terms = tos("TOS0127", "2024-01-01", 0.06);
     const input = base({
       holdings: [holding({ account: "IKE Obligacje", isin: terms.isin, code: "TOS0127", type: "BOND_RETAIL", value: 1180 })],
@@ -194,7 +194,7 @@ describe("holdOrSell", () => {
 });
 
 describe("buyMore", () => {
-  // One more DS1028 (fixed 5 %, yearly coupon on 25 October, matures 2028-10-25) at `price` %, plus accrued interest to T+2.
+  // One more DS1028 (fixed 5%, yearly coupon on 25 October, matures 2028-10-25) at `price` %, plus accrued interest to T+2.
   const accrued = Math.round(((50 * 360) / 365) * 100) / 100;
   const listed = (price: number, account = "IKE Broker") =>
     base({
@@ -218,10 +218,10 @@ describe("buyMore", () => {
     expect(r!.weight).toBeCloseTo(0.1049, 3);
   });
 
-  it("outside IKE: 19 % tax, but not on the accrued interest paid with the bond; cheaper means a higher yield", () => {
+  it("outside IKE: 19% tax, but not on the accrued interest paid with the bond; cheaper means a higher yield", () => {
     const r = buyMore(listed(100, "Broker"))[0]!;
     expect(r.taxFree).toBe(false);
-    // About 5 % × 0,81: the first coupon (50) mostly gives back the accrued interest paid (49,32), which isn't taxed.
+    // About 5% × 0,81: the first coupon (50) mostly gives back the accrued interest paid (49,32), which isn't taxed.
     expect(r.netYield).toBeGreaterThan(0.039);
     expect(r.netYield).toBeLessThan(0.0415);
     expect(r.netYield).toBeLessThan(r.grossYield!);
@@ -258,7 +258,7 @@ describe("buyMore", () => {
 });
 
 describe("buyHoldOrSell", () => {
-  // DS1028 (fixed 5 %, matures 2028-10-25) at `price` %, against a 5 % alternative before tax, in IKE.
+  // DS1028 (fixed 5%, matures 2028-10-25) at `price` %, against a 5% alternative before tax, in IKE.
   const accrued = Math.round(((50 * 360) / 365) * 100) / 100;
   const at = (price: number, commission = 0, today = TODAY) =>
     base({
@@ -281,7 +281,7 @@ describe("buyHoldOrSell", () => {
   });
 
   it("between the two prices of a commission: worth keeping, not worth buying: hold", () => {
-    // 2 % commission each way: held yields more than bought
+    // 2% commission each way: held yields more than bought
     const r = buyHoldOrSell(at(99.5, 0.02)).rows[0]!;
     expect(r.held.yieldIfHeld).toBeGreaterThan(r.bought!.netYield);
     expect(r.decision).toBe("HOLD");

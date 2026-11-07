@@ -18,7 +18,7 @@ describe("corporate bond accrued interest", () => {
   const held = (q: number) => () => q;
 
   it("grows by day within a period (ACT/365, per bond rounded to the grosz)", () => {
-    // 30 days of 7.13 % on 100: 0.586 → 0.59 per bond.
+    // 30 days of 7.13% on 100: 0.586 → 0.59 per bond.
     expect(corporateAccrued(periods, 100, "2026-06-11", 10, held(10))).toEqual({ total: 5.9, rate: { current: 0.0713, previous: 0.0742 } });
     expect(corporateAccrued(periods, 100, "2026-05-12", 10, held(10)).total).toBe(0);
   });
@@ -34,7 +34,7 @@ describe("corporate bond accrued interest", () => {
     const late = [{ ...periods[1]!, paymentDate: "2026-08-14" }, periods[2]!];
     expect(corporateAccrued(late, 100, "2026-08-13", 10, held(10))).toMatchObject({ total: null, missingFrom: "2026-08-12" });
     const rated = [late[0]!, { ...late[1]!, rate: 0.07 }];
-    expect(corporateAccrued(rated, 100, "2026-08-13", 10, held(10)).total).toBe(18 + 0.2); // + 1 day of 7 %: 0.019 → 0.02
+    expect(corporateAccrued(rated, 100, "2026-08-13", 10, held(10)).total).toBe(18 + 0.2); // + 1 day of 7%: 0.019 → 0.02
   });
 
   it("gives nothing without a rate for the period, or without periods", () => {
@@ -51,7 +51,7 @@ describe("coupons received", () => {
     // 120 × 1.80 = 216.00 gross, 41.04 withheld.
     tx({ date: "2026-08-12", type: "COUPON", amount: 174.96, note: "Pobrany podatek: 41.04 PLN", account: "Broker" }),
     tx({ date: "2026-08-12", type: "COUPON", amount: 90, account: "IKZE Broker" }),
-    // Paid on Monday for a Saturday payment day; tax not noted: assumed 19 %.
+    // Paid on Monday for a Saturday payment day; tax not noted: assumed 19%.
     tx({ date: "2026-05-12", type: "COUPON", amount: 147.67, account: "Broker" }),
     tx({ date: "2026-09-30", type: "COUPON", amount: 5, account: "Broker" }),
   ];
@@ -78,11 +78,11 @@ describe("coupons received", () => {
       ["Broker", 216, 120, 216, false, false],
       ["IKZE Broker", 90, 50, 90, false, false],
     ]);
-    // 1.80 per bond over 92 days: 7.12–7.16 %; the middle in 0.01 % steps.
+    // 1.80 per bond over 92 days: 7.12–7.16%; the middle in 0.01% steps.
     expect(aug.checks[0]!.rateRange[0]).toBeCloseTo(0.07121, 4);
     expect(aug.checks[0]!.rateRange[1]).toBeCloseTo(0.07161, 4);
     expect(aug.suggestedRate).toBe(0.0714);
-    // 147.67 / 0.81 = 182.31 for 120 bonds: 1.52 per bond over 89 days → 6.23 %, not the stored 7.42 %.
+    // 147.67 / 0.81 = 182.31 for 120 bonds: 1.52 per bond over 89 days → 6.23%, not the stored 7.42%.
     const may = out.find((p) => p.start === "2026-02-12")!;
     expect(may.checks[0]).toMatchObject({ gross: 182.31, taxAssumed: true, quantity: 120, expected: 217.2, mismatch: true });
     expect(may.suggestedRate).toBe(0.0623);

@@ -38,7 +38,7 @@ export const BENCHMARKS: Benchmark[] = [
 ];
 
 /**
- * A mixed benchmark, computed rather than fetched: 40 % MSCI World and 60 % EDO (the 10-year inflation-linked retail
+ * A mixed benchmark, computed rather than fetched: 40% MSCI World and 60% EDO (the 10-year inflation-linked retail
  * bond), weights kept every day (each day's return is the weighted sum of the parts'). The EDO part is the series on
  * sale on its first day, bought that day and held (the Ministry's published rates; a period not published yet keeps
  * the last rate).
@@ -47,7 +47,7 @@ export const MIX = {
   id: "MIX_40_60",
   label: "40/60 World/EDO",
   short: "40/60",
-  note: "40 % MSCI World, 60 % EDO (10-year inflation-linked retail bond, the series on sale on the first day, held), weights kept every day",
+  note: "40% MSCI World, 60% EDO (10-year inflation-linked retail bond, the series on sale on the first day, held), weights kept every day",
   world: 0.4,
   edo: 0.6,
 } as const;

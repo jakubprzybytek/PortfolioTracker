@@ -20,7 +20,7 @@ const draftOf = (t: Targets | null): Draft =>
 const sumOf = (d: Draft) => ASSET_CLASSES.reduce((s, k) => s + (parseNum(d[k].target) ?? 0), 0);
 const sign = (v: number) => (v > 0 ? "+" : v < 0 ? "−" : "");
 const signedPp = (v: number) => `${sign(v)}${fmtNum(Math.abs(v), 1)} pp`;
-const pct = (v: number) => `${fmtNum(v, v % 1 ? 1 : 0)} %`;
+const pct = (v: number) => `${fmtNum(v, v % 1 ? 1 : 0)}%`;
 
 /** Whether "Rebalance" is open, remembered in this browser (closed when storage isn't there). */
 const OPEN_KEY = "dashboard.rebalanceOpen";
@@ -76,11 +76,11 @@ export function AssetMixPanel({ snapshot }: { snapshot: Snapshot }) {
       <div className="mix-track">
         <div className="mix-bar" aria-hidden>
           {ASSET_CLASSES.filter((k) => byClass[k] > 0).map((k) => (
-            <span key={k} className={`mix-${k}`} style={{ width: `${((byClass[k] / total) * 100).toFixed(2)}%` }} title={`${CLASS_LABELS[k]}: ${fmtNum((byClass[k] / total) * 100, 1)} %`} />
+            <span key={k} className={`mix-${k}`} style={{ width: `${((byClass[k] / total) * 100).toFixed(2)}%` }} title={`${CLASS_LABELS[k]}: ${fmtNum((byClass[k] / total) * 100, 1)}%`} />
           ))}
         </div>
         {ticks.map((t) => (
-          <i key={t.key} className="mix-target" style={{ left: `${t.at.toFixed(2)}%` }} title={`${CLASS_LABELS[t.key]} target ends at ${fmtNum(t.at, 1)} %`} data-testid={`mix-target-${t.key}`} />
+          <i key={t.key} className="mix-target" style={{ left: `${t.at.toFixed(2)}%` }} title={`${CLASS_LABELS[t.key]} target ends at ${fmtNum(t.at, 1)}%`} data-testid={`mix-target-${t.key}`} />
         ))}
       </div>
       <div className="mix-foot">
@@ -92,7 +92,7 @@ export function AssetMixPanel({ snapshot }: { snapshot: Snapshot }) {
                 <span className="mix-name">
                   <i className={`mix-dot mix-${k}`} aria-hidden /> {CLASS_LABELS[k]}
                 </span>
-                <strong>{fmtNum(total ? (byClass[k] / total) * 100 : 0, 1)} %</strong>
+                <strong>{fmtNum(total ? (byClass[k] / total) * 100 : 0, 1)}%</strong>
                 {row && saved && (
                   <>
                     <span className="muted" data-testid={`asset-mix-${k}-target`}>
@@ -186,7 +186,7 @@ function Rebalance({ byClass, saved }: { byClass: Record<AssetClass, number>; sa
                 {!showTrades || Math.abs(r.trade) < 0.5 ? "–" : narrow ? `${sign(r.trade)}${fmtNum(Math.abs(r.trade), 0)}` : `${r.trade > 0 ? "buy" : "sell"} ${fmtPln(Math.abs(r.trade))}`}
               </td>
               <td data-testid={`targets-${r.assetClass}-after`}>
-                {showTrades ? `${fmtNum(r.after, 1)} %` : "–"}
+                {showTrades ? `${fmtNum(r.after, 1)}%` : "–"}
                 <span className="sub muted">of {pct(r.target)}</span>
               </td>
             </tr>
@@ -199,7 +199,7 @@ function Rebalance({ byClass, saved }: { byClass: Record<AssetClass, number>; sa
   );
 }
 
-/** Setting the targets (adding up to 100 %) and the bands, in the asset mix panel. */
+/** Setting the targets (adding up to 100%) and the bands, in the asset mix panel. */
 function TargetsForm({ saved, onDone }: { saved: Targets | null; onDone: (t: Targets | null) => void }) {
   const [draft, setDraft] = useState<Draft>(() => draftOf(saved));
   const [pending, setPending] = useState(false);
@@ -259,13 +259,13 @@ function TargetsForm({ saved, onDone }: { saved: Targets | null; onDone: (t: Tar
             <tr className="total">
               <td>Total</td>
               <td className={sumOk ? "" : "neg"} data-testid="targets-sum">
-                {fmtNum(sum, sum % 1 ? 1 : 0)} %{sumOk ? " ✓" : ""}
+                {fmtNum(sum, sum % 1 ? 1 : 0)}%{sumOk ? " ✓" : ""}
               </td>
               <td />
             </tr>
           </tbody>
         </table>
-        {!sumOk && <p className="muted hint">The targets must add up to 100 %.</p>}
+        {!sumOk && <p className="muted hint">The targets must add up to 100%.</p>}
         <span className="hs-buttons">
           <button type="submit" className="primary" disabled={pending || !sumOk} data-testid="targets-save">
             {pending && <span className="spinner" aria-hidden />}

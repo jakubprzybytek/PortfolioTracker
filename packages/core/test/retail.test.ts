@@ -15,7 +15,7 @@ const edo: RetailBondSeries = {
 
 const coi: RetailBondSeries = { ...edo, series: "COI1028", kind: "COI", maturity: "2028-10-15", firstRate: 0.0605, margin: 0.015, capitalises: false, redemptionFee: 2 };
 
-// CPI y/y published in Sept 2025 (for the period starting Oct 2025) = 2.9 %; Sept 2026 unknown.
+// CPI y/y published in Sept 2025 (for the period starting Oct 2025) = 2.9%; Sept 2026 unknown.
 const cpi = new Map([["2025-09", 0.029]]);
 
 describe("retailRatePeriods", () => {
@@ -48,7 +48,7 @@ describe("valueRetailBond", () => {
     const v = valueRetailBond(edo, periods, "2025-10-15");
     expect(v.base).toBe(106.55);
     expect(v.accrued).toBe(0);
-    // 100 days later at 4.9 % on 106.55
+    // 100 days later at 4.9% on 106.55
     expect(valueRetailBond(edo, periods, "2026-01-23").accrued).toBe(1.43);
   });
 
@@ -57,7 +57,7 @@ describe("valueRetailBond", () => {
     const v = valueRetailBond(coi, p, "2026-01-23");
     expect(v.base).toBe(100);
     expect(v.paidOut).toBe(6.05);
-    // 100/365 × 4.4 % × 100
+    // 100/365 × 4.4% × 100
     expect(v.accrued).toBe(1.21);
     expect(v.value).toBe(101.21);
   });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { rebalance, TargetsInput, type Targets } from "../src/targets/targets.ts";
 
 const t: Targets = { targets: { SHARES: 60, BONDS: 35, CASH: 5, OTHER: 0 }, bands: { SHARES: 5, BONDS: 5, CASH: 2, OTHER: 0 } };
-// 100 000 in all: shares 70 %, bonds 25 %, cash 5 %.
+// 100 000 in all: shares 70%, bonds 25%, cash 5%.
 const mix = { SHARES: 70_000, BONDS: 25_000, CASH: 5_000, OTHER: 0 };
 const row = (rows: ReturnType<typeof rebalance>, k: string) => rows.find((r) => r.assetClass === k)!;
 
@@ -40,7 +40,7 @@ describe("rebalance", () => {
   });
 
   it("new money: classes below target are filled to the same fraction of their targets", () => {
-    // Shares 60 000 (target 60 %), bonds 30 000 (35 %), cash 10 000 (5 %); +20 000 → total 120 000.
+    // Shares 60 000 (target 60%), bonds 30 000 (35%), cash 10 000 (5%); +20 000 → total 120 000.
     // Targets: shares 72 000 (−12 000), bonds 42 000 (−12 000): both gaps are equal in PLN, but as a fraction of
     // the target bonds is further away, so it gets more: λ·72 000 − 60 000 + λ·42 000 − 30 000 = 20 000 → λ = 110/114.
     const rows = rebalance({ SHARES: 60_000, BONDS: 30_000, CASH: 10_000, OTHER: 0 }, t, "NEW_MONEY", 20_000);
@@ -72,7 +72,7 @@ describe("rebalance", () => {
 });
 
 describe("TargetsInput", () => {
-  it("needs the targets to add up to 100 %", () => {
+  it("needs the targets to add up to 100%", () => {
     expect(TargetsInput.safeParse(t).success).toBe(true);
     expect(TargetsInput.safeParse({ ...t, targets: { ...t.targets, CASH: 10 } }).success).toBe(false);
     expect(TargetsInput.safeParse({ ...t, targets: { SHARES: 33.33, BONDS: 33.33, CASH: 33.34, OTHER: 0 } }).success).toBe(true);

@@ -16,7 +16,7 @@ describe("nativeLedger", () => {
     const rows = [
       t({ date: "2025-03-03", type: "DEPOSIT", amount: 10000 }),
       t({ date: "2025-03-03", type: "BUY", isin: EUR, quantity: 2300, price: 1, fxRate: 4.3, amount: -9890, fee: 0 }),
-      // 2 bonds at 96.5 % of 1000 EUR = 1930 EUR, fee 4.30 PLN (1 EUR); the sheet sells the 1931 EUR that paid
+      // 2 bonds at 96.5% of 1000 EUR = 1930 EUR, fee 4.30 PLN (1 EUR); the sheet sells the 1931 EUR that paid
       t({ date: "2025-03-04", type: "BUY", isin: "DE0001102523", quantity: 2, price: 96.5, fxRate: 4.3, amount: -8299, fee: 4.3 }),
       t({ date: "2025-03-04", type: "SELL", isin: EUR, quantity: 1931, price: 1, fxRate: 4.3, amount: 8303.3 }),
       // a fee paid in EUR: the sheet's PLN fee and a sale of 2 EUR for the same PLN

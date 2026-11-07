@@ -19,7 +19,7 @@ export const fmtMoney = (v: number | null | undefined, currency: string): string
 };
 export const fmtNum = (v: number | null | undefined, digits = 2): string =>
   v === null || v === undefined ? "–" : new Intl.NumberFormat("pl-PL", { minimumFractionDigits: digits, maximumFractionDigits: digits, ...always }).format(v);
-export const fmtPct = (v: number | null | undefined): string => (v === null || v === undefined ? "–" : `${pct.format(v)} %`);
+export const fmtPct = (v: number | null | undefined): string => (v === null || v === undefined ? "–" : `${pct.format(v)}%`);
 /** Short axis labels for narrow charts: 950, 12,5k, 57k, 1,6M (no space: the chart would wrap the label there). */
 export const fmtCompact = (v: number): string => {
   const a = Math.abs(v);

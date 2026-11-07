@@ -15,7 +15,7 @@ export interface Liquidity {
   medianSpread30: number | null;
   /** The best bid of the latest quoted session: price (%) and how many bonds. */
   bid: { price: number; volume: number } | null;
-  /** Sessions to sell 10 000 at 20 % of the average daily turnover (last 30); null when nothing traded. */
+  /** Sessions to sell 10 000 at 20% of the average daily turnover (last 30); null when nothing traded. */
   daysToSell10k: number | null;
 }
 

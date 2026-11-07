@@ -31,7 +31,7 @@ export function parseCpiYtdCsv(text: string): { month: string; value: number }[]
   return rowsOf(text, SINCE_DECEMBER);
 }
 
-/** CPI with the same month of the previous year = 100 per "YYYY-MM" (e.g. 104.1: 12-month inflation 4.1 %), oldest first. */
+/** CPI with the same month of the previous year = 100 per "YYYY-MM" (e.g. 104.1: 12-month inflation 4.1%), oldest first. */
 export function parseCpiYoyCsv(text: string): { month: string; value: number }[] {
   return rowsOf(text, YEAR_ON_YEAR);
 }

@@ -46,7 +46,7 @@ const previousMonth = (date: IsoDate): string => addMonths(date.slice(0, 7) + "-
 
 /**
  * Builds the rate periods of a series. `cpiYoY` maps "YYYY-MM" (month of publication) to the CPI y/y change as a
- * fraction (0.049 = +4.9 %). Periods whose CPI isn't known yet get basis "unknown" and the latest known rate.
+ * fraction (0.049 = +4.9%). Periods whose CPI isn't known yet get basis "unknown" and the latest known rate.
  */
 export function retailRatePeriods(series: RetailBondSeries, cpiYoY: ReadonlyMap<string, number>): RetailRatePeriod[] {
   const months = series.periodMonths ?? 12;
@@ -85,13 +85,13 @@ export interface RetailBondValue {
   problem?: "before_purchase" | "matured" | "unknown_rate";
 }
 
-/** Rounds to the grosz, immune to binary noise (100 × 6.3 % / 12 = 0.525 must give 0.53, not 0.52). */
+/** Rounds to the grosz, immune to binary noise (100 × 6.3% / 12 = 0.525 must give 0.53, not 0.52). */
 export const grosz = (x: number): number => Math.round(Number((x * 100).toPrecision(12))) / 100;
 
 /**
  * Value of one retail bond on `date`, the way the Ministry computes it (checked against every fully published
  * series in its file):
- *   - a period earns base × annual rate × months/12 (ROR0623 month 1: 100 × 5.25 % / 12 = 0.44);
+ *   - a period earns base × annual rate × months/12 (ROR0623 month 1: 100 × 5.25% / 12 = 0.44);
  *   - capitalising series (EDO, ROD, ROS, TOS) compound unrounded and round only the amount shown;
  *     payout series (COI, ROR, DOR) pay each period's interest rounded to the grosz;
  *   - within a period, interest accrues by days elapsed / days in the period.

@@ -24,7 +24,7 @@ export const CouponPeriodInput = z
     recordDate: day.optional(),
     paymentDate: day,
     datesSource: source.default("manual"),
-    /** Annual, as a fraction (0.0713 = 7.13 %). */
+    /** Annual, as a fraction (0.0713 = 7.13%). */
     rate: z.number().gt(0).lt(1).optional(),
     rateSource: source.optional(),
     otherRate: z.object({ rate: z.number(), source, seenAt: z.string() }).optional(),
@@ -127,7 +127,7 @@ export interface CouponCheck {
   date: IsoDate;
   /** As booked (after tax). */
   amount: number;
-  /** Before tax: the amount plus its tax (the field, or else its note); in IKE/IKZE the amount; otherwise assumed taxed at 19 %. */
+  /** Before tax: the amount plus its tax (the field, or else its note); in IKE/IKZE the amount; otherwise assumed taxed at 19%. */
   gross: number;
   taxAssumed: boolean;
   /** Bonds held on the record day. */
@@ -143,7 +143,7 @@ export interface CouponCheck {
 export interface PeriodCoupons {
   start: IsoDate;
   checks: CouponCheck[];
-  /** A rate (0.01 % steps) that all of the period's coupons agree on; absent when they don't. */
+  /** A rate (0.01% steps) that all of the period's coupons agree on; absent when they don't. */
   suggestedRate?: number;
 }
 
@@ -187,7 +187,7 @@ export function couponChecks(periods: InterestPeriod[], nominal: number, transac
     const low = Math.max(...entry.checks.map((c) => c.rateRange[0]));
     const high = Math.min(...entry.checks.map((c) => c.rateRange[1]));
     if (low > high) continue;
-    // The rate in 0.01 % steps nearest the middle of what fits (rates are quoted to the hundredth of a percent).
+    // The rate in 0.01% steps nearest the middle of what fits (rates are quoted to the hundredth of a percent).
     const mid = (low + high) / 2;
     const step = Number((Math.round(mid * 10_000) / 10_000).toFixed(4));
     entry.suggestedRate = step >= low && step <= high ? step : Number(mid.toFixed(6));

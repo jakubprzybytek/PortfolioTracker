@@ -84,7 +84,7 @@ const add = (a: Sums, b: Sums): Sums => ({
 });
 
 const CLOSED_XIRR_TITLE =
-  "Money-weighted annual return over the time it was held: its buys, sales, redemptions, coupons and dividends, PLN at NBP D-1 (written off: −100 %). None under 30 days held.";
+  "Money-weighted annual return over the time it was held: its buys, sales, redemptions, coupons and dividends, PLN at NBP D-1 (written off: −100%). None under 30 days held.";
 const XIRR_TITLE =
   "Money-weighted annual return of the positions' own cash flows (buys, sales, coupons, dividends, fees) and their value today, PLN at NBP D-1; cash left out (with cash: the Dashboard's Accounts table). None under 30 days held.";
 
@@ -207,8 +207,8 @@ interface ClassGroup {
 }
 
 /** One holding as a row; `label` is what goes in the first column (the instrument, or the account). */
-/** A fraction as "4,85 %". */
-const fmtRate = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${fmtNum(r * 100, 2)} %`);
+/** A fraction as "4,85%". */
+const fmtRate = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${fmtNum(r * 100, 2)}%`);
 
 /** Buy, hold or sell verdicts per position (account#isin), for the badge on bond rows. */
 const HoldSellVerdicts = createContext<ReadonlyMap<string, HoldSellResponse["rows"][number]>>(new Map());

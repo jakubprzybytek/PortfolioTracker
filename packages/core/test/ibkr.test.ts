@@ -69,6 +69,6 @@ describe("IBKR positions and valuation", () => {
     });
     const by = Object.fromEntries(snap.holdings.map((h) => [h.isin, h]));
     expect(by[EUR]).toMatchObject({ type: "CURRENCY", quantity: 134, valuePerUnit: 4.3, value: 576.2, flags: [] });
-    expect(by[OAT]).toMatchObject({ nominal: 1000, valuePerUnit: 4235.5, value: 21177.5, flags: [] }); // 98.5 % × 1000 × 4.3
+    expect(by[OAT]).toMatchObject({ nominal: 1000, valuePerUnit: 4235.5, value: 21177.5, flags: [] }); // 98.5% × 1000 × 4.3
   });
 });

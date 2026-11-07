@@ -7,7 +7,7 @@ const tx = (t: Partial<TransactionItem> & Pick<TransactionItem, "date" | "type" 
 
 describe("xirr", () => {
   it("is the annual rate that discounts the flows to zero", () => {
-    // 1000 in, 1100 out a year later: 10 %
+    // 1000 in, 1100 out a year later: 10%
     expect(xirr([{ date: "2025-01-01", amount: -1000 }, { date: "2026-01-01", amount: 1100 }])).toBeCloseTo(0.1, 5);
     // two deposits, the second 182 days in: −1000 − 1000 × 1.2029^(−182/365) + 2300 / 1.2029 ≈ 0
     expect(xirr([{ date: "2025-01-01", amount: -1000 }, { date: "2025-07-02", amount: -1000 }, { date: "2026-01-01", amount: 2300 }])!).toBeCloseTo(0.2029, 4);
@@ -53,7 +53,7 @@ describe("accountSummaries", () => {
     const { accounts, total } = accountSummaries({ ...snap, accounts: { ...snap.accounts, c: { cash: 0 } } }, closedTxs);
     const closed = accounts.find((a) => a.account === "c")!;
     expect(closed).toMatchObject({ closed: true, lastDate: "2025-07-01", netDeposits: -40, total: 0, profit: 40, income: 40 });
-    expect(closed.xirr!).toBeGreaterThan(0.08); // 4 % in five months
+    expect(closed.xirr!).toBeGreaterThan(0.08); // 4% in five months
     expect(accounts.find((a) => a.account === "a")!.closed).toBeUndefined();
     expect(accounts.find((a) => a.account === "b")!.closed).toBeUndefined(); // still holds cash, not closed
     expect(total).toMatchObject({ netDeposits: 11460, profit: 805 });

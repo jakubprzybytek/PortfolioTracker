@@ -50,7 +50,7 @@ export function dayFactor(prev: { total: number; netDeposits: number }, p: { tot
 }
 
 /**
- * Drawdown per day: how far the portfolio is below its best so far, as a fraction (0 at a new high, −0.12 = 12 % below).
+ * Drawdown per day: how far the portfolio is below its best so far, as a fraction (0 at a new high, −0.12 = 12% below).
  * Measured on the time-weighted return, not on the value itself, so money put in or taken out (the change of
  * `netDeposits`) is neither a gain nor a loss: a withdrawal isn't a drawdown. A day's return is
  * (total − money added that day) / the day before's total. The best so far counts from the first point given.

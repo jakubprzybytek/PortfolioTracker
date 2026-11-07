@@ -1,7 +1,7 @@
 import type { BuyMoreRow } from "@portfolio/core";
 import { fmtNum, signClass } from "./format.ts";
 
-const fmtRate = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${fmtNum(r * 100, 2)} %`);
+const fmtRate = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${fmtNum(r * 100, 2)}%`);
 const fmtSpread = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${r >= 0 ? "+" : "−"}${fmtNum(Math.abs(r) * 100, 2)} pp`);
 
 /**

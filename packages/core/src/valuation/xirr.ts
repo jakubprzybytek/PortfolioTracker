@@ -18,7 +18,7 @@ const DAY = 86_400_000;
 
 /**
  * Annual rate r with Σ amount × (1 + r)^(−days/365) = 0, by bisection. Needs flows of both signs; returns null
- * otherwise or when no rate in (−99 %, +1000 %) solves it.
+ * otherwise or when no rate in (−99%, +1000%) solves it.
  */
 export function xirr(flows: CashFlow[]): number | null {
   const fs = flows.filter((f) => f.amount !== 0);
@@ -73,7 +73,7 @@ export const XIRR_MIN_DAYS = 30;
 
 /**
  * XIRR of one or more positions together: their flows plus `value` (what they're worth on `date`) as the last inflow.
- * Closed (`value` 0): the flows alone, ending at the last one; nothing came back (a write-off): −100 %. Null when held
+ * Closed (`value` 0): the flows alone, ending at the last one; nothing came back (a write-off): −100%. Null when held
  * under XIRR_MIN_DAYS, with no flows, or not computable (e.g. a value missing: NaN).
  */
 export function positionsXirr(flows: PositionFlow[][], value: number, date: IsoDate): number | null {

@@ -14,7 +14,7 @@ const perClass = (field: z.ZodNumber) => z.object({ SHARES: field, BONDS: field,
 /** The targets as sent by the app (PUT /targets). */
 export const TargetsInput = z
   .object({ targets: perClass(z.number().min(0).max(100)), bands: perClass(z.number().min(0).max(50)) })
-  .refine((t) => Math.abs(ASSET_CLASSES.reduce((s, k) => s + t.targets[k], 0) - 100) < 0.005, { message: "The targets must add up to 100 %", path: ["targets"] });
+  .refine((t) => Math.abs(ASSET_CLASSES.reduce((s, k) => s + t.targets[k], 0) - 100) < 0.005, { message: "The targets must add up to 100%", path: ["targets"] });
 
 /** Where a class is: within its band around the target, above it or below it. */
 export type TargetStatus = "WITHIN" | "OVER" | "UNDER";

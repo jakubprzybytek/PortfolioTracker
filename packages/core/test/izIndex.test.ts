@@ -72,7 +72,7 @@ describe("IZ indexation", () => {
 
   it("values a bond from a clean price", () => {
     const v = valueBond(iz0836, "2026-10-09", { referenceIndex: index });
-    // 87.92 % × 1105.53 + 2.73
+    // 87.92% × 1105.53 + 2.73
     expect(dirtyValue(87.92, v)).toBe(974.71);
   });
 });
@@ -102,7 +102,7 @@ describe("fixed-rate accrued interest", () => {
         { start: "2027-01-15", end: "2027-07-15", paymentDate: "2027-07-15" },
       ],
     };
-    expect(valueBond(fl, "2026-10-15").accruedInterest).toBe(40.6); // 92/184 × 1000 × 8.12 %
+    expect(valueBond(fl, "2026-10-15").accruedInterest).toBe(40.6); // 92/184 × 1000 × 8.12%
     expect(valueBond(fl, "2027-02-01").problem).toBe("missing_coupon_rate");
     expect(valueBond(fl, "2027-02-01", { periodRate: 0.08 }).accruedInterest).toBe(7.51);
   });

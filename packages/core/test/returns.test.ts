@@ -73,7 +73,7 @@ describe("cpiAt", () => {
 });
 
 describe("yearlyReturns", () => {
-  // 1000 put in on 2024-06-01; +10 % by the end of 2024; +10 % by mid 2025, then 1000 more; +10 % by the end of 2025;
+  // 1000 put in on 2024-06-01; +10% by the end of 2024; +10% by mid 2025, then 1000 more; +10% by the end of 2025;
   // 2026 so far: flat.
   const points: ReturnPoint[] = [
     { date: "2024-06-01", total: 1000, netDeposits: 1000 },
@@ -83,7 +83,7 @@ describe("yearlyReturns", () => {
     { date: "2025-12-31", total: 2431, netDeposits: 2000 },
     { date: "2026-03-31", total: 2431, netDeposits: 2000 },
   ];
-  // 2024 from the monthly chain (+0.2 % a month), 2025 on from GUS's figures since December.
+  // 2024 from the monthly chain (+0.2% a month), 2025 on from GUS's figures since December.
   const mom2024 = Array.from({ length: 12 }, (_, i) => ({
     month: `2024-${String(i + 1).padStart(2, "0")}`,
     wr: 0.002,
@@ -110,7 +110,7 @@ describe("yearlyReturns", () => {
     expect(y.twr).toBeCloseTo(0.21, 6);
     expect(y.inflation).toBeCloseTo(0.06, 6);
     expect(y.real).toBeCloseTo(1.21 / 1.06 - 1, 6);
-    // Money-weighted: more money in the stronger second half, but both halves +10 %: about the same as the TWR.
+    // Money-weighted: more money in the stronger second half, but both halves +10%: about the same as the TWR.
     expect(y.xirr!).toBeGreaterThan(0.2);
     expect(y.xirr!).toBeLessThan(0.22);
   });
@@ -159,7 +159,7 @@ describe("growthOf100", () => {
     const g = growthOf100(
       [
         { date: "2025-01-31", total: 1000, netDeposits: 1000 },
-        { date: "2025-02-28", total: 2100, netDeposits: 2000 }, // +1000 put in, +100 gained: +10 %
+        { date: "2025-02-28", total: 2100, netDeposits: 2000 }, // +1000 put in, +100 gained: +10%
         { date: "2025-12-31", total: 2100, netDeposits: 2000 },
       ],
       levels,

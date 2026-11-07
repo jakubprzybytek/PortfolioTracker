@@ -76,7 +76,7 @@ export interface ScreenRow {
   years: number | null;
   /** Before tax, after the commission. */
   yieldGross: number | null;
-  /** After 19 % tax and the commission. */
+  /** After 19% tax and the commission. */
   yieldNet: number | null;
   /** The future coupons rest on an assumed base rate (floating bonds). */
   projected: boolean;
@@ -258,7 +258,7 @@ export function screenRow(input: ScreenInput): ScreenRow {
   base.projected = got.floating || !!got.extended;
 
   if (bond.currency === "PLN") {
-    if (a.alternative === "rate" && a.altRate !== undefined) base.alternative = { label: `${(a.altRate * 100).toFixed(2)} % (your rate)`, yieldNet: round(a.altRate * (1 - INTEREST_TAX)) };
+    if (a.alternative === "rate" && a.altRate !== undefined) base.alternative = { label: `${(a.altRate * 100).toFixed(2)}% (your rate)`, yieldNet: round(a.altRate * (1 - INTEREST_TAX)) };
     else {
       const offer = nearestOffer(input.offers, years);
       if (offer) base.alternative = { label: `${offer.series} (retail, ${offer.termMonths >= 12 ? `${offer.termMonths / 12} y` : `${offer.termMonths} m`})`, yieldNet: retailOfferYield(offer, settle, bond.maturity, false, a) };

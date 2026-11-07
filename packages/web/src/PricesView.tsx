@@ -18,7 +18,7 @@ import { StickyTable, useStickyToolbar } from "./sticky.tsx";
 
 /** Bonds are priced in % of nominal; other instruments in their currency; retail bonds show their interest rate. */
 const fmtPrice = (r: PriceRow) =>
-  r.rate ? `${fmtNum(r.rate.current * 100)} % p.a.` : r.price === null ? "–" : r.type.startsWith("BOND") ? `${fmtNum(r.price)} %` : `${fmtNum(r.price)} ${r.currency}`;
+  r.rate ? `${fmtNum(r.rate.current * 100)}% p.a.` : r.price === null ? "–" : r.type.startsWith("BOND") ? `${fmtNum(r.price)}%` : `${fmtNum(r.price)} ${r.currency}`;
 
 const SORT_KEYS = ["instrument", "type", "class", "price", "date", "change"] as const;
 
@@ -165,7 +165,7 @@ export function PricesView({ params, setParams }: { params: Record<string, strin
                       calculated
                     </td>
                     <td className="muted" title="Rate in the previous interest year">
-                      {r.rate?.previous == null ? "–" : `${fmtNum(r.rate.previous * 100)} % before`}
+                      {r.rate?.previous == null ? "–" : `${fmtNum(r.rate.previous * 100)}% before`}
                     </td>
                   </>
                 ) : (

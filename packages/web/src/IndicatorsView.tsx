@@ -18,7 +18,7 @@ type RangeKey = (typeof RANGES)[number]["key"];
 
 const digits = (i: Pick<IndicatorSummary, "unit">) => (i.unit === "%" ? 1 : i.unit === "PLN" ? 4 : 2);
 const fmtValue = (i: Pick<IndicatorSummary, "unit">, v: number | undefined) =>
-  v === undefined ? "–" : i.unit === "%" ? `${fmtNum(v, 1)} %` : fmtNum(v, digits(i));
+  v === undefined ? "–" : i.unit === "%" ? `${fmtNum(v, 1)}%` : fmtNum(v, digits(i));
 
 /**
  * First date of the range. Monthly indicators lag by a month or two, so they count back from their latest month
@@ -138,7 +138,7 @@ function IndicatorChart({ indicator, points, loading }: { indicator: IndicatorSu
   };
   // Percent: whole-percent axis around zero (Recharts' own steps come out as 1.1, 2.2 …).
   const values = points.map((p) => p.value);
-  // A round step giving at most ~8 ticks: 1 % for a few percent, 100 % for the hyperinflation of 1989–90 (ALL).
+  // A round step giving at most ~8 ticks: 1% for a few percent, 100% for the hyperinflation of 1989–90 (ALL).
   const span = Math.max(0, Math.max(...values)) - Math.min(0, Math.min(...values));
   const step = [1, 2, 5, 10, 20, 50, 100, 200].find((s) => span / s <= 8) ?? 500;
   const pctDomain = indicator.unit === "%" ? [Math.min(0, Math.floor(Math.min(...values) / step) * step), Math.max(0, Math.ceil(Math.max(...values) / step) * step)] : undefined;

@@ -559,7 +559,7 @@ test.describe("adding transactions", () => {
     await page.getByTestId("tx-instrument").selectOption({ label: "DS0432 · Obligacje skarbowe DS0432 (stałe 1,75 %)" });
     await page.getByTestId("tx-quantity").fill("10");
     await page.getByTestId("tx-price").fill("80,5");
-    await expect(page.getByTestId("tx-amount")).toHaveValue("8050"); // 10 × 80.5 % × 1000
+    await expect(page.getByTestId("tx-amount")).toHaveValue("8050"); // 10 × 80.5% × 1000
     await page.getByTestId("tx-fee").fill("16,10");
     await expect(page.getByTestId("tx-summary")).toContainText("8 066,10 zł");
 
@@ -591,7 +591,7 @@ test.describe("adding transactions in other currencies", () => {
     await expect(page.getByTestId("tx-fx")).toHaveCount(0); // paid in the bond's own currency: no rate
     await page.getByTestId("tx-quantity").fill("2");
     await page.getByTestId("tx-price").fill("96");
-    await expect(page.getByTestId("tx-amount")).toHaveValue("1920"); // 2 × 96 % × 1000 EUR
+    await expect(page.getByTestId("tx-amount")).toHaveValue("1920"); // 2 × 96% × 1000 EUR
     await expect(page.getByTestId("tx-summary")).toContainText("1 920,00 EUR");
 
     await page.getByTestId("tx-type").selectOption("EXCHANGE");
@@ -764,18 +764,18 @@ test.describe("prices view", () => {
     const rows = page.getByTestId("prices-table").locator("tbody tr");
     await expect(rows).toHaveCount(7);
     expect(await rows.locator("td:first-child strong").allTextContents()).toEqual(["DE0001102523", "DS0432", "EDO0935", "IZ0836", "KRU0827", "SAMPLE-APARTMENT", "SPXS"]);
-    await expect(page.getByTestId("price-KRU0827").locator("td").nth(3)).toHaveText(/^\d+,\d{2} %$/); // corporate bond: clean, % of nominal
+    await expect(page.getByTestId("price-KRU0827").locator("td").nth(3)).toHaveText(/^\d+,\d{2}%$/); // corporate bond: clean, % of nominal
     await expect(page.getByTestId("price-SPXS").locator("td").nth(3)).toHaveText(/^\d+,\d{2} EUR$/); // ETF: in its currency
     const manual = page.getByTestId("price-SAMPLE-APARTMENT");
     await expect(manual.locator("td").nth(3)).toHaveText("950,00 PLN");
     await expect(manual.locator("td").nth(4)).toHaveText(/2026-09-30\s*manual/);
     // Retail bond: its interest rate instead of a market price, the previous year's rate in "1 year"
     const edo = page.getByTestId("price-EDO0935");
-    await expect(edo.locator("td").nth(3)).toHaveText("5,00 % p.a.");
+    await expect(edo.locator("td").nth(3)).toHaveText("5,00% p.a.");
     await expect(edo.locator("td").nth(4)).toHaveText("calculated");
-    await expect(edo.locator("td").nth(5)).toHaveText("6,00 % before");
+    await expect(edo.locator("td").nth(5)).toHaveText("6,00% before");
     const ds = page.getByTestId("price-DS0432");
-    await expect(ds.locator("td").nth(3)).toHaveText(/^\d+,\d{2} %$/); // clean price, % of nominal
+    await expect(ds.locator("td").nth(3)).toHaveText(/^\d+,\d{2}%$/); // clean price, % of nominal
     await expect(ds.locator("td").nth(4)).toHaveText(/^\d{4}-\d{2}-\d{2}/);
     await expect(ds.locator("td").nth(5)).toHaveText(/%$/);
 
@@ -900,7 +900,7 @@ test.describe("prices view", () => {
     const table = page.getByTestId("coupon-periods");
     // The sample's periods (data/coupons.sample.json), newest first; the sample coupon fits its period's rate.
     const feb = table.locator('[data-testid="coupon-period"][data-start="2026-02-12"]');
-    await expect(feb).toContainText("8,86 %");
+    await expect(feb).toContainText("8,86%");
     await expect(feb).toContainText("86,42 zł");
     await expect(feb.getByTestId("coupon-use-suggested")).toHaveCount(0);
     // A period far ahead (today's value stays as it is), then its rate, then gone.
@@ -916,7 +916,7 @@ test.describe("prices view", () => {
     await added.getByTestId("coupon-edit").click();
     await page.getByTestId("coupon-edit-rate").fill("7,5");
     await page.getByTestId("coupon-edit-save").click();
-    await expect(added.getByTestId("coupon-rate")).toContainText("7,50 %");
+    await expect(added.getByTestId("coupon-rate")).toContainText("7,50%");
     await expect(added.getByTestId("coupon-rate")).toContainText("yours");
     await added.getByTestId("coupon-delete").click();
     await added.getByTestId("coupon-delete").click();
@@ -1273,8 +1273,8 @@ test.describe("buy, hold or sell", () => {
     await expect(page.getByTestId("hs-summary")).toContainText("7 bond positions");
     // Both yields on a listed bond's row
     const ds = page.locator('[data-testid="hs-row"][data-code="DS0432"]').first();
-    await expect(ds.getByTestId("hs-yield")).toHaveText(/\d %/);
-    await expect(ds.getByTestId("hs-bought")).toHaveText(/\d %/);
+    await expect(ds.getByTestId("hs-yield")).toHaveText(/\d%/);
+    await expect(ds.getByTestId("hs-bought")).toHaveText(/\d%/);
     // A row's breakdown, in the URL: the sale today, the flows kept, one more bought today, the notes
     const iz = page.locator('[data-testid="hs-row"][data-code="IZ0836"]');
     await iz.click();
@@ -1311,7 +1311,7 @@ test.describe("indicators view", () => {
     await expect(page.getByTestId("indicator-cpi-index")).toContainText("CPI reference index");
     // GUS's own inflation figures, first: 12 months, per year, since December
     await expect(page.getByTestId("indicator-group-Inflation").locator("xpath=following-sibling::tr[1]")).toHaveAttribute("data-testid", "indicator-cpi-yoy");
-    await expect(page.getByTestId("indicator-cpi-yoy").locator("td").nth(1)).toHaveText(/^-?\d+,\d %$/);
+    await expect(page.getByTestId("indicator-cpi-yoy").locator("td").nth(1)).toHaveText(/^-?\d+,\d%$/);
     const annual = page.getByTestId("indicator-cpi-annual");
     await expect(annual).toContainText("Inflation per year");
     await expect(annual.locator("td").nth(2)).toHaveText(/^\d{4}$/); // the latest whole year
@@ -1325,7 +1325,7 @@ test.describe("indicators view", () => {
     await expect(mom).toHaveClass(/selected/);
     await expect(page.getByTestId("indicator-title")).toContainText("Inflation, month on month");
     await expect(page.getByTestId("indicator-chart")).toHaveAttribute("data-points", "60"); // 5Y default: 60 months
-    await expect(page.getByTestId("indicator-chart").locator(".recharts-bar-rectangle").first()).toBeVisible(); // (a 0.0 % month draws no bar)
+    await expect(page.getByTestId("indicator-chart").locator(".recharts-bar-rectangle").first()).toBeVisible(); // (a 0.0% month draws no bar)
 
     await page.getByTestId("indicator-range").getByRole("button", { name: "1Y" }).click();
     await expect(page).toHaveURL(/range=1Y/);
@@ -1626,7 +1626,7 @@ test.describe("sorting by a column", () => {
     await page.getByTestId("sort-change").click();
     await expect(page).toHaveURL(/#\/prices\?sort=-change$/);
     const changes = await page.getByTestId("prices-table").locator("tbody tr td:nth-child(6)").allTextContents();
-    // A change reads "+1,23 %"; "–" (none) and a retail bond's "6,00 % before" (its rate, not a change) have no value.
+    // A change reads "+1,23%"; "–" (none) and a retail bond's "6,00% before" (its rate, not a change) have no value.
     const values = changes.map((t) => (/^[+−-]?[\d\s]+,\d+\s%$/.test(t.trim()) ? Number(t.replace(/[^\d,−-]/g, "").replace(",", ".").replace("−", "-")) : null));
     const known = values.filter((v): v is number => v !== null);
     expect(known).toEqual([...known].sort((a, b) => b - a));

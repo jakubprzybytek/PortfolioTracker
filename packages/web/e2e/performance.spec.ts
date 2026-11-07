@@ -51,12 +51,12 @@ test.describe("performance", () => {
     const [a, b] = [(await dd.boundingBox())!, (await alloc.boundingBox())!];
     expect(Math.abs(a.y - b.y)).toBeLessThan(2);
     expect(b.x).toBeGreaterThan(a.x + a.width);
-    // y axis of the drawdown: from 0 % down, nothing above it
+    // y axis of the drawdown: from 0% down, nothing above it
     const ticks = dd.locator(".recharts-yAxis-tick-labels text");
     await expect(ticks.first()).toBeVisible();
     const labels = (await ticks.allTextContents()).map((t) => t.replace(/\s/g, " "));
-    expect(labels).toContain("0 %");
-    expect(labels.every((t) => t === "0 %" || /^[-−]/.test(t))).toBe(true);
+    expect(labels).toContain("0%");
+    expect(labels.every((t) => t === "0%" || /^[-−]/.test(t))).toBe(true);
   });
 
   test("two parts: by year (the whole history) and over time (with the range picker)", async ({ page }) => {
@@ -103,16 +103,16 @@ test.describe("performance", () => {
     await expect(rows.last()).toHaveAttribute("data-year", "2025");
     await expect(rows.last()).toContainText("from 2025-02-03");
     await expect(rows.first()).toHaveClass(/partial/);
-    for (const id of ["years-twr", "years-inflation", "years-real", "years-xirr"]) await expect(rows.last().getByTestId(id)).toHaveText(/\d %/);
+    for (const id of ["years-twr", "years-inflation", "years-real", "years-xirr"]) await expect(rows.last().getByTestId(id)).toHaveText(/\d%/);
     await expect(page.getByTestId("years-total")).toContainText("a year, since 2025-02");
     // One pair of bars per year, the real return as a dot
     const bars = page.getByTestId("years-chart");
     expect(await bars.locator(".recharts-bar-rectangle").count()).toBe(2 * (await rows.count()));
     await expect(bars.locator(".recharts-scatter circle").first()).toBeVisible();
-    // Growth of 100 zł: the portfolio, CPI and CPI + 2 % from 100 at the start of the range
+    // Growth of 100 zł: the portfolio, CPI and CPI + 2% from 100 at the start of the range
     const growth = page.getByTestId("growth-chart");
     await expect(growth.locator("path.recharts-line-curve")).toHaveCount(3);
-    await expect(page.getByTestId("growth-panel").locator(".chart-key")).toContainText("Inflation +2 %");
+    await expect(page.getByTestId("growth-panel").locator(".chart-key")).toContainText("Inflation +2%");
     await expect(page.getByTestId("growth-panel").locator(".chart-key")).toContainText("Inflation (CPI)");
     await page.getByTestId("performance-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
@@ -144,13 +144,13 @@ test.describe("performance", () => {
     await expect(table.locator("thead th.col-start").first()).toBeHidden();
     await page.setViewportSize({ width: 1280, height: 900 });
     const oldest = page.getByTestId("years-row").last();
-    await expect(oldest.getByTestId("years-bench-WIG")).toHaveText(/^\+\d.* %$/); // growing: positive
+    await expect(oldest.getByTestId("years-bench-WIG")).toHaveText(/^\+\d.*%$/); // growing: positive
     await expect(oldest.getByTestId("years-bench-MSCI_WORLD")).toHaveText("–");
-    await expect(page.getByTestId("years-total").getByTestId("years-bench-WIG")).toHaveText(/\d %/);
+    await expect(page.getByTestId("years-total").getByTestId("years-bench-WIG")).toHaveText(/\d%/);
     const growth = page.getByTestId("growth-chart");
     await page.getByTestId("performance-range").getByRole("button", { name: "ALL" }).click();
     await expect(page.getByTestId("performance-range")).toHaveAttribute("aria-busy", "false");
-    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(4); // portfolio, CPI, CPI + 2 %, WIG (the other two start later)
+    await expect(growth.locator("path.recharts-line-curve")).toHaveCount(4); // portfolio, CPI, CPI + 2%, WIG (the other two start later)
     const key = page.getByTestId("growth-panel").locator(".chart-key");
     await expect(key).toContainText("WIG");
     await expect(key).not.toContainText("MSCI World");

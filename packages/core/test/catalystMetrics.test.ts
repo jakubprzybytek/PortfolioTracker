@@ -9,9 +9,9 @@ import { isSettlementDay } from "../src/settlement.ts";
 
 describe("curves", () => {
   it("a fixed bond at par yields its coupon (before tax and commission)", () => {
-    // Settles 2026-11-10; 5 % yearly to 2028-11-10, bought at 100 without accrued interest.
+    // Settles 2026-11-10; 5% yearly to 2028-11-10, bought at 100 without accrued interest.
     expect(fixedYield({ maturity: "2028-11-10", close: 100, rate: 0.05, accruedInterest: 0, nominal: 1000 }, "2026-11-10")).toBeCloseTo(0.05, 3);
-    // Below par it yields more; a zero-coupon at 95 a year off yields about 5.3 %.
+    // Below par it yields more; a zero-coupon at 95 a year off yields about 5.3%.
     expect(fixedYield({ maturity: "2028-11-10", close: 98, rate: 0.05, accruedInterest: 0, nominal: 1000 }, "2026-11-10")).toBeGreaterThan(0.06);
     expect(fixedYield({ maturity: "2027-11-10", close: 95, rate: null, accruedInterest: 0, nominal: 1000 }, "2026-11-10")).toBeCloseTo(1 / 0.95 - 1, 3);
   });
@@ -54,7 +54,7 @@ describe("liquidity", () => {
   it("measures: shares, median turnover, spread, days to sell 10 000", () => {
     const l = liquidity([...Array.from({ length: 60 }, () => s(0)), ...Array.from({ length: 30 }, (_, i) => (i < 15 ? s(1, 20_000) : s(0)))], [{ bid: { price: 99.5, volume: 10 }, ask: { price: 100.5 } }, { bid: { price: 99.8, volume: 4 }, ask: { price: 100.2 } }]);
     expect(l).toMatchObject({ traded30: 0.5, traded90: 0.1667, medianTurnover30: 20_000, trades30: 15, medianSpread30: 0.7, bid: { price: 99.8, volume: 4 } });
-    // Average daily turnover 10 000; 20 % of it a day → 5 sessions.
+    // Average daily turnover 10 000; 20% of it a day → 5 sessions.
     expect(l.daysToSell10k).toBe(5);
   });
 });
@@ -100,7 +100,7 @@ const input = (over: Partial<ScreenInput> & Pick<ScreenInput, "bond">): ScreenIn
 });
 
 describe("screenRow", () => {
-  it("a fixed 6 % bond at par: yields 6 % before tax and 6 % × 0,81 after; its premium over a 5 % curve", () => {
+  it("a fixed 6% bond at par: yields 6% before tax and 6% × 0,81 after; its premium over a 5% curve", () => {
     const b = bond({ code: "FIX1129" });
     const r = screenRow(input({ bond: b, terms: terms(b, { kind: "FIXED", rate: 0.06 }), coupons: yearly(b.isin, 0.06), sessions: sessions(b, 100) }));
     expect(r.yieldGross).toBeCloseTo(0.06, 2);

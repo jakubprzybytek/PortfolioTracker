@@ -52,7 +52,7 @@ describe("priceIssues", () => {
     expect(priceIssues(corp, ten, "2026-09-01", "2026-10-22").map((i) => i.kind)).toEqual(["gap"]);
   });
 
-  it("flags jumps (ETFs over 20 %, after splits; bonds over 5 %) and bond prices out of 50–150 %", () => {
+  it("flags jumps (ETFs over 20%, after splits; bonds over 5%) and bond prices out of 50–150%", () => {
     const d = days("2026-10-01", "2026-10-09");
     const etfPrices = d.map((date, i) => ({ date, close: i < 3 ? 100 : 130 }));
     expect(priceIssues(etf, etfPrices, d[0]!, d.at(-1)!).map((i) => [i.kind, i.date])).toEqual([["jump", d[3]]]);

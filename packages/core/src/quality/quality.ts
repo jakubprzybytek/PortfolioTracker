@@ -108,13 +108,13 @@ export function priceIssues(
     const a = comparable[i - 1]!;
     const b = comparable[i]!;
     const move = b.close / a.close - 1;
-    if (Math.abs(move) > limit) issues.push({ ...base, kind: "jump", date: b.date, detail: `${a.close} on ${a.date} → ${b.close} (${move > 0 ? "+" : "−"}${(Math.abs(move) * 100).toFixed(1)} %)` });
+    if (Math.abs(move) > limit) issues.push({ ...base, kind: "jump", date: b.date, detail: `${a.close} on ${a.date} → ${b.close} (${move > 0 ? "+" : "−"}${(Math.abs(move) * 100).toFixed(1)}%)` });
   }
 
   // Bond prices out of range.
   if (!etf) {
     const [lo, hi] = o.bondRange;
-    for (const p of sorted) if (p.close < lo || p.close > hi) issues.push({ ...base, kind: "range", date: p.date, detail: `clean price ${p.close} % on ${p.date}, outside ${lo}–${hi} %` });
+    for (const p of sorted) if (p.close < lo || p.close > hi) issues.push({ ...base, kind: "range", date: p.date, detail: `clean price ${p.close}% on ${p.date}, outside ${lo}–${hi}%` });
   }
   return issues;
 }

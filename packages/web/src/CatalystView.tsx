@@ -137,7 +137,7 @@ const FLAG_TITLE: Record<string, string> = {
 };
 
 const pct = (v: number | null | undefined, d = 2) => (v === null || v === undefined ? "–" : `${fmtNum(v * 100, d)}%`);
-const pp = (v: number | null | undefined) => (v === null || v === undefined ? "–" : fmtPct(v * 100).replace(" %", "%"));
+const pp = (v: number | null | undefined) => (v === null || v === undefined ? "–" : fmtPct(v * 100));
 const couponLabel = (r: BondRow) => {
   const c = r.coupon;
   if (!c) return r.segment === "treasury" && /^(DS|PS|WS)\d/.test(r.code) ? "fixed" : r.segment === "treasury" && /^OK\d/.test(r.code) ? "zero" : "–";

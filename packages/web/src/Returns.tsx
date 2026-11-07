@@ -84,7 +84,7 @@ function BenchCell({ col, b, r, perYear }: { col: BenchColumn; b?: BenchmarkSeri
   );
 }
 
-/** Keeps "−2 %" on one line: recharts wraps axis labels at spaces. */
+/** A non-breaking space. */
 const NBSP = " ";
 const tooltipStyle = {
   background: "var(--bg)",
@@ -535,7 +535,7 @@ export function YearsChart({
               domain={[ticks[0]!, ticks.at(-1)!]}
               ticks={ticks}
               interval={0}
-              tickFormatter={(v: number) => `${fmtNum(v, 0)}${NBSP}%`}
+              tickFormatter={(v: number) => `${fmtNum(v, 0)}%`}
             />
             <Tooltip
               cursor={{ fill: "var(--band)" }}
@@ -647,7 +647,7 @@ export function GrowthChart({
     ticks.push(Math.round(v * 100) / 100);
   const end = data.at(-1)!;
   const zl = (v: number | null | undefined) => (v === null || v === undefined ? "–" : `${fmtNum(v, 2)} zł`);
-  const margin = `+${fmtNum(CPI_MARGIN * 100, 0)} %`;
+  const margin = `+${fmtNum(CPI_MARGIN * 100, 0)}%`;
   const names: Record<string, string> = {
     portfolio: "Portfolio",
     cpi: "Inflation (CPI)",

@@ -29,8 +29,8 @@ export interface HoldSellResponse {
 
 export const DECISION_LABELS: Record<Decision, string> = { BUY: "buy more", HOLD: "hold", SELL: "sell", MATURES: "matures soon" };
 const KIND_LABELS: Record<string, string> = { coupon: "coupon", interest: "interest", redemption: "redemption" };
-/** A fraction as "2,50 %" (yields, rates). */
-const fmtRate = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${fmtNum(r * 100, 2)} %`);
+/** A fraction as "2,50%" (yields, rates). */
+const fmtRate = (r: number | null | undefined) => (r === null || r === undefined ? "–" : `${fmtNum(r * 100, 2)}%`);
 const term = (months: number) => (months >= 12 ? `${months / 12} y` : `${months} m`);
 const rowKey = (r: Pick<ReviewRow, "account" | "isin">) => `${r.account}#${r.isin}`;
 
@@ -233,7 +233,7 @@ export function HoldSellView({ params, setParams }: { params: Record<string, str
                 <th className="left" title="What the money goes into otherwise until the bond's maturity (by default the retail bond on offer with the nearest term), its yield after tax">
                   Alternative
                 </th>
-                <th className="left" title="Sell: keeping it yields less than the alternative. Buy more: one more yields more. Hold: in between (within 0,2 % a year counts as neither). Matures soon: under 3 months left">
+                <th className="left" title="Sell: keeping it yields less than the alternative. Buy more: one more yields more. Hold: in between (within 0,2% a year counts as neither). Matures soon: under 3 months left">
                   Verdict
                 </th>
               </tr>

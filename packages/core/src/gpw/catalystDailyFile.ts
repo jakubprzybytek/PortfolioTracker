@@ -34,7 +34,7 @@ export interface CatalystFileRow {
   segmentCode: string;
   currency: string;
   maturity: IsoDate | null;
-  /** Annual rate of the current interest period, as a fraction (6.44 % → 0.0644); null for zero-coupon bonds. */
+  /** Annual rate of the current interest period, as a fraction (6.44% → 0.0644); null for zero-coupon bonds. */
   rate: number | null;
   accruedInterest: number | null;
   nominal: number | null;

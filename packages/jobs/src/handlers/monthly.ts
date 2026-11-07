@@ -9,7 +9,7 @@ import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv, parseCpiYoyCsv, parseCpiYtd
 import { fetchMfIndexRatios } from "../lib/mfPage.ts";
 
 /**
- * GUS's CPI is kept from here on: the years before (the 1989–90 hyperinflation, 640 % a year) would dwarf everything
+ * GUS's CPI is kept from here on: the years before (the 1989–90 hyperinflation, 640% a year) would dwarf everything
  * since on the Indicators charts, and the portfolio's history starts later anyway.
  */
 const GUS_CPI_FROM = "2000-01";

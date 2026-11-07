@@ -65,7 +65,7 @@ test.describe("dashboard", () => {
   test("the year's return card: time-weighted, against inflation; it opens Performance", async ({ page }) => {
     const card = page.getByTestId("year-return");
     await expect(card.locator(".label")).toHaveText(/^\d{4}( so far)?$/);
-    await expect(card.locator(".value")).toHaveText(/\d %$/);
+    await expect(card.locator(".value")).toHaveText(/\d%$/);
     await expect(card.locator(".note")).toContainText("inflation");
     const value = await card.locator(".value").textContent();
     await card.click();
@@ -130,7 +130,7 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("alloc-type-ETF")).toBeVisible();
     await expect(page.getByTestId("alloc-type-BOND_CORPORATE")).toBeVisible();
     await expect(page.getByTestId("alloc-currency-PLN")).toBeVisible();
-    await expect(page.getByTestId("alloc-currency-EUR")).toContainText(/\d+,\d+ %/);
+    await expect(page.getByTestId("alloc-currency-EUR")).toContainText(/\d+,\d+%/);
     const shares = await page.getByTestId("alloc-type").locator(".alloc-pct").allTextContents();
     const sum = shares.reduce((s, t) => s + Number(t.replace(/[^\d,]/g, "").replace(",", ".")), 0);
     expect(Math.abs(sum - 100)).toBeLessThan(0.5); // one decimal each
@@ -161,19 +161,19 @@ test.describe("dashboard", () => {
     await expect(page.locator(".mix-target")).toHaveCount(0);
     await expect(page.getByTestId("targets-rebalance")).toHaveCount(0);
 
-    // The form, in the panel: the targets must add up to 100 %
+    // The form, in the panel: the targets must add up to 100%
     await edit.click();
     await page.getByTestId("targets-SHARES-target").fill("60");
     await page.getByTestId("targets-BONDS-target").fill("35");
     await page.getByTestId("targets-CASH-target").fill("4");
-    await expect(page.getByTestId("targets-sum")).toHaveText("99 %");
+    await expect(page.getByTestId("targets-sum")).toHaveText("99%");
     await expect(page.getByTestId("targets-save")).toBeDisabled();
     await page.getByTestId("targets-CASH-target").fill("5");
-    await expect(page.getByTestId("targets-sum")).toHaveText("100 % ✓");
+    await expect(page.getByTestId("targets-sum")).toHaveText("100% ✓");
     await page.getByTestId("targets-save").click();
 
     // The legend: each class's share, its target and the difference; ticks on the bar where shares' and bonds' targets end
-    await expect(page.getByTestId("asset-mix-SHARES-target")).toHaveText("of 60 %");
+    await expect(page.getByTestId("asset-mix-SHARES-target")).toHaveText("of 60%");
     await expect(page.getByTestId("asset-mix-SHARES-diff")).toHaveText(/^[+−]\d+,\d\spp$/);
     await expect(page.locator(".mix-target")).toHaveCount(2);
     const shares = await page.getByTestId("asset-mix").locator("li strong").allTextContents();
@@ -200,7 +200,7 @@ test.describe("dashboard", () => {
     await expect(page.getByTestId("targets-amount")).toHaveCount(0);
     const trades = await Promise.all(classes.map((k) => page.getByTestId(`targets-${k}-trade`).textContent()));
     expect(Math.abs(trades.reduce((s, t) => s + signed(t!), 0))).toBeLessThan(0.05);
-    await expect(page.getByTestId("targets-SHARES-after")).toHaveText("60,0 %of 60 %");
+    await expect(page.getByTestId("targets-SHARES-after")).toHaveText("60,0%of 60%");
 
     // Wide: bonds and shares in the left column, cash and other in the right one
     const boxOf = async (k: string) => (await page.getByTestId(`asset-mix-${k}`).boundingBox())!;
@@ -376,7 +376,7 @@ test.describe("on a phone", () => {
     await page.goto("/");
     await expect(page.getByTestId("tx-add")).toBeVisible();
     for (const size of ["15px", "18px"]) {
-      // 18 px: the system font set 20 % larger.
+      // 18 px: the system font set 20% larger.
       await page.evaluate((s) => {
         document.documentElement.style.fontSize = s;
       }, size);
@@ -390,7 +390,7 @@ test.describe("on a phone", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   });
 
-  test("no view scrolls sideways on a narrow phone with a larger font (360 px, font 20 % larger)", async ({ page }) => {
+  test("no view scrolls sideways on a narrow phone with a larger font (360 px, font 20% larger)", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 780 });
     for (const view of ["/", "/#/performance", "/#/holdings", "/#/prices", "/#/hold-sell", "/#/sales", "/#/cash-flows", "/#/indicators", "/#/transactions", "/#/notes", "/#/status"]) {
       await page.goto(view);

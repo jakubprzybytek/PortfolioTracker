@@ -86,7 +86,7 @@ export const fxCurrencyOf = (id: string): string | undefined => /^fx-([a-z]{3})$
 
 /**
  * The inflation indicators, oldest first: 12 months and since December from GUS's figures as published (`yoy`, `ytd`:
- * e.g. 104.1 → 4.1 %), per year from December's since-December figure, and from the IZ reference index (`months`)
+ * e.g. 104.1 → 4.1%), per year from December's since-December figure, and from the IZ reference index (`months`)
  * the month on month change and the index itself.
  */
 export function cpiIndicators(

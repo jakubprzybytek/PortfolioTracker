@@ -113,7 +113,7 @@ describe(`API ${API}`, () => {
     const { status, body } = await get<{ date: string; close: number; calculated?: boolean }[]>("/instruments/PL0000118402/prices?from=2025-09-01&to=2026-10-11");
     expect(status).toBe(200);
     expect(body[0]).toMatchObject({ date: "2025-09-15", close: 100, calculated: true }); // EDO0935 bought 2025-09-15
-    expect(body.find((p) => p.date === "2026-09-15")!.close).toBe(106); // year 1 at 6.00 %, capitalised
+    expect(body.find((p) => p.date === "2026-09-15")!.close).toBe(106); // year 1 at 6.00%, capitalised
     expect(body.at(-1)!.close).toBeGreaterThan(106);
     expect(body.every((p, i) => i === 0 || p.close >= body[i - 1]!.close)).toBe(true);
   });
@@ -131,7 +131,7 @@ describe(`API ${API}`, () => {
     expect(by["broker/IZ0836"]).toMatchObject({ quantity: 10, cost: 9561.54, couponsReceived: 214.2 });
     expect(by["ike/DS0432"]).toMatchObject({ quantity: 5, cost: 4013.01, couponsReceived: 0 });
     expect(by["broker/IZ0836"]!.nominal!).toBeGreaterThan(1100);
-    // Retail bond: valued from the Ministry's rates (6.00 % in year 1, 5.00 % from 2026-09-15), no market price.
+    // Retail bond: valued from the Ministry's rates (6.00% in year 1, 5.00% from 2026-09-15), no market price.
     const edo = by["ike/EDO0935"]!;
     expect(edo).toMatchObject({ type: "BOND_RETAIL", quantity: 10, cost: 1000, cleanPrice: null, flags: [], rate: { current: 0.05, previous: 0.06 } });
     expect(edo.valuePerUnit!).toBeGreaterThan(106); // 100 + 6.00 after year 1, plus year-2 interest so far
@@ -335,7 +335,7 @@ describe(`API ${API}`, () => {
     const { status, body } = await get<{ code: string; price: number | null; priceDate: string | null; stale: boolean; change1y: number | null; yearAgo: { date: string } | null; rate?: unknown }[]>("/prices");
     expect(status).toBe(200);
     expect(body.map((r) => r.code)).toEqual(["DE0001102523", "DS0432", "EDO0935", "IZ0836", "KRU0827", "SAMPLE-APARTMENT", "SPXS"]); // no row for the EUR cash
-    // ETF: EUR price; the 1-year change compares on today's share basis across the split (not -99 %).
+    // ETF: EUR price; the 1-year change compares on today's share basis across the split (not -99%).
     const spxs = body.find((r) => r.code === "SPXS")!;
     expect(spxs).toMatchObject({ currency: "EUR", stale: false });
     expect(spxs.change1y!).toBeGreaterThan(-0.5);
@@ -389,7 +389,7 @@ describe(`API ${API}`, () => {
     expect(body.find((p) => p.date === "2026-10-09")).toMatchObject({ close: 100.45 });
   });
 
-  it("GET /instruments/{isin}/prices: a foreign bond's calculated prices run from the trade to 100 % at maturity", async () => {
+  it("GET /instruments/{isin}/prices: a foreign bond's calculated prices run from the trade to 100% at maturity", async () => {
     const inst = (await get<InstrumentOut[]>("/instruments")).body.find((i) => i.isin === BUND)!;
     expect(inst).toMatchObject({ backfill: { status: "done", from: "2025-10-02", to: "2027-11-15" } });
     const { body } = await get<{ date: string; close: number }[]>(`/instruments/${BUND}/prices?from=2025-10-02&to=2025-10-06`);
@@ -551,7 +551,7 @@ describe(`API ${API}`, () => {
     const before = await list();
     expect(before.nominal).toBe(100);
     expect(before.periods.find((p) => p.start === "2026-02-12")).toMatchObject({ end: "2026-05-12", rate: 0.0886, rateSource: "manual" });
-    // The sample's coupon (70 after an assumed 19 % tax = 86.42 for 40 bonds) fits the period's 8.86 %.
+    // The sample's coupon (70 after an assumed 19% tax = 86.42 for 40 bonds) fits the period's 8.86%.
     expect(before.coupons.find((c) => c.start === "2026-02-12")).toMatchObject({ checks: [{ gross: 86.42, quantity: 40, mismatch: false, taxAssumed: true }], suggestedRate: 0.0886 });
 
     // Far in the future, so today's value doesn't change meanwhile.
@@ -675,13 +675,13 @@ describe(`API ${API}`, () => {
     const after = (await get<Body>("/hold-sell")).body;
     expect(after).toMatchObject({ saved: true, assumptions: { cpi: 0.03, alternative: "rate" } });
     const ds = after.rows.find((r) => r.code === "DS0432")!;
-    expect(ds.held.alternative.label).toContain("6,00 %");
+    expect(ds.held.alternative.label).toContain("6,00%");
     expect(ds.held.alternative.yield).toBeCloseTo(ds.account === "ike" ? 0.06 : 0.06 * 0.81, 6);
     await send("PUT", "/hold-sell/assumptions", { reset: true });
     expect((await get<Body>("/hold-sell")).body.saved).toBe(false);
   });
 
-  it("PUT /targets keeps the target allocation (adding up to 100 %), GET /targets returns it, reset removes it", async () => {
+  it("PUT /targets keeps the target allocation (adding up to 100%), GET /targets returns it, reset removes it", async () => {
     type Body = { targets: { targets: Record<string, number>; bands: Record<string, number> } | null };
     await send("PUT", "/targets", { reset: true });
     expect((await get<Body>("/targets")).body.targets).toBeNull();

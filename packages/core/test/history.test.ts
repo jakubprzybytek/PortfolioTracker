@@ -34,9 +34,9 @@ describe("drawdowns", () => {
   it("is the fall from the best so far, on returns, not on the value", () => {
     const dd = drawdowns([
       { date: "d1", total: 1000, netDeposits: 1000 },
-      { date: "d2", total: 1100, netDeposits: 1000 }, // +10 %: a new high
-      { date: "d3", total: 990, netDeposits: 1000 }, // −10 % from it
-      { date: "d4", total: 1990, netDeposits: 2000 }, // 1000 put in: no gain, still −10 %
+      { date: "d2", total: 1100, netDeposits: 1000 }, // +10%: a new high
+      { date: "d3", total: 990, netDeposits: 1000 }, // −10% from it
+      { date: "d4", total: 1990, netDeposits: 2000 }, // 1000 put in: no gain, still −10%
       { date: "d5", total: 990, netDeposits: 1000 }, // 1000 taken out: no loss either
       { date: "d6", total: 1300, netDeposits: 1000 }, // above the old high
     ]).map((d) => d.drawdown);

@@ -35,7 +35,7 @@ describe("positionFlows", () => {
 
 describe("positionsXirr", () => {
   it("one position: its flows and its value at the end", () => {
-    // 1000 in, worth 1100 a year later: 10 %
+    // 1000 in, worth 1100 a year later: 10%
     expect(positionsXirr([[["2025-01-01", -1000]]], 1100, "2026-01-01")).toBeCloseTo(0.1, 5);
   });
 
@@ -46,7 +46,7 @@ describe("positionsXirr", () => {
     expect(both).toBeCloseTo(xirr([{ date: "2025-01-01", amount: -1000 }, { date: "2025-07-02", amount: -1000 }, { date: "2026-01-01", amount: 2300 }])!, 6);
   });
 
-  it("closed (value 0): the flows alone, ending at the last; written off: −100 %", () => {
+  it("closed (value 0): the flows alone, ending at the last; written off: −100%", () => {
     expect(positionsXirr([[["2025-01-01", -1000], ["2026-01-01", 1050]]], 0, "2026-10-20")).toBeCloseTo(0.05, 5);
     expect(positionsXirr([[["2025-01-01", -1000], ["2026-05-31", 0]]], 0, "2026-10-20")).toBe(-1);
   });

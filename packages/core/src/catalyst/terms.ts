@@ -11,7 +11,7 @@ export interface Coupon {
   kind: CouponKind;
   /** Floating: the reference rate ("WIBOR 3M", "WIRON 1M", "POLSTR 6M" (treasury NZ series), "EURIBOR 6M"). */
   base?: string;
-  /** Floating: the margin over it, as a fraction (3.85 % → 0.0385). */
+  /** Floating: the margin over it, as a fraction (3.85% → 0.0385). */
   margin?: number;
   /** Fixed: the annual rate, as a fraction. */
   rate?: number;

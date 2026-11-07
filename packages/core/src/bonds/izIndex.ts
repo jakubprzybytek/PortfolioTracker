@@ -3,7 +3,7 @@
 
 import { daysInMonth, shiftMonth, type IsoDate } from "../dates.ts";
 
-/** One month of the reference index. `wr` = CPI m/m as a fraction (0.003 = +0.3 %). */
+/** One month of the reference index. `wr` = CPI m/m as a fraction (0.003 = +0.3%). */
 export interface ReferenceIndexMonth {
   month: string; // "YYYY-MM"
   wr: number;

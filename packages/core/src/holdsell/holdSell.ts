@@ -130,7 +130,7 @@ export interface HoldSellInput {
 
 const BOND_TYPES = new Set(["BOND_LISTED", "BOND_CORPORATE", "BOND_RETAIL", "BOND_IBKR"]);
 const round = (x: number, d = 2) => Math.round(x * 10 ** d) / 10 ** d;
-const pct = (x: number) => `${(x * 100).toFixed(2).replace(".", ",")} %`;
+const pct = (x: number) => `${(x * 100).toFixed(2).replace(".", ",")}%`;
 
 // --- retail bonds -----------------------------------------------------------------------------------
 
@@ -435,7 +435,7 @@ export function holdOrSell(input: HoldSellInput): { rows: HoldSellRow[]; skipped
       skip("matured");
       continue;
     }
-    if (!taxFree) notes.push("tax 19 % on interest and on the gain over cost");
+    if (!taxFree) notes.push("tax 19% on interest and on the gain over cost");
     else notes.push("no tax (IKE/IKZE)");
 
     const years = yearsBetween(today, maturity);
@@ -623,7 +623,7 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
     const fixed = (h.type === "BOND_LISTED" && inst.terms?.couponType === "FIXED") || (h.type === "BOND_CORPORATE" && !floating) || h.type === "BOND_IBKR";
     notes.push(`at the last price${h.priceDate ? ` (${h.priceDate})` : ""} + accrued interest; the ask can be higher, above all on Catalyst`);
     notes.push(`purchase: ${pct(commission)} commission${a.commission === undefined ? " (the account's, from its trades)" : ""}`);
-    notes.push(taxFree ? "no tax (IKE/IKZE)" : "tax 19 % on coupons (less the accrued interest paid) and on the gain over the price paid");
+    notes.push(taxFree ? "no tax (IKE/IKZE)" : "tax 19% on coupons (less the accrued interest paid) and on the gain over the price paid");
     if (h.type === "BOND_LISTED" && inst.terms?.couponType === "INDEXED") notes.push(`IZ indexation at CPI ${pct(a.cpi)}: the real yield is the steadier figure`);
     if (floating) notes.push(`coupons not set yet: WIBOR ${pct(a.wibor)} + margin; the margin over WIBOR is the steadier figure`);
     if (h.type === "BOND_CORPORATE") notes.push("a corporate bond's yield is what's promised; the spread is the pay for the issuer's risk");
@@ -681,7 +681,7 @@ const DECISION_ORDER: Decision[] = ["SELL", "BUY", "HOLD", "MATURES"];
  * Hold or sell and buy more, one row per position: "sell" when keeping it yields clearly less than the alternative,
  * "buy more" when one more bought today yields clearly more (not for retail bonds: the series on offer is another
  * bond), "hold" in between (keeping pays, but not enough to buy more: selling and buying back costs two commissions),
- * "matures soon" under three months left. Within 0,2 % a year of the alternative counts as neither side. Sells first,
+ * "matures soon" under three months left. Within 0,2% a year of the alternative counts as neither side. Sells first,
  * then buys, then holds.
  */
 export function buyHoldOrSell(input: HoldSellInput & { portfolioValue?: number }): { rows: ReviewRow[]; skipped: HoldSellSkipped[] } {

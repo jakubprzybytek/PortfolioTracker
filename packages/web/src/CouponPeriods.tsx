@@ -16,8 +16,8 @@ interface CouponsResponse {
 }
 
 const SOURCE_LABELS: Record<string, string> = { manual: "yours", "obligacje.pl": "obligacje.pl", coupons: "from coupons" };
-/** 0.0713 → "7,13 %". */
-const fmtRate = (r: number | undefined) => (r === undefined ? "–" : `${fmtNum(r * 100, 2)} %`);
+/** 0.0713 → "7,13%". */
+const fmtRate = (r: number | undefined) => (r === undefined ? "–" : `${fmtNum(r * 100, 2)}%`);
 const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
 
 interface Draft {
@@ -184,7 +184,7 @@ export function CouponPeriods({ isin, code }: { isin: string; code: string }) {
                     <td>{perBond === undefined ? "–" : fmtMoney(perBond, "PLN")}</td>
                     <td className="left wrap">
                       {(c?.checks ?? []).map((x: CouponCheck) => (
-                        <div key={`${x.account}${x.date}`} className={x.mismatch ? "neg" : ""} title={`${x.account}, ${x.date}: ${fmtMoney(x.amount, "PLN")} received${x.taxAssumed ? ", 19 % tax assumed" : ""}; ${x.quantity} bonds on the record day; fits ${fmtRate(x.rateRange[0])} – ${fmtRate(x.rateRange[1])}`}>
+                        <div key={`${x.account}${x.date}`} className={x.mismatch ? "neg" : ""} title={`${x.account}, ${x.date}: ${fmtMoney(x.amount, "PLN")} received${x.taxAssumed ? ", 19% tax assumed" : ""}; ${x.quantity} bonds on the record day; fits ${fmtRate(x.rateRange[0])} – ${fmtRate(x.rateRange[1])}`}>
                           {fmtMoney(x.gross, "PLN")} <span className="muted">· {x.quantity} bonds</span>
                           {x.mismatch && x.expected !== undefined && <span> · expected {fmtMoney(x.expected, "PLN")}</span>}
                         </div>
