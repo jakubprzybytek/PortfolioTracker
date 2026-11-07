@@ -25,6 +25,8 @@ export const FLAG_LABEL: Record<string, string> = {
   amortising: "amortising",
   "matures-soon": "matures soon",
   indexed: "indexed",
+  suspended: "suspended",
+  marked: "marked",
 };
 export const FLAG_TITLE: Record<string, string> = {
   stale: "No trade in the last 30 sessions: the price is the exchange's reference price; no premium",
@@ -35,6 +37,8 @@ export const FLAG_TITLE: Record<string, string> = {
   amortising: "Part of the nominal has been repaid (instalments)",
   "matures-soon": "Under 90 days to maturity: an annualised yield says nothing",
   indexed: "Inflation-indexed (IZ): not computed here",
+  suspended: "Trading suspended by GPW (the reason in the panel's Track record)",
+  marked: "GPW marks the issuer's instruments (bankruptcy, restructuring, liquidation …): see the panel's Track record",
 };
 
 export const pct = (v: number | null | undefined, d = 2) => (v === null || v === undefined ? "–" : `${fmtNum(v * 100, d)}%`);

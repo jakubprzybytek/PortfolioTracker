@@ -10,3 +10,5 @@ export * from "./terms.ts";
 export * from "./curve.ts";
 export * from "./liquidity.ts";
 export * from "./screen.ts";
+export * from "./exits.ts";
+export * from "./trackRecord.ts";

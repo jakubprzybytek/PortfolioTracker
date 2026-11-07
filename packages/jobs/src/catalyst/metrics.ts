@@ -4,6 +4,7 @@
 
 import {
   catalystAssumptions,
+  issuerKey,
   fixedCurve,
   recentSessions,
   screenRow,
@@ -49,7 +50,7 @@ export async function computeMetrics(): Promise<{ itemsWritten: number; note: st
   const from = window.at(-1)!;
   const quotesFrom = window[Math.min(29, window.length - 1)]!;
 
-  const [bonds, terms, saved] = await Promise.all([catalystRepo.listBonds(), catalystRepo.listTerms(), catalystRepo.getSetting<Partial<CatalystAssumptions>>(ASSUMPTIONS_SETTING)]);
+  const [bonds, terms, saved, exitsNow] = await Promise.all([catalystRepo.listBonds(), catalystRepo.listTerms(), catalystRepo.getSetting<Partial<CatalystAssumptions>>(ASSUMPTIONS_SETTING), catalystRepo.getExitsNow()]);
   const offers = await offersOn(date);
   const { assumptions } = catalystAssumptions(saved, offers);
   const termsBy = new Map(terms.map((t) => [t.isin, t]));
@@ -78,6 +79,13 @@ export async function computeMetrics(): Promise<{ itemsWritten: number; note: st
   const rows = data.map(({ bond, sessions, quotes, coupons }) =>
     screenRow({ bond, terms: termsBy.get(bond.isin), coupons, sessions, quotes, fixedCurve: fixed, wzCurve: wz, offers, assumptions }),
   );
+  // GPW's measures in force (the exits job): a suspended bond, an issuer marked (bankruptcy, restructuring …).
+  const marked = new Set((exitsNow?.marked ?? []).map((m) => issuerKey(m.issuer)));
+  for (const row of rows) {
+    if (exitsNow?.suspended[row.isin]) row.flags.push("suspended");
+    const issuer = termsBy.get(row.isin)?.issuer;
+    if (issuer && marked.has(issuerKey(issuer))) row.flags.push("marked");
+  }
   const written = await catalystRepo.putScreen(rows);
   const withYield = rows.filter((r) => r.yieldNet !== null).length;
   const withPremium = rows.filter((r) => r.premium !== null).length;

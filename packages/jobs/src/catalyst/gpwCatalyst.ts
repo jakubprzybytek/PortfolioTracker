@@ -28,3 +28,18 @@ export async function fetchQuotesPage(page: CatalystQuotesPage): Promise<string>
   if (!res.ok) throw new Error(`gpwcatalyst.pl ${page}: HTTP ${res.status}`);
   return res.text();
 }
+
+/** GPW's suspensions and exclusions: the measures in force (`current`) or everything since 2018 (`archive`, ~2 MB). */
+export async function fetchGpwExits(page: "current" | "archive"): Promise<string> {
+  const url = `https://www.gpw.pl/zawieszenia-i-wykluczenia${page === "archive" ? "-archiwum" : ""}`;
+  const res = await fetchSource(url, { minIntervalMs: POLITE_INTERVAL_MS, timeoutMs: FILE_TIMEOUT_MS });
+  if (!res.ok) throw new Error(`gpw.pl exits (${page}): HTTP ${res.status}`);
+  return res.text();
+}
+
+/** Catalyst's special markings of instruments (the issuers marked now). */
+export async function fetchCatalystMarkings(): Promise<string> {
+  const res = await fetchSource("https://gpwcatalyst.pl/szczegolne-oznaczenia-instrumentow-finansowych", { minIntervalMs: POLITE_INTERVAL_MS });
+  if (!res.ok) throw new Error(`gpwcatalyst.pl markings: HTTP ${res.status}`);
+  return res.text();
+}

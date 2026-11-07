@@ -10,7 +10,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
-import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, type CatalystAssumptions, type CatalystViews } from "@portfolio/core/catalyst/index";
+import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type CatalystAssumptions, type CatalystBondItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { hasAnyGroup } from "../../lib/access.ts";
 import { jobRuns } from "../../lib/context.ts";
 import { JOB_NAMES, jobTable } from "../../lib/jobs.ts";
@@ -96,6 +96,7 @@ const ROUTES: Record<string, Handler> = {
     const market = bond.markets.find((m) => m.startsWith("GPW")) ?? bond.markets[0] ?? "";
     const [terms, coupons, sessions, quotes] = await Promise.all([catalystRepo.listTerms().then((all) => all.find((t) => t.isin === isin) ?? null), catalystRepo.listCoupons(isin), catalystRepo.listSessions(isin, from, to), catalystRepo.listQuotes(isin, from, to)]);
     const strip = <T extends { PK: string; SK: string }>({ PK: _p, SK: _s, ...rest }: T) => rest;
+    const [events, track] = await Promise.all([catalystRepo.listEvents(isin), issuerTrack(bond, terms?.issuer)]);
     return json(200, {
       bond: strip(bond),
       terms: terms ? strip(terms) : null,
@@ -103,6 +104,8 @@ const ROUTES: Record<string, Handler> = {
       market,
       sessions: sessions.filter((s) => s.market === market).map(({ PK: _p, SK: _s, isin: _i, market: _m, source: _src, fetchedAt: _f, ...s }) => s),
       quotes: quotes.filter((q) => q.market === market).map(({ PK: _p, SK: _s, isin: _i, market: _m, source: _src, fetchedAt: _f, ...q }) => q),
+      events: events.map(({ PK: _p, SK: _s, isin: _i, source: _src, fetchedAt: _f, ...e }) => e),
+      track,
     });
   },
 
@@ -154,4 +157,33 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
     console.error(`${event.routeKey} failed (request ${requestId}):`, err);
     return json(500, { error: `Something went wrong on the server (request ${requestId})` });
   }
+}
+
+/**
+ * The repayment track record of a bond's issuer (core/catalyst/trackRecord.ts): until companies are known (phase 2,
+ * N2), the bonds sharing its code's prefix ("KRU0228", "KRU0829"), each with its GPW measures and last close, and the
+ * issuer's current markings.
+ */
+async function issuerTrack(bond: CatalystBondItem, issuer: string | undefined) {
+  const prefix = codePrefix(bond.code);
+  const [group, exitsNow] = await Promise.all([catalystRepo.listBondsByPrefix(prefix), catalystRepo.getExitsNow()]);
+  const bonds: TrackBond[] = await Promise.all(
+    group
+      .filter((b) => codePrefix(b.code) === prefix)
+      .map(async (b) => {
+        const [events, last] = await Promise.all([catalystRepo.listEvents(b.isin), b.status === "ended" ? catalystRepo.lastSession(b.isin) : Promise.resolve(undefined)]);
+        return {
+          isin: b.isin,
+          code: b.code,
+          maturity: b.maturity,
+          status: b.status,
+          firstSeen: b.firstSeen,
+          lastSeen: b.lastSeen,
+          lastClose: last?.close ?? null,
+          events: events.map((e) => ({ published: e.published, action: e.action, reason: e.reason, signal: e.signal })),
+        };
+      }),
+  );
+  const markings = issuer ? (exitsNow?.marked ?? []).filter((m) => issuerKey(m.issuer) === issuerKey(issuer)).map((m) => m.marking) : [];
+  return { prefix, ...trackRecord(bonds, today(), markings) };
 }

@@ -6,7 +6,7 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystEventItem, type CatalystExitsNowItem, type CatalystMarkingItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
 import type { ScreenRow } from "./screen.ts";
 
 /** Batches of 25 written at once, at most. */
@@ -65,6 +65,44 @@ export class CatalystRepository {
 
   putQuotes(items: Omit<CatalystQuoteItem, "PK" | "SK">[]): Promise<number> {
     return this.batchPut(items.map((q) => ({ ...catalystKeys.quote(q.isin, q.date, q.market), ...q })));
+  }
+
+  /** Bonds whose code starts with `prefix` (one query on the index): an issuer's bonds until companies are known. */
+  listBondsByPrefix(prefix: string): Promise<CatalystBondItem[]> {
+    return this.queryAll<CatalystBondItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t AND begins_with(GSI1SK, :p)", ExpressionAttributeValues: { ":t": "BOND", ":p": prefix } });
+  }
+
+  /** A bond's last session (any market), or undefined. */
+  async lastSession(isin: string): Promise<CatalystSessionItem | undefined> {
+    const res = await this.doc.send(
+      new QueryCommand({ TableName: this.table(), KeyConditionExpression: "PK = :pk AND begins_with(SK, :d)", ExpressionAttributeValues: { ":pk": `BOND#${isin}`, ":d": "D#" }, ScanIndexForward: false, Limit: 1 }),
+    );
+    return res.Items?.[0] as CatalystSessionItem | undefined;
+  }
+
+  putEvents(items: Omit<CatalystEventItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut(items.map((e) => ({ ...catalystKeys.event(e.isin, e.published, e.action), ...e })));
+  }
+
+  /** A bond's GPW measures, oldest first. */
+  listEvents(isin: string): Promise<CatalystEventItem[]> {
+    return this.queryAll<CatalystEventItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :e)", ExpressionAttributeValues: { ":pk": `BOND#${isin}`, ":e": "EVENT#" } });
+  }
+
+  listMarkings(): Promise<CatalystMarkingItem[]> {
+    return this.queryAll<CatalystMarkingItem>({ KeyConditionExpression: "PK = :pk", ExpressionAttributeValues: { ":pk": "MARKS" } });
+  }
+
+  putMarkings(items: Omit<CatalystMarkingItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut(items.map((m) => ({ ...catalystKeys.marking(m.issuer, m.marking), ...m })));
+  }
+
+  getExitsNow(): Promise<CatalystExitsNowItem | undefined> {
+    return this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.exitsNow() })).then((r) => r.Item as CatalystExitsNowItem | undefined);
+  }
+
+  async putExitsNow(item: Omit<CatalystExitsNowItem, "PK" | "SK">): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.exitsNow(), ...item } }));
   }
 
   /** Every bond's terms (one query on the index). */

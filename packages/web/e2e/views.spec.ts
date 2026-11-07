@@ -1685,7 +1685,21 @@ test.describe("catalyst view", () => {
     views = [];
     await page.route("**/catalyst/bonds", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(screen) }));
     await page.route("**/catalyst/bonds/PL*", (r) =>
-      r.fulfill({ contentType: "application/json", body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: { issuer: "Kruk S.A.", secured: false }, coupons: [{ start: "2020-08-12", end: "2020-11-12", paymentDate: "2020-11-12", rate: 0.07 }, { start: "2020-11-12", end: "2099-11-12", paymentDate: "2099-11-12", rate: 0.0713 }], market: "GPW ASO", sessions: [{ date: "2026-11-04", close: 100.9, trades: 2, turnover: 20000, nominal: 1000 }, { date: "2026-11-05", close: 101, trades: 1, turnover: 10000, nominal: 1000 }], quotes: [{ date: "2026-11-05", bid: { price: 100.8, volume: 50 }, ask: { price: 101.2, volume: 12 } }] }) }),
+      r.fulfill({ contentType: "application/json", body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: { issuer: "Kruk S.A.", secured: false }, coupons: [{ start: "2020-08-12", end: "2020-11-12", paymentDate: "2020-11-12", rate: 0.07 }, { start: "2020-11-12", end: "2099-11-12", paymentDate: "2099-11-12", rate: 0.0713 }], market: "GPW ASO", sessions: [{ date: "2026-11-04", close: 100.9, trades: 2, turnover: 20000, nominal: 1000 }, { date: "2026-11-05", close: 101, trades: 1, turnover: 10000, nominal: 1000 }], quotes: [{ date: "2026-11-05", bid: { price: 100.8, volume: 50 }, ask: { price: 101.2, volume: 12 } }],
+            events: [{ published: "2026-05-04T08:30:00", action: "suspension", reason: "na wniosek emitenta", signal: "routine", from: "2026-05-05T00:00:00", to: null, inForce: false }],
+            track: {
+              prefix: "KRU",
+              since: "2020-01-02",
+              counts: { repaid: 1, early: 1, "below-par": 0, "past-maturity": 0, listed: 1, unknown: 0 },
+              bonds: [
+                { isin: "x", code: "KRU0829", maturity: "2029-08-12", status: "listed", lastSeen: "2026-11-05", lastClose: null, outcome: "listed", inferred: false, note: "trading", flags: [], attention: [] },
+                { isin: "y", code: "KRU0226", maturity: "2026-02-10", status: "ended", lastSeen: "2026-02-02", lastClose: 100.1, outcome: "repaid", inferred: true, note: "left at maturity (2026-02-10), last price 100.10", flags: [], attention: [] },
+                { isin: "z", code: "KRU0625", maturity: "2025-06-20", status: "ended", lastSeen: "2024-11-05", lastClose: 100.5, outcome: "early", inferred: false, note: "excluded 2024-11-06: przedterminowy wykup obligacji", flags: [], attention: [] },
+              ],
+              flags: [],
+              attention: [],
+            },
+          }) }),
     );
     await page.route("**/catalyst/views", async (r) => {
       if (r.request().method() === "PUT") views = (JSON.parse(r.request().postData() ?? "{}") as { views: typeof views }).views;
@@ -1757,6 +1771,10 @@ test.describe("catalyst view", () => {
     await expect(periods.first()).toHaveClass(/current/);
     await expect(periods.nth(1)).not.toHaveClass(/current/);
     await expect(page).toHaveURL(/tab=coupons/);
+    await page.getByTestId("catalyst-tab-track").click();
+    await expect(page.getByTestId("catalyst-track-summary")).toContainText("Bonds coded KRU… since 2020-01: 1 repaid • 1 redeemed early");
+    await expect(page.getByTestId("catalyst-events")).toContainText("2026-05-04 suspended (na wniosek emitenta)");
+    await expect(page.getByTestId("catalyst-track").locator("tbody tr")).toHaveCount(3);
   });
 
   test("the chart: the filtered bonds against the State's curve", async ({ page }) => {

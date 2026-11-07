@@ -891,6 +891,9 @@ td.cat-issuer { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
 .cat-price { display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
 .cat-price .cat-chart { flex: 1; min-height: 120px; }
 .cat-facts { margin: 0; font-size: var(--fs-13); }
+.cat-track { display: flex; flex-direction: column; gap: 6px; }
+.cat-flags { margin: 0; padding-left: 1.2rem; font-size: var(--fs-13); }
+tr.neg td { color: var(--neg); }
 .cat-facts-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 6px 18px; margin: 0; overflow-y: auto; }
 .cat-facts-list > div { display: flex; flex-direction: column; }
 .cat-facts-list dt { font-size: var(--fs-12); font-weight: 600; }

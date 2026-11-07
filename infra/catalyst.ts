@@ -85,6 +85,9 @@ export function catalystModule({ defaults, link, alerts, market }: CatalystShare
   // Bond terms from obligacje.pl: bonds without terms (150 a run, 2 s apart), floating rates a week into a new period.
   new sst.aws.CronV2("CatalystTerms", { function: job("packages/jobs/src/catalyst/handlers/terms.handler", "15 minutes"), schedule: "cron(30 9 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
 
+  // GPW's suspensions and exclusions and Catalyst's markings: why bonds stop trading early (one request per page).
+  new sst.aws.CronV2("CatalystExits", { function: job("packages/jobs/src/catalyst/handlers/exits.handler"), schedule: "cron(0 10 ? * MON-FRI *)", timezone: WARSAW, retries: 2 });
+
   // PT's watchdog and Status page list the Catalyst jobs too: they may read the job runs (JOB#…) of this table only.
   const seriesReader = {
     environment: { MARKET_TABLE: market.name },

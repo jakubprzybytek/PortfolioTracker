@@ -130,6 +130,21 @@ Done when: each item has an answer in the design doc, and N8's go/no-go is put t
 
 ### N1 Exits and the repayment track record
 
+**Done 2026-11-07.** What was built:
+- `core/catalyst/exits.ts`: the parser and `planExits`;
+- `trackRecord.ts`;
+- the `catalyst-exits` job at 10:00;
+- the `suspended` and `marked` flags in the metrics;
+- the bond detail's `events` and `track`, shown in the panel's *Track record* tab.
+
+First run on dev: 1,859 measures on 706 bonds. Track records of the corporate bonds: 355 repaid, 222 early, 28 below par, none past maturity or unknown (catalyst.md, "Repayment track record").
+
+Changed on the way:
+- **Board resolutions aren't used** (N0).
+- **Ends at maturity come from the daily-file archive.**
+- **Suspensions in the participants' interest and safety are "worth a look", not red flags.** In the first run, 19 of the 30 issuers with flags had only these, mostly one-day technical stops (Marvipol, Robyg, Ronson).
+- **The prefix grouping splits a few issuers** (VI1/VID); N2 replaces it with companies.
+
 Design step 8: the `catalyst-exits` job and the track record, per issuer name until N2 joins names to companies.
 
 - `exits.ts`: GPW's current and archive pages (one request each; a row can name several ISINs) → per bond: the date, the action, the reason, the issuer's LEI; the markings page → markings, whose history the job keeps from its first run.

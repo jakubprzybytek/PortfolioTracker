@@ -7,6 +7,7 @@ import type { CatalystSegment } from "../gpw/catalystDailyFile.ts";
 import type { Coupon } from "./terms.ts";
 import type { CurvePoint } from "./curve.ts";
 import type { ScreenRow } from "./screen.ts";
+import type { ExitAction, ExitSignal } from "./exits.ts";
 
 export type CatalystBondStatus = "listed" | "suspended" | "ended";
 
@@ -69,7 +70,52 @@ export const catalystKeys = {
   curve: (date: IsoDate) => ({ PK: "CURVE#PLGOV" as const, SK: date }),
   setting: (name: string) => ({ PK: `SETTING#${name}` as const, SK: "META" as const }),
   quote: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `Q#${date}#${market}` as const }),
+  event: (isin: string, published: string, action: ExitAction) => ({ PK: `BOND#${isin}` as const, SK: `EVENT#${published}#${action}` as const }),
+  marking: (issuer: string, marking: string) => ({ PK: "MARKS" as const, SK: `${issuer}#${marking}` }),
+  exitsNow: () => ({ PK: "EXITS" as const, SK: "CURRENT" as const }),
 };
+
+/**
+ * A GPW measure on a bond (suspension, lifting, exclusion: gpw.pl's suspensions and exclusions, exits.ts). Rewritten on
+ * every run that sees it (whether it's still in force changes).
+ */
+export interface CatalystEventItem {
+  PK: `BOND#${string}`;
+  SK: `EVENT#${string}#${ExitAction}`;
+  isin: string;
+  code: string;
+  published: string;
+  action: ExitAction;
+  reason: string;
+  signal: ExitSignal;
+  from: string | null;
+  to: string | null;
+  inForce: boolean;
+  issuer: string;
+  lei: string | null;
+  source: "gpw-exits";
+  fetchedAt: string;
+}
+
+/** A special marking of an issuer's instruments (gpwcatalyst.pl shows only the current ones: the history is ours). */
+export interface CatalystMarkingItem {
+  PK: "MARKS";
+  SK: string; // <issuer>#<marking>
+  issuer: string;
+  marking: string;
+  firstSeen: IsoDate;
+  lastSeen: IsoDate;
+  current: boolean;
+}
+
+/** What the latest exits run found in force: suspended bonds (with the reason) and the issuers marked now. */
+export interface CatalystExitsNowItem {
+  PK: "EXITS";
+  SK: "CURRENT";
+  suspended: Record<string, { reason: string; signal: ExitSignal; from: string | null }>;
+  marked: { issuer: string; marking: string }[];
+  fetchedAt: string;
+}
 
 /** A session whose daily file was loaded: the job's look-back skips it, the backfill too. */
 export interface CatalystDayItem {

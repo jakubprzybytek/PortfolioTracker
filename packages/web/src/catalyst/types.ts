@@ -84,4 +84,29 @@ export interface BondDetail {
   market: string;
   sessions: { date: string; close: number | null; trades: number; turnover: number; nominal: number | null }[];
   quotes: { date: string; bid?: { price: number; volume: number }; ask?: { price: number; volume: number } }[];
+  /** GPW's measures on this bond (suspensions, liftings, exclusions), oldest first. */
+  events: BondEvent[];
+  /** The issuer's repayment track record: until companies are linked, the bonds sharing the code's prefix. */
+  track: TrackRecord;
+}
+
+export interface BondEvent {
+  published: string;
+  action: "suspension" | "lifting" | "exclusion" | "other";
+  reason: string;
+  signal: "routine" | "data" | "early-redemption" | "redemption" | "distress" | "attention" | "other";
+  from: string | null;
+  to: string | null;
+  inForce: boolean;
+}
+
+export type BondOutcome = "repaid" | "early" | "below-par" | "past-maturity" | "listed" | "unknown";
+
+export interface TrackRecord {
+  prefix: string;
+  since: string | null;
+  counts: Record<BondOutcome, number>;
+  bonds: { isin: string; code: string; maturity: string | null; status: string; lastSeen: string; lastClose: number | null; outcome: BondOutcome; inferred: boolean; note: string; flags: string[]; attention: string[] }[];
+  flags: string[];
+  attention: string[];
 }

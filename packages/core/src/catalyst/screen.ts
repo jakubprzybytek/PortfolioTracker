@@ -55,7 +55,7 @@ export const MATURES_SOON_DAYS = 90;
 /** No trade in this many sessions: the price is stale (shown grey; no premium). */
 export const STALE_SESSIONS = 30;
 
-export type ScreenFlag = "stale" | "new-listing" | "no-terms" | "no-periods" | "periods-extended" | "amortising" | "matures-soon" | "indexed" | "callable";
+export type ScreenFlag = "stale" | "new-listing" | "no-terms" | "no-periods" | "periods-extended" | "amortising" | "matures-soon" | "indexed" | "callable" | "suspended" | "marked";
 
 /** Fewer sessions than this since listing: the liquidity rests on too few days (CAV1030: 2 of 2 traded, 2026-11-06). */
 export const NEW_LISTING_SESSIONS = 10;

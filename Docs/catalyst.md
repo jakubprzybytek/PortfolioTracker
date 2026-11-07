@@ -138,6 +138,9 @@ On-demand, PITR on, deletion protection on `prod`, TTL attribute `ttl`. Same key
 | Coupon period | `BOND#<isin>` / `COUPON#<start>` | – | As PT's `CouponPeriodItem` |
 | Screen row | `BOND#<isin>` / `SCREEN` | `SCREEN` / `<code>` | Computed metrics (below), the issuer's signals copied for one-query reads, `computedAt` |
 | Treasury curve | `CURVE#PLGOV` / `<date>` | – | points `{ years, yield, isin }`, fitted curve |
+| GPW measure | `BOND#<isin>` / `EVENT#<published>#<action>` | – | A suspension, lifting or exclusion from GPW's pages (`catalyst-exits`): reason, its signal (`routine`, `data`, `early-redemption`, `redemption`, `distress`, `attention`, `other`), from, to, in force, issuer, issuer LEI. Rewritten each run that sees it |
+| Marking | `MARKS` / `<issuer>#<marking>` | – | A special marking of an issuer's instruments, first and last day seen, current or not (the page shows only the current ones: the history is ours) |
+| In force now | `EXITS` / `CURRENT` | – | The latest run's suspended bonds (reason, from) and marked issuers: read by the metrics for the `suspended` and `marked` flags |
 | Job run | `JOB#<name>` / `RUN#<startedAt>` | – | As PT, `ttl` 90 days |
 
 Amount owed per bond = issue value × current nominal / issued nominal (§4: instalment bonds such as KRU0228, RES0228; IZ bonds).
@@ -174,7 +177,7 @@ Sizing: ~1,060 bonds × ~250 sessions a year ≈ 265k session items a year; back
 | `catalyst-daily` | 21:00 (GPW publishes the file between about 19:00 and 20:00), recheck 08:00 Tue–Sat | Downloads the day's file (archives it), upserts bonds (new → `listed`; gone from the file → `ended`), writes sessions, updates current nominals. Backfill mode: a date range from the archive, through a queue, a few files per invocation. |
 | `catalyst-quotes` | 17:20 (after the close), 07:45 Tue–Sat (before the pre-opening) | Reads the six quotes pages (archived), stores the best bid and ask of every known bond that has one, for the session the pages show (`quotesSession`: today's after 09:00 on a trading day, else the trading day before). The morning run fills a session the evening missed. |
 | `catalyst-terms` | 09:30 | obligacje.pl for bonds without terms (up to ~40 per run), then refreshes current coupon rates of floating bonds; adds missing periods, never overwrites a stored date or rate (as PT's `coupons`). New issuer names are resolved against GLEIF (ISIN mapping, then an exact name match); anything else is left `unresolved` for the agent. |
-| `catalyst-exits` | 10:00 | GPW suspensions and exclusions, Catalyst notices and special markings: the reason a bond ended, markings on a company's instruments. Backfill to 2018 once. |
+| `catalyst-exits` | 10:00 Mon–Fri | GPW's suspensions and exclusions (the current page and the archive since 2018: one request each, so the archive is the backfill) and Catalyst's special markings, archived raw: the measures on the bonds the table holds, the markings' history, what's in force now; then queues the metrics. First run on dev (2026-11-07): 1,859 measures on 706 bonds, 73 suspended, 1 issuer marked, 66 ISINs of bonds that ended before 2020 skipped. |
 | `catalyst-metrics` | after `catalyst-daily`; on a change of assumptions; after a write to a company | Treasury curve of the day, then a screen row per listed bond. |
 | `catalyst-export` | 1st of the month 04:30 | Backup (above); with the settings, in M7. Bid/ask needs none: the quotes pages are archived raw (versioned bucket) and can be parsed again. |
 
@@ -249,6 +252,20 @@ As CV's specification, §10 to §12:
 - **Data confidence** high / medium / low with its facts: source and year, years behind, metrics computed and missing (§12). Low-confidence signals are shown faded.
 
 ### Repayment track record (app)
+
+**Built (N1, 2026-11-07):** `core/catalyst/trackRecord.ts`, computed on read in `GET /catalyst/bonds/{isin}` (the bond panel's *Track record* tab). How each bond ended:
+- **excluded by GPW** for an early redemption or a redemption: stated;
+- **ended with a last close under 90:** below par (inferred);
+- **last session within 21 days of maturity:** repaid (inferred);
+- **left more than 30 days before maturity:** redeemed early (inferred);
+- **still listed or suspended after maturity:** past maturity;
+- **otherwise:** unknown.
+
+**Red flags:** suspensions at the KNF's demand, bankruptcy or liquidation, restructuring, the BFG; ends below par; bonds past maturity; GPW markings. Suspensions "in the participants' interest and safety" are listed apart as *worth a look*: they are often a one-day stop (a bondholders' meeting, a late report).
+
+**Grouping:** until companies are linked (N2), an issuer's bonds are those sharing the code's leading letters (KRU0228, KRU0829). This is imperfect: a few issuers use two prefixes (VI1…/VID…, KA1…/KAN…, CO1…/COG…).
+
+**Dev, corporate bonds:** 355 repaid, 222 early, 28 below par, 0 past maturity, 297 listed, 0 unknown. GetBack's and Getin Noble's bonds show their red flags; Kruk shows 23 repaid and 1 early.
 
 Planned in CV (§11); here the data is at hand from the start: the daily-file archive since 2020 gives every bond's last session and last price, `catalyst-exits` gives GPW's reason (back to 2018) and markings. Per company: bonds repaid at maturity, redeemed early, ended below par, still listed past maturity, unknown; the period covered ("since 2020-01"), so a short record isn't read as a clean one; red flags (a missed payment, a marking, an extension, a buy-back below par). Inferred facts are labelled as inferred; confirmation of payment comes from issuers' current reports, read by the agent. Shown next to the scorecard, not as an eighth colour.
 

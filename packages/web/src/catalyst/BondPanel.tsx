@@ -1,9 +1,9 @@
-// A bond's panel in the Catalyst view: price and liquidity, the yield's make-up, the coupons.
+// A bond's panel in the Catalyst view: price and liquidity, the yield's make-up, the coupons, the issuer's track record.
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmtInt, fmtNum, today } from "../format.ts";
 import { useApi } from "../useApi.ts";
 import { chartMargin, useNarrow } from "../useNarrow.ts";
-import type { BondDetail, BondRow, } from "./types.ts";
+import type { BondDetail, BondOutcome, BondRow } from "./types.ts";
 import { FLAG_TITLE, couponLabel, liquidityTitle, pct, pp } from "./labels.ts";
 
 export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; setTab: (t: string) => void }) {
@@ -16,6 +16,7 @@ export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; set
           ["price", "Price & liquidity"],
           ["yield", "Yield"],
           ["coupons", "Coupons"],
+          ["track", "Track record"],
         ].map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "active" : ""} onClick={() => setTab(k!)} data-testid={`catalyst-tab-${k}`}>
             {label}
@@ -26,6 +27,7 @@ export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; set
       {tab === "price" && <PriceTab row={row} detail={d} loading={detail.loading} />}
       {tab === "yield" && <YieldTab row={row} detail={d} />}
       {tab === "coupons" && <CouponsTab detail={d} loading={detail.loading} />}
+      {tab === "track" && <TrackTab detail={d} loading={detail.loading} />}
     </div>
   );
 }
@@ -126,3 +128,85 @@ export function CouponsTab({ detail, loading }: { detail: BondDetail | undefined
     </div>
   );
 }
+
+const OUTCOME: Record<BondOutcome, string> = {
+  repaid: "repaid",
+  early: "redeemed early",
+  "below-par": "ended below par",
+  "past-maturity": "past maturity",
+  listed: "listed",
+  unknown: "unknown",
+};
+const ACTION: Record<string, string> = { suspension: "suspended", lifting: "suspension lifted", exclusion: "excluded", other: "measure" };
+
+/** How the issuer's past bonds ended (the daily-file archive and GPW's measures), and this bond's measures. */
+export function TrackTab({ detail, loading }: { detail: BondDetail | undefined; loading: boolean }) {
+  if (!detail) return <p className="muted">{loading ? "Loading…" : ""}</p>;
+  const t = detail.track;
+  const c = t.counts;
+  const ended = c.repaid + c.early + c["below-par"] + c.unknown;
+  return (
+    <div className="cat-track" data-testid="catalyst-track">
+      {detail.events.length > 0 && (
+        <p className="cat-facts" data-testid="catalyst-events">
+          This bond:{" "}
+          {detail.events
+            .map((e) => `${e.published.slice(0, 10)} ${ACTION[e.action] ?? e.action} (${e.reason})${e.inForce && e.action === "suspension" ? ", in force" : ""}`)
+            .join(" • ")}
+        </p>
+      )}
+      <p className="cat-facts" data-testid="catalyst-track-summary">
+        Bonds coded {t.prefix}… since {t.since?.slice(0, 7) ?? "–"}: {c.repaid} repaid • {c.early} redeemed early • {c["below-par"]} ended below par • {c["past-maturity"]} past maturity • {c.unknown} unknown • {c.listed} listed
+        {ended === 0 ? " (none ended yet: no record)" : ""}.
+      </p>
+      {t.flags.length > 0 ? (
+        <ul className="cat-flags neg" data-testid="catalyst-track-flags">
+          {t.flags.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted cat-facts">No red flags (GPW markings, suspensions at the KNF's demand, bankruptcy, ends below par, bonds past maturity).</p>
+      )}
+      {t.attention.length > 0 && (
+        <details className="cat-facts" data-testid="catalyst-track-attention">
+          <summary>Worth a look: {t.attention.length} suspension{t.attention.length === 1 ? "" : "s"} "in the participants' interest and safety" (often short and technical)</summary>
+          <ul className="cat-flags">
+            {t.attention.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      <div className="table-wrap">
+        <table className="static">
+          <thead>
+            <tr>
+              <th className="left">Bond</th>
+              <th className="left">Maturity</th>
+              <th className="left">Outcome</th>
+              <th>Last price</th>
+              <th className="left">How we know</th>
+            </tr>
+          </thead>
+          <tbody>
+            {t.bonds.map((b) => (
+              <tr key={b.isin} className={b.flags.length ? "neg" : undefined}>
+                <td className="left">{b.code}</td>
+                <td className="left">{b.maturity ?? "–"}</td>
+                <td className="left">{OUTCOME[b.outcome]}</td>
+                <td>{b.lastClose === null ? "–" : fmtNum(b.lastClose)}</td>
+                <td className="left muted">
+                  {b.inferred ? "inferred: " : "GPW: "}
+                  {b.note}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted cat-facts">Grouped by the code's prefix until bonds are linked to companies. "Inferred" is read from trading (when a bond left, its last price); only the issuer's reports confirm a payment.</p>
+    </div>
+  );
+}
+

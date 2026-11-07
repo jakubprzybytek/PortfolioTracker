@@ -41,7 +41,7 @@ The jobs group into a few short windows a day. With DynamoDB this doesn't matter
 
 ## Catalyst module
 
-Its own jobs, schedules and queue (Docs/catalyst.md, "Jobs" and "How jobs run"): `catalyst-daily` (21:00, recheck 08:00), `catalyst-quotes` (17:20, 07:45), `catalyst-terms` (09:30), `catalyst-export` (1st, 04:30), and `catalyst-metrics` and `catalyst-backfill` from its queue. Their runs are in its own table and on the Status page.
+Its own jobs, schedules and queue (Docs/catalyst.md, "Jobs" and "How jobs run"): `catalyst-daily` (21:00, recheck 08:00), `catalyst-quotes` (17:20, 07:45), `catalyst-terms` (09:30), `catalyst-exits` (10:00), `catalyst-export` (1st, 04:30), and `catalyst-metrics` and `catalyst-backfill` from its queue. Their runs are in its own table and on the Status page.
 
 ## Live prices (on demand, 2026-10-14)
 
