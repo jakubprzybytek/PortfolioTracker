@@ -49,9 +49,9 @@ These settle details the design leaves open. Where the design differs, the desig
 
 ## Owner decisions needed
 
-1. **obligacje.pl's `ai-input=no` and the CLI.** Proposed: the agent sees only figures the app derived (amount owed, maturity, coupon as numbers, yields), never the site's text or pages. Needed before N7.
-2. **Agent as a scheduled cloud routine** (the token as a secret) or by hand in Claude Code only. Needed after N7; the plan builds for by-hand use.
-3. **CatalystViewer:** switching its issuer jobs off (N9), then deleting its resources. Both are your call; the plan only proposes them.
+1. **obligacje.pl's `ai-input=no` and the CLI.** Agreed (2026-11-07): the agent sees only figures the app derived (amount owed, maturity, coupon as numbers, yields), never the site's text or pages.
+2. **Agent runs:** by hand in Claude Code only, for now (2026-11-07). No scheduled routine.
+3. **CatalystViewer:** not switched off for now, at all (2026-11-07). N9 is on hold; CV keeps running alongside.
 4. **Interim reports:** go or no-go after N0's check of which issuers publish what (N8).
 
 ## What is ported from CatalystViewer
@@ -217,7 +217,7 @@ Done when: for the issuers in scope that publish interim reports, the latest one
 
 ### N9 CatalystViewer handed over
 
-Proposed to you once N7 has run for a few weeks:
+**On hold** (owner, 2026-11-07: CV is not switched off for now). When it's taken up, proposed to you once N7 has run for a few weeks:
 
 - switch off CV's issuer jobs and its bonds updater (phase 1's parts);
 - keep CV read-only for a month;
@@ -255,5 +255,5 @@ Each step is your call. This plan only prepares them: it checks that every CV ta
 - Every company in scope has a scorecard from its latest full year (and interim period, after N8), with its confidence, refinancing and track record. Otherwise it is listed in `catalyst work`.
 - The bonds table filters and colours by the scorecard. The issuer dialog shows each figure's lines and source.
 - An agent in Claude Code keeps it current through the CLI, and you check its work in the app.
-- CV's issuer data is migrated, and switching CV off is put to you.
+- CV's issuer data is migrated (CV keeps running; switching it off is on hold).
 - The design, the methodology document and the ui, data-storage, ingestion and data-sources docs describe what was built.
