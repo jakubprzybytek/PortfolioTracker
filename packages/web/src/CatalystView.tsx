@@ -512,7 +512,8 @@ function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondDetail |
         <ComposedChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
           <XAxis dataKey="date" tickFormatter={(d: string) => d.slice(5)} minTickGap={30} />
-          <YAxis yAxisId="p" domain={["auto", "auto"]} width={narrow ? 40 : 48} />
+          {/* Whole percents: "auto" picks fractional ticks (101.25) that don't fit the axis once prices pass 100. */}
+          <YAxis yAxisId="p" domain={[(min: number) => Math.floor(min), (max: number) => Math.ceil(max)]} allowDecimals={false} tickFormatter={(v: number) => fmtInt(v)} width={narrow ? 36 : 44} />
           <YAxis yAxisId="t" orientation="right" hide />
           <Tooltip formatter={(v, name) => [name === "turnover" ? fmtInt(Math.round(Number(v))) : fmtNum(Number(v)), String(name)]} />
           <Bar yAxisId="t" dataKey="turnover" fill="var(--line)" isAnimationActive={false} />
@@ -572,7 +573,8 @@ function CouponsTab({ detail, loading }: { detail: BondDetail | undefined; loadi
           </tr>
         </thead>
         <tbody>
-          {detail.coupons.map((c) => (
+          {/* The latest period first. */}
+          {[...detail.coupons].sort((a, b) => b.start.localeCompare(a.start)).map((c) => (
             <tr key={c.start}>
               <td className="left">{c.start}</td>
               <td className="left">{c.end}</td>
@@ -605,16 +607,19 @@ function ViewsMenu({ params, setParams }: { params: Record<string, string>; setP
       setError((e as Error).message);
     }
   };
-  const selected = list.find((v) => JSON.stringify(v.params) === JSON.stringify(current))?.name ?? "";
+  const same = (v: SavedView) => JSON.stringify(v.params) === JSON.stringify(current);
+  // The view in use: the one chosen (`view` in the URL), even after its filters changed, or one that matches them.
+  const active = list.find((v) => v.name === params["view"]) ?? list.find(same);
+  const changed = active !== undefined && !same(active);
   return (
     <span className="cat-views">
       <FilterSelect
         label="View"
-        value={selected}
-        options={list.map((v) => ({ value: v.name, label: v.name }))}
+        value={active?.name ?? ""}
+        options={list.map((v) => ({ value: v.name, label: v === active && changed ? `${v.name} (changed)` : v.name }))}
         onChange={(v) => {
           const view = list.find((x) => x.name === v);
-          setParams({ ...(view?.params ?? {}), bond: params["bond"], chart: params["chart"] });
+          setParams({ ...(view?.params ?? {}), view: view?.name, bond: params["bond"], chart: params["chart"] });
         }}
         testId="catalyst-view"
         width="9rem"
@@ -624,10 +629,12 @@ function ViewsMenu({ params, setParams }: { params: Record<string, string>; setP
           className="cat-view-name"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!name.trim()) return;
-            void save([...list.filter((v) => v.name !== name.trim()), { name: name.trim(), params: current }]).then(() => {
+            const n = name.trim();
+            if (!n) return;
+            void save([...list.filter((v) => v.name !== n), { name: n, params: current }]).then(() => {
               setNaming(false);
               setName("");
+              setParams({ ...params, view: n });
             });
           }}
         >
@@ -640,12 +647,25 @@ function ViewsMenu({ params, setParams }: { params: Record<string, string>; setP
           </button>
         </form>
       ) : (
-        <button type="button" className="link" onClick={() => setNaming(true)} title="Save these filters and the sort as a view" data-testid="catalyst-view-new">
-          Save view
-        </button>
+        <>
+          {active && changed && (
+            <button type="button" className="link" onClick={() => void save(list.map((v) => (v === active ? { name: v.name, params: current } : v)))} title={`Save these filters and the sort into the view "${active.name}"`} data-testid="catalyst-view-update">
+              Save changes
+            </button>
+          )}
+          <button type="button" className="link" onClick={() => setNaming(true)} title="Save these filters and the sort as a new view" data-testid="catalyst-view-new">
+            {active ? "Save as…" : "Save view"}
+          </button>
+        </>
       )}
-      {selected && !naming && (
-        <button type="button" className="link" onClick={() => void save(list.filter((v) => v.name !== selected))} title={`Delete the view "${selected}"`} data-testid="catalyst-view-delete">
+      {active && !naming && (
+        <button
+          type="button"
+          className="link"
+          onClick={() => void save(list.filter((v) => v !== active)).then(() => setParams({ ...params, view: undefined }))}
+          title={`Delete the view "${active.name}"`}
+          data-testid="catalyst-view-delete"
+        >
           Delete
         </button>
       )}

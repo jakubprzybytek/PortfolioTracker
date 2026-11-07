@@ -1733,6 +1733,13 @@ test.describe("catalyst view", () => {
     await expect(rows).toHaveCount(3);
     await page.getByTestId("catalyst-view").selectOption("Liquid, small");
     await expect(rows).toHaveCount(2);
+    await expect(page).toHaveURL(/view=Liquid/);
+    // Changing a view's filters and saving them into it, without retyping its name.
+    await page.getByTestId("catalyst-liq").selectOption("high");
+    await expect(page.getByTestId("catalyst-view")).toContainText("Liquid, small (changed)");
+    await page.getByTestId("catalyst-view-update").click();
+    await expect.poll(() => views.map((v) => [v.name, v.params["liq"]])).toEqual([["Liquid, small", "high"]]);
+    await expect(page.getByTestId("catalyst-view-update")).toHaveCount(0);
   });
 
   test("a row opens its panel: price and liquidity, the yield's make-up, the coupons", async ({ page }) => {
