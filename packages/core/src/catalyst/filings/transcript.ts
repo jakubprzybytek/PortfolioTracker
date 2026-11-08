@@ -61,8 +61,9 @@ export function findStatementPages(pages: PdfPage[]): number[] {
             && headingLines(p).some(l => re.test(fold(l)))
             && tableLines(p) >= MIN_TABLE_LINES);
         if (hits.length === 0) continue;
-        // Also a second heading page right after the first (a section title page before the statement)
-        for (const hit of hits.filter(h => h.page - hits[0]!.page <= 1)) {
+        // Also a heading page soon after the first: a section title page before the statement, or the statement's
+        // heading printed again on a page it runs over to (GCI's H1 2026 balance sheet: pages 12, 13 and 14).
+        for (const hit of hits.filter(h => h.page - hits[0]!.page <= 3)) {
             chosen.add(hit.page);
             if (pages.some(p => p.page === hit.page + 1)) chosen.add(hit.page + 1);
         }
@@ -305,15 +306,25 @@ export function transcriptToFiling(transcript: Transcript, pages: PdfPage[], ext
         const equityAndLiabilities = figure(of('totalEquityAndLiabilities', 'balance').slice(0, 1))?.value
             ?? (figures.equity && liabilities !== undefined ? round2(figures.equity.value + liabilities) : undefined);
         const tolerance = Math.max(unit, Math.abs(assets ?? 0) * 0.0005);
-        if (assets === undefined) checks.push(`${label}: no total assets`);
-        else if (equityAndLiabilities === undefined) checks.push(`${label}: no total equity and liabilities`);
-        else if (Math.abs(assets - equityAndLiabilities) > tolerance) checks.push(`${label}: total assets ${fmt(assets)} ≠ total equity and liabilities ${fmt(equityAndLiabilities)}`);
-        if (!figures.equity) checks.push(`${label}: no total equity`);
-        if (!figures.netProfit) checks.push(`${label}: no net profit`);
-
         const start = isoDate(column.periodStart) ?? yearStart(end);
-        return { column: i === 0 ? 'current' : 'previous', periodStart: start, periodEnd: end, months: monthsBetween(start, end), figures, lines };
+        const months = monthsBetween(start, end);
+        // An interim report's comparative column often has the income statement and cash flows only (its balance
+        // sheet compares with the last year end, which the annual report holds): no balance sheet checks then.
+        const flowsOnly = i > 0 && months < 12 && !lines.some(l => l.statement === 'balance');
+        if (!flowsOnly) {
+            if (assets === undefined) checks.push(`${label}: no total assets`);
+            else if (equityAndLiabilities === undefined) checks.push(`${label}: no total equity and liabilities`);
+            else if (Math.abs(assets - equityAndLiabilities) > tolerance) checks.push(`${label}: total assets ${fmt(assets)} ≠ total equity and liabilities ${fmt(equityAndLiabilities)}`);
+            if (!figures.equity) checks.push(`${label}: no total equity`);
+        } else notes.push(`${end} (comparative): income statement and cash flows only`);
+        if (!figures.netProfit) checks.push(`${label}: no net profit`);
+        return { column: i === 0 ? 'current' : 'previous', periodStart: start, periodEnd: end, months, figures, lines };
     });
+    // An interim report: its year to date and the comparative are labelled with their periods, the same months apart
+    // by a year (H1 2026 against H1 2025), never a year end against a half-year.
+    const [now, then] = periods;
+    if (now && now.months < 12 && then && (then.months !== now.months || then.periodEnd.slice(5) !== now.periodEnd.slice(5)))
+        checks.push(`${now.periodEnd}: ${now.months} months, but the comparative column is ${then.months} months to ${then.periodEnd}: an interim's comparative is the same months a year earlier (give each column its periodStart)`);
     if (mixedDebt) notes.push('Debt: the balance sheet has combined financing lines (e.g. "financial liabilities"), so bonds aren\'t split out');
 
     return {

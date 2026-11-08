@@ -84,7 +84,31 @@ export const catalystKeys = {
   analysis: (entityId: string, at: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `ANALYSIS#${at}` as const }),
   collected: (entityId: string, at: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `AIFIG#${at}` as const }),
   check: (entityId: string, year: number, scope: string) => ({ PK: `CHECK#${entityId}` as const, SK: `${year}#${scope}` }),
+  document: (entityId: string, sha256: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `DOC#${sha256}` as const }),
 };
+
+/**
+ * A company's other document (plan N8): the auditor's report, the management report, an interim report, a current
+ * report: what a judgement rests on beside the statements. The original in the files bucket, once per SHA-256.
+ */
+export interface CatalystDocumentItem {
+  PK: `ENTITY#${string}`;
+  SK: `DOC#${string}`;
+  entityId: string;
+  sha256: string;
+  /** The original in the files bucket. */
+  key: string;
+  fileName: string;
+  kind: "audit" | "management" | "interim" | "annual" | "current-report" | "terms" | "other";
+  /** The document's own date (published, or signed). */
+  date: string;
+  title: string;
+  /** Where it was downloaded from. */
+  sourceUrl?: string;
+  size: number;
+  by: string;
+  at: string;
+}
 
 /**
  * A report to fetch by hand from the KRS financial documents repository (it has no API and bot protection, so the

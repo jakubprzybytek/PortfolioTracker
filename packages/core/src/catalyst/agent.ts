@@ -86,6 +86,20 @@ export const KnownInput = z
   })
   .strict();
 
+/** A document a judgement rests on (`catalyst documents put`): the auditor's report, an interim report, a current report. */
+export const DocumentInput = z
+  .object({
+    uploadKey: z.string().regex(/^catalyst\/uploads\/[0-9a-f-]{36}$/),
+    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    fileName: z.string().min(1).max(200),
+    kind: z.enum(["audit", "management", "interim", "annual", "current-report", "terms", "other"]),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    title: z.string().trim().min(1).max(300),
+    sourceUrl: z.string().url().max(500).optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict();
+
 /** A report to download by hand from the KRS repository (`catalyst checklist --add`), or its new state. */
 export const ChecklistInput = z
   .object({
@@ -103,6 +117,7 @@ export const AGENT_SCHEMAS = {
   figures: CollectedFiguresInput,
   known: KnownInput,
   checklist: ChecklistInput,
+  document: DocumentInput,
 } as const;
 
 // ─── The token's reach ──────────────────────────────────────────────────────────────────────────────────────────
@@ -120,6 +135,7 @@ export const AGENT_WRITES = [
   "POST /catalyst/entities/{id}/figures",
   "POST /catalyst/entities/{id}/known",
   "PUT /catalyst/checklist/{id}/{year}/{scope}",
+  "POST /catalyst/entities/{id}/documents",
 ] as const;
 
 export function agentMayCall(routeKey: string): boolean {
@@ -130,7 +146,7 @@ export function agentMayCall(routeKey: string): boolean {
 // ─── What needs doing ───────────────────────────────────────────────────────────────────────────────────────────
 
 export interface WorkItem {
-  kind: "identity" | "profile" | "lender-kind" | "report" | "checklist" | "collected" | "judgement" | "measure";
+  kind: "identity" | "profile" | "lender-kind" | "report" | "interim" | "checklist" | "collected" | "judgement" | "measure";
   /** Who does it: the agent, or you (a lender's kind, a download from the KRS repository). */
   who: "agent" | "you";
   entityId: string | null;
@@ -153,6 +169,11 @@ export interface WorkInput {
   measures: Map<string, Pick<CatalystEventItem, "code" | "published" | "reason" | "signal">[]>;
   /** Whether a company is a lender of a known kind through CatalystViewer's name lists (scorecard.ts). */
   lenderByName: (entityId: string) => boolean;
+  /**
+   * Why a company needs its half-year report (on demand, plan N8): bonds due within 24 months, or debt service,
+   * liquidity or refinancing yellow or red. Absent: it doesn't.
+   */
+  needsInterim?: Map<string, string>;
   /** Whether a company has no scorecard (banks, insurers, the State, municipalities, a lender of no known kind). */
   outOfScope: (entity: WorkInput["entities"][number]) => boolean;
 }
@@ -191,6 +212,16 @@ export function assumedBasis(years: { periodEnd: string; months: number }[], at:
 /** The latest full year among stored years: what a judgement written now rests on. */
 export const latestFullYear = (years: { periodEnd: string; months: number }[]) => years.filter((y) => y.months >= 12).map((y) => y.periodEnd).sort().at(-1);
 
+/** The half-year report after the latest full year, due by now (period end + 3 months, Annex 4 §19) and not stored. */
+export function halfYearDue(years: { periodEnd: string; months: number }[], today: string): { periodEnd: string; dueOn: string } | null {
+  const latest = years.filter((y) => y.months >= 12).map((y) => y.periodEnd).sort().at(-1);
+  if (!latest) return null;
+  const periodEnd = addMonths(latest, 6);
+  const dueOn = addMonths(periodEnd, 3);
+  if (dueOn > today || years.some((y) => y.months === 6 && y.periodEnd === periodEnd)) return null;
+  return { periodEnd, dueOn };
+}
+
 /** What `catalyst work` lists: for companies and names with AI analysis on, the agent's items first. */
 export function workItems(input: WorkInput): WorkItem[] {
   const items: WorkItem[] = [];
@@ -211,6 +242,9 @@ export function workItems(input: WorkInput): WorkItem[] {
       const due = annualDue(years, input.today);
       const waiting = input.checklist.find((c) => c.entityId === e.entityId && due && c.year === Number(due.periodEnd.slice(0, 4)));
       if (due && !waiting) items.push({ kind: "report", who: "agent", entityId: e.entityId, name, detail: `annual report FY${due.periodEnd.slice(0, 4)} (year end ${due.periodEnd}) due since ${due.dueOn}, not stored; group accounts first` });
+      const why = input.needsInterim?.get(e.entityId);
+      const half = !due && why ? halfYearDue(years, input.today) : null;
+      if (half) items.push({ kind: "interim", who: "agent", entityId: e.entityId, name, detail: `half-year report H1 ${half.periodEnd.slice(0, 4)} (to ${half.periodEnd}) due since ${half.dueOn}, not stored (${why}); same accounts as the year, with its comparative H1` });
       const collected = input.collected.get(e.entityId);
       const newest = years.map((y) => y.importedAt).sort().at(-1);
       if (collected && (!newest || newest < collected)) items.push({ kind: "collected", who: "agent", entityId: e.entityId, name, detail: `the scorecard rests on figures collected from the web (${collected.slice(0, 10)}): look for a report` });
@@ -226,6 +260,6 @@ export function workItems(input: WorkInput): WorkItem[] {
   }
   for (const c of input.checklist.filter((x) => x.status === "missing" && on.some((e) => e.entityId === x.entityId)))
     items.push({ kind: "checklist", who: "you", entityId: c.entityId, name: on.find((e) => e.entityId === c.entityId)!.shortName, detail: `download FY${c.year} (${c.scope}) from the KRS repository: ${c.where}` });
-  const order: WorkItem["kind"][] = ["identity", "profile", "report", "collected", "judgement", "measure", "lender-kind", "checklist"];
+  const order: WorkItem["kind"][] = ["identity", "profile", "report", "interim", "collected", "judgement", "measure", "lender-kind", "checklist"];
   return items.sort((a, b) => Number(a.who === "you") - Number(b.who === "you") || order.indexOf(a.kind) - order.indexOf(b.kind) || a.name.localeCompare(b.name));
 }

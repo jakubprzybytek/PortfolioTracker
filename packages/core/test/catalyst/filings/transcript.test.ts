@@ -93,6 +93,15 @@ describe('findStatementPages', () => {
     });
 });
 
+describe('findStatementPages over three pages', () => {
+    it('takes a statement whose heading is printed again two pages on (assets on two pages, then equity and liabilities)', () => {
+        const table = (n: number) => Array.from({ length: 14 }, (_, i) => `Pozycja ${n}.${i} | ${i + 1} 234,56 | ${i + 2} 345,67`);
+        const page = (n: number, heading: string) => ({ page: n, lines: [heading, ...table(n)] });
+        const pages = [page(11, 'Wprowadzenie'), page(12, 'Skonsolidowany bilans'), page(13, 'Okres zakończony'), page(14, 'Skonsolidowany bilans'), page(15, 'Notes'), page(30, 'Skonsolidowany bilans')];
+        expect(findStatementPages(pages)).toEqual([12, 13, 14, 15]);
+    });
+});
+
 describe('transcriptToFiling', () => {
     const pages = asPages(reportPages);
 
@@ -133,6 +142,22 @@ describe('transcriptToFiling', () => {
             '2025-12-31: no total equity',
             '2024-12-31 (comparative): no total equity',
         ]);
+    });
+
+    it('an interim report: a comparative column with flows only passes; one of other months is refused', () => {
+        // The same report read as a half-year: H1 2025 against H1 2024, the comparative without its balance sheet.
+        const h1 = structuredClone(transcript);
+        h1.columns = [{ id: h1.columns[0]!.id, periodStart: '2025-01-01', periodEnd: '2025-06-30' }, { id: h1.columns[1]!.id, periodStart: '2024-01-01', periodEnd: '2024-06-30' }];
+        for (const l of h1.lines) if (l.statement === 'balance') l.values = l.values.filter(v => v.column === h1.columns[0]!.id);
+        const filing = transcriptToFiling(h1, pages, EXTRACTION);
+        expect(filing.checks).toEqual([]);
+        expect(filing.periods.map(p => [p.periodEnd, p.months])).toEqual([['2025-06-30', 6], ['2024-06-30', 6]]);
+        expect(filing.periods[1]!.figures.totalAssets).toBeUndefined();
+        expect(filing.notes).toContain('2024-06-30 (comparative): income statement and cash flows only');
+        // A half-year against a full year (no periodStart given for the comparative): refused.
+        const mixed = structuredClone(h1);
+        mixed.columns[1] = { id: mixed.columns[1]!.id, periodEnd: '2024-12-31' };
+        expect(transcriptToFiling(mixed, pages, EXTRACTION).checks.join()).toContain("an interim's comparative is the same months a year earlier");
     });
 
     it('says when combined financing lines hide the bonds', () => {

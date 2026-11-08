@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGENT_SCHEMAS, AnalysisInput, agentMayCall, annualDue, assumedBasis, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
+import { AGENT_SCHEMAS, AnalysisInput, agentMayCall, annualDue, assumedBasis, halfYearDue, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
 
 const entity = (entityId: string, over: Partial<WorkInput["entities"][number]> = {}): WorkInput["entities"][number] => ({
   entityId,
@@ -97,6 +97,19 @@ describe("what needs doing", () => {
   it("a financing vehicle is judged on its group's years", () => {
     const items = workItems(input({ entities: [entity("LEI:259400AAAAAAAAAAAA01", { financialsEntityId: "0000533217" })], years: new Map([["0000533217", [fy("2025-12-31")]]]) }));
     expect(items.map((i) => i.kind)).toEqual(["judgement"]);
+  });
+});
+
+describe("the half-year report, on demand", () => {
+  it("due 3 months after 30 June, for a company that needs it; not when the next year is due, nor once stored", () => {
+    const needs = new Map([["0000533217", "bonds due within 24 months"]]);
+    const base = input({ today: "2026-11-08", entities: [entity("0000533217")], years: new Map([["0000533217", [fy("2025-12-31")]]]), judged: new Map([["0000533217", { at: "2026-06-02T00:00:00Z", basedOn: "2025-12-31" }]]), needsInterim: needs });
+    expect(workItems(base).map((i) => i.detail)).toEqual(["half-year report H1 2026 (to 2026-06-30) due since 2026-09-30, not stored (bonds due within 24 months); same accounts as the year, with its comparative H1"]);
+    expect(workItems({ ...base, today: "2026-09-29" })).toEqual([]);
+    expect(workItems({ ...base, needsInterim: new Map() })).toEqual([]);
+    expect(halfYearDue([fy("2025-12-31"), { periodEnd: "2026-06-30", months: 6 }], "2026-11-08")).toBeNull();
+    // The next annual report due: that one first.
+    expect(workItems({ ...base, today: "2027-06-01" }).map((i) => i.kind)).toEqual(["report"]);
   });
 });
 

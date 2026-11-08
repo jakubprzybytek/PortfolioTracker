@@ -1734,7 +1734,7 @@ test.describe("catalyst view", () => {
             state: "scored",
             ruleSet: "collector",
             scorecard: { dimensions: DIMS.map((name) => ({ name, signal: name === "Asset Coverage" ? "red" : "green", metrics: [{ name: `${name} metric`, value: 1, formattedValue: "1.0×", signal: name === "Asset Coverage" ? "red" : "green" }] })), confidence: { level: "high", periodEnd: "2025-12-31", yearsBehind: 0, years: 3, missing: [], thinDimensions: [], facts: [] } },
-            source: { format: "esef", scope: "group", latestPeriodEnd: "2025-12-31", years: 3 },
+            source: { format: "esef", scope: "group", latestPeriodEnd: "2025-12-31", years: 3, interim: { periodEnd: "2026-06-30", months: 6, label: "H1 2026", ttm: ["revenue"], comparative: "H1 2025" } },
             refinancing: { bonds: [{ isin: "x", name: "KRU0829", maturityDay: "2029-08-12", currency: "PLN", amount: 100_000_000 }], report: { periodEnd: "2025-12-31", scope: "group", currency: "PLN", cash: 400_000_000, due12: 0, due24: 0, listed: 100_000_000 }, signal: "green", notes: [] },
           },
           [{ period: "2025-12-31#group", periodStart: "2025-01-01", periodEnd: "2025-12-31", months: 12, scope: "group", currency: "PLN", column: "current", reportPeriodEnd: "2025-12-31", figures: { revenue: { value: 2_900_000_000, source: ["Revenue"] }, cash: { value: 400_000_000, source: ["Cash"] } }, review: { status: review }, filing: { key: "k", sha256: "abc", format: "esef", checks: [] }, enteredBy: "you", importedAt: "2026-11-03T10:00:00Z", lines: 2 }],
@@ -1783,7 +1783,8 @@ test.describe("catalyst view", () => {
     analysis,
     years,
     filings: [],
-    analyses: c.judgedAt ? [{ at: c.judgedAt, markdown: "Debt service is comfortable.\n\nWatch the next bond.", by: "agent", source: "agent" }] : [],
+    analyses: c.judgedAt ? [{ at: c.judgedAt, markdown: "# Kruk\n\n- Kruk S.A.\n\n| Dimension | Signal |\n|---|---|\n| Debt service | green |\n\n**Judgement:** Debt service is comfortable.\n\nWatch the next bond.", by: "agent", source: "agent" }] : [],
+    documents: [{ sha256: "d".repeat(64), fileName: "audit.pdf", kind: "audit", date: "2026-03-31", title: "Auditor's report FY2025", size: 1000, by: "agent (claude)", at: "2026-11-08T10:00:00Z" }],
     collected: [],
     names: [],
     bonds: [],
@@ -1895,8 +1896,10 @@ test.describe("catalyst view", () => {
     const dialog = page.getByTestId("issuer-dialog");
     await expect(dialog.getByTestId("issuer-name")).toHaveText("Kruk");
     await expect(dialog.getByTestId("issuer-dimension")).toHaveCount(6);
-    await expect(dialog.getByTestId("issuer-source")).toContainText("ESEF, group accounts, FY2025 and 2 earlier · judgement 2026-11-02");
-    await expect(dialog.getByTestId("issuer-judgement")).toContainText("Debt service is comfortable.");
+    await expect(dialog.getByTestId("issuer-source")).toContainText("ESEF, group accounts, FY2025 and 2 earlier + H1 2026 (TTM to 2026-06-30, unaudited) · judgement 2026-11-02");
+    await expect(dialog.getByTestId("issuer-source-interim")).toContainText("+ H1 2026 (TTM to 2026-06-30, unaudited)");
+    // The summary is the "Judgement:" paragraph, not the header.
+    await expect(dialog.getByTestId("issuer-judgement")).toHaveText("Judgement: Debt service is comfortable.");
     await expect(dialog.getByTestId("issuer-bonds").locator("tbody tr")).toHaveCount(1);
     await dialog.getByTestId("issuer-tab-financials").click();
     await expect(page).toHaveURL(/itab=financials/);
@@ -1907,6 +1910,11 @@ test.describe("catalyst view", () => {
     await dialog.getByTestId("issuer-years").getByRole("button", { name: "2 900,0" }).click();
     await expect(dialog.getByTestId("issuer-lines")).toContainText("Revenue, FY2025");
     await expect(dialog.getByTestId("issuer-lines").locator("tbody tr")).toHaveCount(1);
+    // Judgements render as GitHub Markdown (a table); other documents are listed with the statements.
+    await dialog.getByTestId("issuer-tab-judgements").click();
+    await expect(dialog.getByTestId("issuer-judgements").locator("table")).toHaveCount(1);
+    await dialog.getByTestId("issuer-tab-documents").click();
+    await expect(dialog.getByTestId("issuer-other-documents")).toContainText("Auditor's report FY2025");
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(page).not.toHaveURL(/issuer=/);

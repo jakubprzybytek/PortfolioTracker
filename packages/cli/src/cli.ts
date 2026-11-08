@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { z } from "zod";
 import { AGENT_SCHEMAS, AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, KRS_REGISTER, krsExtract, leiByIsin, leiRecords, sameName, type Fetcher, type LeiRecord, type WorkItem } from "@portfolio/core/catalyst/index";
-import { isPdf, pdfStatementPages, readFiling, readPdfFiling } from "@portfolio/core/catalyst/filings/index";
+import { isPdf, pdfStatementPages, readFiling, readPdfFiling, sha256Of } from "@portfolio/core/catalyst/filings/index";
 import { ApiError, CliError, Client, enc, forgetToken, saveToken, type Io } from "./client.ts";
 import { apiUrl } from "./stage.ts";
 
@@ -44,6 +44,10 @@ Reports:
   known put <id> --file known.json      figures read by hand from a printed report (for filings check)
   figures put <id> --file fig.json [--dry-run]         figures collected from the web, when there's no report
 
+Documents (what a judgement rests on beside the statements; never stored twice):
+  documents put <id> <file> --kind <audit|management|interim|annual|current-report|terms|other> --date <yyyy-mm-dd>
+                [--title "…"] [--source <url>] [--dry-run]
+
 Judgement:
   analysis put <id> --file judgement.md --meta meta.json [--dry-run]
 
@@ -52,7 +56,7 @@ Other:
   --version, --help`;
 
 type Args = { positional: string[]; flags: Map<string, string | true> };
-const VALUE_FLAGS = new Set(["--stage", "--by", "--entity", "--q", "--lei", "--krs", "--evidence", "--financials", "--file", "--meta", "--out", "--transcript", "--where"]);
+const VALUE_FLAGS = new Set(["--stage", "--by", "--entity", "--q", "--lei", "--krs", "--evidence", "--financials", "--file", "--meta", "--out", "--transcript", "--where", "--kind", "--date", "--title", "--source"]);
 
 function parse(args: string[]): Args {
   const positional: string[] = [];
@@ -291,6 +295,25 @@ async function dispatch({ positional, flags }: Args, io: Io): Promise<number> {
       const body = AnalysisInput.parse({ markdown: readFileSync(need("--file"), "utf8"), meta: readJson(need("--meta")), ...(dryRun ? { dryRun } : {}) });
       json(await c.call("POST", `/entities/${enc(id)}/analyses`, body));
       return 0;
+    }
+
+    case "documents": {
+      if (sub !== "put") throw new CliError("documents put <id> <file> --kind … --date …");
+      const [id, file] = rest;
+      if (!id || !file) throw new CliError("documents put <id> <file> --kind … --date …");
+      const data = readFileSync(file);
+      const fileName = basename(file);
+      const sha256 = sha256Of(data);
+      const meta = { fileName, sha256, kind: need("--kind"), date: need("--date"), title: flag("--title") ?? fileName, ...(flag("--source") ? { sourceUrl: flag("--source") } : {}) };
+      // Checked here (no upload when it's refused), with a key for the shape only.
+      AGENT_SCHEMAS.document.parse({ ...meta, uploadKey: "catalyst/uploads/00000000-0000-0000-0000-000000000000" });
+      const c = client();
+      const held = (await c.get<{ documents?: { sha256: string }[] }>(`/entities/${enc(id)}`)).documents?.find((d) => d.sha256 === sha256);
+      if (held) return print({ duplicate: true, stored: false, ...held });
+      if (dryRun) return print({ dryRun: true, would: { entityId: id, ...meta, size: data.length } });
+      const contentType = fileName.toLowerCase().endsWith(".pdf") ? "application/pdf" : fileName.toLowerCase().endsWith(".zip") ? "application/zip" : "application/octet-stream";
+      const uploadKey = await c.upload(data, contentType);
+      return print(await c.call("POST", `/entities/${enc(id)}/documents`, { uploadKey, ...meta }));
     }
 
     case "schema": {

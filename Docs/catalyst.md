@@ -159,6 +159,7 @@ Bonds are joined to reports **through the company's identity, never by matching 
 | Collected figures | `ENTITY#<entityId>` / `AIFIG#<collectedAt>` | – | Fallback figures collected from the web by an agent when no report is available (§9): marked as such, never for lenders, confidence medium at most |
 | Filing | `ENTITY#<entityId>` / `FILING#<sha256>` | – | Original document: format, fiscal year, scope, source URL, S3 key, import result |
 | Analysis | `ENTITY#<entityId>` / `ANALYSIS#<ts>`, mirror `ANALYSIS#LATEST` | – | The agent's written judgement (§13, §14 layout), red flags with source and quote, what to watch, sources read, model, and the scorecard version it saw |
+| Document | `ENTITY#<entityId>` / `DOC#<sha256>` | – | Another document a judgement rests on (auditor's report, management report, interim or current report, bond terms): kind, its date, title, where it came from, who stored it; the original at `catalyst/documents/<entity>/<date>-<kind>-<sha12>.<ext>`, once per SHA-256 (N8) |
 | Checklist entry | `CHECK#<entityId>` / `<year>#<scope>` | `CHECK` / `<status>` | A report to fetch: company, KRS, year, group/single/any, where it can be found, status (`missing`, `downloaded`, `imported`, `not available`) |
 | Known answer | `KNOWN#<entityId>` / `<period end>#<scope>` | – | Figures read by hand from printed statements (CV's `expected.json`, 40 reports), for `check-filings` |
 | Setting | `SETTING#<name>` / `META` | – | `assumptions` (WIBOR, WIRON, commission, tax, alternative), `views` (saved filters), `agentToken` (hash) |
@@ -169,7 +170,7 @@ Bonds are joined to reports **through the company's identity, never by matching 
 
 Sizing: ~1,060 bonds × ~250 sessions a year ≈ 265k session items a year; backfill from 2020 ≈ 1.6M items (one-off write cost ≈ $2). The screen is ~600 items. Issuers: ~200 names, ~100 companies, a few hundred financial years.
 
-**Backup:** monthly `catalyst-export` of names, companies, financial years, collected figures, filings (metadata; originals stay in S3, versioned), analyses, checklist, known answers and settings to `exports/<date>/catalyst/`, in the CLI's input formats, so a restore is a re-import. Market data is rebuilt from the file archive; bid/ask history can't be (accepted).
+**Backup:** monthly `catalyst-export` of names, companies, links, financial years (with their lines), collected figures, filings and documents (metadata; originals stay in S3, versioned), analyses, checklist, known answers and settings to `exports/<date>/catalyst/`, so a restore is a re-import. (Built in full 2026-11-08; until then it held settings, companies, names and links only.) Market data is rebuilt from the file archive; bid/ask history can't be (accepted).
 
 ## Jobs
 
@@ -285,6 +286,8 @@ The agent works only on companies you switch on. Each company has `aiAnalysis`: 
 
 ### Interim reports
 
+**Built (N8, 2026-11-08):** `core/catalyst/issuers/interim.ts`. Interim periods are stored as rows like years (`FIN#<period end>#<scope>`, `months` < 12; not `INT#`: the full-year code already takes 12-month rows only). The latest interim period newer than the year, of the same scope and standard, gives the balance sheet (the point-in-time items) and, with its comparative period, TTM flows item by item; the trend arrows stay the full years'; each dimension says which figures it used; the confidence notes "interim, usually unaudited"; refinancing counts the interim's cash; the source line reads "FY2025 + H1 2026 (TTM to 2026-06-30, unaudited)". A transcript's interim comparative may have no balance sheet (it's skipped from the balance checks) and must be the same months a year earlier. `catalyst work` lists the half-year report (period end + 3 months) only for companies that need it: bonds due within 24 months, or debt service, liquidity or refinancing yellow or red. Not built: quarterly reports on request, the flag when the next audited year differs from the interim by more than 5 %, `filings sort`'s names for interim files.
+
 Decided 2026-11-07: the half-year balance sheet, on demand (below); trailing 12 months later, if the balance sheet proves useful. After the annual path works, in two steps (the first is cheap and the most valuable):
 
 1. **Interim balance sheet.** The latest interim balance sheet newer than the last full year replaces the year end's point-in-time items (debt, cash, debt due within a year, equity, assets) in Debt burden, Liquidity, Asset coverage and Refinancing. A year end can be up to 15 months old when its report arrives; a quarter is at most 5.
@@ -317,6 +320,7 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 - **The skill:** `.claude/skills/catalyst-analyst/SKILL.md`; at most 5 companies a session.
 - **The app:** the token in the Catalyst settings, "needs work" and the reports checklist in the Issuers view.
 - **Known answers** (`catalyst known put`) are also open to the token: they only feed `filings check`.
+- **Documents** (N8): `catalyst documents put <id> <file> --kind … --date …` keeps what a judgement rests on beside the statements (auditor's and management reports, interim and current reports, bond terms); one already held isn't uploaded again. The issuer dialog's Documents tab lists them with the statements.
 
 - **Location:** `packages/cli` in this repo, TypeScript, run with `npx catalyst …`. It uses `core`'s zod schemas and parsers (the same ones the API uses); `catalyst schema <kind>` prints an input as JSON Schema.
 - **Where the work runs:** on your machine. The CLI imports `core`'s parsers, checks, scorecard and identity clients, so none of these needs the backend: sorting files, finding PDF pages, parsing, the checks, GLEIF and KRS lookups, and a dry run (with the scorecard the import would give). The app is called only to read a company's stored rows and to write results.

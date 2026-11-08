@@ -794,6 +794,8 @@ describe(`API ${API}`, () => {
     expect((await agent("POST", "/entities/0000000000/analyses", t, { markdown: "x".repeat(60), meta: { model: "test", sources: ["none"], redFlags: [] }, dryRun: true })).status).toBe(404);
     expect((await agent("POST", "/entities/0000000000/figures", t, { currency: "PLN", unit: "thousands", years: [{ periodEnd: "2025-12-31", months: 12, scope: "group", figures: { revenue: 1 }, source: "x" }], dryRun: true })).status).toBe(404);
     expect((await agent("PUT", "/checklist/0000000000/2025/group", t, { where: "KRS repository" })).status).toBe(404);
+    expect((await agent("POST", "/entities/0000000000/documents", t, { uploadKey: "catalyst/uploads/00000000-0000-0000-0000-000000000000", sha256: "0".repeat(64), fileName: "a.pdf", kind: "audit", date: "2026-03-31", title: "x" })).status).toBe(404);
+    expect((await agent("GET", `/entities/0000000000/documents/${"0".repeat(64)}`, t)).status).toBe(404);
     expect((await agent("PUT", "/entities/0000000000", t, { industry: "Developer" })).status).toBe(404);
     expect((await agent("PUT", `/names/${encodeURIComponent("No Such Name S.A.")}`, t, { entityId: "0000000000" })).status).toBe(400); // no evidence
     expect((await agent("POST", "/filings", t, { entityId: "0000000000" })).status).toBe(400);

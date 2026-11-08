@@ -46,18 +46,32 @@ analysis, end to end".
    person would (the site's reports page, a search); don't guess URLs. An unlisted company filing under the
    accounting act: `catalyst checklist --add <id> <year> group --where "KRS repository, KRS <number>"`, and tell
    the owner it's waiting for them.
+   - **Half-year reports** (`kind: "interim"` in `catalyst work`): only for the companies it lists (bonds due within
+     24 months, or debt service, liquidity or refinancing yellow or red), or when the owner asks. The same accounts
+     (group or single) as the year, under the same standard. Quarterly reports only when asked.
 
 5. **Import (§8):** `catalyst filings import <file> --entity <id> --dry-run`, then without `--dry-run`. The dry run
    shows the periods, figures, checks, which years would be stored or kept, and the scorecard they'd give.
    - **A PDF:** `catalyst filings pages <pdf> --out pages.txt`, read it, write the transcript
      (`catalyst schema transcript`): each line's label, page and amounts **exactly as printed**. Copy; never
      compute, add up or convert. Then `--transcript t.json`.
+   - **An interim report:** two columns, each with its `periodStart` and `periodEnd`: the year to date (e.g.
+     2026-01-01 to 2026-06-30) and its comparative, the same months a year earlier (2025-01-01 to 2025-06-30). Its
+     balance sheet compares with the last year end: copy the year to date's balance sheet only, and the comparative's
+     income statement and cash flow (the app knows the year end from the annual report). Never add quarters up into
+     a year.
    - **Refused:** read the checks, fix the transcript (a misread amount, a wrong column, a missing line), try
      again. Never `--force` without asking the owner.
 
 6. **No report at all**, and an operating company: `catalyst figures put <id> --file fig.json` (`schema figures`),
    avoiding §9's failure modes: part years as years, today's date as the year end, the wrong unit, the wrong
    company (a group's figures for its subsidiary or the reverse). Never for lenders or municipalities.
+
+   - **Keep what you read:** every document the judgement rests on beside the statements (the auditor's report,
+     the management report, interim and current reports, the bond terms) goes in with
+     `catalyst documents put <id> <file> --kind <audit|management|interim|annual|current-report|terms|other> --date <its date> --title "…" --source <url>`
+     (dry run first). One already held isn't uploaded again; check `catalyst entity <id>`'s `documents` before
+     downloading.
 
 7. **Read (§13):** `catalyst entity <id>` gives the scorecard (six dimensions, trend arrows, rule set,
    confidence), refinancing and the track record. Read it against the rule set's thresholds. Then read what code

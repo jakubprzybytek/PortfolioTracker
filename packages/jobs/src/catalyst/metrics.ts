@@ -102,6 +102,7 @@ export async function computeMetrics(): Promise<{ itemsWritten: number; note: st
       dimensions: (a.scorecard?.dimensions ?? []).map((d) => ({ name: d.name, signal: d.signal, ...(d.trend ? { arrow: d.trend.arrow } : {}) })),
       ...(a.scorecard?.confidence ? { confidence: a.scorecard.confidence.level } : {}),
       ...(a.source ? { latestPeriodEnd: a.source.latestPeriodEnd } : {}),
+      ...(a.source?.interim ? { interim: { label: a.source.interim.label, ttm: a.source.interim.ttm.length > 0 } } : {}),
     });
   }
   for (const row of rows) {

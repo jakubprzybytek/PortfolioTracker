@@ -240,7 +240,10 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
                   <IssuerSignalsCell ai={r.c.aiAnalysis.on} signals={r.signals} compact />
                 </td>
                 <td className={`left${r.signals?.confidence === "low" ? " muted" : ""}`}>{r.signals?.state === "scored" ? (r.signals.confidence ?? "–") : ""}</td>
-                <td>{r.signals?.latestPeriodEnd?.slice(0, 4) ?? "–"}</td>
+                <td title={r.signals?.interim ? `FY${r.signals.latestPeriodEnd?.slice(0, 4)} + ${r.signals.interim.label}${r.signals.interim.ttm ? " (TTM)" : ""}, interim unaudited` : ""}>
+                  {r.signals?.latestPeriodEnd?.slice(0, 4) ?? "–"}
+                  {r.signals?.interim && <span className="muted"> + {r.signals.interim.label.split(" ")[0]}</span>}
+                </td>
                 <td>{r.c.judgedAt?.slice(0, 10) ?? "–"}</td>
                 <td title={r.work.map((w) => `${w.who === "you" ? "You: " : ""}${w.detail}`).join("\n")} data-testid="issuers-work-cell">
                   {r.work.length ? (

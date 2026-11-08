@@ -94,7 +94,8 @@ export function catalystModule({ defaults, link, alerts, market }: CatalystShare
     permissions: [{ actions: ["dynamodb:GetItem"], resources: [market.arn], conditions: [{ test: "ForAllValues:StringLike", variable: "dynamodb:LeadingKeys", values: ["SERIES#*"] }] }],
   };
 
-  // The monthly backup of what exists nowhere else (the settings): exports/<date>/catalyst/ in the files bucket.
+  // The monthly backup of what exists nowhere else (settings, companies and names, years, filings, judgements, documents,
+  // known answers, the checklist): exports/<date>/catalyst/ in the files bucket.
   new sst.aws.CronV2("CatalystExport", { function: job("packages/jobs/src/catalyst/handlers/export.handler"), schedule: "cron(30 4 1 * ? *)", timezone: WARSAW, retries: 2 });
 
   const jobRunsReader = {
@@ -144,6 +145,8 @@ export function catalystApi(
     "POST /catalyst/entities/{id}/known",
     "GET /catalyst/checklist",
     "PUT /catalyst/checklist/{id}/{year}/{scope}",
+    "POST /catalyst/entities/{id}/documents",
+    "GET /catalyst/entities/{id}/documents/{sha}",
     "GET /catalyst/agent-token",
     "POST /catalyst/agent-token",
     "DELETE /catalyst/agent-token",

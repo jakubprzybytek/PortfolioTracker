@@ -54,7 +54,7 @@ export function IssuerSignalsCell({ ai, signals, offSince, compact = false }: { 
   if (signals.state === "out-of-scope") return <span className="muted">not scored</span>;
   const offNote = !ai ? `AI analysis off${offSince ? ` since ${offSince}` : ""}: not kept current` : undefined;
   if (compact) {
-    const extra = [`${RULE_SETS[signals.ruleSet] ?? signals.ruleSet} rules`, signals.confidence ? `${signals.confidence} confidence` : "", signals.latestPeriodEnd ? `FY${signals.latestPeriodEnd.slice(0, 4)}` : "", offNote ?? ""].filter(Boolean);
+    const extra = [`${RULE_SETS[signals.ruleSet] ?? signals.ruleSet} rules`, signals.confidence ? `${signals.confidence} confidence` : "", signals.latestPeriodEnd ? `FY${signals.latestPeriodEnd.slice(0, 4)}${signals.interim ? ` + ${signals.interim.label}${signals.interim.ttm ? " (TTM)" : ""}` : ""}` : "", offNote ?? ""].filter(Boolean);
     return (
       <span className="cat-signals">
         <SignalDots signals={signals} extra={extra} />

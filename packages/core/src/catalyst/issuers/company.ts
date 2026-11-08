@@ -6,6 +6,7 @@
 import type { FinancialYear } from "../financials.ts";
 import { dataConfidence, type ConfidenceSource } from "./confidence.ts";
 import { filedYears } from "./filedYears.ts";
+import { withInterim, type InterimUse } from "./interim.ts";
 import { latestReport, refinancing, refinancingDimension, type ListedBond, type Rates, type Refinancing } from "./refinancing.ts";
 import { isInFundamentalScope } from "./scope.ts";
 import { financeRuleSetFor, ruleSetFor, scorecardFromReportedYears, type DimensionResult, type FinanceRuleSet, type FundamentalScorecard, type MetricResult, type RuleSet, type Signal } from "./scorecard.ts";
@@ -62,7 +63,7 @@ export interface CompanyAnalysis {
   state: "scored" | "no-report" | "out-of-scope";
   ruleSet: RuleSet;
   scorecard?: Omit<FundamentalScorecard, "dimensions"> & { dimensions: Dimension[] };
-  source?: { format: string; scope: string; latestPeriodEnd: string; years: number };
+  source?: { format: string; scope: string; latestPeriodEnd: string; years: number; interim?: InterimUse; interimSkipped?: string };
   refinancing?: Refinancing;
 }
 
@@ -78,21 +79,46 @@ export function companyRuleSet(profile: CompanyProfile, names: string[]): { rule
 
 export function companyAnalysis(profile: CompanyProfile, names: string[], years: FinancialYear[], bonds: ListedBond[], rates: Rates, today: string): CompanyAnalysis {
   const { ruleSet, lender } = companyRuleSet(profile, names);
-  const report = latestReport(years);
+  // A lender's bonds may sit in "other financial liabilities" (filedYears).
+  const filed = filedYears(years, lender && bonds.length > 0);
+  // The latest interim period newer than the year (interim.ts): its balance sheet, and TTM flows.
+  const inter = filed ? withInterim(years, filed.years, { periodEnd: filed.latestPeriodEnd, scope: filed.scope }, lender && bonds.length > 0) : undefined;
+  const annual = latestReport(years);
+  // Refinancing: cash at the interim's date when there is one.
+  const report = annual && inter?.row ? { ...annual, periodEnd: inter.row.periodEnd, figures: { ...annual.figures, ...(inter.row.figures.cash ? { cash: inter.row.figures.cash } : {}), ...(inter.row.figures.bonds ? { bonds: inter.row.figures.bonds } : {}) } } : annual;
   const refi = bonds.length || report ? refinancing(bonds, report, today, rates) : undefined;
   const base = { ruleSet, ...(refi ? { refinancing: refi } : {}) };
   if (!lender && !isInFundamentalScope(profile.industry)) return { state: "out-of-scope", ...base };
-  // A lender's bonds may sit in "other financial liabilities" (filedYears).
-  const filed = filedYears(years, lender && bonds.length > 0);
-  if (!filed) return { state: "no-report", ...base };
-  const scorecard = scorecardFromReportedYears("", filed.years, ruleSet);
+  if (!filed || !inter) return { state: "no-report", ...base };
+  const annualCard = scorecardFromReportedYears("", filed.years, ruleSet);
+  // The trend compares full years: an interim changes the snapshot, never the arrows.
+  const snapshot = inter.interim ? scorecardFromReportedYears("", inter.years, ruleSet) : annualCard;
+  const scorecard = inter.interim ? { ...snapshot, dimensions: snapshot.dimensions.map((d) => (d.name === TREND ? (annualCard.dimensions.find((x) => x.name === TREND) ?? d) : withInterimNote(d, inter.interim!, filed.latestPeriodEnd))) } : annualCard;
   const source: ConfidenceSource = { kind: "filing", format: filed.format, scope: filed.scope, periodEnd: filed.latestPeriodEnd, years: filed.years.length };
   const confidence = dataConfidence(scorecard, source, today);
+  if (inter.interim) confidence.facts.push(`${inter.interim.label}: interim figures, usually unaudited (half-years of listed companies are reviewed)`);
+  if (inter.skipped) confidence.facts.push(inter.skipped);
   const refiDimension = refi && refinancingDimension(refi);
   return {
     state: "scored",
     ...base,
     scorecard: { ...scorecard, confidence, dimensions: sixDimensions(refiDimension ? [...scorecard.dimensions, refiDimension] : scorecard.dimensions) },
-    source: { format: filed.format, scope: filed.scope, latestPeriodEnd: filed.latestPeriodEnd, years: filed.years.length },
+    source: { format: filed.format, scope: filed.scope, latestPeriodEnd: filed.latestPeriodEnd, years: filed.years.length, ...(inter.interim ? { interim: inter.interim } : {}), ...(inter.skipped ? { interimSkipped: inter.skipped } : {}) },
   };
+}
+
+const BALANCE_DIMENSIONS = ["Debt Burden", "Liquidity", "Asset Coverage"];
+const FLOW_DIMENSIONS = ["Debt Service", "Profitability"];
+
+/** Which figures a dimension used: the year, the interim balance sheet, TTM flows. */
+function withInterimNote(d: DimensionResult, i: InterimUse, yearEnd: string): DimensionResult {
+  const fy = `FY${yearEnd.slice(0, 4)}`;
+  const note = BALANCE_DIMENSIONS.includes(d.name)
+    ? `balance sheet at ${i.periodEnd} (${i.label}, interim)`
+    : FLOW_DIMENSIONS.includes(d.name)
+      ? i.ttm.length
+        ? `flows over the 12 months to ${i.periodEnd} (${fy} + ${i.label} − ${i.comparative}); balance sheet at ${i.periodEnd}`
+        : `flows of ${fy} (no comparative period in the ${i.label} report for TTM); balance sheet at ${i.periodEnd}`
+      : undefined;
+  return note ? { ...d, notes: [...(d.notes ?? []), note] } : d;
 }

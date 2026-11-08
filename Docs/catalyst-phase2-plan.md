@@ -318,6 +318,14 @@ Tests: TTM on hand-computed cases (including a part year that must be refused an
 
 Done when: for the issuers in scope that publish interim reports, the latest one is imported on prod, and their scorecards show "+ Q… (TTM)".
 
+**Built 2026-11-08 on dev** (both steps; see the design, "Interim reports", "Built"). Also, asked for the same day:
+- **Documents** (owner, 2026-11-08): a company's other documents (auditor's and management reports, interim and current reports, bond terms) stored by the CLI and the agent token (`POST /catalyst/entities/{id}/documents`, a 15-minute link from `GET …/documents/{sha}`), once per SHA-256; listed in the dialog's Documents tab. The skill keeps every document a judgement read.
+- **The backup** now holds years, filings, judgements, collected figures, documents, known answers and the checklist (it held settings, companies, names and links only).
+- **Found on the way:** the statement page finder missed a balance sheet whose heading is printed again two pages on (GCI H1 2026, pages 12–14); it now takes a repeat within three pages.
+- **On dev, Grupa Corpus Iuris:** the five documents its judgement read stored (FY2025 audit and management reports, H1 2026 report and review, EBI 5/2026; the sixth try was recognised as held); its H1 2026 group statements imported from a transcript (43 lines, no checks failed; H1 2026 and its comparative H1 2025): the scorecard shows "FY2025 + H1 2026 (TTM to 2026-06-30)", net debt / equity 0.91× at 30 June (0.73× at the year end, before the June bond issue).
+- **Tests:** 8 unit tests of the interim (TTM by hand, an item missing from the comparative, scope and standard mismatches, the year that supersedes it, a part year never a year, the analysis' notes and arrows), the transcript's interim checks, the half-year item in `catalyst work`, the page finder; the CLI's `documents put`; E2E: the source line, the Markdown table, the other documents.
+- **Prod:** waits for the push; then the half-year reports of the companies `catalyst work` lists on prod, with a prod token.
+
 ### N9 CatalystViewer handed over
 
 **On hold** (owner, 2026-11-07: CV is not switched off for now). When it's taken up, proposed to you once N7 has run for a few weeks:

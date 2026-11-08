@@ -8,3 +8,4 @@ export * from "./refinancing.ts";
 export * from "./scope.ts";
 export * from "./scorecard.ts";
 export * from "./company.ts";
+export * from "./interim.ts";

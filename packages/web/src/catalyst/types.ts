@@ -145,6 +145,7 @@ export interface IssuerSignals {
   dimensions: { name: string; signal: Signal; arrow?: Arrow }[];
   confidence?: "high" | "medium" | "low";
   latestPeriodEnd?: string;
+  interim?: { label: string; ttm: boolean };
 }
 
 export interface AiSwitch {
@@ -220,7 +221,7 @@ export interface CompanyAnalysis {
   state: "scored" | "no-report" | "out-of-scope";
   ruleSet: string;
   scorecard?: { dimensions: Dimension[]; confidence?: Confidence };
-  source?: { format: string; scope: string; latestPeriodEnd: string; years: number };
+  source?: { format: string; scope: string; latestPeriodEnd: string; years: number; interim?: { periodEnd: string; months: number; label: string; ttm: string[]; comparative?: string }; interimSkipped?: string };
   refinancing?: Refinancing;
 }
 export type ReviewStatus = "parsed" | "hand-checked" | "flagged";
@@ -273,6 +274,7 @@ export interface CompanyDetail {
   filings: CompanyFiling[];
   analyses: Judgement[];
   collected: { at: string; by?: string; source?: string }[];
+  documents?: { sha256: string; fileName: string; kind: string; date: string; title: string; sourceUrl?: string; size: number; by: string; at: string }[];
   names: { name: string; status: string }[];
   bonds: { isin: string; code: string; status: string; maturity: string | null; segment: string }[];
   track: TrackRecord;

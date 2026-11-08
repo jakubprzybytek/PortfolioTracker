@@ -12,6 +12,7 @@
 //   GET  /catalyst/work                   what needs doing for the companies with AI analysis on (`catalyst work`)
 //   POST /catalyst/entities/{id}/analyses|figures|known   a judgement, collected figures, hand-read figures
 //   GET  /catalyst/checklist, PUT /catalyst/checklist/{id}/{year}/{scope}   reports to download by hand
+//   POST /catalyst/entities/{id}/documents, GET …/documents/{sha}   a company's other documents, and a link to one
 //   GET|POST|DELETE /catalyst/agent-token  the agent's token (yours only: shown once, only its SHA-256 kept)
 //   ANY  /catalyst/agent/{proxy+}         the agent's way in (bearer token): the reads and the writes it may make
 //                                         (core/catalyst/agent.ts, AGENT_WRITES), as the routes above
@@ -20,6 +21,8 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
+import { DocumentInput } from "@portfolio/core/catalyst/index";
+import { storeDocument } from "../documents.ts";
 import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestFullYear, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
 import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { z } from "zod";
@@ -161,7 +164,7 @@ const ROUTES: Record<string, Handler> = {
     const [names, links, bonds] = await Promise.all([catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
     const own = new Set(links.filter((l) => l.entityId === id).map((l) => l.isin));
     const theirs = bonds.filter((b) => own.has(b.isin));
-    const [years, filings, inputs, analyses, collected] = await Promise.all([catalystRepo.listYears(id), catalystRepo.listFilings(id), analysisInputs(today()), catalystRepo.listAnalyses(id), catalystRepo.listCollectedFigures(id)]);
+    const [years, filings, inputs, analyses, collected, documents] = await Promise.all([catalystRepo.listYears(id), catalystRepo.listFilings(id), analysisInputs(today()), catalystRepo.listAnalyses(id), catalystRepo.listCollectedFigures(id), catalystRepo.listDocuments(id)]);
     return json(200, {
       company: entityView(entity),
       analysis: await analysisOf(entity, inputs, years),
@@ -170,6 +173,7 @@ const ROUTES: Record<string, Handler> = {
       // Newest first.
       analyses: analyses.map(({ PK: _p, SK: _s, ...a }) => a).sort((a, b) => b.at.localeCompare(a.at)),
       collected: collected.map(({ PK: _p, SK: _s, ...c }) => c).sort((a, b) => b.at.localeCompare(a.at)),
+      documents: documents.map(({ PK: _p, SK: _s, key: _k, ...d }) => d).sort((a, b) => b.date.localeCompare(a.date)),
       names: names.filter((n) => n.entityId === id).map(stripKeys),
       bonds: theirs.map((b) => ({ isin: b.isin, code: b.code, status: b.status, maturity: b.maturity, segment: b.segment })),
       track: await trackOf(theirs, entity.legalName),
@@ -396,6 +400,31 @@ const ROUTES: Record<string, Handler> = {
     return json(201, item);
   },
 
+  "POST /catalyst/entities/{id}/documents": async (event) => {
+    // A document a judgement rests on, uploaded first (filings/upload-url); one already held isn't stored again.
+    const id = pathParam(event, "id");
+    const body = DocumentInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
+    const { dryRun, sourceUrl, ...b } = body.data;
+    try {
+      const r = await storeDocument({ entityId: id, ...b, ...(sourceUrl ? { sourceUrl } : {}), by: userOf(event), dryRun: dryRun ?? false });
+      const { key: _k, ...document } = r.document;
+      return json(r.stored ? 201 : 200, { ...document, stored: r.stored, duplicate: r.duplicate });
+    } catch (err) {
+      if (err instanceof FilingRefused) return json(err.message.startsWith("No company") ? 404 : 422, { error: err.message });
+      throw err;
+    }
+  },
+
+  "GET /catalyst/entities/{id}/documents/{sha}": async (event) => {
+    const id = pathParam(event, "id");
+    const sha = pathParam(event, "sha");
+    const doc = (await catalystRepo.listDocuments(id)).find((d) => d.sha256 === sha);
+    if (!doc) return json(404, { error: `No document ${sha} of ${id}` });
+    const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: Resource.Files.name, Key: doc.key, ResponseContentDisposition: `inline; filename="${doc.fileName.replace(/["\\]/g, "")}"` }), { expiresIn: 900 });
+    return json(200, { url, fileName: doc.fileName });
+  },
+
   "GET /catalyst/checklist": async () => json(200, { checklist: (await catalystRepo.listChecklist()).map(stripKeys).sort((a, b) => a.status.localeCompare(b.status) || a.entityId.localeCompare(b.entityId) || b.year - a.year) }),
 
   "PUT /catalyst/checklist/{id}/{year}/{scope}": async (event) => {
@@ -547,7 +576,7 @@ async function entityFromLei(lei: string): Promise<Entity | undefined> {
 
 /** What needs doing (core/catalyst/agent.ts): the companies with AI analysis on, their years, judgements and measures. */
 async function work() {
-  const [entities, names, checklist, links] = await Promise.all([catalystRepo.listEntities(), catalystRepo.listNames(), catalystRepo.listChecklist(), catalystRepo.listLinks()]);
+  const [entities, names, checklist, links, bonds, screen] = await Promise.all([catalystRepo.listEntities(), catalystRepo.listNames(), catalystRepo.listChecklist(), catalystRepo.listLinks(), catalystRepo.listBonds(), catalystRepo.listScreen()]);
   const on = entities.filter((e) => e.aiAnalysis?.on);
   const ids = [...new Set(on.flatMap((e) => [e.entityId, ...(e.financialsEntityId ? [e.financialsEntityId] : [])]))];
   const [years, judged, collected, measures] = await Promise.all([
@@ -562,6 +591,20 @@ async function work() {
       }),
     ),
   ]);
+  // Who needs a half-year report (plan N8): bonds due within 24 months, or debt service, liquidity or refinancing
+  // yellow or red (the signals the metrics copied into its bonds' rows).
+  const in24 = addDays(today(), 730);
+  const signalsOf = new Map(screen.flatMap((s) => (s.issuer ? [[s.isin, s.issuer] as const] : [])));
+  const needsInterim = new Map<string, string>();
+  for (const e of on) {
+    const own = new Set(links.filter((l) => l.entityId === e.entityId).map((l) => l.isin));
+    const listed = bonds.filter((b) => own.has(b.isin) && b.status === "listed");
+    const due = listed.filter((b) => b.maturity && b.maturity <= in24).map((b) => b.code);
+    const signals = listed.map((b) => signalsOf.get(b.isin)).find(Boolean);
+    const weak = (signals?.dimensions ?? []).filter((d) => ["Debt Service", "Liquidity", "Refinancing"].includes(d.name) && (d.signal === "yellow" || d.signal === "red")).map((d) => `${d.name.toLowerCase()} ${d.signal}`);
+    const why = [...(due.length ? [`bonds due within 24 months: ${due.join(", ")}`] : []), ...weak];
+    if (why.length) needsInterim.set(e.entityId, why.join("; "));
+  }
   const namesOf = (id: string) => names.filter((n) => n.entityId === id).map((n) => n.name);
   const lenderByName = (id: string) => namesOf(id).some((n) => financeRuleSetFor(n));
   const defined = <V>(pairs: readonly (readonly [string, V | undefined])[]) => new Map(pairs.filter((p): p is readonly [string, V] => p[1] !== undefined));
@@ -575,6 +618,7 @@ async function work() {
     checklist: checklist.map(stripKeys),
     measures: new Map(measures),
     lenderByName,
+    needsInterim,
     outOfScope: (e) => !(e.financeRuleSet || e.ruleSetOverride || lenderByName(e.entityId)) && !isInFundamentalScope(e.industry),
   });
 }

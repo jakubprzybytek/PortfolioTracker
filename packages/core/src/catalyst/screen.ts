@@ -69,6 +69,8 @@ export interface IssuerSignals {
   confidence?: "high" | "medium" | "low";
   /** The latest year the scorecard rests on. */
   latestPeriodEnd?: string;
+  /** The interim period the scorecard also rests on ("H1 2026"), and whether its flows are TTM. */
+  interim?: { label: string; ttm: boolean };
 }
 
 export interface ScreenRow {

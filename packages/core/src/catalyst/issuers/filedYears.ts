@@ -85,7 +85,12 @@ export function filedYears(records: DbIssuerFinancialsRecord[], bondsMayBeInOthe
         scope,
         format: rows[0]!.filing.format ?? 'krs-xml',
         latestPeriodEnd: rows[0]!.periodEnd,
-        years: rows.map(r => {
+        years: rows.map(r => reportedYear(r, bondsMayBeInOtherFinancialLiabilities)),
+    };
+}
+
+// One stored row as the scorecard's figures (PLN millions): a full year, or an interim period (interim.ts).
+export function reportedYear(r: DbIssuerFinancialsRecord, bondsMayBeInOtherFinancialLiabilities = false): ReportedYear {
             const year: ReportedYear = { year: Number(r.periodEnd.slice(0, 4)) };
             for (const field of SCORECARD_FIELDS) {
                 const figure = r.figures[field];
@@ -104,6 +109,4 @@ export function filedYears(records: DbIssuerFinancialsRecord[], bondsMayBeInOthe
             const writeDowns = writeDownsOutsideDepreciation(r);
             if (writeDowns !== undefined) year.writeDowns = writeDowns / 1_000_000;
             return year;
-        }),
-    };
 }

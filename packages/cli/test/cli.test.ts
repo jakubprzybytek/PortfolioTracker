@@ -123,6 +123,22 @@ describe("catalyst CLI", () => {
     expect((sent[0]!.body as { dryRun: boolean }).dryRun).toBe(true);
   });
 
+  it("documents put: one already held isn't uploaded again; a new one is uploaded, then stored", async () => {
+    const { cli, sent, dir } = setup({
+      "GET /entities/0000442287": () => ({ body: { documents: [{ sha256: "x".repeat(64), title: "held" }] } }),
+      "POST /filings/upload-url": () => ({ body: { key: "catalyst/uploads/11111111-1111-1111-1111-111111111111", url: "https://s3.example/put" } }),
+      "PUT https://s3.example/put": () => ({ body: {} }),
+      "POST /entities/0000442287/documents": (b) => ({ status: 201, body: { stored: true, ...(b as object) } }),
+    });
+    writeFileSync(join(dir, "audit.pdf"), "%PDF-1.4 audit");
+    const bad = await cli("documents", "put", "0000442287", join(dir, "audit.pdf"), "--kind", "auditor", "--date", "2026-03-31");
+    expect(bad.err).toContain("not valid");
+    expect(sent).toHaveLength(0);
+    const r = JSON.parse((await cli("documents", "put", "0000442287", join(dir, "audit.pdf"), "--kind", "audit", "--date", "2026-03-31", "--title", "Auditor's report FY2025")).out);
+    expect(r).toMatchObject({ stored: true, kind: "audit", fileName: "audit.pdf", uploadKey: "catalyst/uploads/11111111-1111-1111-1111-111111111111" });
+    expect(sent.map((s) => `${s.method} ${s.url.replace(/^.*\/agent/, "")}`)).toEqual(["GET /entities/0000442287", "POST /filings/upload-url", "PUT https://s3.example/put", "POST /entities/0000442287/documents"]);
+  });
+
   it("schema: the inputs as JSON Schema", async () => {
     const { cli } = setup();
     const s = JSON.parse((await cli("schema", "analysis")).out);

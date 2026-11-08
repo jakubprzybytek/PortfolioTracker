@@ -24,6 +24,11 @@ const TABS = [
 const mln = (v: number | null | undefined) => (v === null || v === undefined ? "–" : fmtNum(v / 1e6, 1));
 const FORMAT: Record<string, string> = { "krs-xml": "KRS e-report (XML)", esef: "ESEF", pdf: "PDF", "ifrs-text": "IFRS text" };
 const formatLabel = (f: string) => FORMAT[f] ?? f;
+/** An interim period's name: "H1 2026", "Q1 2026", "Q1–Q3 2026" (as core/catalyst/issuers/interim.ts). */
+const periodLabel = (periodEnd: string, months: number) => {
+  const year = periodEnd.slice(0, 4);
+  return months === 6 ? `H1 ${year}` : months === 3 ? `Q1 ${year}` : months === 9 ? `Q1–Q3 ${year}` : `${months} m to ${periodEnd}`;
+};
 
 export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds }: { entityId: string; rows: BondRow[]; tab: string; setTab: (t: string) => void; onClose: () => void; onShowBonds: () => void }) {
   const detail = useApi<CompanyDetail>(`/catalyst/entities/${encodeURIComponent(entityId)}`);
@@ -86,6 +91,13 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
           <>
             <p className="muted cat-facts" data-testid="issuer-source">
               {a.source ? `${formatLabel(a.source.format)}, ${a.source.scope} accounts, FY${a.source.latestPeriodEnd.slice(0, 4)}${a.source.years > 1 ? ` and ${a.source.years - 1} earlier` : ""}` : "No full year stored"}
+              {a.source?.interim && (
+                <span data-testid="issuer-source-interim">
+                  {" "}
+                  + {a.source.interim.label} ({a.source.interim.ttm.length ? `TTM to ${a.source.interim.periodEnd}` : `balance sheet at ${a.source.interim.periodEnd}`}, unaudited)
+                </span>
+              )}
+              {a.source?.interimSkipped && <span className="muted"> · {a.source.interimSkipped}</span>}
               {latest && ` · judgement ${latest.at.slice(0, 10)}`}
             </p>
             {c?.businessSummary && (
@@ -307,7 +319,8 @@ const FIGURES: [string, string][] = [
 const REVIEW: Record<ReviewStatus, string> = { parsed: "parsed", "hand-checked": "hand-checked", flagged: "flagged" };
 
 function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => void }) {
-  const years = [...d.years].sort((a, b) => b.periodEnd.localeCompare(a.periodEnd) || a.scope.localeCompare(b.scope)).slice(0, 6);
+  // Up to six columns, newest first: the interim periods (H1 2026, H1 2025) beside the full years.
+  const years = [...d.years].sort((a, b) => b.periodEnd.localeCompare(a.periodEnd) || a.scope.localeCompare(b.scope)).slice(0, 7);
   const [open, setOpen] = useState<{ period: string; field?: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -335,7 +348,7 @@ function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => 
               <th className="left">m {years[0]!.currency}</th>
               {years.map((y) => (
                 <th key={y.period} title={`${y.periodStart} – ${y.periodEnd}, ${y.months} months; from the ${y.reportPeriodEnd.slice(0, 4)} report (${y.column === "current" ? "its year" : "its comparative"}); ${formatLabel(y.filing.format)}; imported by ${y.enteredBy}`}>
-                  FY{y.periodEnd.slice(0, 4)}
+                  {y.months < 12 ? periodLabel(y.periodEnd, y.months) : `FY${y.periodEnd.slice(0, 4)}`}
                   <br />
                   <span className="muted">{y.scope}</span>
                 </th>
@@ -476,19 +489,22 @@ function JudgementsTab({ d }: { d: CompanyDetail }) {
 
 function DocumentsTab({ d }: { d: CompanyDetail }) {
   const [error, setError] = useState<string | null>(null);
-  const open = async (sha: string) => {
+  const open = async (sha: string, what: "filings" | "documents" = "filings") => {
     setError(null);
     try {
-      const { url } = await api<{ url: string }>(`/catalyst/entities/${encodeURIComponent(d.company.entityId)}/filings/${sha}`);
+      const { url } = await api<{ url: string }>(`/catalyst/entities/${encodeURIComponent(d.company.entityId)}/${what}/${sha}`);
       window.open(url, "_blank", "noopener");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
   };
-  if (d.filings.length === 0) return <p className="muted">No reports imported.</p>;
+  const docs = d.documents ?? [];
+  if (d.filings.length === 0 && docs.length === 0) return <p className="muted">No reports imported, no documents stored.</p>;
   return (
     <div className="cat-track">
       {error && <p className="error">{error}</p>}
+      <h4 className="cat-subhead">Statements imported</h4>
+      {d.filings.length === 0 && <p className="muted">None.</p>}
       <div className="table-wrap">
         <table className="static" data-testid="issuer-documents">
           <thead>
@@ -526,6 +542,47 @@ function DocumentsTab({ d }: { d: CompanyDetail }) {
           </tbody>
         </table>
       </div>
+      <h4 className="cat-subhead">Other documents</h4>
+      {docs.length === 0 ? (
+        <p className="muted">None stored (the auditor's report, the management report, interim and current reports the judgement read).</p>
+      ) : (
+        <div className="table-wrap">
+          <table className="static" data-testid="issuer-other-documents">
+            <thead>
+              <tr>
+                <th className="left">Document</th>
+                <th className="left">Kind</th>
+                <th className="left">Date</th>
+                <th className="left">Stored</th>
+              </tr>
+            </thead>
+            <tbody>
+              {docs.map((x) => (
+                <tr key={x.sha256}>
+                  <td className="left">
+                    <button type="button" className="link-button" onClick={() => void open(x.sha256, "documents")} title={`Open ${x.fileName}`}>
+                      {x.title}
+                    </button>
+                    {x.sourceUrl && (
+                      <a className="muted" href={x.sourceUrl} target="_blank" rel="noopener noreferrer" title="Where it came from">
+                        {" "}
+                        ↗
+                      </a>
+                    )}
+                  </td>
+                  <td className="left">{DOC_KIND[x.kind] ?? x.kind}</td>
+                  <td className="left">{x.date}</td>
+                  <td className="left muted">
+                    {x.at.slice(0, 10)} · {x.by}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
+
+const DOC_KIND: Record<string, string> = { audit: "auditor's report", management: "management report", interim: "interim report", annual: "annual report", "current-report": "current report", terms: "bond terms", other: "other" };
