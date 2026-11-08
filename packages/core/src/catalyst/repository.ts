@@ -6,7 +6,7 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystEventItem, type CatalystExitsNowItem, type CatalystMarkingItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystEntityItem, type CatalystEventItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
 import type { ScreenRow } from "./screen.ts";
 
 /** Batches of 25 written at once, at most. */
@@ -103,6 +103,43 @@ export class CatalystRepository {
 
   async putExitsNow(item: Omit<CatalystExitsNowItem, "PK" | "SK">): Promise<void> {
     await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.exitsNow(), ...item } }));
+  }
+
+  /** Every bond's issuer link (one query on the index). */
+  listLinks(): Promise<CatalystLinkItem[]> {
+    return this.queryAll<CatalystLinkItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "LINK" } });
+  }
+
+  getLink(isin: string): Promise<CatalystLinkItem | undefined> {
+    return this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.link(isin) })).then((r) => r.Item as CatalystLinkItem | undefined);
+  }
+
+  putLinks(items: Omit<CatalystLinkItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {
+    return this.batchPut(items.map((l) => ({ ...catalystKeys.link(l.isin), GSI1PK: "LINK", GSI1SK: l.isin, ...l })));
+  }
+
+  listNames(): Promise<CatalystNameItem[]> {
+    return this.queryAll<CatalystNameItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "NAME" } });
+  }
+
+  getName(name: string): Promise<CatalystNameItem | undefined> {
+    return this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.name(name) })).then((r) => r.Item as CatalystNameItem | undefined);
+  }
+
+  putNames(items: Omit<CatalystNameItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {
+    return this.batchPut(items.map((n) => ({ ...catalystKeys.name(n.name), GSI1PK: "NAME", GSI1SK: n.name, ...n })));
+  }
+
+  listEntities(): Promise<CatalystEntityItem[]> {
+    return this.queryAll<CatalystEntityItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "ENTITY" } });
+  }
+
+  getEntity(entityId: string): Promise<CatalystEntityItem | undefined> {
+    return this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.entity(entityId) })).then((r) => r.Item as CatalystEntityItem | undefined);
+  }
+
+  putEntities(items: Omit<CatalystEntityItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {
+    return this.batchPut(items.map((e) => ({ ...catalystKeys.entity(e.entityId), GSI1PK: "ENTITY", GSI1SK: e.shortName, ...e })));
   }
 
   /** Every bond's terms (one query on the index). */

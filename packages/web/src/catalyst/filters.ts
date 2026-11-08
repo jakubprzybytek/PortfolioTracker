@@ -25,7 +25,7 @@ export const MIN_PREMIUM: Option[] = ["0", "1", "2", "3", "5"].map((v) => ({ val
 export const FILTER_KEYS = ["q", "type", "cur", "base", "mat", "nom", "liq", "yield", "prem", "stale", "sort"] as const;
 
 export function matches(r: BondRow, p: Record<string, string>): boolean {
-  if (p["q"] && !matchesAny(p["q"], r.code, r.issuer ?? undefined, r.isin)) return false;
+  if (p["q"] && !matchesAny(p["q"], r.code, r.issuer ?? undefined, r.issuerShort, r.issuerLegal, r.isin)) return false;
   if (p["type"] && r.segment !== p["type"]) return false;
   if (p["cur"] && r.currency !== p["cur"]) return false;
   if (p["base"] && baseOf(r) !== p["base"]) return false;

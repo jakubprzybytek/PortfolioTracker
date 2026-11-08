@@ -156,7 +156,7 @@ export function TrackTab({ detail, loading }: { detail: BondDetail | undefined; 
         </p>
       )}
       <p className="cat-facts" data-testid="catalyst-track-summary">
-        Bonds coded {t.prefix}… since {t.since?.slice(0, 7) ?? "–"}: {c.repaid} repaid • {c.early} redeemed early • {c["below-par"]} ended below par • {c["past-maturity"]} past maturity • {c.unknown} unknown • {c.listed} listed
+        {t.company ? `${t.company}'s bonds` : `Bonds coded ${t.prefix}…`} since {t.since?.slice(0, 7) ?? "–"}: {c.repaid} repaid • {c.early} redeemed early • {c["below-par"]} ended below par • {c["past-maturity"]} past maturity • {c.unknown} unknown • {c.listed} listed
         {ended === 0 ? " (none ended yet: no record)" : ""}.
       </p>
       {t.flags.length > 0 ? (
@@ -205,7 +205,9 @@ export function TrackTab({ detail, loading }: { detail: BondDetail | undefined; 
           </tbody>
         </table>
       </div>
-      <p className="muted cat-facts">Grouped by the code's prefix until bonds are linked to companies. "Inferred" is read from trading (when a bond left, its last price); only the issuer's reports confirm a payment.</p>
+      <p className="muted cat-facts">
+        {t.company ? "The company's bonds (linked through GLEIF and GPW). " : "Grouped by the code's prefix: the bond isn't linked to a company yet. "}"Inferred" is read from trading (when a bond left, its last price); only the issuer's reports confirm a payment.
+      </p>
     </div>
   );
 }

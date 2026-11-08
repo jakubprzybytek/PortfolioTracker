@@ -779,6 +779,19 @@ describe(`API ${API}`, () => {
     expect(typeof body.deadLetter).toBe("number");
   });
 
+  it("Catalyst: companies and listed names, the AI analysis switch (int holds none: the answers to unknown ones)", async () => {
+    const entities = await get<{ entities: unknown[] }>("/catalyst/entities");
+    expect(entities.status).toBe(200);
+    expect(Array.isArray(entities.body.entities)).toBe(true);
+    expect((await get<{ names: unknown[] }>("/catalyst/names")).status).toBe(200);
+    expect((await get("/catalyst/entities/0000000000")).status).toBe(404);
+    expect((await send("PUT", "/catalyst/entities/0000000000/ai", { on: true })).status).toBe(404);
+    expect((await send("PUT", "/catalyst/entities/0000000000/ai", { on: "yes" })).status).toBe(400);
+    expect((await send("PUT", "/catalyst/entities/0000000000", { shortName: "" })).status).toBe(400);
+    expect((await send("PUT", `/catalyst/names/${encodeURIComponent("No Such Name S.A.")}/ai`, { on: true })).status).toBe(404);
+    expect((await send("PUT", `/catalyst/names/${encodeURIComponent("No Such Name S.A.")}`, { entityId: "0000000000" })).status).toBe(400);
+  });
+
   it("Catalyst: the screen, a bond, the assumptions and the saved views", async () => {
     const screen = await get<{ date: string | null; rows: unknown[]; curve: unknown }>("/catalyst/bonds");
     expect(screen.status).toBe(200);

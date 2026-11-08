@@ -73,7 +73,82 @@ export const catalystKeys = {
   event: (isin: string, published: string, action: ExitAction) => ({ PK: `BOND#${isin}` as const, SK: `EVENT#${published}#${action}` as const }),
   marking: (issuer: string, marking: string) => ({ PK: "MARKS" as const, SK: `${issuer}#${marking}` }),
   exitsNow: () => ({ PK: "EXITS" as const, SK: "CURRENT" as const }),
+  link: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "ENTITY" as const }),
+  name: (name: string) => ({ PK: `NAME#${name}` as const, SK: "META" as const }),
+  entity: (entityId: string) => ({ PK: `ENTITY#${entityId}` as const, SK: "META" as const }),
 };
+
+/** Whether the AI agent works on a company (or a listed name not yet linked): off unless you switch it on. */
+export interface AiSwitch {
+  on: boolean;
+  /** Who switched it (the user's e-mail, or "setup" for the first switch-on) and when. */
+  by: string;
+  at: string;
+}
+
+/**
+ * A bond's issuer (phase 2, N2): its own item, apart from the bond's (the daily job rewrites that one). Listed on the
+ * index (`LINK`) so all links are read in one query.
+ */
+export interface CatalystLinkItem {
+  PK: `BOND#${string}`;
+  SK: "ENTITY";
+  GSI1PK: "LINK";
+  GSI1SK: string; // isin
+  isin: string;
+  code: string;
+  /** Null when no source names the issuer yet ("none": asked again a month later). */
+  entityId: string | null;
+  lei: string | null;
+  /**
+   * How: GLEIF's ISIN mapping, the issuer LEI on GPW's measures, the listed name of a bond linked so, the code prefix
+   * of an ended bond (inferred), set by hand (the CLI, N7), or not found.
+   */
+  via: "gleif-isin" | "gpw-exits" | "listed-name" | "code-prefix" | "hand" | "none";
+  at: string;
+}
+
+/** An issuer name as listed (obligacje.pl), pointing at its company. Several names can point at one company. */
+export interface CatalystNameItem {
+  PK: `NAME#${string}`;
+  SK: "META";
+  GSI1PK: "NAME";
+  GSI1SK: string; // name
+  name: string;
+  entityId: string | null;
+  /** resolved: by code, names agree; confirmed: by you; review: linked by code but the legal name differs; unresolved: no link. */
+  status: "resolved" | "confirmed" | "review" | "unresolved";
+  evidence: string;
+  /** The switch of a name not yet linked to a company (it passes to the company when linked). */
+  aiAnalysis?: AiSwitch;
+  updatedAt: string;
+}
+
+/** A company behind bonds: identity from GLEIF and the KRS register; the rest by you and the agent (later milestones). */
+export interface CatalystEntityItem {
+  PK: `ENTITY#${string}`;
+  SK: "META";
+  GSI1PK: "ENTITY";
+  GSI1SK: string; // short name
+  entityId: string;
+  shortName: string;
+  /** True once you set the short name (the code's refresh leaves it alone). */
+  shortNameSet?: boolean;
+  legalName: string;
+  country: string | null;
+  krs: string | null;
+  lei: string;
+  /** The LEI's registration (ISSUED, LAPSED …) and the entity's status (ACTIVE, INACTIVE). */
+  leiStatus: string | null;
+  status: string | null;
+  legalForm: string | null;
+  /** The KRS register: main business (PKD) and section 6 (a liquidation open, the kinds of entries it holds). */
+  pkd?: string | null;
+  register?: { liquidationOpen: boolean; entries: string[] };
+  aiAnalysis?: AiSwitch;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /**
  * A GPW measure on a bond (suspension, lifting, exclusion: gpw.pl's suspensions and exclusions, exits.ts). Rewritten on

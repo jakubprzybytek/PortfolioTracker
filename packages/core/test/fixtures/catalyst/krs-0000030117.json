@@ -1,0 +1,969 @@
+{
+  "odpis": {
+    "rodzaj": "Aktualny",
+    "naglowekA": {
+      "rejestr": "RejP",
+      "numerKRS": "0000030117",
+      "dataCzasOdpisu": "07.11.2026 23:05:17",
+      "stanZDnia": "21.08.2026",
+      "dataRejestracjiWKRS": "24.07.2001",
+      "numerOstatniegoWpisu": 125,
+      "dataOstatniegoWpisu": "21.08.2026",
+      "sygnaturaAktSprawyDotyczacejOstatniegoWpisu": "WR.VI NS-REJ.KRS/29469/26/612",
+      "oznaczenieSaduDokonujacegoOstatniegoWpisu": "SĄD REJONOWY DLA WROCŁAWIA FABRYCZNEJ WE WROCŁAWIU, VI WYDZIAŁ GOSPODARCZY KRAJOWEGO REJESTRU SĄDOWEGO",
+      "stanPozycji": 1
+    },
+    "dane": {
+      "dzial1": {
+        "danePodmiotu": {
+          "formaPrawna": "SPÓŁKA AKCYJNA",
+          "identyfikatory": {
+            "regon": "93077802400000",
+            "nip": "8960000701"
+          },
+          "nazwa": "VANTAGE DEVELOPMENT SPÓŁKA AKCYJNA",
+          "daneOWczesniejszejRejestracji": {
+            "nazwaPoprzedniegoRejestru": "RHB",
+            "numerWPoprzednimRejestrze": "6074",
+            "sadProwadzacyRejestr": "SĄD REJONOWY DLA WROCŁAWIA - FABRYCZNEJ, VI WYDZIAŁ GOSPODARCZY REJESTROWY"
+          },
+          "czyProwadziDzialalnoscZInnymiPodmiotami": false,
+          "czyPosiadaStatusOPP": false
+        },
+        "siedzibaIAdres": {
+          "siedziba": {
+            "kraj": "POLSKA",
+            "wojewodztwo": "DOLNOŚLĄSKIE",
+            "powiat": "WROCŁAW",
+            "gmina": "WROCŁAW",
+            "miejscowosc": "WROCŁAW"
+          },
+          "adres": {
+            "ulica": "UL. JAWORSKA",
+            "nrDomu": "11",
+            "miejscowosc": "WROCŁAW",
+            "kodPocztowy": "53-612",
+            "poczta": "WROCŁAW",
+            "kraj": "POLSKA"
+          },
+          "adresStronyInternetowej": "HTTPS://VANTAGE-SA.PL/",
+          "adresDoDoreczenElektronicznychWpisanyDoBAE": "AE:PL-83934-95478-JGDRA-24"
+        },
+        "umowaStatut": {
+          "informacjaOZawarciuZmianieUmowyStatutu": [
+            {
+              "zawarcieZmianaUmowyStatutu": "- AKT NOTARIALNY Z DNIA 27.12.1995 R., SPORZĄDZONY PRZEZ NOTARIUSZA PAWŁA BŁASZCZAKA Z KANCELARII NOTARIALNEJ W WARSZAWIE PRZY UL.DŁUGIEJ 31, REP. A NR 21270/95;\n\n- ZMIANY DOTYCHCZAS NIEZAREJESTROWANE: AKT NOTARIALNY Z DNIA 30.03.2001 R., SPORZĄDZONY PRZEZ NOTARIUSZA JOLANTĘ OŁPIŃSKĄ Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY UL.GRABISZYŃSKIEJ 14/1, REP. A NR 1689/01: M.IN. ZMIANA STATUTU SPÓŁKI W ZAKRESIE DOTYCZĄCYM ART.1, ART.7 ORAZ ART.22 UST.2 PKT.6, W TYM ZMIANA FIRMY SPÓŁKI."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "-26.09.2001 R., REP. A NR 5237/01, NOTARIUSZ JOLANTA OŁPIŃSKA Z KANCELARII NOTARIALNEJ WE WROCŁAWIU, ZMIENIONO ART. 10, ART. 17, DODANO ART. 28.1 PKT 4."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "28.02.2002 R. REPERTORIUM A NR 1134/02\nKANCELARIA NOTARIALNA WE WROCŁAWIU PRZY UL. GRABISZYŃSKIEJ 14/1\nNOTARIUSZ JOLANTA OŁPIŃSKA\nZMIANA TREŚCI ART.15 STAUTU SPÓŁKI"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "AKT NOTARIALNY Z DNIA 20.12.2007 R., NOTARIUSZ BEATA BARANOWSKA-SEWERYN, KANCELARIA NOTARIALNA WE WROCŁAWIU PRZY UL. RUSKIEJ 3/4, REPERTORIUM A NR 10914/2007,\nUCHYLONO W CAŁOŚCI DOTYCHCZASOWĄ TREŚĆ STATUTU SPÓŁKI I NADANO MU NOWE BRZMIENIE."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "AKT NOTARIALNY Z DNIA 29.01.2008 R., NOTARIUSZ BEATA BARANOWSKA-SEWERYN, KANCELARIA NOTARIALNA WE WROCŁAWIU PRZY UL. RUSKIEJ 3/4, REPERTORIUM A NR 1773/2008,\nZMIENIONO §7 STATUTU"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "AKT NOTARIALNY Z DNIA 09.04.2008 R., REP. A NR 6040/2008 SPORZĄDZONY PRZED ASESOREM NOTARIALNYM MARKIEM WYPARTEM ZASTĘPCĄ NOTARIUSZA BEATY BARANOWSKIEJ-SEWERYN Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY UL. RUSKIEJ 3/4, NA PODSTAWIE KTÓREGO ZMIENIONO PAR. 7 STATUTU SPÓŁKI."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "09.05.2011 R., NOTARIUSZ BEATA BARANOWSKA-SEWERYN, KANCELARIA NOTARIALNA WE WROCŁAWIU PRZY UL. 3/4, REP. A NR 40442/2011 \n- ZMIENIONO: § 6 PKT 1, § 7 PKT 1, § 9 PKT 2, § 15 PKT 1, W § 15 DODANO PKT 4, PKT 5, W § 16 DODANO PKT 7, § 18 PKT 2, § 18 PKT 3, § 18 PKT 4, § 18 PKT 5, § 19 PKT 3\n- SKREŚLONO: § 7 PKT 2\nPRZYJĘTO TEKST JEDNOLITY STATUTU"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "19.08.2011 R., ASESOR NOTARIALNY ANNA LUBIENIECKA, ZASTĘPCA NOTARIUSZA BEATY BARANOWSKIEJ-SEWERYN, KANCELARIA NOTARIALNA WE WROCŁAWIU, UL. RUSKA 3/4, REPERTORIUM A NR 65968/2011 - ZMIENIONO: § 7 PKT 1."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "22.05.2013 R., NOTARIUSZ BEATA BARANOWSKA-SEWERYN Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY UL.RUSKIEJ 3/4, REPERTORIUM A NUMER 40856/2013 - ZMIANA §17 UST.2 PKT \"N\" STATUTU SPÓŁKI"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "04.11.2013 R., NOTARIUSZ BEATA BARANOWSKA-SEWERYN Z KANCELARII NOTARIALNEJ WE WROCŁAWIU UL.RUSKA 3/4, REPERTORIUM A NR 96950/2013 - ZMIANA §7 STATUTU\n22.05.2013 R., NOTARIUSZ BEATA BARANOWSKA-SEWERYN Z KANCELARII NOTARIALNEJ WE WROCŁAWIU UL. RUSKA 3/4, REPERTORIUM A NR 40856/2013 - ZMIANA §7 STATUTU SPÓŁKI"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "16.06.2016 R., NOTARIUSZ TOMASZ KALINOWSKI Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY ULICY RYNEK NUMER 60, REPERTORIUM A NR 15115/2016 - ZMIENIONO BRZMIENIE §13 UST.2 STATUTU SPÓŁKI"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "15.09.2017 R., NOTARIUSZ TOMASZ KALINOWSKI Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY ULICY RYNEK NR 60, REPERTORIUM A NR 22178/2017 - ZMIENIONO §7 UST.1 STATUTU SPÓŁKI"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "19.06.2018 R., NOTARIUSZ TOMASZ KALINOWSKI Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY ULICY RYNEK NR 60, REPERTORIUM A NR 13060/2018 - ZMIENIONO §7 UST.1 STATUTU SPÓŁKI"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "19.06.2019R., NOTARIUSZ TOMASZ KALINOWSKI, KANCELARIA NOTARIALNA WE WROCŁAWIU PRZY UL. RYNEK NR 50, REP. A NR 11402/2019;\nZMIENIONO §7 STATUTU SPÓŁKI."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "26.05.2020 R., NOTARIUSZ TOMASZ KALINOWSKI Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY ULICY RYNEK 60, REPERTORIUM A NR 10705/2020 - ZMIENIONO §1, §6 UST.1, §9, §11 UST.2, §15, W §16 UST.1,2 I 7, §17, §18, §23, §24 UST.2, §25 UST.3, §27 UST.3, W §27 DODAJE UST.6, USUNIĘTO §29"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "13.05.2022 R. NOTARIUSZ TOMASZ KALINOWSKI Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY ULICY RYNEK 60, REPERTORIUM A NR 6178/2022 - ZMIENIONO § 17 UST. 2, \n§ 24 UST. 2, USUNIĘTO § 17 UST. 3"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "23.03.2023 R. NOTARIUSZ TOMASZ KALINOWSKI Z KANCELARII NOTARIANEJ WE WROCŁAWIU PRZY UL. RYNEK 60, REPERTORIUM A NR 2715/2023 - ZMIENIONO § 6 UST. 1, § 13, § 16 UST. 3 I 5, § 17 UST. 2,  § 20, § 26 UST. 2, § 27 UST. 6, W § 9 PO UST. 2 DODANO UST. 3 ORAZ W § 17 PO UST. 2 DODANO UST. 3,"
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "11.07.2025 R. NOTARIUSZ TOMASZ KALINOWSKI Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY UL. PAWŁA WŁODKOWICA 10/8, REPERTORIUM A NR 5182/2025 - ZMIENIONO § 6 UST. 1 I § 7."
+            },
+            {
+              "zawarcieZmianaUmowyStatutu": "14.05.2026 R. NOTARIUSZ TOMASZ KALINOWSKI Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY UL. PAWŁA WŁODKOWICA 10/8, REPERTORIUM A NR 3159/2026 - ZMIENIONO § 7"
+            }
+          ]
+        },
+        "pozostaleInformacje": {
+          "czasNaJakiUtworzonyZostalPodmiot": "NIEOZNACZONY",
+          "czyUmowaStatutPrzyznajeUprawnieniaOsobiste": false,
+          "czyObligatoriuszeMajaPrawoDoUdzialuWZysku": false
+        },
+        "jedynyAkcjonariusz": [
+          {
+            "nazwa": "TAG BETEILIGUNGS-UND IMMOBILIENVERWALTUNGS GMBH",
+            "identyfikator": {},
+            "krs": {
+              "krs": "0000000000"
+            }
+          }
+        ],
+        "kapital": {
+          "wysokoscKapitaluZakladowego": {
+            "wartosc": "124122937,94",
+            "waluta": "PLN"
+          },
+          "lacznaLiczbaAkcjiUdzialow": "200198287",
+          "wartoscJednejAkcji": {
+            "wartosc": "0,62",
+            "waluta": "PLN"
+          },
+          "czescKapitaluWplaconegoPokrytego": {
+            "wartosc": "132727620,96",
+            "waluta": "PLN"
+          },
+          "wniesioneAporty": {
+            "okreslenieWartosciUdzialowObjetychZaAport": [
+              {
+                "wartosc": "4169115,60",
+                "waluta": "PLN"
+              }
+            ]
+          }
+        },
+        "emisjeAkcji": [
+          {
+            "nazwaSeriiAkcji": "A",
+            "liczbaAkcjiWSerii": "800000",
+            "czyAkcjeUprzywilejowaneLiczbaAkcjiRodzajUprzywilejowania": "AKCJE NIE SĄ UPRZYWILEJOWANE"
+          },
+          {
+            "nazwaSeriiAkcji": "B",
+            "liczbaAkcjiWSerii": "5635316",
+            "czyAkcjeUprzywilejowaneLiczbaAkcjiRodzajUprzywilejowania": "AKCJE NIE SĄ UPRZYWILEJOWANE"
+          },
+          {
+            "nazwaSeriiAkcji": "SERIA C",
+            "liczbaAkcjiWSerii": "12764684",
+            "czyAkcjeUprzywilejowaneLiczbaAkcjiRodzajUprzywilejowania": "AKCJE NIE SĄ UPRZYWILEJOWANE"
+          },
+          {
+            "nazwaSeriiAkcji": "SERIA D",
+            "liczbaAkcjiWSerii": "6724380",
+            "czyAkcjeUprzywilejowaneLiczbaAkcjiRodzajUprzywilejowania": "AKCJE NIE SĄ UPRZYWILEJOWANE"
+          },
+          {
+            "nazwaSeriiAkcji": "E",
+            "liczbaAkcjiWSerii": "22637326",
+            "czyAkcjeUprzywilejowaneLiczbaAkcjiRodzajUprzywilejowania": "AKCJE NIE SĄ UPRZYWILEJOWANE"
+          },
+          {
+            "nazwaSeriiAkcji": "F",
+            "liczbaAkcjiWSerii": "0",
+            "czyAkcjeUprzywilejowaneLiczbaAkcjiRodzajUprzywilejowania": "AKCJE NIE SĄ UPRZYWILEJOWANE"
+          },
+          {
+            "nazwaSeriiAkcji": "G",
+            "liczbaAkcjiWSerii": "68572581",
+            "czyAkcjeUprzywilejowaneLiczbaAkcjiRodzajUprzywilejowania": "AKCJE NIE SĄ UPRZYWILEJOWANE"
+          },
+          {
+            "nazwaSeriiAkcji": "H",
+            "liczbaAkcjiWSerii": "83064000",
+            "czyAkcjeUprzywilejowaneLiczbaAkcjiRodzajUprzywilejowania": "AKCJE NIE SĄ UPRZYWILEJOWANE"
+          }
+        ],
+        "wzmiankaOUpowaznieniuDoEmisjiWarrantowSubskrypcyjnych": {
+          "czyZarzadJestUprawnionyDoEmisjiWarrantowSubskrypcyjnych": false
+        }
+      },
+      "dzial2": {
+        "reprezentacja": {
+          "nazwaOrganu": "ZARZĄD SPÓŁKI",
+          "sposobReprezentacji": "W PRZYPADKU ZARZĄDU WIELOOSOBOWEGO DO SKŁADANIA OŚWIADCZEŃ I PODPISYWANIA W IMIENIU SPÓŁKI UPOWAŻNIENI SĄ DWAJ CZŁONKOWIE ZARZĄDU DZIAŁAJĄCY ŁĄCZNIE LUB CZŁONEK ZARZĄDU ŁĄCZNIE Z PROKURENTEM, ZAŚ W PRZYPADKU ZARZĄDU JEDNOOSOBOWEGO CZŁONEK ZARZĄDU DZIAŁAJĄCY SAMODZIELNIE.",
+          "sklad": [
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "P**********"
+              },
+              "imiona": {
+                "imie": "D******"
+              },
+              "identyfikator": {
+                "pesel": "7**********"
+              },
+              "funkcjaWOrganie": "WICEPREZES ZARZĄDU",
+              "czyZawieszona": false
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "H****"
+              },
+              "imiona": {
+                "imie": "M****"
+              },
+              "identyfikator": {
+                "pesel": "8**********"
+              },
+              "funkcjaWOrganie": "WICEPREZES ZARZĄDU",
+              "czyZawieszona": false
+            },
+            {
+              "nazwisko": {
+                "nazwiskoICzlon": "K*****"
+              },
+              "imiona": {
+                "imie": "E***"
+              },
+              "identyfikator": {
+                "pesel": "6**********"
+              },
+              "funkcjaWOrganie": "PREZES ZARZĄDU",
+              "czyZawieszona": false
+            }
+          ]
+        },
+        "organNadzoru": [
+          {
+            "nazwa": "RADA NADZORCZA",
+            "sklad": [
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "V****"
+                },
+                "imiona": {
+                  "imie": "H*****"
+                },
+                "identyfikator": {}
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "T****"
+                },
+                "imiona": {
+                  "imie": "M*****"
+                },
+                "identyfikator": {}
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "H****"
+                },
+                "imiona": {
+                  "imie": "C******"
+                },
+                "identyfikator": {}
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "B*******"
+                },
+                "imiona": {
+                  "imie": "R*******",
+                  "imieDrugie": "Z*******"
+                },
+                "identyfikator": {
+                  "pesel": "6**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "K*********"
+                },
+                "imiona": {
+                  "imie": "P*********"
+                },
+                "identyfikator": {
+                  "pesel": "6**********"
+                }
+              },
+              {
+                "nazwisko": {
+                  "nazwiskoICzlon": "K*********"
+                },
+                "imiona": {
+                  "imie": "O****"
+                },
+                "identyfikator": {
+                  "pesel": "5**********"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "dzial3": {
+        "przedmiotDzialalnosci": {
+          "przedmiotPrzewazajacejDzialalnosci": [
+            {
+              "opis": "REALIZACJA PROJEKTÓW BUDOWLANYCH ZWIĄZANYCH ZE WZNOSZENIEM BUDYNKÓW MIESZKALNYCH",
+              "kodDzial": "68",
+              "kodKlasa": "12",
+              "kodPodklasa": "A"
+            }
+          ],
+          "przedmiotPozostalejDzialalnosci": [
+            {
+              "opis": "POZOSTAŁA DZIAŁALNOŚĆ WSPOMAGAJĄCA USŁUGI FINANSOWE, Z WYŁĄCZENIEM UBEZPIECZEŃ I FUNDUSZÓW EMERYTALNYCH",
+              "kodDzial": "66",
+              "kodKlasa": "19",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "WYNAJEM I ZARZĄDZANIE NIERUCHOMOŚCIAMI WŁASNYMI LUB DZIERŻAWIONYMI",
+              "kodDzial": "68",
+              "kodKlasa": "20",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "DZIAŁALNOŚĆ FIRM CENTRALNYCH (HEAD OFFICES); DORADZTWO ZWIĄZANE Z ZARZĄDZANIEM",
+              "kodDzial": "70"
+            },
+            {
+              "opis": "DZIAŁALNOŚĆ W ZAKRESIE ARCHITEKTURY",
+              "kodDzial": "71",
+              "kodKlasa": "11",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "ROBOTY BUDOWLANE ZWIĄZANE ZE WZNOSZENIEM BUDYNKÓW MIESZKALNYCH",
+              "kodDzial": "41",
+              "kodKlasa": "00",
+              "kodPodklasa": "A"
+            },
+            {
+              "opis": "KUPNO I SPRZEDAŻ NIERUCHOMOŚCI NA WŁASNY RACHUNEK",
+              "kodDzial": "68",
+              "kodKlasa": "11",
+              "kodPodklasa": "Z"
+            },
+            {
+              "opis": "DZIAŁALNOŚĆ ZWIĄZANA Z ZARZĄDZANIEM NIERUCHOMOŚCIAMI WYKONYWANYM NA ZLECENIE",
+              "kodDzial": "68",
+              "kodKlasa": "32",
+              "kodPodklasa": "B"
+            },
+            {
+              "opis": "POZOSTAŁA DZIAŁALNOŚĆ W ZAKRESIE INŻYNIERII I ZWIĄZANE Z NIĄ DORADZTWO TECHNICZNE",
+              "kodDzial": "71",
+              "kodKlasa": "12",
+              "kodPodklasa": "B"
+            },
+            {
+              "opis": "POZOSTAŁA FINANSOWA DZIAŁALNOŚĆ USŁUGOWA, Z WYŁĄCZENIEM UBEZPIECZEŃ I FUNDUSZY EMERYTALNYCH, GDZIE INDZIEJ NIESKLASYFIKOWANA",
+              "kodDzial": "64",
+              "kodKlasa": "99",
+              "kodPodklasa": "Z"
+            }
+          ]
+        },
+        "wzmiankiOZlozonychDokumentach": {
+          "wzmiankaOZlozeniuRocznegoSprawozdaniaFinansowego": [
+            {
+              "dataZlozenia": "29.05.2002",
+              "zaOkresOdDo": "01.01.2001 - 31.12.2001"
+            },
+            {
+              "dataZlozenia": "08.07.2003",
+              "zaOkresOdDo": "01.01.2002 R. - 31.12.2002 R."
+            },
+            {
+              "dataZlozenia": "09.07.2004",
+              "zaOkresOdDo": "01.01.2003 R. - 31.12.2003 R."
+            },
+            {
+              "dataZlozenia": "14.07.2005",
+              "zaOkresOdDo": "01.01.2004 R. - 31.12.2004 R."
+            },
+            {
+              "dataZlozenia": "21.07.2006",
+              "zaOkresOdDo": "01.01.2005 R. - 31.12.2005 R."
+            },
+            {
+              "dataZlozenia": "31.08.2007",
+              "zaOkresOdDo": "01.01.2006 R - 31.12.2006 R."
+            },
+            {
+              "dataZlozenia": "17.07.2008",
+              "zaOkresOdDo": "01.01.2007R.-31.12.2007R."
+            },
+            {
+              "dataZlozenia": "26.06.2009",
+              "zaOkresOdDo": "01.01.2008-31.12.2008"
+            },
+            {
+              "dataZlozenia": "23.06.2010",
+              "zaOkresOdDo": "01.01.2009 R. - 31.12.2009 R."
+            },
+            {
+              "dataZlozenia": "27.05.2011",
+              "zaOkresOdDo": "01.01.2010 R. - 31.12.2010 R."
+            },
+            {
+              "dataZlozenia": "06.07.2012",
+              "zaOkresOdDo": "01.01.2011 R. - 31.12.2011 R."
+            },
+            {
+              "dataZlozenia": "11.06.2013",
+              "zaOkresOdDo": "01.01.2012 R. - 31.12.2012 R."
+            },
+            {
+              "dataZlozenia": "27.05.2014",
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "dataZlozenia": "08.06.2015",
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "dataZlozenia": "23.06.2016",
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "dataZlozenia": "03.07.2017",
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "dataZlozenia": "05.07.2018",
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "dataZlozenia": "04.07.2019",
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "dataZlozenia": "05.06.2020",
+              "zaOkresOdDo": "OD 01.01.2019 DO 31.12.2019"
+            },
+            {
+              "dataZlozenia": "12.05.2021",
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "dataZlozenia": "23.05.2022",
+              "zaOkresOdDo": "OD 01.01.2021 DO 31.12.2021"
+            },
+            {
+              "dataZlozenia": "12.07.2023",
+              "zaOkresOdDo": "OD 01.01.2022 DO 31.12.2022"
+            },
+            {
+              "dataZlozenia": "02.07.2024",
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "dataZlozenia": "02.07.2025",
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "dataZlozenia": "08.07.2026",
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ],
+          "wzmiankaOZlozeniuOpiniiBieglegoRewidentaSprawozdaniaZBadania": [
+            {
+              "zaOkresOdDo": "01.01.2001 - 30.09.2001"
+            },
+            {
+              "zaOkresOdDo": "01.01.2002 R. - 31.12.2002 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2006 R - 31.12.2006 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2007R.-31.12.2007R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2008-31.12.2008"
+            },
+            {
+              "zaOkresOdDo": "01.01.2009 R. - 31.12.2009 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2010 R. - 31.12.2010 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2011 R. - 31.12.2011 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2012 R. - 31.12.2012 R."
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2019 DO 31.12.2019"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2021 DO 31.12.2021"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2022 DO 31.12.2022"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ],
+          "wzmiankaOZlozeniuUchwalyPostanowieniaOZatwierdzeniuRocznegoSprawozdaniaFinansowego": [
+            {
+              "zaOkresOdDo": "1.01.2001 - 31.12.2001"
+            },
+            {
+              "zaOkresOdDo": "01.01.2002 R. - 31.12.2002 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2003 R. - 31.12.2003 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2004 R. - 31.12.2004 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2005 R. - 31.12.2005 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2006 R - 31.12.2006 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2007R.-31.12.2007R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2008-31.12.2008"
+            },
+            {
+              "zaOkresOdDo": "01.01.2009 R. - 31.12.2009 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2010 R. - 31.12.2010 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2011 R. - 31.12.2011 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2012 R. - 31.12.2012 R."
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2019 DO 31.12.2019"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2021 DO 31.12.2021"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2022 DO 31.12.2022"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ],
+          "wzmiankaOZlozeniuSprawozdaniaZDzialalnosci": [
+            {
+              "zaOkresOdDo": "01.01.2001 - 31.12.2001"
+            },
+            {
+              "zaOkresOdDo": "01.01.2002 R. - 31.12.2002 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2003 R. - 31.12.2003 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2004 R. - 31.12.2004 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2005 R. - 31.12.2005 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2006 R - 31.12.2006 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2007R.-31.12.2007R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2008-31.12.2008"
+            },
+            {
+              "zaOkresOdDo": "01.01.2009 R. - 31.12.2009 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2010 R. - 31.12.2010 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2011 R. - 31.12.2011 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2012 R. - 31.12.2012 R."
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2019 DO 31.12.2019"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2021 DO 31.12.2021"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2022 DO 31.12.2022"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ]
+        },
+        "sprawozdaniaGrupyKapitalowej": {
+          "wzmiankaOZlozeniuSkonsolidowanegoRocznegoSprawozdaniaFinansowego": [
+            {
+              "dataZlozenia": "06.07.2012",
+              "zaOkresOdDo": "01.01.2011 R. - 31.12.2011 R."
+            },
+            {
+              "dataZlozenia": "11.06.2013",
+              "zaOkresOdDo": "01.01.2012 R. - 31.12.2012 R."
+            },
+            {
+              "dataZlozenia": "27.05.2014",
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "dataZlozenia": "08.06.2015",
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "dataZlozenia": "23.06.2016",
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "dataZlozenia": "03.07.2017",
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "dataZlozenia": "04.07.2018",
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "dataZlozenia": "04.07.2019",
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "dataZlozenia": "05.06.2020",
+              "zaOkresOdDo": "OD 01.01.2019 DO 31.12.2019"
+            },
+            {
+              "dataZlozenia": "12.05.2021",
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "dataZlozenia": "02.07.2024",
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "dataZlozenia": "02.07.2025",
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "dataZlozenia": "08.07.2026",
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ],
+          "wzmiankaOZlozeniuOpiniiBieglegoRewidentaSprawozdaniaZBadania": [
+            {
+              "zaOkresOdDo": "01.01.2011 R. - 31.12.2011 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2012 R. - 31.12.2012 R."
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2019 DO 31.12.2019"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ],
+          "wzmiankaOZlozeniuUchwalyPostanowieniaOZatwierdzeniuSkonsolidowanegoRocznegoSprawozdaniaFinansowego": [
+            {
+              "zaOkresOdDo": "01.01.2011 R. - 31.12.2011 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2012 R. - 31.12.2012 R."
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2019 DO 31.12.2019"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ],
+          "wzmiankaOZlozeniuSprawozdaniaZDzialalnosciGrupyKapitalowejSpolkiDominujacejLacznie": [
+            {
+              "zaOkresOdDo": "01.01.2011 R. - 31.12.2011 R."
+            },
+            {
+              "zaOkresOdDo": "01.01.2012 R. - 31.12.2012 R."
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2013 DO 31.12.2013"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2014 DO 31.12.2014"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2015 DO 31.12.2015"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2016 DO 31.12.2016"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2017 DO 31.12.2017"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2018 DO 31.12.2018"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2019 DO 31.12.2019"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2020 DO 31.12.2020"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2023 DO 31.12.2023"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2024 DO 31.12.2024"
+            },
+            {
+              "zaOkresOdDo": "OD 01.01.2025 DO 31.12.2025"
+            }
+          ]
+        },
+        "informacjaODniuKonczacymRokObrotowy": {
+          "dzienKonczacyPierwszyRokObrotowy": "31.12.1995"
+        }
+      },
+      "dzial4": {},
+      "dzial5": {},
+      "dzial6": {
+        "likwidacja": [
+          {
+            "otwarcieLikwidacji": "26.09.2001 R. \nNOTARIUSZ JOLANTA OŁPIŃSKA, KANCELARIA NOTARIALNA WE WROCŁAWIU, REP. A NR 5237/01",
+            "zakonczenieLikwidacji": "UCHWAŁA NR 1 NADZWYCZAJNEGO WALNEGO ZGROMADZENIA SPÓŁKI POD FIRMĄ ASSET INVEST IN POLAND SPÓŁKA AKCYJNA W LIKWIDACJI W SPRAWIE UCHYLENIA LIKWIDACJI\n- AKT NOTARIALNY Z DNIA 30.08.2006 R., NOTARIUSZ BEATA BARANOWSKA-SEWERYN Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY UL. RUSKIEJ 3/4, REPERTORIUM A NR 6696/2006",
+            "sposobReprezentacjiPodmiotuPrzezLikwidatorow": "DO SKŁADANIA OŚWIADCZEŃ I PODPISYWANIA W IMIENIU SPÓŁKI UPOWAŻNIONY JEST KAŻDY Z LIKWIDATORÓW SAMODZIELNIE"
+          }
+        ],
+        "rozwiazanieUniewaznienie": {
+          "okreslenieOkolicznosci": "ROZWIĄZANIE",
+          "informacjaORozwiazaniuUniewaznieniu": "26.09.2001 R. \nNOTARIUSZ JOLANTA OŁPIŃSKA, KANCELARIA NOTARIALNA WE WROCŁAWIU, REP. A NR 5237/01\nUCHWAŁA NR 1 NADZWYCZAJNEGO WALNEGO ZGROMADZENIA."
+        },
+        "polaczeniePodzialPrzeksztalcenie": [
+          {
+            "okreslenieOkolicznosci": "PRZEJĘCIE CZĘŚCI MAJĄTKU INNEJ SPÓŁKI W WYNIKU PODZIAŁU",
+            "opisPolaczeniaPodzialuPrzeksztalcenia": "PLANOWANE WARUNKOWE PRZEJĘCIE CZĘŚCI MAJĄTKU SPÓŁKI IMPEL SPÓŁKA AKCYJNA (SPÓŁKA DZIELONA) NA PODSTAWIE ART.529 § 1 PKT 4 KSH POPRZEZ PRZENIESIENIE NA VANTAGE DEVELOPMENT SPÓŁKA AKCYJNA (SPÓŁKA PRZEJMUJĄCA) ZORGANIZOWANEJ CZĘŚCI PRZEDSIĘBIORSTWA SPÓŁKI DZIELONEJ W POSTACI ZAKŁADU ECOIMPEL - UCHWAŁA NADZWYCZAJNEGO ZGROMADZENIA AKCJONARIUSZY SPÓŁKI VANTAGE DEVELOPMENT SPÓŁKA AKCYJNA Z DNIA 19.08.2011 R. SPORZĄDZONA PRZEZ ASESORA NOTARIALNEGO ANNĘ LUBIEŃSKĄ ZASTĘPCĘ NOTARIUSZA BEATY BARANOWSKIEJ - SEWERYN REP A NR 65968/2011."
+          },
+          {
+            "okreslenieOkolicznosci": "PRZEJĘCIE CZĘŚCI MAJĄTKU INNEJ SPÓŁKI W WYNIKU PODZIAŁU",
+            "opisPolaczeniaPodzialuPrzeksztalcenia": "OPIS SPOSOBU PODZIAŁU - PODZIAŁ PRZEZ WYDZIELENIE DOKONANY NA PODSTAWIE PRZEPISU ART. 529 § 1 PKT 4 KSH, POPRZEZ PRZENIESIENIE CZĘŚCI MAJĄTKU SPÓŁKI IMPEL S.A. Z/S WE WROCŁAWIU W POSTACI ZORGANIZOWANEJ CZĘŚCI PRZEDSIĘBIORSTWA (\"ZAKŁAD ECOIMPEL\"),\nNA RZECZ SPÓŁKI VANTAGE DEVELOPMENT S.A. Z/S WE WROCŁAWIU.\nDATA PODJĘCIA UCHWAŁY ORAZ ORGAN PODEJMUJĄCY UCHWAŁĘ:\n1)UCHWAŁA NR 1 NADZWYCZAJNEGO WALNEGO ZGROMADZENIA AKCJONARIUSZY SPÓŁKI VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU Z DNIA 19 SIERPNIA 2011 ROKU W SPRAWIE PODZIAŁU SPÓŁKI IMPEL S.A. POPRZEZ PRZENIESIENIE CZĘŚCI MAJĄTKU IMPEL S.A. NA SPÓŁKĘ I ZGODY NA BRZMIENIE PLANU PODZIAŁU IMPEL S.A, W SPRAWIE PODWYŻSZENIA KAPITAŁU ZAKŁADOWEGO SPÓŁKI W ZWIĄZKU Z PODZIAŁEM SPÓŁKI IMPEL S.A. ORAZ WYRAŻENIA ZGODY NA BRZMIENIE STATUTU SPÓŁKI - ZOSTAŁA PODJĘTA W DNIU 19.08.2011 R. PRZEZ NADZWYCZAJNE WALNE ZGROMADZENIE AKCJONARIUSZY SPÓŁKI VANTAGE DEVELOPMENT SPÓŁKA AKCYJNA (REP A NR 65968/2011 PRZED ASESOREM NOTARIALNYM ANNĄ LUBIEŃSKĄ ZASTĘPCĄ NOTARIUSZA BEATY BARANOWSKIEJ -SEWERYN Z KANCELARII NOTARIALNEJ, WE WROCŁAWIU, UL. RUSKA 3/4);\n2)UCHWAŁA NR 3 NADZWYCZAJNEGO WALNEGO ZGROMADZENIA IMPEL S.A. Z SIEDZIBĄ WE WROCŁAWIU Z DNIA 6 WRZEŚNIA 2011 ROKU W SPRAWIE PODZIAŁU SPÓŁKI IMPEL S.A. - ZOSTAŁA PODJĘTA W DNIU 06.09.2011 R. PRZEZ NADZWYCZAJNE WALNE ZGROMADZENIE AKCJONARIUSZY SPÓŁKI \"IMPEL\" SPÓŁKA AKCYJNA (REP A NR 70128/2011 PRZED NOTARIUSZEM BEATĄ BARANOWSKĄ - SEWERYN Z KANCELARII NOTARIALNEJ, WE WROCŁAWIU, UL. RUSKA 3/4).",
+            "podmiotyPrzejmowane": [
+              {
+                "nazwa": "\"IMPEL\" SPÓŁKA AKCYJNA,------",
+                "krajNazwaRejestru": "------,",
+                "identyfikator": {
+                  "regon": "00631884900000"
+                }
+              }
+            ]
+          },
+          {
+            "okreslenieOkolicznosci": "PRZEJĘCIE INNEJ SPÓŁKI",
+            "opisPolaczeniaPodzialuPrzeksztalcenia": "POŁĄCZENIE SPÓŁEK VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU ORAZ SPÓŁKI VD INVEST POZNAŃ SP. Z O.O. Z SIEDZIBĄ WE WROCŁAWIU W SPOSÓB OKREŚLONY W ART.492 § 1 KODEKSU SPÓŁEK HANDLOWYCH, POPRZEZ PRZENIESIENIE CAŁEGO MAJĄTKU VD INVEST POZNAŃ Z SIEDZIBĄ WE WROCŁAWIU (SPÓŁKA PRZEJMOWANA) NA VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU (SPÓŁKA PRZEJMUJĄCA) BEZ WYDAWANIA UDZIAŁÓW WSPÓLNIKÓWI SPÓŁKI PRZEJMOWANEJ, KTÓRYM JEST SPÓŁKA PRZEJMUJĄCA, ZGODNIE Z ART.514 K.S.H. NA MOCY UCHWAŁY NR 1 NADZWYCZAJNEGO ZGROMADZENIA WSPÓLNIKÓW SPÓŁKI PRZEJMOWANEJ Z DNIA 30.11.2020 R., REP.A NR 26741/2020 ZAPROTOKOŁOWANEJ PRZEZ NOTARIUSZA TOMASZA KALINOWSKIEGO Z KANCELARII NOTARIALNEJ WE WROCŁAWIU UL.RYNEK 60 ZA ZGODĄ ZARZĄDU SPÓŁKI PRZEJMUJĄCEJ WYRAŻONEJ W UCHWALE NR 12/11/2020 ZARZĄDU VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU Z DNIA 30 LISTOPADA 2020 R.",
+            "podmiotyPrzejmowane": [
+              {
+                "nazwa": "VD INVEST POZNAŃ SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ,------",
+                "krajNazwaRejestru": "POLSKA, KRAJOWY REJESTR SĄDOWY",
+                "krs": {
+                  "krs": "0000784668"
+                },
+                "nazwaSadu": "*******",
+                "identyfikator": {
+                  "regon": "38328896100000"
+                }
+              }
+            ]
+          },
+          {
+            "okreslenieOkolicznosci": "PRZEJĘCIE INNEJ SPÓŁKI",
+            "opisPolaczeniaPodzialuPrzeksztalcenia": "POŁĄCZENIE SPÓŁEK VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU ORAZ SPÓŁKI VD BUDOWNICTWO SP. Z O.O. Z SIEDZIBĄ WE WROCŁAWIU W SPOSÓB OKREŚLONY W ART.492 21 1 KODEKSU SPÓŁEK HANDLOWYCH, POPRZEZ PRZENIESIENIE CAŁEGO MAJĄTKU VD BUDOWNICTWO Z SIEDZIBĄ WE WROCŁAWIU (SPÓŁKA PRZEJMOWANA) NA VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU (SPÓŁKA PRZEJMUJĄCA) BEZ WYDAWANIA UDZIAŁÓW WSPÓLNIKOWI SPÓŁKI PRZEJMOWANEJ, KTÓRYM JEST SPÓŁKA PRZEJMUJĄCA, ZGODNIE Z ART.514 §1 K.S.H. NA MOCY UCHWAŁY NR 1 NADZWYCZAJNEGO ZGROMADZENIA WSPÓLNIKÓW SPÓŁKI PRZEJMOWANEJ Z DNIA 06.04.2021 R., REP. A NR 6404/2021, ZAPROTOKOŁOWANEJ PRZEZ NOTARIUSZA TOMASZA KALINOWSKIEGO Z KANCELARII NOTARIALNEJ WE WROCŁAWIU PRZY ULICY RYNEK 60 ZA ZGODĄ ZARZĄDU SPÓŁKI PRZEJMUJĄCEJ WYRAŻONEJ W UCHWALE NR 01/04/2021 ZARZĄDU VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU Z DNIA 06.04.2021 R.",
+            "podmiotyPrzejmowane": [
+              {
+                "nazwa": "VD BUDOWNICTWO, SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ",
+                "krajNazwaRejestru": "POLSKA, KRAJOWY REJESTR SĄDOWY",
+                "krs": {
+                  "krs": "0000744666"
+                },
+                "nazwaSadu": "*******",
+                "identyfikator": {
+                  "regon": "38101204800000"
+                }
+              }
+            ]
+          },
+          {
+            "okreslenieOkolicznosci": "PRZEJĘCIE INNEJ SPÓŁKI",
+            "opisPolaczeniaPodzialuPrzeksztalcenia": "POŁĄCZENIE SPÓŁKI VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU ORAZ SPÓŁKI OGRODY BOTANICZNE SP. Z O.O. Z SIEDZIBĄ WE WROCŁAWIU W SPOSÓB\nOKREŚLONY W ART. 492 § 1 PKT 1) KODEKSU SPÓŁEK HANDLOWYCH, POPRZEZ PRZENIESIENIE CAŁEGO MAJĄTKU SPÓŁKI OGRODY BOTANICZNE Z SIEDZIBĄ WE WROCŁAWIU (SPÓŁKA PRZEJMOWANA) NA SPÓŁKĘ VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU (SPÓŁKA PRZEJMUJĄCA) BEZ WYDAWANIA UDZIAŁÓW WSPÓLNIKÓWI SPÓŁKI PRZEJMOWANEJ,KTÓRYM JEST SPÓŁKA PRZEJMUJĄCA, ZGODNIE Z ART. 514 § 1 K.S.H. NA MOCY UCHWAŁY NR 1 NADZWYCZAJNEGO ZGROMADZENIA WSPÓLNIKÓW SPÓŁKI PRZEJMOWANEJ Z DNIA 13.05.2022 R., REP. A NR 6174/2022 ZAPROTOKOŁOWANEJ PRZEZ NOTARIUSZA TOMASZA KALINOWSKIEGO Z KANCELARII NOTARIALNEJ WE WROCŁAWIU UL. RYNEK 60 ZA ZGODĄ ZARZĄDU SPÓŁKI PRZEJMUJĄCEJ WYRAŻONEJ W UCHWALE NR 6/05/2022 ZARZĄDU VANTAGE DEVELOPMENT S.A. Z SIEDZIBĄ WE WROCŁAWIU Z DNIA 13 MAJA 2022 R., 13.05.2022, ZGROMADZENIE WSPÓLNIKÓW",
+            "podmiotyPrzejmowane": [
+              {
+                "nazwa": "OGRODY BOTANICZNE SPÓŁKA Z OGRANICZONĄ ODPOWIEDZIALNOŚCIĄ, ",
+                "krajNazwaRejestru": "------,------",
+                "numerWRejestrzeAlboEwidencji": "0000920129",
+                "identyfikator": {
+                  "regon": "389853681"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

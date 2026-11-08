@@ -10,7 +10,8 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
-import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type CatalystAssumptions, type CatalystBondItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
+import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
+import { z } from "zod";
 import { hasAnyGroup } from "../../lib/access.ts";
 import { jobRuns } from "../../lib/context.ts";
 import { JOB_NAMES, jobTable } from "../../lib/jobs.ts";
@@ -58,8 +59,10 @@ const ROUTES: Record<string, Handler> = {
 
   "GET /catalyst/bonds": async () => {
     // Listed bonds with a screen row, their terms in short, and the curves the premiums were measured against.
-    const [bonds, screen, terms, curve] = await Promise.all([catalystRepo.listBonds(), catalystRepo.listScreen(), catalystRepo.listTerms(), catalystRepo.latestCurve()]);
+    const [bonds, screen, terms, curve, links, entities] = await Promise.all([catalystRepo.listBonds(), catalystRepo.listScreen(), catalystRepo.listTerms(), catalystRepo.latestCurve(), catalystRepo.listLinks(), catalystRepo.listEntities()]);
     const termsBy = new Map(terms.map((t) => [t.isin, t]));
+    const entityBy = new Map(entities.map((e) => [e.entityId, e]));
+    const companyOf = new Map(links.filter((l) => l.entityId && entityBy.has(l.entityId)).map((l) => [l.isin, entityBy.get(l.entityId!)!]));
     const screenBy = new Map(screen.map((s) => [s.isin, s]));
     const rows = bonds
       .filter((b) => b.status === "listed" && screenBy.has(b.isin))
@@ -74,6 +77,7 @@ const ROUTES: Record<string, Handler> = {
           markets: b.markets,
           maturity: b.maturity,
           nominal: b.nominal,
+          ...company(companyOf.get(b.isin)),
           ...(t && !t.notFound
             ? { issuer: t.issuer ?? null, coupon: t.coupon, couponText: t.couponText ?? null, secured: t.secured ?? null, issueAmount: t.issueValue ? (t.issueValue.amount * (b.nominal ?? t.issueValue.nominal)) / t.issueValue.nominal : null }
             : {}),
@@ -96,7 +100,8 @@ const ROUTES: Record<string, Handler> = {
     const market = bond.markets.find((m) => m.startsWith("GPW")) ?? bond.markets[0] ?? "";
     const [terms, coupons, sessions, quotes] = await Promise.all([catalystRepo.listTerms().then((all) => all.find((t) => t.isin === isin) ?? null), catalystRepo.listCoupons(isin), catalystRepo.listSessions(isin, from, to), catalystRepo.listQuotes(isin, from, to)]);
     const strip = <T extends { PK: string; SK: string }>({ PK: _p, SK: _s, ...rest }: T) => rest;
-    const [events, track] = await Promise.all([catalystRepo.listEvents(isin), issuerTrack(bond, terms?.issuer)]);
+    const [events, track, link] = await Promise.all([catalystRepo.listEvents(isin), issuerTrack(bond, terms?.issuer), catalystRepo.getLink(isin)]);
+    const entity = link?.entityId ? await catalystRepo.getEntity(link.entityId) : undefined;
     return json(200, {
       bond: strip(bond),
       terms: terms ? strip(terms) : null,
@@ -106,7 +111,90 @@ const ROUTES: Record<string, Handler> = {
       quotes: quotes.filter((q) => q.market === market).map(({ PK: _p, SK: _s, isin: _i, market: _m, source: _src, fetchedAt: _f, ...q }) => q),
       events: events.map(({ PK: _p, SK: _s, isin: _i, source: _src, fetchedAt: _f, ...e }) => e),
       track,
+      company: entity ? entityView(entity) : null,
     });
+  },
+
+  "GET /catalyst/entities": async () => {
+    // The companies behind bonds, with their names and how many bonds each has (listed and in all).
+    const [entities, names, links, bonds] = await Promise.all([catalystRepo.listEntities(), catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
+    const status = new Map(bonds.map((b) => [b.isin, b.status]));
+    return json(200, {
+      entities: entities.map((e) => {
+        const own = links.filter((l) => l.entityId === e.entityId);
+        return { ...entityView(e), names: names.filter((n) => n.entityId === e.entityId).map((n) => n.name), bonds: own.length, listed: own.filter((l) => status.get(l.isin) === "listed").length };
+      }),
+    });
+  },
+
+  "GET /catalyst/entities/{id}": async (event) => {
+    const id = pathParam(event, "id");
+    const entity = await catalystRepo.getEntity(id);
+    if (!entity) return json(404, { error: `No company ${id}` });
+    const [names, links, bonds] = await Promise.all([catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
+    const own = new Set(links.filter((l) => l.entityId === id).map((l) => l.isin));
+    const theirs = bonds.filter((b) => own.has(b.isin));
+    return json(200, {
+      company: entityView(entity),
+      names: names.filter((n) => n.entityId === id).map(stripKeys),
+      bonds: theirs.map((b) => ({ isin: b.isin, code: b.code, status: b.status, maturity: b.maturity, segment: b.segment })),
+      track: await trackOf(theirs, entity.legalName),
+    });
+  },
+
+  "GET /catalyst/names": async () => json(200, { names: (await catalystRepo.listNames()).map(stripKeys) }),
+
+  "PUT /catalyst/names/{name}": async (event) => {
+    // Link a listed name to a company (or unlink it), or confirm the link the code made (review → confirmed).
+    const name = pathParam(event, "name");
+    const body = NameInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: "body: { entityId?: string | null }" });
+    const before = await catalystRepo.getName(name);
+    const entityId = body.data.entityId === undefined ? (before?.entityId ?? null) : body.data.entityId;
+    if (entityId && !(await catalystRepo.getEntity(entityId))) return json(400, { error: `No company ${entityId}` });
+    const by = userOf(event);
+    const item = {
+      ...(before ? stripKeys(before) : {}),
+      name,
+      entityId,
+      status: entityId ? ("confirmed" as const) : ("unresolved" as const),
+      evidence: entityId ? `${before?.evidence ? `${before.evidence}; ` : ""}confirmed by ${by}` : `unlinked by ${by}`,
+      updatedAt: new Date().toISOString(),
+    };
+    await catalystRepo.putNames([item]);
+    if (entityId && before?.aiAnalysis) await passSwitch(entityId, before.aiAnalysis);
+    return json(200, item);
+  },
+
+  "PUT /catalyst/names/{name}/ai": async (event) => {
+    // AI analysis for a listed name: on its company when it's linked, else kept on the name until it is.
+    const name = pathParam(event, "name");
+    const body = SwitchInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: "body: { on: boolean }" });
+    const before = await catalystRepo.getName(name);
+    if (!before) return json(404, { error: `No listed name ${name}` });
+    const ai: AiSwitch = { on: body.data.on, by: userOf(event), at: new Date().toISOString() };
+    if (before.entityId) return switchEntity(before.entityId, ai);
+    await catalystRepo.putNames([{ ...stripKeys(before), aiAnalysis: ai, updatedAt: ai.at }]);
+    return json(200, { name, aiAnalysis: ai });
+  },
+
+  "PUT /catalyst/entities/{id}": async (event) => {
+    const id = pathParam(event, "id");
+    const body = EntityInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: "body: { shortName?: string }" });
+    const entity = await catalystRepo.getEntity(id);
+    if (!entity) return json(404, { error: `No company ${id}` });
+    const next = { ...stripKeys(entity), ...body.data, ...(body.data.shortName ? { shortNameSet: true } : {}), updatedAt: new Date().toISOString() };
+    await catalystRepo.putEntities([next]);
+    return json(200, entityView(next));
+  },
+
+  "PUT /catalyst/entities/{id}/ai": async (event) => {
+    const id = pathParam(event, "id");
+    const body = SwitchInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: "body: { on: boolean }" });
+    return switchEntity(id, { on: body.data.on, by: userOf(event), at: new Date().toISOString() });
   },
 
   "GET /catalyst/settings/assumptions": async () => json(200, await assumptionsNow()),
@@ -159,31 +247,111 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
   }
 }
 
-/**
- * The repayment track record of a bond's issuer (core/catalyst/trackRecord.ts): until companies are known (phase 2,
- * N2), the bonds sharing its code's prefix ("KRU0228", "KRU0829"), each with its GPW measures and last close, and the
- * issuer's current markings.
- */
-async function issuerTrack(bond: CatalystBondItem, issuer: string | undefined) {
-  const prefix = codePrefix(bond.code);
-  const [group, exitsNow] = await Promise.all([catalystRepo.listBondsByPrefix(prefix), catalystRepo.getExitsNow()]);
+// --- companies and names (phase 2, N2) ------------------------------------------------------------------------
+
+const NameInput = z.object({ entityId: z.string().min(1).max(40).nullable().optional() }).strict();
+const SwitchInput = z.object({ on: z.boolean() }).strict();
+const EntityInput = z.object({ shortName: z.string().trim().min(1).max(60) }).partial().strict();
+
+function parseBody(event: APIGatewayProxyEventV2WithJWTAuthorizer): unknown {
+  try {
+    return JSON.parse(event.body ?? "{}");
+  } catch {
+    return undefined;
+  }
+}
+
+/** Who made a change: the e-mail in the login token, else its user name. */
+function userOf(event: APIGatewayProxyEventV2WithJWTAuthorizer): string {
+  const claims = event.requestContext.authorizer?.jwt?.claims ?? {};
+  return String(claims["email"] ?? claims["username"] ?? claims["cognito:username"] ?? claims["sub"] ?? "unknown");
+}
+
+/** A path parameter, decoded (names carry spaces and Polish letters). */
+function pathParam(event: APIGatewayProxyEventV2WithJWTAuthorizer, key: string): string {
+  const raw = event.pathParameters?.[key] ?? "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+const stripKeys = <T extends { PK: string; SK: string; GSI1PK: string; GSI1SK: string }>({ PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _gs, ...rest }: T) => rest;
+
+type Entity = Omit<CatalystEntityItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">;
+
+/** The company as the views show it (AI analysis off unless switched on). */
+function entityView(e: Entity) {
+  return {
+    entityId: e.entityId,
+    shortName: e.shortName,
+    legalName: e.legalName,
+    country: e.country,
+    krs: e.krs,
+    lei: e.lei,
+    leiStatus: e.leiStatus,
+    status: e.status,
+    legalForm: e.legalForm,
+    pkd: e.pkd ?? null,
+    register: e.register ?? null,
+    aiAnalysis: e.aiAnalysis ?? { on: false },
+  };
+}
+
+/** A bond row's company fields. */
+function company(e: Entity | undefined) {
+  return e ? { entityId: e.entityId, issuerShort: e.shortName, issuerLegal: e.legalName, aiAnalysis: e.aiAnalysis?.on ?? false } : {};
+}
+
+async function switchEntity(entityId: string, ai: AiSwitch) {
+  const entity = await catalystRepo.getEntity(entityId);
+  if (!entity) return json(404, { error: `No company ${entityId}` });
+  await catalystRepo.putEntities([{ ...stripKeys(entity), aiAnalysis: ai, updatedAt: ai.at }]);
+  return json(200, { entityId, aiAnalysis: ai });
+}
+
+/** A switch set on a name before it was linked passes to its company, unless the company has one already. */
+async function passSwitch(entityId: string, ai: AiSwitch) {
+  const entity = await catalystRepo.getEntity(entityId);
+  if (!entity || entity.aiAnalysis) return;
+  await catalystRepo.putEntities([{ ...stripKeys(entity), aiAnalysis: ai, updatedAt: new Date().toISOString() }]);
+}
+
+/** The track record of a set of bonds (core/catalyst/trackRecord.ts), each with its GPW measures and last close. */
+async function trackOf(group: CatalystBondItem[], issuer: string | undefined) {
+  const exitsNow = await catalystRepo.getExitsNow();
   const bonds: TrackBond[] = await Promise.all(
-    group
-      .filter((b) => codePrefix(b.code) === prefix)
-      .map(async (b) => {
-        const [events, last] = await Promise.all([catalystRepo.listEvents(b.isin), b.status === "ended" ? catalystRepo.lastSession(b.isin) : Promise.resolve(undefined)]);
-        return {
-          isin: b.isin,
-          code: b.code,
-          maturity: b.maturity,
-          status: b.status,
-          firstSeen: b.firstSeen,
-          lastSeen: b.lastSeen,
-          lastClose: last?.close ?? null,
-          events: events.map((e) => ({ published: e.published, action: e.action, reason: e.reason, signal: e.signal })),
-        };
-      }),
+    group.map(async (b) => {
+      const [events, last] = await Promise.all([catalystRepo.listEvents(b.isin), b.status === "ended" ? catalystRepo.lastSession(b.isin) : Promise.resolve(undefined)]);
+      return {
+        isin: b.isin,
+        code: b.code,
+        maturity: b.maturity,
+        status: b.status,
+        firstSeen: b.firstSeen,
+        lastSeen: b.lastSeen,
+        lastClose: last?.close ?? null,
+        events: events.map((e) => ({ published: e.published, action: e.action, reason: e.reason, signal: e.signal })),
+      };
+    }),
   );
   const markings = issuer ? (exitsNow?.marked ?? []).filter((m) => issuerKey(m.issuer) === issuerKey(issuer)).map((m) => m.marking) : [];
-  return { prefix, ...trackRecord(bonds, today(), markings) };
+  return trackRecord(bonds, today(), markings);
+}
+
+/**
+ * The repayment track record of a bond's issuer: its company's bonds once the bond is linked, else the bonds sharing
+ * its code's prefix ("KRU0228", "KRU0829").
+ */
+async function issuerTrack(bond: CatalystBondItem, issuer: string | undefined) {
+  const link = await catalystRepo.getLink(bond.isin);
+  if (link?.entityId) {
+    const [links, bonds, entity] = await Promise.all([catalystRepo.listLinks(), catalystRepo.listBonds(), catalystRepo.getEntity(link.entityId)]);
+    const own = new Set(links.filter((l) => l.entityId === link.entityId).map((l) => l.isin));
+    return { prefix: null, company: entity?.shortName ?? link.entityId, ...(await trackOf(bonds.filter((b) => own.has(b.isin)), issuer ?? entity?.legalName)) };
+  }
+  const prefix = codePrefix(bond.code);
+  const group = (await catalystRepo.listBondsByPrefix(prefix)).filter((b) => codePrefix(b.code) === prefix);
+  return { prefix, company: null, ...(await trackOf(group, issuer)) };
 }

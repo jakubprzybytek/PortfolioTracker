@@ -59,7 +59,7 @@ export function sortValue(r: BondRow, key: string): SortValue {
     case "bond":
       return r.code;
     case "issuer":
-      return r.issuer ?? null;
+      return r.issuerShort ?? r.issuer ?? null;
     case "type":
       return SEGMENTS[r.segment] ?? r.segment;
     case "coupon":

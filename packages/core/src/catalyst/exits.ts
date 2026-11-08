@@ -175,12 +175,18 @@ export function parseCatalystMarkings(html: string): CatalystMarking[] {
 
 /** A company name for matching across sources: lower case, no legal form, no "w restrukturyzacji" and such. */
 export function issuerKey(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\b(w (restrukturyzacji|likwidacji|upadłości))\b/g, " ")
-    .replace(/\b(spółka akcyjna|spółka z ograniczoną odpowiedzialnością|spółka komandytowo-akcyjna|s\.a\.|sp\. z o\.o\.|s\.k\.a\.|sa|plc|n\.v\.|ab|se)(?=\s|$)/g, " ")
-    .replace(/[^a-z0-9ąćęłńóśźż]+/g, " ")
-    .trim();
+  return (
+    name
+      .toLowerCase()
+      .replace(/\b(w (restrukturyzacji|likwidacji|upadłości))\b/g, " ")
+      .replace(/\b(spółka akcyjna|spółka z ograniczoną odpowiedzialnością|spółka komandytowo-akcyjna|s\.a\.|sp\. z o\.o\.|s\.k\.a\.|sa|plc|n\.v\.|ab|se)(?=\s|$)/g, " ")
+      // Without diacritics: "Żabka Group" and "Zabka Group" are one name.
+      .normalize("NFD")
+      .replace(/\p{M}/gu, "")
+      .replace(/ł/g, "l")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+  );
 }
 
 export interface ExitsPlan {

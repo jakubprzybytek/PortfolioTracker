@@ -101,7 +101,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
             <li key={r.isin} className={r.isin === params["bond"] ? "selected" : ""} data-testid="catalyst-row" data-code={r.code}>
               <button type="button" className="cat-row" onClick={() => toggleRow(r)} aria-expanded={r.isin === params["bond"]}>
               <div className="cat-line">
-                <strong>{r.code}</strong> <span className="muted">{r.issuer ?? ""}</span>
+                <strong>{r.code}</strong> <span className="muted">{r.issuerShort ?? r.issuer ?? ""}</span>
                 <LiquidityDots level={r.liquidity.level} />
               </div>
               <div className="cat-line muted">
@@ -147,8 +147,8 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
                       </span>
                     ))}
                 </td>
-                <td className="left cat-issuer" title={r.issuer ?? ""}>
-                  {r.issuer ?? <span className="muted">–</span>}
+                <td className="left cat-issuer" title={r.issuerLegal ?? r.issuer ?? ""}>
+                  {r.issuerShort ?? r.issuer ?? <span className="muted">–</span>}
                 </td>
                 <td className="left">{SEGMENTS[r.segment] ?? r.segment}</td>
                 <td className="left" title={r.couponText ?? ""}>

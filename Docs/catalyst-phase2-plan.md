@@ -157,6 +157,30 @@ Done when: every bond that ended since 2020 has a reason or "unknown". On dev, G
 
 ### N2 Identity: names and companies
 
+**Done 2026-11-08.** What was built:
+- `core/catalyst/identity.ts`: the GLEIF and KRS clients (take a fetch function), `planIdentity`, `planFallbackLinks`, short names;
+- `jobs/catalyst/identity.ts`: run after the terms job, 60 bonds a run, saving every 50, retrying rate limits and server errors;
+- `scripts/catalyst-identity.ts` for the backlog and `scripts/catalyst-ai-holdings.ts`;
+- the routes `GET /catalyst/entities[/{id}]`, `GET /catalyst/names`, `PUT /catalyst/names/{name}[/ai]`, `PUT /catalyst/entities/{id}[/ai]`;
+- the bond table showing short names; the track record by company;
+- the export of companies, names and links.
+
+Dev, 1,030 bonds of companies (2020 on):
+- **Linked:** 948. Of these, 312 through GLEIF's ISIN mapping and 325 through the LEI on GPW's measures. Another 18 through their listed name: Orlen's and PKO's bonds GLEIF doesn't map. Another 293 ended bonds through a code prefix only one company has (inferred). That leaves 82 ended bonds without a company.
+- **Listed bonds:** all but 3 (ING Bank Hipoteczny: left for the agent).
+- **Companies:** 145, 138 with a KRS number. One has a liquidation open (Polski Bank Spółdzielczy w Poznaniu).
+- **Names:** 82 resolved, 11 to review, 1 unresolved. The ones to review are mostly full legal names (PKO, Pekao, PZU, PGE) and one financing vehicle (Pepco → PEU (FIN) PLC).
+- **Time:** about 25 minutes for the backlog.
+
+Changed on the way:
+- **Links are their own items** (`BOND#<isin>/ENTITY`): the daily job rewrites the bond's.
+- **GLEIF is asked one ISIN at a time:** a batch doesn't say which record is which ISIN's.
+- **Bonds no source maps are marked and asked again a month later.**
+- **KRS section 6 is read as "liquidation open"** (an entry without an end) plus the kinds of entries: Vantage's liquidation of 2001 was lifted in 2006.
+- **The listed-name and code-prefix fallbacks** were added after the first run left Orlen and PKO's bonds unlinked.
+- **Names are compared without diacritics** (Żabka / Zabka).
+- **Short names you set are kept** (`shortNameSet`); the code's are refreshed each run.
+
 - Items: `NAME#`, `ENTITY#`; `entityId` on the bond.
 - `gleif.ts`, `krs.ts` in core (fetch-based, used by the terms job and the CLI; the job archives responses under `raw/catalyst-identity/`); `identity.ts` ported: ISIN → LEI mapping, exact name match, LEI record and parent, KRS extract.
 - `catalyst-terms` resolves new issuer names on its runs (design, "Jobs"). A one-off run resolves the names already in the table. Names that aren't resolved stay `unresolved`; a legal name that differs from the listed one stays `review`.

@@ -1688,6 +1688,7 @@ test.describe("catalyst view", () => {
       r.fulfill({ contentType: "application/json", body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: { issuer: "Kruk S.A.", secured: false }, coupons: [{ start: "2020-08-12", end: "2020-11-12", paymentDate: "2020-11-12", rate: 0.07 }, { start: "2020-11-12", end: "2099-11-12", paymentDate: "2099-11-12", rate: 0.0713 }], market: "GPW ASO", sessions: [{ date: "2026-11-04", close: 100.9, trades: 2, turnover: 20000, nominal: 1000 }, { date: "2026-11-05", close: 101, trades: 1, turnover: 10000, nominal: 1000 }], quotes: [{ date: "2026-11-05", bid: { price: 100.8, volume: 50 }, ask: { price: 101.2, volume: 12 } }],
             events: [{ published: "2026-05-04T08:30:00", action: "suspension", reason: "na wniosek emitenta", signal: "routine", from: "2026-05-05T00:00:00", to: null, inForce: false }],
             track: {
+              company: null,
               prefix: "KRU",
               since: "2020-01-02",
               counts: { repaid: 1, early: 1, "below-par": 0, "past-maturity": 0, listed: 1, unknown: 0 },

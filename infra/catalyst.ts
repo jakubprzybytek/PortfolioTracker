@@ -126,6 +126,13 @@ export function catalystApi(
     "PUT /catalyst/settings/assumptions",
     "GET /catalyst/views",
     "PUT /catalyst/views",
+    "GET /catalyst/entities",
+    "GET /catalyst/entities/{id}",
+    "PUT /catalyst/entities/{id}",
+    "PUT /catalyst/entities/{id}/ai",
+    "GET /catalyst/names",
+    "PUT /catalyst/names/{name}",
+    "PUT /catalyst/names/{name}/ai",
   ])
     api.route(route, apiHandler, auth);
 }

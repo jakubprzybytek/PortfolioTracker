@@ -25,7 +25,13 @@ export interface BondRow {
   markets: string[];
   maturity: string | null;
   nominal: number | null;
+  /** The issuer name as listed (obligacje.pl). */
   issuer?: string | null;
+  /** The company once the bond is linked (phase 2): its id, short and legal name, and whether AI analysis is on. */
+  entityId?: string;
+  issuerShort?: string;
+  issuerLegal?: string;
+  aiAnalysis?: boolean;
   coupon?: Coupon;
   couponText?: string | null;
   secured?: boolean | null;
@@ -103,7 +109,9 @@ export interface BondEvent {
 export type BondOutcome = "repaid" | "early" | "below-par" | "past-maturity" | "listed" | "unknown";
 
 export interface TrackRecord {
-  prefix: string;
+  /** The company whose bonds these are, or, until the bond is linked, the code prefix they share. */
+  company: string | null;
+  prefix: string | null;
   since: string | null;
   counts: Record<BondOutcome, number>;
   bonds: { isin: string; code: string; maturity: string | null; status: string; lastSeen: string; lastClose: number | null; outcome: BondOutcome; inferred: boolean; note: string; flags: string[]; attention: string[] }[];
