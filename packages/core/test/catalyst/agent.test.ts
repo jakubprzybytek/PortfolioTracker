@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGENT_SCHEMAS, AnalysisInput, agentMayCall, annualDue, assumedBasis, halfYearDue, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
+import { AGENT_SCHEMAS, AnalysisInput, agentMayCall, annualDue, assumedBasis, halfYearDue, latestPeriod, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
 
 const entity = (entityId: string, over: Partial<WorkInput["entities"][number]> = {}): WorkInput["entities"][number] => ({
   entityId,
@@ -112,6 +112,21 @@ describe("the half-year report, on demand", () => {
     expect(halfYearDue([fy("2025-09-30")], "2026-11-08")).toEqual({ periodEnd: "2026-03-31", dueOn: "2026-06-30" });
     // The next annual report due: that one first.
     expect(workItems({ ...base, today: "2027-06-01" }).map((i) => i.kind)).toEqual(["report"]);
+  });
+});
+
+describe("a judgement after a half-year report", () => {
+  it("stale when the half-year came in after it; not once a judgement rests on it", () => {
+    const h1 = (imported: string) => ({ periodEnd: "2026-06-30", scope: "group" as const, months: 6, importedAt: imported });
+    const base = input({ today: "2026-11-08", entities: [entity("0000533217")], years: new Map([["0000533217", [fy("2025-12-31"), h1("2026-11-05T00:00:00Z")]]]), judged: new Map([["0000533217", { at: "2026-06-02T00:00:00Z", basedOn: "2025-12-31" }]]) });
+    expect(workItems(base).map((i) => i.detail)).toEqual(["the judgement (2026-06-02) predates the half-year report to 2026-06-30, stored since; read it and write a new one"]);
+    // Written after the half-year came in (before judgements recorded it), or resting on it: up to date.
+    expect(workItems({ ...base, judged: new Map([["0000533217", { at: "2026-11-06T00:00:00Z", basedOn: "2025-12-31" }]]) })).toEqual([]);
+    expect(workItems({ ...base, judged: new Map([["0000533217", { at: "2026-11-06T00:00:00Z", basedOn: "2026-06-30" }]]) })).toEqual([]);
+    // The next full year makes a judgement resting on the half-year stale.
+    const next = { ...base, today: "2027-04-02", years: new Map([["0000533217", [fy("2025-12-31"), h1("2026-11-05T00:00:00Z"), fy("2026-12-31", "2027-04-01T00:00:00Z")]]]), judged: new Map([["0000533217", { at: "2026-11-06T00:00:00Z", basedOn: "2026-06-30" }]]) };
+    expect(workItems(next).map((i) => i.kind)).toEqual(["judgement"]);
+    expect(latestPeriod([fy("2025-12-31"), h1("x")])).toBe("2026-06-30");
   });
 });
 

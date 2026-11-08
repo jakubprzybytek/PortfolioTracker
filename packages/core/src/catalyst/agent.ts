@@ -211,8 +211,11 @@ export function assumedBasis(years: { periodEnd: string; months: number }[], at:
   return years.filter((y) => y.months >= 12 && y.periodEnd <= cutoff).map((y) => y.periodEnd).sort().at(-1);
 }
 
-/** The latest full year among stored years: what a judgement written now rests on. */
+/** The latest full year among stored years. */
 export const latestFullYear = (years: { periodEnd: string; months: number }[]) => years.filter((y) => y.months >= 12).map((y) => y.periodEnd).sort().at(-1);
+
+/** The latest period stored, a full year or a half-year after it: what a judgement written now rests on. */
+export const latestPeriod = (years: { periodEnd: string }[]) => years.map((y) => y.periodEnd).sort().at(-1);
 
 /** The half-year report after the latest full year, due by now (period end + 3 months, Annex 4 §19) and not stored. */
 export function halfYearDue(years: { periodEnd: string; months: number }[], today: string): { periodEnd: string; dueOn: string } | null {
@@ -255,8 +258,14 @@ export function workItems(input: WorkInput): WorkItem[] {
     const judged = judgement?.at;
     const latestYear = years.filter((y) => y.months >= 12).map((y) => y.periodEnd).sort().at(-1);
     const basedOn = judgement && (judgement.basedOn ?? assumedBasis(years, judgement.at));
+    // A half-year report after the latest full year, newer than the judgement's basis. Judgements written before
+    // basedOn counted half-years rest on the full year: those are stale only when the half-year came in after them.
+    const interim = years.filter((y) => y.months < 12 && latestYear && y.periodEnd > latestYear).sort((a, b) => a.periodEnd.localeCompare(b.periodEnd)).at(-1);
+    const interimStale = judgement && basedOn && interim && basedOn < interim.periodEnd && (!interim.importedAt || interim.importedAt > judgement.at);
     if (latestYear && (!judgement || !basedOn || basedOn < latestYear))
       items.push({ kind: "judgement", who: "agent", entityId: e.entityId, name, detail: judgement ? `the judgement (${judgement.at.slice(0, 10)}) predates FY${latestYear.slice(0, 4)}, stored since${basedOn ? ` (it rests on FY${basedOn.slice(0, 4)})` : ""}` : "no judgement yet" });
+    else if (interimStale)
+      items.push({ kind: "judgement", who: "agent", entityId: e.entityId, name, detail: `the judgement (${judgement.at.slice(0, 10)}) predates the half-year report to ${interim.periodEnd}, stored since; read it and write a new one` });
     for (const m of (input.measures.get(e.entityId) ?? []).filter((x) => !judged || x.published > judged))
       items.push({ kind: "measure", who: "agent", entityId: e.entityId, name, detail: `GPW, ${m.published.slice(0, 10)}, ${m.code}: ${m.reason} (${m.signal}${judged ? ", after the judgement" : ""})` });
   }

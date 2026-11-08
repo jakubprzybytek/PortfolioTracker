@@ -23,7 +23,7 @@ import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
 import { DocumentInput } from "@portfolio/core/catalyst/index";
 import { storeDocument } from "../documents.ts";
-import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestFullYear, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
+import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestPeriod, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
 import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
@@ -369,7 +369,7 @@ const ROUTES: Record<string, Handler> = {
     if (!entity) return json(404, { error: `No company ${id}` });
     const { markdown, meta, dryRun } = body.data;
     // What it rests on: the latest full year stored now (a later one makes it stale in `catalyst work`).
-    const basedOn = latestFullYear(await catalystRepo.listYears(entity.financialsEntityId ?? id));
+    const basedOn = latestPeriod(await catalystRepo.listYears(entity.financialsEntityId ?? id));
     const item = { entityId: id, at: new Date().toISOString(), ...(basedOn ? { basedOn } : {}), markdown, by: isAgent(event) ? meta.model : userOf(event), source: isAgent(event) ? ("agent" as const) : ("you" as const), sources: meta.sources, redFlags: meta.redFlags, ...(meta.scorecard !== undefined ? { scorecard: meta.scorecard } : {}) };
     if (!dryRun) await catalystRepo.putAnalyses([item]);
     return json(dryRun ? 200 : 201, { ...item, stored: !dryRun });
