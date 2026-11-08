@@ -298,6 +298,13 @@ This adds a new way into the API (access).
 
 Done when: an agent session in Claude Code takes one item from `catalyst work` through to a stored judgement on dev, then on prod after your approval of the token's scope. From then on analyses are made in PT; CV keeps running (N9 on hold).
 
+**Built 2026-11-08 on dev** (not pushed: prod waits for your approval of the token's scope, after an agent session on dev):
+- **Token and agent route** as above: reads of the module (not the token's own route) and the writes in `AGENT_WRITES` (names, company descriptions, filings and their uploads, judgements, collected figures, known answers, checklist entries). Refused (403): the AI analysis switches, a lender's kind and overrides, year reviews, assumptions, saved views, the token; PT isn't reachable. Every write records `agent (<model>)`.
+- **`catalyst work`** (`core/catalyst/agent.ts`, `workItems`): names switched on to resolve or confirm; descriptions missing; the annual report due (year end + 5 months) and not stored or on the checklist; companies on collected figures; judgements missing or older than the latest import; GPW measures (distress, attention) after the judgement; a Finance company of no known kind (yours); checklist downloads (yours). Half-year reports come with N8.
+- **CLI:** login (hidden prompt, checked with the stage, last four characters shown), logout, where, work, bonds, bond, entity (`--lines`), entity set, identity resolve (the name's bonds' ISINs and a GLEIF full-text search, KRS extracts), identity set (`--lei` makes the company; `--financials`), checklist (`--add`, `--set`), filings pages, filings import (`--transcript`, `--dry-run`, `--force`), known put, figures put, analysis put, schema (and `transcript`). Not yet: `filings sort`, `filings check` through the API.
+- **Skill** `catalyst-analyst`; **app:** the token panel, "needs work", the reports checklist.
+- **Tests:** 13 unit tests of the work list, due dates, allow-list and inputs; 12 of the CLI (a fake API); integration on dev: the token's reads, allowed and refused writes, PT unreachable, replaced and revoked tokens; E2E: the token panel, needs work and the checklist.
+
 ### N8 Interim reports
 
 Design, "Interim reports". Go (2026-11-07): step 1 for the companies that need it (on demand), step 2 only if step 1 proves useful.

@@ -83,7 +83,29 @@ export const catalystKeys = {
   known: (entityId: string, period: string) => ({ PK: `KNOWN#${entityId}` as const, SK: period }),
   analysis: (entityId: string, at: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `ANALYSIS#${at}` as const }),
   collected: (entityId: string, at: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `AIFIG#${at}` as const }),
+  check: (entityId: string, year: number, scope: string) => ({ PK: `CHECK#${entityId}` as const, SK: `${year}#${scope}` }),
 };
+
+/**
+ * A report to fetch by hand from the KRS financial documents repository (it has no API and bot protection, so the
+ * agent never touches it): added by the agent (`catalyst checklist --add`), downloaded and filed by you.
+ */
+export interface CatalystChecklistItem {
+  PK: `CHECK#${string}`;
+  SK: string; // <year>#<scope>
+  GSI1PK: "CHECK";
+  GSI1SK: string; // <status>#<entityId>#<year>
+  entityId: string;
+  krs: string | null;
+  year: number;
+  scope: "group" | "single" | "any";
+  /** Where it can be found ("KRS repository, KRS 0000123456"). */
+  where: string;
+  status: "missing" | "downloaded" | "imported" | "not-available";
+  note?: string;
+  by: string;
+  at: string;
+}
 
 /** A financial year of a company, from a report (financials.ts). Replaced versions are kept as `FINOLD#…`. */
 export type CatalystYearItem = FinancialYear & { PK: `ENTITY#${string}`; SK: `FIN#${string}` | `FINOLD#${string}` };
@@ -126,6 +148,9 @@ export interface CatalystAnalysisItem {
   /** The scorecard it saw, as it was then. */
   scorecard?: unknown;
   source: "agent" | "you" | "CatalystViewer";
+  /** What it rests on: the documents read, and each red flag with its source and quote (the agent's, N7). */
+  sources?: string[];
+  redFlags?: { text: string; source: string; quote?: string }[];
 }
 
 /**

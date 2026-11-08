@@ -310,6 +310,14 @@ Rules:
 
 The app has no AI. It stores, parses, checks, computes and shows. Finding and reading documents, resolving hard identities and writing judgements is done by an AI agent (Claude Code or another chat) through the CLI.
 
+**Built (N7, 2026-11-08):**
+- **The token and the agent route:** `core/catalyst/agent.ts` (`AGENT_WRITES`, `agentMayCall`), the API's `ANY /catalyst/agent/{proxy+}` (no Cognito; the token's SHA-256, then the route if allowed, as `agent (<x-catalyst-by>)`). The agent's name links are `resolved` when the names agree, else `review`; it can make a company from its LEI (GLEIF, KRS); its company writes can't carry a lender's kind, an override or the switch (403); its imports are recorded as its own.
+- **New routes** (yours and the agent's): `GET /catalyst/work`, `POST …/analyses|figures|known`, `GET /catalyst/checklist`, `PUT /catalyst/checklist/{id}/{year}/{scope}`; a filings dry run returns the scorecard it would give.
+- **The CLI:** every command of the table but `filings sort` and `filings check` (the check stays `scripts/catalyst-filings-check.ts`, inside the stage's shell). A dry run of an import uploads the file (7-day area) so the server checks the same things it would store.
+- **The skill:** `.claude/skills/catalyst-analyst/SKILL.md`; at most 5 companies a session.
+- **The app:** the token in the Catalyst settings, "needs work" and the reports checklist in the Issuers view.
+- **Known answers** (`catalyst known put`) are also open to the token: they only feed `filings check`.
+
 - **Location:** `packages/cli` in this repo, TypeScript, run with `npx catalyst …`. It uses `core`'s zod schemas and parsers (the same ones the API uses); `catalyst schema <kind>` prints an input as JSON Schema.
 - **Where the work runs:** on your machine. The CLI imports `core`'s parsers, checks, scorecard and identity clients, so none of these needs the backend: sorting files, finding PDF pages, parsing, the checks, GLEIF and KRS lookups, and a dry run (with the scorecard the import would give). The app is called only to read a company's stored rows and to write results.
 - **Transport:** only the API (`/api/catalyst/agent/*`), never DynamoDB directly. The server checks what it receives (the zod schemas, the arithmetic checks re-run on the submitted lines, the original's SHA-256) and stores the original; it doesn't parse files. `filings check` re-parses the stored originals locally against the known answers at any time. JSON output by default, `--table` for people, `--dry-run` on every write.
@@ -435,7 +443,7 @@ Every write records who made it.
 
 ## UI
 
-**Built (N6, 2026-11-08):** the bonds table's scorecard column and issuer filters, the chart coloured by a dimension, the issuer dialog, the Issuers view (Docs/ui.md, "Catalyst"). Not yet: the track-record and judgement-age filters, the Issuers view's "needs work" and the reports checklist (they need `catalyst work` and checklist entries, N7), the interim and TTM columns (N8). The type is a bond tag and a filter, not a column, so the table fits a laptop.
+**Built (N6, 2026-11-08):** the bonds table's scorecard column and issuer filters, the chart coloured by a dimension, the issuer dialog, the Issuers view (Docs/ui.md, "Catalyst"). Not yet: the track-record and judgement-age filters, the interim and TTM columns (N8). The type is a bond tag and a filter, not a column, so the table fits a laptop.
 
 Routes: `#/catalyst?<filters>&bond=<isin>&issuer=<entityId>` (bonds), `#/catalyst/issuers?<filters>&issuer=<entityId>`. Style, sticky filters and header, loading placeholders and the bottom chart panel as in the rest of PT. Companies are always shown by their **short name**; legal name, KRS and LEI in tooltips and the issuer dialog.
 

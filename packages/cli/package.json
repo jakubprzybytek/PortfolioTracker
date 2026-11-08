@@ -8,6 +8,7 @@
     "catalyst": "./src/main.ts"
   },
   "dependencies": {
-    "@portfolio/core": "0.1.0"
+    "@portfolio/core": "0.1.0",
+    "zod": "^4.6.7"
   }
 }

@@ -138,6 +138,17 @@ export function catalystApi(
     "GET /catalyst/entities/{id}/years/{period}",
     "PUT /catalyst/entities/{id}/years/{period}",
     "GET /catalyst/entities/{id}/filings/{sha}",
+    "GET /catalyst/work",
+    "POST /catalyst/entities/{id}/analyses",
+    "POST /catalyst/entities/{id}/figures",
+    "POST /catalyst/entities/{id}/known",
+    "GET /catalyst/checklist",
+    "PUT /catalyst/checklist/{id}/{year}/{scope}",
+    "GET /catalyst/agent-token",
+    "POST /catalyst/agent-token",
+    "DELETE /catalyst/agent-token",
   ])
     api.route(route, apiHandler, auth);
+  // The agent's way in: no Cognito login; the function checks the agent token and what it may call (N7).
+  api.route("ANY /catalyst/agent/{proxy+}", apiHandler);
 }

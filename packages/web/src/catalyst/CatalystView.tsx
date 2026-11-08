@@ -18,6 +18,7 @@ import { BondTitle, LiquidityDots } from "./parts.tsx";
 import { YieldChart } from "./YieldChart.tsx";
 import { BondPanel } from "./BondPanel.tsx";
 import { ViewsMenu } from "./ViewsMenu.tsx";
+import { AgentTokenPanel } from "./AgentTokenPanel.tsx";
 import { AssumptionsPanel } from "./AssumptionsPanel.tsx";
 import { CatalystTabs } from "./CatalystTabs.tsx";
 import { CONFIDENCE_FILTERS, DIMENSIONS, IssuerSignalsCell, RULE_SETS, SCORECARD_FILTERS, STATE_FILTERS } from "./issuer.tsx";
@@ -73,7 +74,12 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
         </span>
       </header>
       {screen.error && <p className="error callout">{screen.error}</p>}
-      {settingsOpen && <AssumptionsPanel onSaved={screen.reload} />}
+      {settingsOpen && (
+        <>
+          <AssumptionsPanel onSaved={screen.reload} />
+          <AgentTokenPanel />
+        </>
+      )}
 
       <div className="sticky-toolbar" ref={toolbar} data-testid="catalyst-toolbar">
         <FilterBar

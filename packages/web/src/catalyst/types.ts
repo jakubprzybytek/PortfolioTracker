@@ -124,6 +124,15 @@ export interface TrackRecord {
   attention: string[];
 }
 
+/** What `catalyst work` lists (core/catalyst/agent.ts). */
+export interface WorkItem {
+  kind: string;
+  who: "agent" | "you";
+  entityId: string | null;
+  name: string;
+  detail: string;
+}
+
 // ─── Issuers (phase 2) ─────────────────────────────────────────────────────────────────────────────────────────────
 
 export type Signal = "green" | "yellow" | "red" | "na";

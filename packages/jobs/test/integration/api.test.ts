@@ -771,6 +771,59 @@ describe(`API ${API}`, () => {
     expect((await get<{ feed: unknown }>("/cash-flows")).body.feed).toBeNull();
   });
 
+  it("the agent token: reads and the allowed writes through /catalyst/agent; the switches, reviews, settings, the token and PT refused; replaced and revoked tokens rejected", async () => {
+    // Replaces this stage's agent token: on dev, log the CLI in again afterwards.
+    const agent = async (method: string, route: string, token: string | null, body?: unknown) => {
+      const res = await fetch(`${API}/catalyst/agent${route}`, { method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), "x-catalyst-by": "integration test", ...(body ? { "content-type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+      return { status: res.status, body: (await res.json().catch(() => null)) as Record<string, unknown> | null };
+    };
+    const made = await send<{ token: string; createdAt: string }>("POST", "/catalyst/agent-token");
+    expect(made.status).toBe(201);
+    expect(made.body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const t = made.body.token;
+    expect((await get<{ token: unknown }>("/catalyst/agent-token")).body.token).toEqual({ createdAt: made.body.createdAt, lastUsedAt: null });
+
+    // Reads.
+    expect((await agent("GET", "/work", t)).status).toBe(200);
+    expect(Array.isArray((await agent("GET", "/work", t)).body?.["items"])).toBe(true);
+    expect((await agent("GET", "/bonds", t)).status).toBe(200);
+    expect((await agent("GET", "/entities", t)).status).toBe(200);
+    expect((await agent("GET", "/checklist", t)).status).toBe(200);
+    expect((await get<{ token: { lastUsedAt: string | null } }>("/catalyst/agent-token")).body.token.lastUsedAt).not.toBeNull();
+    // Allowed writes reach their route (no such company here: 404, or the input refused: 400).
+    expect((await agent("POST", "/entities/0000000000/analyses", t, { markdown: "x".repeat(60), meta: { model: "test", sources: ["none"], redFlags: [] }, dryRun: true })).status).toBe(404);
+    expect((await agent("POST", "/entities/0000000000/figures", t, { currency: "PLN", unit: "thousands", years: [{ periodEnd: "2025-12-31", months: 12, scope: "group", figures: { revenue: 1 }, source: "x" }], dryRun: true })).status).toBe(404);
+    expect((await agent("PUT", "/checklist/0000000000/2025/group", t, { where: "KRS repository" })).status).toBe(404);
+    expect((await agent("PUT", "/entities/0000000000", t, { industry: "Developer" })).status).toBe(404);
+    expect((await agent("PUT", `/names/${encodeURIComponent("No Such Name S.A.")}`, t, { entityId: "0000000000" })).status).toBe(400); // no evidence
+    expect((await agent("POST", "/filings", t, { entityId: "0000000000" })).status).toBe(400);
+    // Refused: the AI analysis switches, a lender's kind, year reviews, settings, views, the token itself.
+    expect((await agent("PUT", "/entities/0000000000", t, { financeRuleSet: "collector" })).status).toBe(403);
+    for (const [method, route, body] of [
+      ["PUT", "/entities/0000000000/ai", { on: true }],
+      ["PUT", `/names/${encodeURIComponent("No Such Name S.A.")}/ai`, { on: true }],
+      ["PUT", "/entities/0000000000/years/2025-12-31%23group", { status: "hand-checked" }],
+      ["PUT", "/settings/assumptions", { reset: true }],
+      ["PUT", "/views", { views: [] }],
+      ["GET", "/agent-token", undefined],
+      ["POST", "/agent-token", {}],
+      ["DELETE", "/agent-token", undefined],
+    ] as const)
+      expect((await agent(method, route, t, body)).status, `${method} ${route}`).toBe(403);
+    // Nothing of PT through it.
+    expect((await agent("GET", "/../holdings", t)).status).not.toBe(200);
+    expect((await agent("GET", "/holdings", t)).status).toBe(404);
+    // No token, a wrong one, a replaced one, a revoked one.
+    expect((await agent("GET", "/work", null)).status).toBe(401);
+    expect((await agent("GET", "/work", "A".repeat(43))).status).toBe(401);
+    const next = await send<{ token: string }>("POST", "/catalyst/agent-token");
+    expect((await agent("GET", "/work", t)).status).toBe(401);
+    expect((await agent("GET", "/work", next.body.token)).status).toBe(200);
+    expect((await send("DELETE", "/catalyst/agent-token")).status).toBe(200);
+    expect((await agent("GET", "/work", next.body.token)).status).toBe(401);
+    expect((await get<{ token: unknown }>("/catalyst/agent-token")).body.token).toBeNull();
+  });
+
   it("GET /catalyst/status: the Catalyst module's bonds, its jobs' latest runs and its dead-letter queue", async () => {
     const { status, body } = await get<{ bonds: number; jobs: Record<string, unknown>; deadLetter: number | null }>("/catalyst/status");
     expect(status).toBe(200);

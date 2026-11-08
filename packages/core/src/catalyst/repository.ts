@@ -6,7 +6,7 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystChecklistItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
 import type { ScreenRow } from "./screen.ts";
 import type { FinancialYear } from "./financials.ts";
 
@@ -180,6 +180,14 @@ export class CatalystRepository {
 
   putCollectedFigures(items: Omit<CatalystCollectedFiguresItem, "PK" | "SK">[]): Promise<number> {
     return this.batchPut(items.map((a) => ({ ...catalystKeys.collected(a.entityId, a.at), ...a })));
+  }
+
+  listChecklist(): Promise<CatalystChecklistItem[]> {
+    return this.queryAll<CatalystChecklistItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "CHECK" } });
+  }
+
+  putChecklist(items: Omit<CatalystChecklistItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {
+    return this.batchPut(items.map((c) => ({ ...catalystKeys.check(c.entityId, c.year, c.scope), GSI1PK: "CHECK", GSI1SK: `${c.status}#${c.entityId}#${c.year}`, ...c })));
   }
 
   listKnown(): Promise<CatalystKnownItem[]> {

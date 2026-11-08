@@ -11,11 +11,12 @@ import { useApi } from "../useApi.ts";
 import { useNarrow } from "../useNarrow.ts";
 import { fmtNum } from "../format.ts";
 import { CatalystTabs } from "./CatalystTabs.tsx";
+import { ChecklistTab } from "./ChecklistTab.tsx";
 import { CONFIDENCE_FILTERS, IssuerSignalsCell, RULE_SETS, SCORECARD_FILTERS, STATE_FILTERS, confidenceAtLeast, scorecardMatches, signalsScore, stateMatches } from "./issuer.tsx";
 import { IssuerDialog } from "./IssuerDialog.tsx";
 import { pp } from "./labels.ts";
 import { opt } from "./filters.ts";
-import type { AiSwitch, BondRow, CompanyListItem, IssuerSignals, Screen } from "./types.ts";
+import type { AiSwitch, BondRow, CompanyListItem, IssuerSignals, Screen, WorkItem } from "./types.ts";
 
 interface IssuerRow {
   c: CompanyListItem;
@@ -26,9 +27,11 @@ interface IssuerRow {
   due12: number;
   otherCurrencies: string[];
   premium: number | null;
+  /** What `catalyst work` lists for it (the agent's and yours). */
+  work: WorkItem[];
 }
 
-const KEYS = ["name", "ai", "industry", "rule", "bonds", "owed", "due12", "premium", "scorecard", "confidence", "year", "judged"] as const;
+const KEYS = ["name", "ai", "industry", "rule", "bonds", "owed", "due12", "premium", "scorecard", "confidence", "year", "judged", "work"] as const;
 const median = (xs: number[]) => {
   if (xs.length === 0) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -63,6 +66,8 @@ function value(r: IssuerRow, key: string): SortValue {
       return r.signals?.latestPeriodEnd ?? null;
     case "judged":
       return r.c.judgedAt;
+    case "work":
+      return r.work.length;
   }
   return null;
 }
@@ -70,6 +75,7 @@ function value(r: IssuerRow, key: string): SortValue {
 export function IssuersView({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const entities = useApi<{ entities: CompanyListItem[] }>("/catalyst/entities");
   const screen = useApi<Screen>("/catalyst/bonds");
+  const work = useApi<{ items: WorkItem[] }>("/catalyst/work");
   const narrow = useNarrow();
   const [toolbar, stickyStyle] = useStickyToolbar();
   const [error, setError] = useState<string | null>(null);
@@ -91,9 +97,10 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
           due12: pln.filter((r) => r.years !== null && r.years <= 1).reduce((s, r) => s + (r.issueAmount ?? 0), 0),
           otherCurrencies: [...new Set(bonds.filter((r) => r.currency !== "PLN").map((r) => r.currency))],
           premium: median(bonds.map((r) => r.premium).filter((p): p is number => p !== null)),
+          work: (work.data?.items ?? []).filter((w) => w.entityId === c.entityId),
         };
       });
-  }, [entities.data, screen.data]);
+  }, [entities.data, screen.data, work.data]);
 
   const shown = useMemo(() => {
     const p = params;
@@ -105,14 +112,17 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
         (!p["rule"] || r.signals?.ruleSet === p["rule"]) &&
         (!p["sc"] || scorecardMatches(r.signals, p["sc"])) &&
         (!p["conf"] || confidenceAtLeast(r.signals, p["conf"])) &&
-        (!p["state"] || stateMatches(r.signals, r.c.aiAnalysis.on, p["state"])),
+        (!p["state"] || stateMatches(r.signals, r.c.aiAnalysis.on, p["state"])) &&
+        (!p["work"] || (p["work"] === "you" ? r.work.some((w) => w.who === "you") : r.work.length > 0)),
     );
     return sortRows(sortRows(filtered, { key: "name", desc: false }, value), sort, value);
   }, [all, params, sort]);
 
   const industries = useMemo(() => opt(all.map((r) => r.c.industry ?? "").filter(Boolean)), [all]);
   const rules = useMemo(() => opt(all.map((r) => r.signals?.ruleSet ?? "").filter(Boolean), (v) => RULE_SETS[v] ?? v), [all]);
-  const active = ["q", "ai", "ind", "rule", "sc", "conf", "state"].filter((k) => params[k]).length;
+  const active = ["q", "ai", "ind", "rule", "sc", "conf", "state", "work"].filter((k) => params[k]).length;
+  const names = useMemo(() => new Map((entities.data?.entities ?? []).map((e) => [e.entityId, e.shortName])), [entities.data]);
+  const checklist = params["tab"] === "checklist";
   const closeDialog = useCallback(() => setParams({ ...params, issuer: undefined, itab: undefined }), [params, setParams]);
 
   const setAi = async (c: CompanyListItem, on: boolean) => {
@@ -136,7 +146,19 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
         <h2 className="view-title">Catalyst</h2>
         <CatalystTabs current="issuers" />
       </header>
+      {/* biome-ignore lint/a11y/useSemanticElements: a segmented control; a <fieldset> would bring its own box and legend */}
+      <div className="segmented cat-tabs cat-issuers-tabs" role="group" aria-label="Issuers or the reports checklist">
+        <button type="button" className={checklist ? "" : "active"} aria-pressed={!checklist} onClick={() => setParams({ ...params, tab: undefined })} data-testid="issuers-tab-companies">
+          Companies
+        </button>
+        <button type="button" className={checklist ? "active" : ""} aria-pressed={checklist} onClick={() => setParams({ ...params, tab: "checklist" })} data-testid="issuers-tab-checklist">
+          Reports checklist
+        </button>
+      </div>
+      {checklist && <ChecklistTab names={names} />}
       {(entities.error || screen.error || error) && <p className="error callout">{entities.error ?? screen.error ?? error}</p>}
+      {!checklist && (
+      <>
       <div className="sticky-toolbar" ref={toolbar} data-testid="issuers-toolbar">
         <FilterBar
           compact
@@ -152,6 +174,7 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
           <FilterSelect label="Confidence" value={params["conf"] ?? ""} options={CONFIDENCE_FILTERS} onChange={(v) => set("conf", v)} testId="issuers-conf" width="9rem" />
           <FilterSelect label="Industry" value={params["ind"] ?? ""} options={industries} onChange={(v) => set("ind", v)} testId="issuers-ind" width="10rem" />
           <FilterSelect label="Rules" value={params["rule"] ?? ""} options={rules} onChange={(v) => set("rule", v)} testId="issuers-rule" width="10rem" />
+          <FilterSelect label="Needs work" value={params["work"] ?? ""} options={[{ value: "any", label: "Anything" }, { value: "you", label: "Yours" }]} onChange={(v) => set("work", v)} testId="issuers-work" width="8rem" />
         </FilterBar>
       </div>
 
@@ -190,11 +213,12 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
               {th("Conf.", "confidence", { left: true, firstDesc: true, title: "Data confidence" })}
               {th("Year", "year", { firstDesc: true, title: "The latest full year the scorecard rests on" })}
               {th("Judgement", "judged", { firstDesc: true })}
+              {th("Needs work", "work", { firstDesc: true, title: "What catalyst work lists for the company (AI analysis on): the agent's items and yours" })}
             </tr>
           }
         >
           <tbody>
-            {loading && <SkeletonRows rows={12} cols={11} />}
+            {loading && <SkeletonRows rows={12} cols={12} />}
             {shown.map((r) => (
               <tr key={r.c.entityId} className="clickable" onClick={() => setParams({ ...params, issuer: r.c.entityId })} data-testid="issuers-row" data-entity={r.c.entityId}>
                 <td className="left cat-issuer" title={[r.c.legalName, r.c.krs && `KRS ${r.c.krs}`, r.c.lei && `LEI ${r.c.lei}`].filter(Boolean).join(" · ")}>
@@ -218,11 +242,21 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
                 <td className={`left${r.signals?.confidence === "low" ? " muted" : ""}`}>{r.signals?.state === "scored" ? (r.signals.confidence ?? "–") : ""}</td>
                 <td>{r.signals?.latestPeriodEnd?.slice(0, 4) ?? "–"}</td>
                 <td>{r.c.judgedAt?.slice(0, 10) ?? "–"}</td>
+                <td title={r.work.map((w) => `${w.who === "you" ? "You: " : ""}${w.detail}`).join("\n")} data-testid="issuers-work-cell">
+                  {r.work.length ? (
+                    <>
+                      {r.work.length}
+                      {r.work.some((w) => w.who === "you") && <span className="neg"> · yours</span>}
+                    </>
+                  ) : (
+                    <span className="muted">–</span>
+                  )}
+                </td>
               </tr>
             ))}
             {!loading && shown.length === 0 && (
               <tr>
-                <td className="left muted" colSpan={11}>
+                <td className="left muted" colSpan={12}>
                   {all.length === 0 ? "No companies yet." : "No companies match the filters."}
                 </td>
               </tr>
@@ -230,7 +264,9 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
           </tbody>
         </StickyTable>
       )}
-      <p className="muted catalyst-foot">* Also bonds in other currencies, not in the sum. The reports checklist and what the agent has to do for each company come with the CLI.</p>
+      <p className="muted catalyst-foot">* Also bonds in other currencies, not in the sum. "Needs work": what <code>catalyst work</code> lists (the agent's items, and yours: a lender's kind, a download).</p>
+      </>
+      )}
 
       {params["issuer"] && (
         <IssuerDialog

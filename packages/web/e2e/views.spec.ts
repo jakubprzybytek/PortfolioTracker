@@ -1742,6 +1742,21 @@ test.describe("catalyst view", () => {
       );
     });
   });
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/catalyst/work", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify({ items: [{ kind: "judgement", who: "agent", entityId: "0000533217", name: "Kruk", detail: "no judgement yet" }, { kind: "lender-kind", who: "you", entityId: "0000533217", name: "Kruk", detail: "a Finance company of no known kind" }] }) }));
+    await page.route("**/catalyst/checklist**", async (r) => {
+      if (r.request().method() === "PUT") writes.push(`${new URL(r.request().url()).pathname.replace(/^.*\/catalyst/, "")} ${r.request().postData()}`);
+      await r.fulfill({ contentType: "application/json", body: JSON.stringify({ checklist: [{ entityId: "0000000001", krs: "0000000001", year: 2025, scope: "group", where: "KRS repository, KRS 0000000001", status: "missing", by: "agent", at: "2026-11-08T10:00:00Z" }] }) });
+    });
+    agentToken = null;
+    await page.route("**/catalyst/agent-token", async (r) => {
+      const method = r.request().method();
+      if (method === "POST") agentToken = { createdAt: "2026-11-08T10:00:00Z", lastUsedAt: null };
+      if (method === "DELETE") agentToken = null;
+      await r.fulfill({ status: method === "POST" ? 201 : 200, contentType: "application/json", body: JSON.stringify(method === "POST" ? { token: "T".repeat(43), createdAt: "2026-11-08T10:00:00Z" } : { token: agentToken }) });
+    });
+  });
+  let agentToken: { createdAt: string; lastUsedAt: string | null } | null = null;
   let writes: string[] = [];
   let review = "parsed";
   let abcAi = false;
@@ -1939,6 +1954,36 @@ test.describe("catalyst view", () => {
     await expect(page.getByTestId("info-premium-text")).toHaveCount(0);
     await page.getByTestId("info-vsalt").click();
     await expect(page.getByTestId("info-vsalt-text")).toContainText("safe alternative");
+  });
+
+  test("the agent's token: made in the settings, shown once, with the login command; revoked after a confirmation", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    await page.getByTestId("catalyst-settings-toggle").click();
+    const panel = page.getByTestId("agent-token");
+    await expect(panel.getByTestId("agent-token-state")).toHaveText("No token.");
+    await panel.getByTestId("agent-token-create").click();
+    await expect(panel.getByTestId("agent-token-value")).toHaveValue("T".repeat(43));
+    await expect(panel).toContainText("npx catalyst login --stage");
+    await expect(panel.getByTestId("agent-token-state")).toContainText("not used yet");
+    await panel.getByTestId("agent-token-revoke").click();
+    await panel.getByTestId("agent-token-confirm").click();
+    await expect(panel.getByTestId("agent-token-state")).toHaveText("No token.");
+    await expect(panel.getByTestId("agent-token-value")).toHaveCount(0);
+  });
+
+  test("the issuers view: what needs doing per company, and the reports checklist", async ({ page }) => {
+    await page.goto("/#/catalyst/issuers");
+    const kruk = page.getByTestId("issuers-table").locator("tbody tr").filter({ hasText: "Kruk" });
+    await expect(kruk.getByTestId("issuers-work-cell")).toContainText("2 · yours");
+    await page.getByTestId("issuers-work").selectOption("you");
+    await expect(page.getByTestId("issuers-table").locator("tbody tr")).toHaveCount(1);
+    await page.getByTestId("issuers-tab-checklist").click();
+    await expect(page).toHaveURL(/tab=checklist/);
+    const row = page.getByTestId("checklist-row");
+    await expect(row).toContainText("Abc");
+    await expect(row).toContainText("2025");
+    await row.getByTestId("checklist-status").selectOption("downloaded");
+    await expect.poll(() => writes).toEqual(['/checklist/0000000001/2025/group {"status":"downloaded"}']);
   });
 
   test("on a phone: the issuer dialog takes the screen", async ({ page }) => {
