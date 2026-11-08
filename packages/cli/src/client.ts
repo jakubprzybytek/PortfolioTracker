@@ -12,6 +12,8 @@ export interface Io {
   env: NodeJS.ProcessEnv;
   /** A hidden prompt (the token), or a line of stdin when it isn't a terminal. */
   secret: (question: string) => Promise<string>;
+  /** The clipboard's text (`login --from-clipboard`). */
+  clipboard: () => Promise<string>;
   /** Where the settings live (tests point it elsewhere). */
   configDir: string;
 }

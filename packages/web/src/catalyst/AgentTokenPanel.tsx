@@ -73,7 +73,7 @@ export function AgentTokenPanel() {
       {made && (
         <div className="cat-token-made">
           <p>
-            Shown only now. In Claude Code, type <code>! npx catalyst login --stage {stage()}</code> and paste it at the prompt (it isn't shown, and the agent never sees it).
+            Shown only now. Click Copy, then in Claude Code type <code>! npx catalyst login --stage {stage()} --from-clipboard</code> (or, in a terminal, <code>npx catalyst login --stage {stage()}</code> and paste it at the prompt). The CLI keeps it in your profile and shows only its last four characters; the agent never sees it.
           </p>
           <div className="cf-formula">
             <input readOnly value={made} onFocus={(e) => e.target.select()} aria-label="Agent token" data-testid="agent-token-value" />

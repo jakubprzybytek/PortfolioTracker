@@ -2,6 +2,7 @@
 // GLEIF and KRS lookups run here; the app is called (through the agent route, with the agent token) only to read
 // stored rows and to write results. JSON by default; `--table` for people; `--dry-run` on every write.
 
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { z } from "zod";
@@ -17,7 +18,8 @@ const HELP = `catalyst ${VERSION}: the Catalyst module's command line (the AI ag
 Usage: catalyst <command> [options]   (--stage <stage>: dev by default; --by <model>: who you are, recorded on writes)
 
 Access (you, once per stage):
-  login --stage <stage>                 store the agent token, asked at a hidden prompt: run it yourself, \`! npx catalyst login --stage dev\`
+  login --stage <stage> [--from-clipboard]   store the agent token: at a hidden prompt in a terminal, or from the
+                                        clipboard after "Copy" in the app (\`! npx catalyst login --stage dev --from-clipboard\` in Claude Code)
   logout --stage <stage>                forget it
   where                                 the stage's API and where the CLI keeps its settings
 
@@ -74,6 +76,7 @@ export function defaultIo(): Io {
     fetch: globalThis.fetch,
     env: process.env,
     secret: hiddenPrompt,
+    clipboard: async () => readClipboard(),
     configDir: "",
   };
 }
@@ -127,7 +130,8 @@ async function dispatch({ positional, flags }: Args, io: Io): Promise<number> {
 
     case "login": {
       apiUrl(stage);
-      const token = (await io.secret(`Agent token for ${stage} (made in the Catalyst settings; not shown): `)).trim();
+      // From the clipboard ("Copy" in the token panel) where there's no terminal to type into, e.g. Claude Code's `!`.
+      const token = (flags.has("--from-clipboard") ? await io.clipboard() : await io.secret(`Agent token for ${stage} (made in the Catalyst settings; not shown): `)).trim();
       if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) throw new CliError("That doesn't look like an agent token (43 characters)");
       saveToken(io, stage, token);
       // Checked at once: a wrong or revoked token is found now, not mid-session.
@@ -389,6 +393,16 @@ const TRANSCRIPT_SCHEMA = {
     },
   },
 };
+
+/** The clipboard's text, through the system's own tool; never printed. */
+function readClipboard(): string {
+  const [cmd, args] = process.platform === "win32" ? ["powershell", ["-NoProfile", "-Command", "Get-Clipboard"]] : process.platform === "darwin" ? ["pbpaste", []] : ["xclip", ["-selection", "clipboard", "-o"]];
+  try {
+    return execFileSync(cmd, args as string[], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  } catch {
+    throw new CliError("Couldn't read the clipboard: run `npx catalyst login --stage <stage>` in a terminal and paste the token at the prompt");
+  }
+}
 
 /** A prompt that doesn't echo what's typed (a token); stdin's first line when it isn't a terminal. */
 function hiddenPrompt(question: string): Promise<string> {

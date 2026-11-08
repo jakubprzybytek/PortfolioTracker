@@ -26,7 +26,8 @@ function setup(routes: Record<string, (body: unknown) => { status?: number; body
     const r = route(body);
     return new Response(JSON.stringify(r.body), { status: r.status ?? 200 });
   }) as typeof fetch;
-  const io: Io = { out: (s) => out.push(s), err: (s) => err.push(s), fetch: fetchFake, env: {}, secret: async () => secret, configDir: dir };
+  const io: Io = { out: (s) => out.push(s), err: (s) => err.push(s), fetch: fetchFake, env: {}, secret: async () => secret, clipboard: async () => `${TOKEN}
+`, configDir: dir };
   if (login) writeFileSync(join(dir, "agent-token.dev.json"), JSON.stringify({ stage: "dev", token: TOKEN }));
   const cli = async (...args: string[]) => ({ code: await run(args, io), out: out.splice(0).join("\n"), err: err.splice(0).join("\n") });
   return { cli, sent, dir };
@@ -59,6 +60,9 @@ describe("catalyst CLI", () => {
     expect(r.out).toBe("Saved the agent token for dev (…aaaa).");
     expect(r.out).not.toContain(TOKEN);
     expect(JSON.parse(readFileSync(join(ok.dir, "agent-token.dev.json"), "utf8")).token).toBe(TOKEN);
+    // From the clipboard (Claude Code's `!` has no terminal to type into).
+    const clip = setup({ "GET /work": () => ({ body: { items: [] } }) }, { login: false, secret: "" });
+    expect((await clip.cli("login", "--stage", "dev", "--from-clipboard")).out).toBe("Saved the agent token for dev (…aaaa).");
     const refused = setup({ "GET /work": () => ({ status: 401, body: { error: "No agent token" } }) }, { login: false });
     expect((await refused.cli("login", "--stage", "dev")).err).toContain("refuses this token");
     expect(existsSync(join(refused.dir, "agent-token.dev.json"))).toBe(false);
