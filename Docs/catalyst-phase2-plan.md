@@ -255,7 +255,7 @@ This writes data on prod that exists nowhere else (design, "Migration from Catal
 
 Done when: prod holds every company CV analysed, each scorecard equals CV's or its difference is on the report, and `filings check` passes.
 
-**Dev done 2026-11-08; prod waits for your approval of this report.** `scripts/catalyst-migrate-cv.ts` (dry run by default, `--write` to write) on dev:
+**Done 2026-11-08** (dev, then prod after the owner's approval of this report; prod gave the same results). `scripts/catalyst-migrate-cv.ts` (dry run by default, `--write` to write) on dev:
 - **Names and companies:** 100 names confirmed; Pepco Group N.V. and Dadelo created; PEU (Pepco's financing company) reads Pepco's reports (`financialsEntityId`).
 - **Profiles:** industry, summary, website, lender's kind or override for 98 companies, marked as from the migration.
 - **Reports:** CatalystViewer's 85 originals copied (none downloaded again): 128 years of 43 companies. The 18 PDFs are read from transcripts rebuilt from CatalystViewer's stored lines (`filings/rebuild.ts`): each stored value is found again on its page, so the same checks run as for an agent's transcript. Every stored line was found; two layouts needed care: cells the PDF merges ("3 4,523,463", note and amount; two years in one cell, Pepco and MOL).
