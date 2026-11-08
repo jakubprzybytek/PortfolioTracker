@@ -140,7 +140,7 @@ const OUTCOME: Record<BondOutcome, string> = {
 const ACTION: Record<string, string> = { suspension: "suspended", lifting: "suspension lifted", exclusion: "excluded", other: "measure" };
 
 /** How the issuer's past bonds ended (the daily-file archive and GPW's measures), and this bond's measures. */
-export function TrackTab({ detail, loading }: { detail: BondDetail | undefined; loading: boolean }) {
+export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track" | "events"> | undefined; loading: boolean }) {
   if (!detail) return <p className="muted">{loading ? "Loading…" : ""}</p>;
   const t = detail.track;
   const c = t.counts;

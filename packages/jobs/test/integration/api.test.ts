@@ -804,12 +804,20 @@ describe(`API ${API}`, () => {
     expect(refused.body.error).toContain("No company");
     expect((await send("PUT", "/catalyst/entities/0000000000/years/2025-12-31%23single", { status: "hand-checked" })).status).toBe(404);
     expect((await send("PUT", "/catalyst/entities/0000000000/years/2025-12-31%23single", { status: "great" })).status).toBe(400);
+    // The issuer dialog's reads: a year's lines, a report's original.
+    expect((await get("/catalyst/entities/0000000000/years/2025-12-31%23single")).status).toBe(404);
+    expect((await get(`/catalyst/entities/0000000000/filings/${"0".repeat(64)}`)).status).toBe(404);
   });
 
   it("Catalyst: the screen, a bond, the assumptions and the saved views", async () => {
     const screen = await get<{ date: string | null; rows: unknown[]; curve: unknown }>("/catalyst/bonds");
     expect(screen.status).toBe(200);
     expect(Array.isArray(screen.body.rows)).toBe(true);
+    // The listed name stays a name; a company's signals come as `scorecard`.
+    for (const row of screen.body.rows as { issuer?: unknown; scorecard?: unknown }[]) {
+      expect(row.issuer === undefined || row.issuer === null || typeof row.issuer === "string").toBe(true);
+      if (row.scorecard !== undefined) expect(row.scorecard).toHaveProperty("dimensions");
+    }
     expect((await get("/catalyst/bonds/NOT-AN-ISIN")).status).toBe(400);
     expect((await get("/catalyst/bonds/PL0000000000")).status).toBe(404);
 

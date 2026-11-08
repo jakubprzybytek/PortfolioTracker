@@ -1,5 +1,6 @@
 // Labels, formats and sort values of the Catalyst view.
 import { fmtMoney, fmtNum, fmtPct } from "../format.ts";
+import { signalsScore } from "./issuer.tsx";
 import type { SortValue } from "../sort.ts";
 import type { BondRow, Level, Liquidity } from "./types.ts";
 
@@ -53,7 +54,7 @@ export const couponLabel = (r: BondRow) => {
 };
 export const baseOf = (r: BondRow) => (r.coupon?.kind === "FLOATING" ? (r.coupon.base ?? "other") : r.coupon?.kind === "FIXED" || /^(DS|PS|WS)\d/.test(r.code) ? "fixed" : r.coupon?.kind === "ZERO" || /^OK\d/.test(r.code) ? "zero" : "");
 
-export const SORT_KEYS = ["bond", "issuer", "type", "coupon", "maturity", "price", "yield", "vsalt", "premium", "liquidity"] as const;
+export const SORT_KEYS = ["bond", "issuer", "type", "coupon", "maturity", "price", "yield", "vsalt", "premium", "liquidity", "scorecard"] as const;
 export function sortValue(r: BondRow, key: string): SortValue {
   switch (key) {
     case "bond":
@@ -76,6 +77,8 @@ export function sortValue(r: BondRow, key: string): SortValue {
       return r.premium;
     case "liquidity":
       return LEVELS.indexOf(r.liquidity.level) * 1e9 + (r.liquidity.medianTurnover30 ?? 0);
+    case "scorecard":
+      return signalsScore(r.scorecard);
   }
   return null;
 }

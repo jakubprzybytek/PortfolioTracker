@@ -5,6 +5,10 @@
 //   GET  /catalyst/settings/assumptions   the assumptions in use, the saved ones, the defaults, the retail offers
 //   PUT  /catalyst/settings/assumptions   save them ({ reset: true }: back to the defaults); the metrics are recomputed
 //   GET  /catalyst/views, PUT /catalyst/views   the saved views of the screen (name + URL parameters)
+//   GET  /catalyst/entities[/{id}]        the companies (with their latest judgement's date); one company: scorecard,
+//                                         years, filings, judgements, collected figures, track record
+//   GET  /catalyst/entities/{id}/years/{period}   a year's statement lines as printed
+//   GET  /catalyst/entities/{id}/filings/{sha}    a link to a report's original (15 minutes)
 
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 } from "aws-lambda";
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
@@ -13,7 +17,7 @@ import { addDays, today } from "@portfolio/core";
 import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { ParsedFiling } from "@portfolio/core/catalyst/filings/filingParser";
 import { FilingRefused, storeFiling } from "../filings.ts";
@@ -75,7 +79,8 @@ const ROUTES: Record<string, Handler> = {
     const rows = bonds
       .filter((b) => b.status === "listed" && screenBy.has(b.isin))
       .map((b) => {
-        const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _gs, computedAt: _c, isin: _i, code: _code, maturity: _m, nominal: _n, ...row } = screenBy.get(b.isin)!;
+        // The company's signals go out as `scorecard`: under `issuer` they'd hide the listed name.
+        const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _gs, computedAt: _c, isin: _i, code: _code, maturity: _m, nominal: _n, issuer: signals, ...row } = screenBy.get(b.isin)!;
         const t = termsBy.get(b.isin);
         return {
           isin: b.isin,
@@ -90,6 +95,7 @@ const ROUTES: Record<string, Handler> = {
             ? { issuer: t.issuer ?? null, coupon: t.coupon, couponText: t.couponText ?? null, secured: t.secured ?? null, issueAmount: t.issueValue ? (t.issueValue.amount * (b.nominal ?? t.issueValue.nominal)) / t.issueValue.nominal : null }
             : {}),
           ...row,
+          ...(signals ? { scorecard: signals } : {}),
         };
       });
     const computedAt = screen.map((s) => s.computedAt).sort().at(-1) ?? null;
@@ -127,10 +133,12 @@ const ROUTES: Record<string, Handler> = {
     // The companies behind bonds, with their names and how many bonds each has (listed and in all).
     const [entities, names, links, bonds] = await Promise.all([catalystRepo.listEntities(), catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
     const status = new Map(bonds.map((b) => [b.isin, b.status]));
+    // The latest judgement's date: only companies whose AI analysis was ever on have judgements.
+    const judged = new Map(await Promise.all(entities.filter((e) => e.aiAnalysis).map(async (e) => [e.entityId, (await catalystRepo.listAnalyses(e.entityId)).map((a) => a.at).sort().at(-1) ?? null] as const)));
     return json(200, {
       entities: entities.map((e) => {
         const own = links.filter((l) => l.entityId === e.entityId);
-        return { ...entityView(e), names: names.filter((n) => n.entityId === e.entityId).map((n) => n.name), bonds: own.length, listed: own.filter((l) => status.get(l.isin) === "listed").length };
+        return { ...entityView(e), names: names.filter((n) => n.entityId === e.entityId).map((n) => n.name), bonds: own.length, listed: own.filter((l) => status.get(l.isin) === "listed").length, judgedAt: judged.get(e.entityId) ?? null };
       }),
     });
   },
@@ -142,12 +150,15 @@ const ROUTES: Record<string, Handler> = {
     const [names, links, bonds] = await Promise.all([catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
     const own = new Set(links.filter((l) => l.entityId === id).map((l) => l.isin));
     const theirs = bonds.filter((b) => own.has(b.isin));
-    const [years, filings, inputs] = await Promise.all([catalystRepo.listYears(id), catalystRepo.listFilings(id), analysisInputs(today())]);
+    const [years, filings, inputs, analyses, collected] = await Promise.all([catalystRepo.listYears(id), catalystRepo.listFilings(id), analysisInputs(today()), catalystRepo.listAnalyses(id), catalystRepo.listCollectedFigures(id)]);
     return json(200, {
       company: entityView(entity),
       analysis: await analysisOf(entity, inputs, years),
       years: years.map(({ PK: _p, SK: _s, lines, ...y }) => ({ ...y, lines: lines.length })),
       filings: filings.map(({ PK: _p, SK: _s, ...f }) => f),
+      // Newest first.
+      analyses: analyses.map(({ PK: _p, SK: _s, ...a }) => a).sort((a, b) => b.at.localeCompare(a.at)),
+      collected: collected.map(({ PK: _p, SK: _s, ...c }) => c).sort((a, b) => b.at.localeCompare(a.at)),
       names: names.filter((n) => n.entityId === id).map(stripKeys),
       bonds: theirs.map((b) => ({ isin: b.isin, code: b.code, status: b.status, maturity: b.maturity, segment: b.segment })),
       track: await trackOf(theirs, entity.legalName),
@@ -247,6 +258,25 @@ const ROUTES: Record<string, Handler> = {
       if (err instanceof FilingRefused) return json(422, { error: err.message });
       throw err;
     }
+  },
+
+  "GET /catalyst/entities/{id}/years/{period}": async (event) => {
+    // A year's statement lines as printed (the Financials tab's full statements, the lines behind a figure).
+    const id = pathParam(event, "id");
+    const period = pathParam(event, "period");
+    const year = (await catalystRepo.listYears(id)).find((y) => y.period === period);
+    if (!year) return json(404, { error: `No year ${period} of ${id}` });
+    return json(200, { period, currency: year.currency, presentedUnit: year.presentedUnit, lines: year.lines, figures: year.figures });
+  },
+
+  "GET /catalyst/entities/{id}/filings/{sha}": async (event) => {
+    // A link to a report's original, valid 15 minutes.
+    const id = pathParam(event, "id");
+    const sha = pathParam(event, "sha");
+    const filing = (await catalystRepo.listFilings(id)).find((f) => f.sha256 === sha);
+    if (!filing) return json(404, { error: `No filing ${sha} of ${id}` });
+    const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: Resource.Files.name, Key: filing.key, ResponseContentDisposition: `inline; filename="${filing.fileName.replace(/["\\]/g, "")}"` }), { expiresIn: 900 });
+    return json(200, { url, fileName: filing.fileName });
   },
 
   "PUT /catalyst/entities/{id}/years/{period}": async (event) => {
@@ -389,12 +419,17 @@ function entityView(e: Entity) {
     financeRuleSet: e.financeRuleSet ?? null,
     ruleSetOverride: e.ruleSetOverride ?? null,
     aiAnalysis: e.aiAnalysis ?? { on: false },
+    businessSummary: e.businessSummary ?? null,
+    website: e.website ?? null,
+    financialsEntityId: e.financialsEntityId ?? null,
   };
 }
 
 /** A bond row's company fields. */
 function company(e: Entity | undefined) {
-  return e ? { entityId: e.entityId, issuerShort: e.shortName, issuerLegal: e.legalName, aiAnalysis: e.aiAnalysis?.on ?? false } : {};
+  return e
+    ? { entityId: e.entityId, issuerShort: e.shortName, issuerLegal: e.legalName, aiAnalysis: e.aiAnalysis?.on ?? false, ...(e.aiAnalysis && !e.aiAnalysis.on ? { aiOffSince: e.aiAnalysis.at.slice(0, 10) } : {}), ...(e.industry ? { industry: e.industry } : {}) }
+    : {};
 }
 
 async function switchEntity(entityId: string, ai: AiSwitch) {

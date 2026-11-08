@@ -1669,13 +1669,16 @@ test.describe("catalyst view", () => {
     flags: [],
     ...over,
   });
+  const DIMS = ["Debt Burden", "Debt Service", "Liquidity", "Profitability", "Asset Coverage", "Refinancing"];
+  const signals = { state: "scored", ruleSet: "collector", confidence: "high", latestPeriodEnd: "2025-12-31", dimensions: DIMS.map((name) => ({ name, signal: name === "Asset Coverage" ? "red" : "green", ...(name === "Debt Burden" ? { arrow: "up" } : {}) })) };
   const screen = {
     date: "2026-11-05",
     computedAt: "2026-11-05T20:00:00Z",
     curve: { fixed: [{ years: 1, value: 0.04, code: "PS1127" }, { years: 5, value: 0.055, code: "DS1031" }], wz: [] },
     rows: [
-      row("KRU0829", {}),
-      row("ABC1227", { issuer: "Abc S.A.", coupon: { kind: "FIXED", rate: 0.09 }, couponText: "stałe 9%", years: 1.1, yieldNet: 0.074, vsAlternative: 0.035, premium: 0.045, premiumBasis: "fixed-curve", projected: false, liquidity: liq("low", 0.1), nominal: 100 }),
+      // Kruk: linked, AI analysis on, scored (red only in asset coverage). Abc: linked, AI analysis off.
+      row("KRU0829", { entityId: "0000533217", issuerShort: "Kruk", issuerLegal: "Kruk S.A.", aiAnalysis: true, industry: "Finance", scorecard: signals }),
+      row("ABC1227", { entityId: "0000000001", issuerShort: "Abc", issuerLegal: "Abc S.A.", aiAnalysis: false, issuer: "Abc S.A.", coupon: { kind: "FIXED", rate: 0.09 }, couponText: "stałe 9%", years: 1.1, yieldNet: 0.074, vsAlternative: 0.035, premium: 0.045, premiumBasis: "fixed-curve", projected: false, liquidity: liq("low", 0.1), nominal: 100 }),
       row("WAW0130", { segment: "municipal", issuer: null, coupon: undefined, couponText: null, yieldNet: null, yieldGross: null, vsAlternative: null, premium: null, liquidity: liq("medium", 0.5), flags: ["no-terms"] }),
       row("OLD0828", { issuer: "Old S.A.", yieldNet: 0.2, liquidity: liq("none", 0), flags: ["stale"] }),
     ],
@@ -1706,6 +1709,70 @@ test.describe("catalyst view", () => {
       if (r.request().method() === "PUT") views = (JSON.parse(r.request().postData() ?? "{}") as { views: typeof views }).views;
       await r.fulfill({ contentType: "application/json", body: JSON.stringify({ views }) });
     });
+    // The companies: Kruk (scored, one year) and Abc (AI analysis off). Writes are recorded.
+    writes = [];
+    review = "parsed";
+    abcAi = false;
+    await page.route(/\/catalyst\/entities/, async (r) => {
+      const url = new URL(r.request().url());
+      const method = r.request().method();
+      const body = (data: unknown) => r.fulfill({ contentType: "application/json", body: JSON.stringify(data) });
+      if (method === "PUT") {
+        const data = JSON.parse(r.request().postData() ?? "{}") as { status?: string; on?: boolean };
+        writes.push(`${url.pathname.replace(/^.*\/catalyst/, "")} ${JSON.stringify(data)}`);
+        if (data.status) review = data.status;
+        if (url.pathname.endsWith("/0000000001/ai")) abcAi = data.on ?? false;
+        return body(url.pathname.endsWith("/ai") ? { aiAnalysis: { on: data.on, by: "test", at: "2026-11-08T10:00:00Z" } } : { review: { status: data.status } });
+      }
+      if (url.pathname.endsWith("/catalyst/entities")) return body({ entities: [company("0000533217", "Kruk", true, "2026-11-02T09:00:00Z"), company("0000000001", "Abc", abcAi, null)] });
+      if (url.pathname.includes("/years/")) return body({ period: "2025-12-31#group", currency: "PLN", presentedUnit: 1000, figures: { revenue: { value: 2_900_000_000, source: ["Revenue"] } }, lines: [{ statement: "income", order: 0, label: "Revenue", value: 2_900_000_000, page: 12 }, { statement: "income", order: 1, label: "Cost of sales", value: -900_000_000, page: 12 }] });
+      if (url.pathname.endsWith("/0000000001")) return body(detail(company("0000000001", "Abc", abcAi, null), { state: "no-report", ruleSet: "general" }, []));
+      return body(
+        detail(
+          company("0000533217", "Kruk", true, "2026-11-02T09:00:00Z"),
+          {
+            state: "scored",
+            ruleSet: "collector",
+            scorecard: { dimensions: DIMS.map((name) => ({ name, signal: name === "Asset Coverage" ? "red" : "green", metrics: [{ name: `${name} metric`, value: 1, formattedValue: "1.0×", signal: name === "Asset Coverage" ? "red" : "green" }] })), confidence: { level: "high", periodEnd: "2025-12-31", yearsBehind: 0, years: 3, missing: [], thinDimensions: [], facts: [] } },
+            source: { format: "esef", scope: "group", latestPeriodEnd: "2025-12-31", years: 3 },
+            refinancing: { bonds: [{ isin: "x", name: "KRU0829", maturityDay: "2029-08-12", currency: "PLN", amount: 100_000_000 }], report: { periodEnd: "2025-12-31", scope: "group", currency: "PLN", cash: 400_000_000, due12: 0, due24: 0, listed: 100_000_000 }, signal: "green", notes: [] },
+          },
+          [{ period: "2025-12-31#group", periodStart: "2025-01-01", periodEnd: "2025-12-31", months: 12, scope: "group", currency: "PLN", column: "current", reportPeriodEnd: "2025-12-31", figures: { revenue: { value: 2_900_000_000, source: ["Revenue"] }, cash: { value: 400_000_000, source: ["Cash"] } }, review: { status: review }, filing: { key: "k", sha256: "abc", format: "esef", checks: [] }, enteredBy: "you", importedAt: "2026-11-03T10:00:00Z", lines: 2 }],
+        ),
+      );
+    });
+  });
+  let writes: string[] = [];
+  let review = "parsed";
+  let abcAi = false;
+  const company = (entityId: string, shortName: string, on: boolean, judgedAt: string | null) => ({
+    entityId,
+    shortName,
+    legalName: `${shortName} S.A.`,
+    country: "PL",
+    krs: entityId,
+    industry: "Finance",
+    financeRuleSet: null,
+    ruleSetOverride: null,
+    aiAnalysis: { on },
+    businessSummary: null,
+    website: null,
+    financialsEntityId: null,
+    names: [`${shortName} S.A.`],
+    bonds: 1,
+    listed: 1,
+    judgedAt,
+  });
+  const detail = (c: ReturnType<typeof company>, analysis: unknown, years: unknown[]) => ({
+    company: c,
+    analysis,
+    years,
+    filings: [],
+    analyses: c.judgedAt ? [{ at: c.judgedAt, markdown: "Debt service is comfortable.\n\nWatch the next bond.", by: "agent", source: "agent" }] : [],
+    collected: [],
+    names: [],
+    bonds: [],
+    track: { company: c.shortName, prefix: null, since: "2020-01-02", counts: { repaid: 2, early: 0, "below-par": 0, "past-maturity": 0, listed: 1, unknown: 0 }, bonds: [], flags: [], attention: [] },
   });
 
   test("in the menu; every listed bond but the stale ones, the best net yield first", async ({ page }) => {
@@ -1789,5 +1856,97 @@ test.describe("catalyst view", () => {
     await expect(page.getByTestId("catalyst-row")).toHaveCount(3);
     await page.getByTestId("catalyst-row").first().getByRole("button").click();
     await expect(page.getByTestId("catalyst-panel-title")).toBeVisible();
+  });
+
+  test("the issuer column: six dots, AI analysis off by default; filtered by the scorecard", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    const rows = page.getByTestId("catalyst-table").locator("tbody tr");
+    await expect(rows.filter({ hasText: "KRU0829" }).getByTestId("issuer-dots").locator(".cat-dot")).toHaveCount(6);
+    await expect(rows.filter({ hasText: "KRU0829" }).locator(".cat-dot.red")).toHaveCount(1);
+    await expect(rows.filter({ hasText: "ABC1227" }).getByTestId("issuer-ai-off")).toHaveText("AI analysis off");
+    // No red in debt service and refinancing: Kruk (red only in asset coverage); "no red" at all: nobody.
+    await page.getByTestId("catalyst-sc").selectOption("nored-sr");
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText("KRU0829");
+    await expect(page).toHaveURL(/sc=nored-sr/);
+    await page.getByTestId("catalyst-sc").selectOption("nored");
+    await expect(rows.first()).toContainText("No bonds match the filters.");
+  });
+
+  test("the issuer dialog: scorecard, judgement, a year marked hand-checked, the lines behind a figure", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).getByTestId("catalyst-issuer").click();
+    await expect(page).toHaveURL(/issuer=0000533217/);
+    const dialog = page.getByTestId("issuer-dialog");
+    await expect(dialog.getByTestId("issuer-name")).toHaveText("Kruk");
+    await expect(dialog.getByTestId("issuer-dimension")).toHaveCount(6);
+    await expect(dialog.getByTestId("issuer-source")).toContainText("ESEF, group accounts, FY2025 and 2 earlier · judgement 2026-11-02");
+    await expect(dialog.getByTestId("issuer-judgement")).toContainText("Debt service is comfortable.");
+    await expect(dialog.getByTestId("issuer-bonds").locator("tbody tr")).toHaveCount(1);
+    await dialog.getByTestId("issuer-tab-financials").click();
+    await expect(page).toHaveURL(/itab=financials/);
+    await expect(dialog.getByTestId("issuer-years")).toContainText("2 900,0");
+    await dialog.getByTestId("issuer-year-check").click();
+    await expect.poll(() => writes).toEqual([`/entities/0000533217/years/${encodeURIComponent("2025-12-31#group")} {"status":"hand-checked"}`]);
+    await expect(dialog.getByTestId("issuer-year-review")).toContainText("hand-checked");
+    await dialog.getByTestId("issuer-years").getByRole("button", { name: "2 900,0" }).click();
+    await expect(dialog.getByTestId("issuer-lines")).toContainText("Revenue, FY2025");
+    await expect(dialog.getByTestId("issuer-lines").locator("tbody tr")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page).not.toHaveURL(/issuer=/);
+  });
+
+  test("AI analysis off: shown in place of the scorecard, enabled from the dialog", async ({ page }) => {
+    await page.goto("/#/catalyst?issuer=0000000001");
+    const dialog = page.getByTestId("issuer-dialog");
+    await expect(dialog.getByTestId("issuer-ai-off-callout")).toContainText("AI analysis off");
+    await dialog.getByTestId("issuer-ai-enable").click();
+    await expect.poll(() => writes).toEqual(['/entities/0000000001/ai {"on":true}']);
+    await expect(dialog.getByTestId("issuer-ai-switch")).toBeChecked();
+  });
+
+  test("the issuers view: one row per company, its switch, a row opens the dialog", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    await page.getByTestId("catalyst-tab-issuers").click();
+    await expect(page).toHaveURL(/#\/catalyst\/issuers$/);
+    const rows = page.getByTestId("issuers-table").locator("tbody tr");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.filter({ hasText: "Kruk" })).toContainText("2026-11-02");
+    await expect(rows.filter({ hasText: "Abc" }).getByTestId("issuer-ai-off")).toBeVisible();
+    await page.getByTestId("issuers-ai").selectOption("on");
+    await expect(rows).toHaveCount(1);
+    await page.getByTestId("issuers-ai").selectOption("");
+    // The box shows the saved state: it's ticked once the switch is stored.
+    await rows.filter({ hasText: "Abc" }).getByTestId("issuers-ai-switch").click();
+    await expect.poll(() => writes).toEqual(['/entities/0000000001/ai {"on":true}']);
+    await expect(rows.filter({ hasText: "Abc" }).getByTestId("issuers-ai-switch")).toBeChecked();
+    await rows.filter({ hasText: "Kruk" }).click();
+    await expect(page.getByTestId("issuer-dialog").getByTestId("issuer-name")).toHaveText("Kruk");
+    await page.getByTestId("issuer-dialog").getByTestId("issuer-show-bonds").click();
+    await expect(page).toHaveURL(/#\/catalyst\?co=0000533217/);
+    await expect(page.getByTestId("catalyst-table").locator("tbody tr")).toHaveCount(1);
+  });
+
+  test("the yield headings explain themselves: an 'i' that opens on hover or a tap, without sorting", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    await page.getByTestId("info-yield").hover();
+    await expect(page.getByTestId("info-yield-text")).toContainText("after the 19% tax");
+    await page.getByTestId("info-premium").click();
+    await expect(page.getByTestId("info-premium-text")).toContainText("the State's floating bonds (WZ)");
+    await expect(page).not.toHaveURL(/sort=/);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("info-premium-text")).toHaveCount(0);
+    await page.getByTestId("info-vsalt").click();
+    await expect(page.getByTestId("info-vsalt-text")).toContainText("safe alternative");
+  });
+
+  test("on a phone: the issuer dialog takes the screen", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/#/catalyst?issuer=0000533217");
+    const dialog = page.getByTestId("issuer-dialog");
+    await expect(dialog.getByTestId("issuer-name")).toHaveText("Kruk");
+    const box = await dialog.boundingBox();
+    expect(box?.width).toBe(390);
   });
 });

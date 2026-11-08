@@ -32,6 +32,11 @@ export interface BondRow {
   issuerShort?: string;
   issuerLegal?: string;
   aiAnalysis?: boolean;
+  /** AI analysis switched off again: since when (the scorecard isn't kept current). */
+  aiOffSince?: string;
+  industry?: string;
+  /** The company's scorecard in short (its six dimensions), once it's linked and analysed. */
+  scorecard?: IssuerSignals;
   coupon?: Coupon;
   couponText?: string | null;
   secured?: boolean | null;
@@ -117,4 +122,166 @@ export interface TrackRecord {
   bonds: { isin: string; code: string; maturity: string | null; status: string; lastSeen: string; lastClose: number | null; outcome: BondOutcome; inferred: boolean; note: string; flags: string[]; attention: string[] }[];
   flags: string[];
   attention: string[];
+}
+
+// ─── Issuers (phase 2) ─────────────────────────────────────────────────────────────────────────────────────────────
+
+export type Signal = "green" | "yellow" | "red" | "na";
+export type Arrow = "up" | "flat" | "down";
+
+/** A company's scorecard in short, as the bond rows carry it (core/catalyst/screen.ts). */
+export interface IssuerSignals {
+  state: "scored" | "no-report" | "out-of-scope";
+  ruleSet: string;
+  dimensions: { name: string; signal: Signal; arrow?: Arrow }[];
+  confidence?: "high" | "medium" | "low";
+  latestPeriodEnd?: string;
+}
+
+export interface AiSwitch {
+  on: boolean;
+  by?: string;
+  at?: string;
+}
+
+export interface Company {
+  entityId: string;
+  shortName: string;
+  legalName: string;
+  country?: string;
+  krs?: string;
+  lei?: string;
+  status?: string;
+  legalForm?: string;
+  industry: string | null;
+  financeRuleSet: string | null;
+  ruleSetOverride: { ruleSet: string; reason?: string } | null;
+  aiAnalysis: AiSwitch;
+  businessSummary: string | null;
+  website: string | null;
+  financialsEntityId: string | null;
+}
+
+export interface CompanyListItem extends Company {
+  names: string[];
+  bonds: number;
+  listed: number;
+  judgedAt: string | null;
+}
+
+export interface Metric {
+  name: string;
+  value: number | null;
+  formattedValue: string;
+  signal: Signal;
+  scored?: false;
+}
+export interface Dimension {
+  name: string;
+  signal: Signal;
+  metrics: Metric[];
+  notes?: string[];
+  trend?: { arrow: Arrow; metrics: Metric[] };
+}
+export interface Confidence {
+  level: "high" | "medium" | "low";
+  periodEnd: string;
+  yearsBehind: number;
+  years: number;
+  missing: string[];
+  thinDimensions: string[];
+  facts: string[];
+}
+export interface ScheduledBond {
+  isin: string;
+  name: string;
+  maturityDay: string;
+  currency: string;
+  amount: number;
+  issued?: number;
+  inReportCurrency?: number;
+}
+export interface Refinancing {
+  bonds: ScheduledBond[];
+  report?: { periodEnd: string; scope: string; currency: string; cash?: number; operatingCashFlow?: number; balanceSheetBonds?: number; due12: number; due24: number; listed: number; cashCover12?: number; liquidityCover24?: number };
+  signal: Signal;
+  notes: string[];
+}
+export interface CompanyAnalysis {
+  state: "scored" | "no-report" | "out-of-scope";
+  ruleSet: string;
+  scorecard?: { dimensions: Dimension[]; confidence?: Confidence };
+  source?: { format: string; scope: string; latestPeriodEnd: string; years: number };
+  refinancing?: Refinancing;
+}
+export type ReviewStatus = "parsed" | "hand-checked" | "flagged";
+/** A figure in the report's currency, with the statement lines (codes or labels) or XBRL concepts it came from. */
+export interface Figure {
+  value: number;
+  source: string[];
+}
+export interface CompanyYear {
+  period: string;
+  periodStart: string;
+  periodEnd: string;
+  months: number;
+  scope: "group" | "single";
+  currency: string;
+  standard?: string;
+  presentedUnit?: number;
+  column: "current" | "previous";
+  reportPeriodEnd: string;
+  figures: Record<string, Figure | undefined>;
+  review: { status: ReviewStatus; note?: string; at?: string; by?: string };
+  filing: { key: string; sha256: string; format: string; checks: string[]; notes?: string[] };
+  enteredBy: string;
+  importedAt: string;
+  lines: number;
+}
+export interface CompanyFiling {
+  sha256: string;
+  fileName: string;
+  format: string;
+  scope: string;
+  periodEnd: string;
+  stored: string[];
+  kept: string[];
+  replaced: string[];
+  checks: string[];
+  enteredBy: string;
+  importedAt: string;
+}
+export interface Judgement {
+  at: string;
+  markdown: string;
+  by: string;
+  source: "agent" | "you" | "CatalystViewer";
+}
+export interface CompanyDetail {
+  company: Company;
+  analysis: CompanyAnalysis;
+  years: CompanyYear[];
+  filings: CompanyFiling[];
+  analyses: Judgement[];
+  collected: { at: string; by?: string; source?: string }[];
+  names: { name: string; status: string }[];
+  bonds: { isin: string; code: string; status: string; maturity: string | null; segment: string }[];
+  track: TrackRecord;
+}
+export interface StatementLineView {
+  statement: string;
+  order: number;
+  label: string;
+  value: number;
+  code?: string;
+  item?: string;
+  page?: number;
+  parent?: number;
+}
+export interface YearLines {
+  period: string;
+  currency: string;
+  presentedUnit?: number;
+  lines: StatementLineView[];
+  figures: Record<string, Figure | undefined>;
 }

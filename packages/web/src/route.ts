@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-export type View = "dashboard" | "performance" | "holdings" | "prices" | "holdsell" | "sales" | "cashflows" | "indicators" | "transactions" | "notes" | "catalyst" | "instrument" | "status";
+export type View = "dashboard" | "performance" | "holdings" | "prices" | "holdsell" | "sales" | "cashflows" | "indicators" | "transactions" | "notes" | "catalyst" | "catalystIssuers" | "instrument" | "status";
 /** `hidden`: not in the menu (opened from another view). */
 export const VIEWS: { view: View; label: string; path: string; hidden?: true }[] = [
   { view: "dashboard", label: "Dashboard", path: "#/" },
@@ -17,6 +17,7 @@ export const VIEWS: { view: View; label: string; path: string; hidden?: true }[]
   { view: "transactions", label: "Transactions", path: "#/transactions" },
   { view: "notes", label: "Notes", path: "#/notes" },
   { view: "catalyst", label: "Catalyst", path: "#/catalyst" },
+  { view: "catalystIssuers", label: "Catalyst issuers", path: "#/catalyst/issuers", hidden: true },
   { view: "instrument", label: "Instrument", path: "#/instrument", hidden: true },
   { view: "status", label: "Status", path: "#/status", hidden: true },
 ];

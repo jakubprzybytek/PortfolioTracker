@@ -16,7 +16,7 @@ export function LiquidityDots({ level }: { level: Level }) {
 export function BondTitle({ r }: { r: BondRow }) {
   return (
     <span data-testid="catalyst-panel-title">
-      <strong>{r.code}</strong> {r.issuer ?? ""} <span className="muted">{r.couponText ?? couponLabel(r)} · matures {r.maturity ?? "–"}</span>
+      <strong>{r.code}</strong> {r.issuerShort ?? r.issuer ?? ""} <span className="muted">{r.couponText ?? couponLabel(r)} · matures {r.maturity ?? "–"}</span>
     </span>
   );
 }

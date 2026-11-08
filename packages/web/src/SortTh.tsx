@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { nextSort, type Sort } from "./sort.ts";
 
 /**
@@ -18,6 +18,7 @@ export function SortTh({
   onSort,
   className,
   title,
+  info,
   firstDesc = false,
 }: {
   label: string;
@@ -26,6 +27,8 @@ export function SortTh({
   onSort: (sort: Sort | null) => void;
   className?: string;
   title?: string;
+  /** An explanation behind an "i" after the label (InfoTip): what the column is. */
+  info?: ReactNode;
   /** Start descending (the highest first), e.g. for yields. */
   firstDesc?: boolean;
 }) {
@@ -39,6 +42,7 @@ export function SortTh({
           {active ? (sort.desc ? "▼" : "▲") : ""}
         </span>
       </button>
+      {info}
     </th>
   );
 }

@@ -279,6 +279,13 @@ Design, "UI": "Issuer dialog" and "Issuers".
 
 Done when: on prod you can go from a bond to its company's scorecard and the lines behind each figure, and filter the bonds by "no red in debt service and refinancing".
 
+**Built 2026-11-08** (on dev; prod with the push):
+- **API:** the bond rows carry the company's signals as `scorecard` (under `issuer` they hid the listed name: since N4 a scored bond's panel title broke), its industry and when AI analysis was switched off; the company view adds judgements and collected figures; `GET …/years/{period}` (a year's lines), `GET …/filings/{sha}` (a 15-minute link to the original); the companies list adds the latest judgement's date.
+- **Bonds view:** the scorecard column (six dots, arrows, faded at low confidence; rule set, confidence and year on hover; "AI analysis off", "no report yet", "not scored"); filters scorecard, state, confidence, AI analysis, industry, rules and one company (`co`); the chart's dots by a chosen dimension (debt service by default) or liquidity; an "i" by yield net, vs alt. and premium that explains them (owner, 2026-11-08). The Type column became a tag on non-corporate bonds, so the table fits 1440 px.
+- **Issuer dialog** and **Issuers view** as the design; marking a year hand-checked or flagged, the lines behind a figure, the original report.
+- **Not yet:** the track-record and judgement-age filters on the bonds; "needs work" and the reports checklist (with N7).
+- **Tests:** 7 new E2E tests (the column and its filter, the dialog with a year marked hand-checked and the lines behind a figure, AI analysis enabled from the dialog, the Issuers view and its switch, the yield headings' explanations, a phone); integration: the bond rows' `issuer` stays a name, the new routes' 404s.
+
 ### N7 CLI, agent token and the agent skill ⚠ approval
 
 This adds a new way into the API (access).

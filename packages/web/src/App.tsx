@@ -23,6 +23,7 @@ const PricesView = lazy(() => import("./PricesView.tsx").then((m) => ({ default:
 const SalesView = lazy(() => import("./SalesView.tsx").then((m) => ({ default: m.SalesView })));
 const StatusView = lazy(() => import("./StatusView.tsx").then((m) => ({ default: m.StatusView })));
 const CatalystView = lazy(() => import("./catalyst/CatalystView.tsx").then((m) => ({ default: m.CatalystView })));
+const IssuersView = lazy(() => import("./catalyst/IssuersView.tsx").then((m) => ({ default: m.IssuersView })));
 const CashFlowsView = lazy(() => import("./CashFlowsView.tsx").then((m) => ({ default: m.CashFlowsView })));
 const TransactionsView = lazy(() => import("./TransactionsView.tsx").then((m) => ({ default: m.TransactionsView })));
 
@@ -180,7 +181,7 @@ function Shell({ email }: { email: string }) {
             <ul>
               {VIEWS.filter((v) => !v.hidden).map((v) => (
                 <li key={v.view}>
-                  <a href={v.path} aria-current={route.view === v.view ? "page" : undefined} data-testid={`nav-${v.view}`} onClick={() => setMenuOpen(false)}>
+                  <a href={v.path} aria-current={route.view === v.view || (v.view === "catalyst" && route.view === "catalystIssuers") ? "page" : undefined} data-testid={`nav-${v.view}`} onClick={() => setMenuOpen(false)}>
                     <Icon name={v.view} />
                     {v.label}
                   </a>
@@ -223,6 +224,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}
         {route.view === "catalyst" && <CatalystView key="catalyst" params={route.params} setParams={setParams} />}
+        {route.view === "catalystIssuers" && <IssuersView key="catalystIssuers" params={route.params} setParams={setParams} />}
         {route.view === "instrument" && <InstrumentView key="instrument" params={route.params} />}
         {route.view === "status" && <StatusView />}
         </Suspense>

@@ -435,6 +435,8 @@ Every write records who made it.
 
 ## UI
 
+**Built (N6, 2026-11-08):** the bonds table's scorecard column and issuer filters, the chart coloured by a dimension, the issuer dialog, the Issuers view (Docs/ui.md, "Catalyst"). Not yet: the track-record and judgement-age filters, the Issuers view's "needs work" and the reports checklist (they need `catalyst work` and checklist entries, N7), the interim and TTM columns (N8). The type is a bond tag and a filter, not a column, so the table fits a laptop.
+
 Routes: `#/catalyst?<filters>&bond=<isin>&issuer=<entityId>` (bonds), `#/catalyst/issuers?<filters>&issuer=<entityId>`. Style, sticky filters and header, loading placeholders and the bottom chart panel as in the rest of PT. Companies are always shown by their **short name**; legal name, KRS and LEI in tooltips and the issuer dialog.
 
 ### Bonds
