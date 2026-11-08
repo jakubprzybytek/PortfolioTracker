@@ -108,6 +108,8 @@ describe("the half-year report, on demand", () => {
     expect(workItems({ ...base, today: "2026-09-29" })).toEqual([]);
     expect(workItems({ ...base, needsInterim: new Map() })).toEqual([]);
     expect(halfYearDue([fy("2025-12-31"), { periodEnd: "2026-06-30", months: 6 }], "2026-11-08")).toBeNull();
+    // A September year end: the half-year ends on 31 March (a month end stays one).
+    expect(halfYearDue([fy("2025-09-30")], "2026-11-08")).toEqual({ periodEnd: "2026-03-31", dueOn: "2026-06-30" });
     // The next annual report due: that one first.
     expect(workItems({ ...base, today: "2027-06-01" }).map((i) => i.kind)).toEqual(["report"]);
   });

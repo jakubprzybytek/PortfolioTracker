@@ -183,9 +183,11 @@ const addMonths = (day: string, months: number) => {
   const target = d.getUTCMonth() + months;
   d.setUTCDate(1);
   d.setUTCMonth(target);
-  // The month's last day when the year end is one (31 Dec + 5 months = 31 May).
+  // A month end stays a month end (31 Dec + 5 months = 31 May; 30 Sep + 6 months = 31 Mar), else the same day.
+  const from = new Date(`${day}T00:00:00Z`);
+  const fromLast = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 0)).getUTCDate();
   const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-  d.setUTCDate(Math.min(new Date(`${day}T00:00:00Z`).getUTCDate(), last));
+  d.setUTCDate(from.getUTCDate() === fromLast ? last : Math.min(from.getUTCDate(), last));
   return d.toISOString().slice(0, 10);
 };
 
