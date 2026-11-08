@@ -93,6 +93,30 @@ describe('findStatementPages', () => {
     });
 });
 
+describe('findStatementPages: headings seen in 2026 half-year reports', () => {
+    const table = (n: number) => Array.from({ length: 14 }, (_, i) => `Pozycja ${n}.${i} | ${i + 1} 234 | ${i + 2} 345`);
+    it('a section number between the lines of a heading (Archicom)', () => {
+        const pages = [
+            { page: 4, lines: ['Skonsolidowane sprawozdanie', '1.', 'z sytuacji finansowej', '1', ...table(4)] },
+            { page: 11, lines: ['Skonsolidowane sprawozdanie', '5. | z przepływów pieniężnych', '5', ...table(11)] },
+        ];
+        expect(findStatementPages(pages)).toEqual([4, 11]);
+    });
+    it('"sprawozdanie z zysków lub strat" (Vindexus)', () => {
+        const pages = [{ page: 53, lines: ['1. Śródroczne skrócone skonsolidowane sprawozdanie z zysków lub strat i innych całkowitych', 'dochodów', ...table(53)] }];
+        expect(findStatementPages(pages)).toEqual([53]);
+    });
+    it('not a segment note laid out like the statements (Echo)', () => {
+        const pages = [
+            { page: 18, lines: ['Segmenty Grupy', '1.5', 'Skonsolidowane sprawozdanie z sytuacji finansowej', '– struktura segmentowa', ...table(18)] },
+            { page: 22, lines: ['Skonsolidowany rachunek zysków i strat', '– struktura segmentowa', ...table(22)] },
+            { page: 86, lines: ['Skrócony śródroczny skonsolidowany', 'rachunek zysków i strat [tys. PLN]', ...table(86)] },
+            { page: 87, lines: ['Skrócone śródroczne skonsolidowane', 'sprawozdanie z sytuacji finansowej [tys. PLN]', ...table(87)] },
+        ];
+        expect(findStatementPages(pages)).toEqual([86, 87]);
+    });
+});
+
 describe('findStatementPages over three pages', () => {
     it('takes a statement whose heading is printed again two pages on (assets on two pages, then equity and liabilities)', () => {
         const table = (n: number) => Array.from({ length: 14 }, (_, i) => `Pozycja ${n}.${i} | ${i + 1} 234,56 | ${i + 2} 345,67`);

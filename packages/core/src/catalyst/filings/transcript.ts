@@ -31,7 +31,7 @@ const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{Diacrit
 // heading may run over two lines. Also English and Hungarian (MOL: "pénzügyi helyzetre vonatkozó kimutatás").
 const HEADINGS: Record<Statement, RegExp> = {
     balance: /(sprawozdani\w*(?: \w+){0,2} z sytuacji finansowej|^.{0,40}\bbilans\b|statement of financial position|balance sheet|penzugyi helyzetre vonatkozo)/,
-    income: /(rachunek zyskow (?:i|lub) strat|sprawozdani\w*(?: \w+){0,2} z (?:wyniku|calkowitych dochodow)|statement of (?:profit(?: or |\/)loss|comprehensive income)|profit and loss account|income statement|eredmenykimutatas)/,
+    income: /(rachunek zyskow (?:i|lub) strat|sprawozdani\w*(?: \w+){0,2} z (?:wyniku|calkowitych dochodow|zyskow (?:i|lub) strat)|statement of (?:profit(?: or |\/)loss|comprehensive income)|profit and loss account|income statement|eredmenykimutatas)/,
     cashFlow: /(sprawozdani\w*(?: \w+){0,2} z przeplywow pienieznych|rachunek przeplywow pienieznych|statement of cash flows|cash flow statement|cash.?flow-?ra vonatkozo)/,
 };
 // Polish "1 792,2" / "1.792,2" or English "1,792.2" (thousands groups, then decimals)
@@ -45,11 +45,16 @@ const isContents = (page: PdfPage) => page.lines.some(l => /\.{6,}/.test(l))
 // Table lines: two amounts or more, the last cell an amount (prose with numbers in it rarely ends in one).
 const tableLines = (page: PdfPage) => page.lines.filter(l => (l.match(AMOUNT) ?? []).length >= 2 && ENDS_IN_AMOUNT.test(l)).length;
 
-// The page's first short lines, each alone and joined with the next.
+// The page's first short lines, each alone and joined with the next one or two, without cell bars and section
+// numbers: Archicom prints "Skonsolidowane sprawozdanie" / "1." / "z sytuacji finansowej".
 const headingLines = (page: PdfPage) => {
-    const top = page.lines.slice(0, 12).filter(l => l.length < 120);
-    return [...top, ...top.slice(0, -1).map((l, i) => `${l} ${top[i + 1]}`)];
+    const top = page.lines.slice(0, 12).filter(l => l.length < 120)
+        .map(l => l.replace(/\|/g, ' ').replace(/(^|\s)\d{1,2}\.?(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    return [...top, ...top.slice(0, -1).map((l, i) => `${l} ${top[i + 1]}`), ...top.slice(0, -2).map((l, i) => `${l} ${top[i + 1]} ${top[i + 2]}`)];
 };
+// A segment note laid out like a statement (Echo: "Skonsolidowane sprawozdanie z sytuacji finansowej – struktura
+// segmentowa", ahead of the statements themselves).
+const isSegmentTable = (page: PdfPage) => headingLines(page).some(l => /segment/.test(fold(l)));
 
 // For each statement: the first page (past the table of contents) whose heading is near the top and
 // which is mostly a table, and the page after it (statements often run over two pages); also a
@@ -57,7 +62,7 @@ const headingLines = (page: PdfPage) => {
 export function findStatementPages(pages: PdfPage[]): number[] {
     const chosen = new Set<number>();
     for (const re of Object.values(HEADINGS)) {
-        const hits = pages.filter(p => !isContents(p)
+        const hits = pages.filter(p => !isContents(p) && !isSegmentTable(p)
             && headingLines(p).some(l => re.test(fold(l)))
             && tableLines(p) >= MIN_TABLE_LINES);
         if (hits.length === 0) continue;
