@@ -38,6 +38,7 @@ describe('finance lines', () => {
     it('finds securitisation and other financial liabilities by label or concept, on the balance sheet only', () => {
         expect(financeItem({ statement: 'balance', label: 'zobowiązania z tytułu sekurytyzacji' })).toBe('debtSecuritisation');
         expect(financeItem({ statement: 'balance', label: 'Liabilities from securitisation' })).toBe('debtSecuritisation');
+        expect(financeItem({ statement: 'balance', label: 'd) zobowiązania z tytułu sekurytzyacji' })).toBe('debtSecuritisation');
         expect(financeItem({ statement: 'balance', label: 'Pozostałe zobowiązania finansowe' })).toBe('otherFinancialLiabilities');
         expect(financeItem({ statement: 'balance', label: 'x', code: 'ifrs-full:OtherCurrentFinancialLiabilities' })).toBe('otherFinancialLiabilities');
         expect(financeItem({ statement: 'balance', label: 'Zobowiązania z tytułu dostaw i usług' })).toBeUndefined();

@@ -111,8 +111,9 @@ export function isWriteDown(line: Pick<StatementLine, 'statement' | 'label' | 'c
 }
 
 // Balance sheet lines the parsers leave out of debt, found by label or concept: a lessor's securitisation
-// funding (Vehis), and "other financial liabilities", where some lenders put their bonds (Vindexus FY2025).
-const SECURITISATION = /sekurytyz|securiti[sz]/i;
+// funding (Vehis; its H1 2026 report misspells it "sekurytzyacji"), and "other financial liabilities", where some
+// lenders put their bonds (Vindexus FY2025).
+const SECURITISATION = /sekuryt|securiti[sz]/i;
 const OTHER_FINANCIAL = /(pozosta\S*|inne) (krótkoterminowe |długoterminowe )?zobowiązania finansowe|other (current |non-?current )?financial liabilities|:Other(Current|Noncurrent)?FinancialLiabilities/i;
 
 export function financeItem(line: Pick<StatementLine, 'statement' | 'label' | 'code'>): LineItem | undefined {
