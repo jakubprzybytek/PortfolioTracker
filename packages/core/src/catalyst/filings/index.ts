@@ -10,3 +10,4 @@ export * from "./read.ts";
 export * from "./statementLines.ts";
 export * from "./transcript.ts";
 export * from "./zip.ts";
+export * from "./rebuild.ts";

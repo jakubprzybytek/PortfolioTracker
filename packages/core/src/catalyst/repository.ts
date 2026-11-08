@@ -6,7 +6,7 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
 import type { ScreenRow } from "./screen.ts";
 import type { FinancialYear } from "./financials.ts";
 
@@ -163,6 +163,23 @@ export class CatalystRepository {
 
   async putFiling(item: Omit<CatalystFilingItem, "PK" | "SK">): Promise<void> {
     await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.filing(item.entityId, item.sha256), ...item } }));
+  }
+
+  /** A company's judgements, oldest first (the last is the latest). */
+  listAnalyses(entityId: string): Promise<CatalystAnalysisItem[]> {
+    return this.queryAll<CatalystAnalysisItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :a)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":a": "ANALYSIS#" } });
+  }
+
+  putAnalyses(items: Omit<CatalystAnalysisItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut(items.map((a) => ({ ...catalystKeys.analysis(a.entityId, a.at), ...a })));
+  }
+
+  listCollectedFigures(entityId: string): Promise<CatalystCollectedFiguresItem[]> {
+    return this.queryAll<CatalystCollectedFiguresItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :a)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":a": "AIFIG#" } });
+  }
+
+  putCollectedFigures(items: Omit<CatalystCollectedFiguresItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut(items.map((a) => ({ ...catalystKeys.collected(a.entityId, a.at), ...a })));
   }
 
   listKnown(): Promise<CatalystKnownItem[]> {

@@ -255,6 +255,17 @@ This writes data on prod that exists nowhere else (design, "Migration from Catal
 
 Done when: prod holds every company CV analysed, each scorecard equals CV's or its difference is on the report, and `filings check` passes.
 
+**Dev done 2026-11-08; prod waits for your approval of this report.** `scripts/catalyst-migrate-cv.ts` (dry run by default, `--write` to write) on dev:
+- **Names and companies:** 100 names confirmed; Pepco Group N.V. and Dadelo created; PEU (Pepco's financing company) reads Pepco's reports (`financialsEntityId`).
+- **Profiles:** industry, summary, website, lender's kind or override for 98 companies, marked as from the migration.
+- **Reports:** CatalystViewer's 85 originals copied (none downloaded again): 128 years of 43 companies. The 18 PDFs are read from transcripts rebuilt from CatalystViewer's stored lines (`filings/rebuild.ts`): each stored value is found again on its page, so the same checks run as for an agent's transcript. Every stored line was found; two layouts needed care: cells the PDF merges ("3 4,523,463", note and amount; two years in one cell, Pepco and MOL).
+- **Known answers:** 40, all match (`catalyst-filings-check` passes).
+- **Analyses:** 45 judgements of 43 companies, with 45 sets of collected figures, marked as from CatalystViewer's agent.
+- **AI analysis:** on for the 42 companies with reports.
+- **Checklist:** nothing to migrate (CatalystViewer's `checklist.json` is empty).
+
+**Scorecards compared with CatalystViewer** (`catalyst-compare-cv-scorecards.ts`, refinancing aside): **41 of 43 equal**, dimension by dimension and metric by metric. The 2 lenders of N4 still differ in the 4th decimal of cash against debt due within a year (MCI 0.16084 vs 0.16083, Vehis 0.15856 vs 0.15835), no colour change: ours are fresh reads.
+
 ### N6 Issuers view and the issuer dialog
 
 Design, "UI": "Issuer dialog" and "Issuers".

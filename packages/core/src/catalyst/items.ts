@@ -81,6 +81,8 @@ export const catalystKeys = {
   replacedYear: (entityId: string, period: string, importedAt: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `FINOLD#${period}#${importedAt}` as const }),
   filing: (entityId: string, sha256: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `FILING#${sha256}` as const }),
   known: (entityId: string, period: string) => ({ PK: `KNOWN#${entityId}` as const, SK: period }),
+  analysis: (entityId: string, at: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `ANALYSIS#${at}` as const }),
+  collected: (entityId: string, at: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `AIFIG#${at}` as const }),
 };
 
 /** A financial year of a company, from a report (financials.ts). Replaced versions are kept as `FINOLD#…`. */
@@ -106,6 +108,41 @@ export interface CatalystFilingItem {
   checks: string[];
   enteredBy: string;
   importedAt: string;
+}
+
+/**
+ * A written judgement of a company (§13, §14 layout): append-only, the latest shown. Made by the agent (N7) or
+ * migrated from CatalystViewer (its AI analyses, marked so).
+ */
+export interface CatalystAnalysisItem {
+  PK: `ENTITY#${string}`;
+  SK: `ANALYSIS#${string}`;
+  entityId: string;
+  at: string;
+  /** The judgement in Markdown. */
+  markdown: string;
+  /** Who wrote it: a model id, a person, "CatalystViewer (<model>)". */
+  by: string;
+  /** The scorecard it saw, as it was then. */
+  scorecard?: unknown;
+  source: "agent" | "you" | "CatalystViewer";
+}
+
+/**
+ * Figures collected from the web when no report is available (§9): marked as such, confidence medium at most.
+ * CatalystViewer's AI analyses carried them (agentFinancials).
+ */
+export interface CatalystCollectedFiguresItem {
+  PK: `ENTITY#${string}`;
+  SK: `AIFIG#${string}`;
+  entityId: string;
+  at: string;
+  currency: string;
+  unit: string;
+  notes?: string;
+  years: Record<string, unknown>[];
+  by: string;
+  source: "agent" | "CatalystViewer";
 }
 
 /** Figures read by hand from a printed report (CatalystViewer's expected.json), for `filings check`. */
@@ -194,6 +231,14 @@ export interface CatalystEntityItem {
   register?: { liquidationOpen: boolean; entries: string[] };
   /** From the fixed list (issuers/scope.ts, INDUSTRIES): it picks the rule set. Set by the agent or you. */
   industry?: string;
+  /** What the company does (a few sentences) and its website: by the agent or you. */
+  businessSummary?: string;
+  website?: string;
+  /**
+   * A financing vehicle's group: the company whose reports judge this one's bonds (PEU (FIN) PLC → Pepco Group N.V.,
+   * whose guarantee stands behind them).
+   */
+  financialsEntityId?: string;
   /** A lender's kind (collector, leasing, investment): set by you; a Finance company has no scorecard without it. */
   financeRuleSet?: "collector" | "leasing" | "investment";
   /** Rules that fit the business model better than the industry's, with the reason (yours). */

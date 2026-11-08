@@ -35,8 +35,9 @@ export async function analysisInputs(today: string): Promise<AnalysisInputs> {
   return { bonds, links, terms: new Map(terms.map((t) => [t.isin, t])), names, today };
 }
 
-export async function analysisOf(entity: Pick<CatalystEntityItem, "entityId" | "industry" | "financeRuleSet" | "ruleSetOverride">, inputs: AnalysisInputs, years?: FinancialYear[]): Promise<CompanyAnalysis> {
-  const own = years ?? (await catalystRepo.listYears(entity.entityId));
+/** A financing vehicle's bonds are judged on its group's reports (`financialsEntityId`). */
+export async function analysisOf(entity: Pick<CatalystEntityItem, "entityId" | "industry" | "financeRuleSet" | "ruleSetOverride" | "financialsEntityId">, inputs: AnalysisInputs, years?: FinancialYear[]): Promise<CompanyAnalysis> {
+  const own = entity.financialsEntityId ? await catalystRepo.listYears(entity.financialsEntityId) : (years ?? (await catalystRepo.listYears(entity.entityId)));
   const names = inputs.names.filter((n) => n.entityId === entity.entityId).map((n) => n.name);
   return companyAnalysis(
     { ...(entity.industry ? { industry: entity.industry } : {}), ...(entity.financeRuleSet ? { financeRuleSet: entity.financeRuleSet } : {}), ...(entity.ruleSetOverride ? { ruleSetOverride: entity.ruleSetOverride } : {}) },
