@@ -50,7 +50,8 @@ export default $config({
     const transactions = new sst.aws.Dynamo("Transactions", { ...byType, deletionProtection, transform: withPitr });
     const holdings = new sst.aws.Dynamo("Holdings", { fields: keys, primaryIndex, deletionProtection });
 
-    // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload; exports/… =
+    // raw/<source>/<yyyy>/<mm>/<dd>/… = originals of every download; imports/<kind>/… = files you upload; catalyst/… =
+    // the Catalyst module (filings/: report originals, uploads/: in transit, 7 days); exports/… =
     // the monthly backup. Versioned: an overwritten or deleted file can be got back for 90 days.
     const files = new sst.aws.Bucket("Files", { versioning: true });
     new aws.s3.BucketLifecycleConfiguration("FilesLifecycle", {
@@ -59,6 +60,9 @@ export default $config({
         // Old originals are only read to re-run a parser: Glacier Instant Retrieval after 90 days (still read at once).
         // Only files of 128 KB or more: smaller ones are billed as 128 KB there, which costs more than keeping them.
         { id: "raw-to-glacier-ir", status: "Enabled", filter: { and: { prefix: "raw/", objectSizeGreaterThan: 128 * 1024 } }, transitions: [{ days: 90, storageClass: "GLACIER_IR" }] },
+        // Reports uploaded for a Catalyst import are only in transit (an import copies them away and deletes them): an
+        // abandoned one goes after 7 days (approved 2026-11-08).
+        { id: "catalyst-uploads", status: "Enabled", filter: { prefix: "catalyst/uploads/" }, expiration: { days: 7 } },
         { id: "old-versions", status: "Enabled", filter: {}, noncurrentVersionExpiration: { noncurrentDays: 90 }, expiration: { expiredObjectDeleteMarker: true }, abortIncompleteMultipartUpload: { daysAfterInitiation: 7 } },
       ],
     }, { dependsOn: [files] });

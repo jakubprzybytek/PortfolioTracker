@@ -204,7 +204,7 @@ Dev:
 - **CatalystViewer's files:** all 85 originals read again, none downloaded from the sources. The 67 structured ones gave 103 financial years of 37 companies (2023–2025); every year's figures equal CatalystViewer's.
 - **Known answers:** the 21 ESEF ones match, both as stored and on a fresh read. The other 18 are PDFs, left for N5 with the 18 PDF files and one company not in the module yet (LEI 213800OVMJPFP79OB449).
 
-Not done here: a lifecycle rule for `catalyst/uploads/` (a change to the files bucket: yours to approve). An import deletes its upload; only abandoned ones (a dry run never followed) stay.
+Uploads: an import deletes its upload; abandoned ones (a dry run never followed) expire after 7 days (lifecycle rule `catalyst-uploads` on the files bucket, approved 2026-11-08).
 
 The ported parsers, run locally, and the API that stores their result. The CLI's commands come in N7; until then a script (`scripts/catalyst-import-filing.ts`) parses locally and writes through the repository inside `sst shell`, as phase 1's scripts.
 
