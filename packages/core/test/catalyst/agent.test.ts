@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGENT_SCHEMAS, AnalysisInput, agentMayCall, annualDue, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
+import { AGENT_SCHEMAS, AnalysisInput, agentMayCall, annualDue, assumedBasis, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
 
 const entity = (entityId: string, over: Partial<WorkInput["entities"][number]> = {}): WorkInput["entities"][number] => ({
   entityId,
@@ -60,10 +60,13 @@ describe("what needs doing", () => {
 
   it("a report due, then the judgement after it is imported", () => {
     expect(workItems(input({ entities: [entity("0000533217")], years: new Map([["0000533217", [fy("2024-12-31")]]]) })).map((i) => i.kind)).toEqual(["report", "judgement"]);
-    const done = input({ entities: [entity("0000533217")], years: new Map([["0000533217", [fy("2025-12-31", "2026-06-01T00:00:00Z")]]]), judged: new Map([["0000533217", "2026-06-02T00:00:00Z"]]) });
+    const done = input({ entities: [entity("0000533217")], years: new Map([["0000533217", [fy("2025-12-31")]]]), judged: new Map([["0000533217", { at: "2026-06-02T00:00:00Z", basedOn: "2025-12-31" }]]) });
     expect(workItems(done)).toEqual([]);
-    done.years.set("0000533217", [fy("2025-12-31", "2026-07-01T00:00:00Z")]);
-    expect(workItems(done)[0]!.detail).toContain("older than the latest report imported (2026-07-01)");
+    // Importing the same year again (a migration, a fresh parse) doesn't make it stale; a later year does.
+    done.years.set("0000533217", [fy("2025-12-31", "2026-11-08T00:00:00Z")]);
+    expect(workItems(done)).toEqual([]);
+    done.years.set("0000533217", [fy("2025-12-31"), fy("2026-12-31", "2027-04-01T00:00:00Z")]);
+    expect(workItems({ ...done, today: "2027-04-02" })[0]!.detail).toBe("the judgement (2026-06-02) predates FY2026, stored since (it rests on FY2025)");
   });
 
   it("a report on the checklist isn't asked for again; the download is yours", () => {
@@ -83,7 +86,7 @@ describe("what needs doing", () => {
         names: [{ name: "Nowa Spółka S.A.", entityId: null, status: "unresolved", evidence: "", updatedAt: "x", aiAnalysis: { on: true, by: "you", at: "x" } }],
         entities: [entity("0000533217", { businessSummary: undefined } as never)],
         years: new Map([["0000533217", [fy("2025-12-31")]]]),
-        judged: new Map([["0000533217", "2026-07-01T00:00:00Z"]]),
+        judged: new Map([["0000533217", { at: "2026-07-01T00:00:00Z", basedOn: "2025-12-31" }]]),
         measures: new Map([["0000533217", [{ code: "KRU0829", published: "2026-08-01T08:00:00", reason: "na żądanie KNF", signal: "distress" }, { code: "KRU0829", published: "2026-01-01T08:00:00", reason: "old", signal: "distress" }]]]),
       }),
     );
@@ -94,6 +97,15 @@ describe("what needs doing", () => {
   it("a financing vehicle is judged on its group's years", () => {
     const items = workItems(input({ entities: [entity("LEI:259400AAAAAAAAAAAA01", { financialsEntityId: "0000533217" })], years: new Map([["0000533217", [fy("2025-12-31")]]]) }));
     expect(items.map((i) => i.kind)).toEqual(["judgement"]);
+  });
+});
+
+describe("a migrated judgement's basis", () => {
+  it("the latest year ended two months before it was written", () => {
+    const years = [fy("2024-12-31"), fy("2025-12-31")];
+    expect(assumedBasis(years, "2026-05-28T10:00:00Z")).toBe("2025-12-31");
+    expect(assumedBasis(years, "2026-02-15T10:00:00Z")).toBe("2024-12-31");
+    expect(assumedBasis(years, "2024-06-01T10:00:00Z")).toBeUndefined();
   });
 });
 

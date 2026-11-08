@@ -2,9 +2,9 @@
 // due against cash, the track record and the judgement; tabs for its bonds, years, past bonds, judgements and reports.
 // Opened from any issuer name (`issuer=<entityId>` in the URL); full screen on a phone.
 import { useEffect, useState } from "react";
-import Markdown from "react-markdown";
 import { apiSend, api } from "../api.ts";
 import { fmtNum } from "../format.ts";
+import { MarkdownText } from "../NotesView.tsx";
 import { useApi } from "../useApi.ts";
 import { TrackTab } from "./BondPanel.tsx";
 import { ARROW, ARROW_LABEL, DIMENSIONS, RULE_SETS, SIGNAL_LABEL } from "./issuer.tsx";
@@ -147,12 +147,15 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
   );
 }
 
-/** The judgement's first paragraph, without Markdown's marks. */
-const firstParagraph = (md: string) =>
-  md
+/** The judgement in short: its "Judgement:" paragraph (the §14 layout), else the first one, without Markdown's marks. */
+const firstParagraph = (md: string) => {
+  const paragraphs = md
     .split(/\n\s*\n/)
     .map((p) => p.replace(/^#+\s.*$/gm, "").replace(/[*_`]/g, "").trim())
-    .find(Boolean) ?? "";
+    .filter((p) => p && !p.startsWith("|"));
+  const judgement = paragraphs.find((p) => /^Judgement:/i.test(p));
+  return judgement ? judgement.replace(/^Judgement:\s*/i, "") : (paragraphs[0] ?? "");
+};
 
 function Scorecard({ d }: { d: CompanyDetail }) {
   const a = d.analysis;
@@ -458,17 +461,13 @@ function JudgementsTab({ d }: { d: CompanyDetail }) {
         {latest!.at.slice(0, 10)} · {latest!.by}
         {latest!.source === "CatalystViewer" ? " (from CatalystViewer)" : ""}
       </p>
-      <div className="markdown">
-        <Markdown>{latest!.markdown}</Markdown>
-      </div>
+      <MarkdownText text={latest!.markdown} />
       {earlier.map((j) => (
         <details key={j.at}>
           <summary>
             {j.at.slice(0, 10)} · {j.by}
           </summary>
-          <div className="markdown">
-            <Markdown>{j.markdown}</Markdown>
-          </div>
+          <MarkdownText text={j.markdown} />
         </details>
       ))}
     </div>

@@ -144,8 +144,8 @@ export interface WorkInput {
   names: Omit<CatalystNameItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[];
   /** Each company's stored years (period end, scope, months, imported). */
   years: Map<string, Pick<FinancialYear, "periodEnd" | "scope" | "months" | "importedAt">[]>;
-  /** Each company's latest judgement's date. */
-  judged: Map<string, string>;
+  /** Each company's latest judgement: when, and the latest full year it was based on (unknown for migrated ones). */
+  judged: Map<string, { at: string; basedOn?: string | undefined }>;
   /** Each company's latest collected figures' date. */
   collected: Map<string, string>;
   checklist: Omit<CatalystChecklistItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[];
@@ -179,6 +179,18 @@ export function annualDue(years: { periodEnd: string; months: number }[], today:
   return dueOn <= today ? { periodEnd: next, dueOn } : null;
 }
 
+/**
+ * The full year a judgement without its basis (CatalystViewer's) most likely rested on: the latest stored one that
+ * ended at least two months before it was written (an annual report rarely comes out sooner).
+ */
+export function assumedBasis(years: { periodEnd: string; months: number }[], at: string): string | undefined {
+  const cutoff = addMonths(at.slice(0, 10), -2);
+  return years.filter((y) => y.months >= 12 && y.periodEnd <= cutoff).map((y) => y.periodEnd).sort().at(-1);
+}
+
+/** The latest full year among stored years: what a judgement written now rests on. */
+export const latestFullYear = (years: { periodEnd: string; months: number }[]) => years.filter((y) => y.months >= 12).map((y) => y.periodEnd).sort().at(-1);
+
 /** What `catalyst work` lists: for companies and names with AI analysis on, the agent's items first. */
 export function workItems(input: WorkInput): WorkItem[] {
   const items: WorkItem[] = [];
@@ -203,9 +215,12 @@ export function workItems(input: WorkInput): WorkItem[] {
       const newest = years.map((y) => y.importedAt).sort().at(-1);
       if (collected && (!newest || newest < collected)) items.push({ kind: "collected", who: "agent", entityId: e.entityId, name, detail: `the scorecard rests on figures collected from the web (${collected.slice(0, 10)}): look for a report` });
     }
-    const judged = input.judged.get(e.entityId);
-    const latestImport = years.map((y) => y.importedAt).sort().at(-1);
-    if (years.length && (!judged || (latestImport && judged < latestImport))) items.push({ kind: "judgement", who: "agent", entityId: e.entityId, name, detail: judged ? `the judgement (${judged.slice(0, 10)}) is older than the latest report imported (${latestImport!.slice(0, 10)})` : "no judgement yet" });
+    const judgement = input.judged.get(e.entityId);
+    const judged = judgement?.at;
+    const latestYear = years.filter((y) => y.months >= 12).map((y) => y.periodEnd).sort().at(-1);
+    const basedOn = judgement && (judgement.basedOn ?? assumedBasis(years, judgement.at));
+    if (latestYear && (!judgement || !basedOn || basedOn < latestYear))
+      items.push({ kind: "judgement", who: "agent", entityId: e.entityId, name, detail: judgement ? `the judgement (${judgement.at.slice(0, 10)}) predates FY${latestYear.slice(0, 4)}, stored since${basedOn ? ` (it rests on FY${basedOn.slice(0, 4)})` : ""}` : "no judgement yet" });
     for (const m of (input.measures.get(e.entityId) ?? []).filter((x) => !judged || x.published > judged))
       items.push({ kind: "measure", who: "agent", entityId: e.entityId, name, detail: `GPW, ${m.published.slice(0, 10)}, ${m.code}: ${m.reason} (${m.signal}${judged ? ", after the judgement" : ""})` });
   }

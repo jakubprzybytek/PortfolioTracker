@@ -151,6 +151,8 @@ export interface CatalystAnalysisItem {
   /** What it rests on: the documents read, and each red flag with its source and quote (the agent's, N7). */
   sources?: string[];
   redFlags?: { text: string; source: string; quote?: string }[];
+  /** The latest full year stored when it was written (its period end): a later one makes it stale. */
+  basedOn?: string;
 }
 
 /**

@@ -20,7 +20,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
-import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
+import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestFullYear, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
 import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
@@ -361,9 +361,12 @@ const ROUTES: Record<string, Handler> = {
     const id = pathParam(event, "id");
     const body = AnalysisInput.safeParse(parseBody(event));
     if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
-    if (!(await catalystRepo.getEntity(id))) return json(404, { error: `No company ${id}` });
+    const entity = await catalystRepo.getEntity(id);
+    if (!entity) return json(404, { error: `No company ${id}` });
     const { markdown, meta, dryRun } = body.data;
-    const item = { entityId: id, at: new Date().toISOString(), markdown, by: isAgent(event) ? meta.model : userOf(event), source: isAgent(event) ? ("agent" as const) : ("you" as const), sources: meta.sources, redFlags: meta.redFlags, ...(meta.scorecard !== undefined ? { scorecard: meta.scorecard } : {}) };
+    // What it rests on: the latest full year stored now (a later one makes it stale in `catalyst work`).
+    const basedOn = latestFullYear(await catalystRepo.listYears(entity.financialsEntityId ?? id));
+    const item = { entityId: id, at: new Date().toISOString(), ...(basedOn ? { basedOn } : {}), markdown, by: isAgent(event) ? meta.model : userOf(event), source: isAgent(event) ? ("agent" as const) : ("you" as const), sources: meta.sources, redFlags: meta.redFlags, ...(meta.scorecard !== undefined ? { scorecard: meta.scorecard } : {}) };
     if (!dryRun) await catalystRepo.putAnalyses([item]);
     return json(dryRun ? 200 : 201, { ...item, stored: !dryRun });
   },
@@ -549,7 +552,7 @@ async function work() {
   const ids = [...new Set(on.flatMap((e) => [e.entityId, ...(e.financialsEntityId ? [e.financialsEntityId] : [])]))];
   const [years, judged, collected, measures] = await Promise.all([
     Promise.all(ids.map(async (id) => [id, (await catalystRepo.listYears(id)).map((y) => ({ periodEnd: y.periodEnd, scope: y.scope, months: y.months, importedAt: y.importedAt }))] as const)),
-    Promise.all(on.map(async (e) => [e.entityId, (await catalystRepo.listAnalyses(e.entityId)).map((a) => a.at).sort().at(-1)] as const)),
+    Promise.all(on.map(async (e) => [e.entityId, (await catalystRepo.listAnalyses(e.entityId)).sort((a, b) => a.at.localeCompare(b.at)).map((a) => ({ at: a.at, basedOn: a.basedOn })).at(-1)] as const)),
     Promise.all(on.map(async (e) => [e.entityId, (await catalystRepo.listCollectedFigures(e.entityId)).map((a) => a.at).sort().at(-1)] as const)),
     Promise.all(
       on.map(async (e) => {

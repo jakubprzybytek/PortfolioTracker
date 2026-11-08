@@ -69,19 +69,22 @@ analysis, end to end".
    `catalyst analysis put <id> --file judgement.md --meta meta.json --dry-run`, then without `--dry-run`:
 
    ```
-   <Company> (<legal name>, <country>, KRS <…> / LEI <…>): <industry>, <rule set> rules
-   Bonds: <n> listed, <amount> due in 12 months, <amount> in 24 months
-   Figures: <source>, <scope> accounts, FY<year> (+<n> earlier); confidence <level> (<facts>)
+   # <Company>
+
+   - <legal name>, <country>, KRS <…> / LEI <…>: <industry>, <rule set> rules
+   - Bonds: <n> listed, <amount> due in 12 months, <amount> in 24 months
+   - Figures: <source>, <scope> accounts, FY<year> (+<n> earlier); confidence <level> (<facts>)
 
    | Dimension | Signal | Metrics |
    … the six: debt burden, debt service, liquidity, profitability, asset coverage, refinancing (with the arrows) …
 
-   Judgement: 2–5 sentences. The reds that matter and why, what offsets them, refinancing.
-   Red flags: each with its source and quote, or "none found in <documents read>".
-   Watch: what would change the view (the next report's date, a maturity, a covenant).
-   Sources: each document with its year and link.
+   **Judgement:** 2–5 sentences. The reds that matter and why, what offsets them, refinancing.
+   **Red flags:** each with its source and quote, or "none found in <documents read>".
+   **Watch:** what would change the view (the next report's date, a maturity, a covenant).
+   **Sources:** each document with its year and link.
    ```
 
+   It's Markdown (tables render): keep each part a paragraph of its own, and the header lines a list.
    `meta.json` (`catalyst schema analysis`): `model` (your model id), `sources` (every document read), `redFlags`
    (text, source, quote), `scorecard` (the `analysis.scorecard` you read, as it was).
 
