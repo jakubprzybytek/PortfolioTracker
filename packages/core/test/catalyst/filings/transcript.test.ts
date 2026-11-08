@@ -160,6 +160,22 @@ describe('transcriptToFiling', () => {
         expect(transcriptToFiling(mixed, pages, EXTRACTION).checks.join()).toContain("an interim's comparative is the same months a year earlier");
     });
 
+    it('adds up revenue printed in segments, and takes the total of a breakdown', () => {
+        const withParts = (parts: [string, string][], at: number[]) => {
+            const ps = structuredClone(reportPages);
+            const t = structuredClone(transcript);
+            parts.forEach(([label, amount], k) => {
+                ps[1]!.splice(4 + k, 0, `${label} | ${amount} | 1,0`);
+                t.lines.splice(at[k]!, 0, { statement: 'income', page: 2, label, field: 'revenue', values: [{ column: 'c', printed: amount }] });
+            });
+            return transcriptToFiling(t, asPages(ps), EXTRACTION).periods[0]!.figures.revenue!.value / 1e6;
+        };
+        // A total and the lines under it ("of which"): the total.
+        expect(withParts([['of which flats', '600,0'], ['of which rent', '400,0']], [1, 2])).toBe(1000);
+        // Segments apart from each other, each followed by its costs: the sum.
+        expect(withParts([['Rental income', '250,0']], [2])).toBe(1250);
+    });
+
     it('says when combined financing lines hide the bonds', () => {
         const mixed = structuredClone(transcript);
         mixed.lines[10]!.field = 'debtMixed';

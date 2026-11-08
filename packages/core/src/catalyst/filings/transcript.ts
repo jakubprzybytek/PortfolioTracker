@@ -258,11 +258,20 @@ export function transcriptToFiling(transcript: Transcript, pages: PdfPage[], ext
         const first = (field: LineField, statement?: Statement, abs = false) => figure(of(field, statement).slice(0, 1), abs);
         // A total the model also gave to the lines making it up: the largest of them is the total.
         const total = (field: LineField, statement: Statement) => figure(of(field, statement).sort((a, b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 1));
+        // Revenue: lines printed one after another are a total and its breakdown ("Przychody, w tym:"), so the
+        // first counts; lines apart, each with its own costs, are segments and add up (Cavatina: flats, rent).
+        const revenue = () => {
+            const items = of('revenue', 'income');
+            const income = t.lines.filter(l => l.statement === 'income');
+            const at = items.map(x => income.indexOf(x.line));
+            const adjacent = at.some((i, k) => k > 0 && i === at[k - 1]! + 1);
+            return figure(adjacent ? items.slice(0, 1) : items);
+        };
 
         const debtItems = (['debtBankLoans', 'debtBonds', 'debtLeases', 'debtMixed', 'debtOther'] as const).flatMap(f => of(f, 'balance'));
         if (of('debtMixed', 'balance').length && !of('debtBonds', 'balance').length) mixedDebt = true;
         const figures: Partial<Record<FilingField, SourcedFigure>> = {
-            revenue: first('revenue', 'income'),
+            revenue: revenue(),
             ebit: first('ebit', 'income'),
             // all cash flow lines: IFRS 16 reports often add right-of-use depreciation separately
             depreciation: figure(of('depreciation', 'cashFlow'), true) ?? first('depreciation', 'income', true),
