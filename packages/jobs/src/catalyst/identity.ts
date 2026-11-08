@@ -27,10 +27,11 @@ const polite: Fetcher = async (url) => {
 };
 
 /** Links up to `limit` bonds (listed ones first, newest first), saving every chunk. Returns what was written. */
-export async function resolveIdentities(limit = Number.POSITIVE_INFINITY, fetcher: Fetcher = polite): Promise<{ itemsWritten: number; note: string }> {
+export async function resolveIdentities(limit = Number.POSITIVE_INFINITY, fetcher: Fetcher = polite, { retryNow = false } = {}): Promise<{ itemsWritten: number; note: string }> {
   const [bonds, links, terms, entities, names] = await Promise.all([catalystRepo.listBonds(), catalystRepo.listLinks(), catalystRepo.listTerms(), catalystRepo.listEntities(), catalystRepo.listNames()]);
   const retryBefore = new Date(Date.now() - RETRY_DAYS * 86_400_000).toISOString();
-  const linked = new Set(links.filter((l) => l.entityId || l.at > retryBefore).map((l) => l.isin));
+  // Bonds no source could link are asked again a month later, or now (`retryNow`: a new source, e.g. GPW's measures).
+  const linked = new Set(links.filter((l) => l.entityId || (!retryNow && l.at > retryBefore)).map((l) => l.isin));
   const segmentOf = new Map(bonds.map((b) => [b.isin, b.segment]));
   const waiting = bonds
     .filter((b) => SEGMENTS.includes(b.segment) && !linked.has(b.isin))

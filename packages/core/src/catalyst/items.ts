@@ -8,6 +8,7 @@ import type { Coupon } from "./terms.ts";
 import type { CurvePoint } from "./curve.ts";
 import type { ScreenRow } from "./screen.ts";
 import type { ExitAction, ExitSignal } from "./exits.ts";
+import type { FinancialYear } from "./financials.ts";
 
 export type CatalystBondStatus = "listed" | "suspended" | "ended";
 
@@ -76,7 +77,53 @@ export const catalystKeys = {
   link: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "ENTITY" as const }),
   name: (name: string) => ({ PK: `NAME#${name}` as const, SK: "META" as const }),
   entity: (entityId: string) => ({ PK: `ENTITY#${entityId}` as const, SK: "META" as const }),
+  year: (entityId: string, period: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `FIN#${period}` as const }),
+  replacedYear: (entityId: string, period: string, importedAt: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `FINOLD#${period}#${importedAt}` as const }),
+  filing: (entityId: string, sha256: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `FILING#${sha256}` as const }),
+  known: (entityId: string, period: string) => ({ PK: `KNOWN#${entityId}` as const, SK: period }),
 };
+
+/** A financial year of a company, from a report (financials.ts). Replaced versions are kept as `FINOLD#…`. */
+export type CatalystYearItem = FinancialYear & { PK: `ENTITY#${string}`; SK: `FIN#${string}` | `FINOLD#${string}` };
+
+/** An original report: where it is, what it gave, who imported it. */
+export interface CatalystFilingItem {
+  PK: `ENTITY#${string}`;
+  SK: `FILING#${string}`;
+  entityId: string;
+  sha256: string;
+  /** The original in the files bucket. */
+  key: string;
+  fileName: string;
+  format: string;
+  scope: string;
+  /** The report's own year end. */
+  periodEnd: string;
+  /** Years stored, years kept from a more recent report, years replaced. */
+  stored: string[];
+  kept: string[];
+  replaced: string[];
+  checks: string[];
+  enteredBy: string;
+  importedAt: string;
+}
+
+/** Figures read by hand from a printed report (CatalystViewer's expected.json), for `filings check`. */
+export interface CatalystKnownItem {
+  PK: `KNOWN#${string}`;
+  SK: string; // <period end>#<scope>
+  GSI1PK: "KNOWN";
+  GSI1SK: string; // <entityId>#<period>
+  entityId: string;
+  period: string;
+  currency: string;
+  /** In thousands of the currency, as printed. */
+  thousands: Record<string, number>;
+  /** The original it was read from (files bucket key), and when it was checked. */
+  file?: string;
+  checkedOn: string;
+  source: string;
+}
 
 /** Whether the AI agent works on a company (or a listed name not yet linked): off unless you switch it on. */
 export interface AiSwitch {

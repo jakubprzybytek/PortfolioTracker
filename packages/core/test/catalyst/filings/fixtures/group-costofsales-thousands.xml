@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic test filing: group, cost-of-sales income statement, amounts in thousands (schema 1-2 style, default namespace). -->
+<SkonsolidowanaJednostkaInna xmlns="http://www.mf.gov.pl/schematy/SF/DefinicjeTypySprawozdaniaFinansowe/2018/07/09/SkonsolidowanaJednostkaInnaWTysiacach" xmlns:dtsf="http://www.mf.gov.pl/schematy/SF/DefinicjeTypySprawozdaniaFinansowe/2018/07/09/DefinicjeTypySprawozdaniaFinansowe/" xmlns:sin="http://www.mf.gov.pl/schematy/SF/DefinicjeTypySprawozdaniaFinansowe/2018/07/09/SkonsolidowanaJednostkaInnaStruktury">
+  <Naglowek>
+    <dtsf:OkresOd>2024-04-01</dtsf:OkresOd>
+    <dtsf:OkresDo>2025-03-31</dtsf:OkresDo>
+    <dtsf:DataSporzadzenia>2025-06-30</dtsf:DataSporzadzenia>
+    <sin:KodSprawozdania kodSystemowy="SFSINT (1)" wersjaSchemy="1-2">SprFinSkonsolidowanaJednostkaInnaWTysiacach</sin:KodSprawozdania>
+  </Naglowek>
+  <WprowadzenieDoSprawozdaniaFinansowego>
+    <P_1><P_1A><dtsf:NazwaFirmy>Grupa Testowa Sp. z o.o.</dtsf:NazwaFirmy></P_1A><P_1C>7010Z</P_1C><P_1D>0000654321</P_1D></P_1>
+  </WprowadzenieDoSprawozdaniaFinansowego>
+  <Bilans>
+    <sin:Aktywa><dtsf:KwotaA>5000</dtsf:KwotaA><dtsf:KwotaB>4500</dtsf:KwotaB>
+      <sin:Aktywa_A><dtsf:KwotaA>2000</dtsf:KwotaA><dtsf:KwotaB>1900</dtsf:KwotaB>
+        <sin:Aktywa_A_I><dtsf:KwotaA>100</dtsf:KwotaA><dtsf:KwotaB>110</dtsf:KwotaB></sin:Aktywa_A_I>
+        <sin:Aktywa_A_II><dtsf:KwotaA>300</dtsf:KwotaA><dtsf:KwotaB>300</dtsf:KwotaB></sin:Aktywa_A_II>
+      </sin:Aktywa_A>
+      <sin:Aktywa_B><dtsf:KwotaA>3000</dtsf:KwotaA><dtsf:KwotaB>2600</dtsf:KwotaB>
+        <sin:Aktywa_B_I><dtsf:KwotaA>800</dtsf:KwotaA><dtsf:KwotaB>700</dtsf:KwotaB></sin:Aktywa_B_I>
+        <sin:Aktywa_B_III><dtsf:KwotaA>600</dtsf:KwotaA><dtsf:KwotaB>500</dtsf:KwotaB>
+          <sin:Aktywa_B_III_1><dtsf:KwotaA>600</dtsf:KwotaA><dtsf:KwotaB>500</dtsf:KwotaB>
+            <sin:Aktywa_B_III_1_C><dtsf:KwotaA>100</dtsf:KwotaA><dtsf:KwotaB>100</dtsf:KwotaB></sin:Aktywa_B_III_1_C>
+            <sin:Aktywa_B_III_1_D><dtsf:KwotaA>500</dtsf:KwotaA><dtsf:KwotaB>400</dtsf:KwotaB></sin:Aktywa_B_III_1_D>
+          </sin:Aktywa_B_III_1>
+        </sin:Aktywa_B_III>
+      </sin:Aktywa_B>
+    </sin:Aktywa>
+    <sin:Pasywa><dtsf:KwotaA>5000</dtsf:KwotaA><dtsf:KwotaB>4500</dtsf:KwotaB>
+      <sin:Pasywa_A><dtsf:KwotaA>2000</dtsf:KwotaA><dtsf:KwotaB>1800</dtsf:KwotaB>
+        <sin:Pasywa_A_VII><dtsf:KwotaA>200</dtsf:KwotaA><dtsf:KwotaB>150</dtsf:KwotaB></sin:Pasywa_A_VII>
+      </sin:Pasywa_A>
+      <sin:Pasywa_B><dtsf:KwotaA>250</dtsf:KwotaA><dtsf:KwotaB>200</dtsf:KwotaB></sin:Pasywa_B>
+      <sin:Pasywa_D><dtsf:KwotaA>2750</dtsf:KwotaA><dtsf:KwotaB>2500</dtsf:KwotaB>
+        <sin:Pasywa_D_II><dtsf:KwotaA>1000</dtsf:KwotaA><dtsf:KwotaB>900</dtsf:KwotaB>
+          <sin:Pasywa_D_II_3><dtsf:KwotaA>1000</dtsf:KwotaA><dtsf:KwotaB>900</dtsf:KwotaB>
+            <sin:Pasywa_D_II_3_B><dtsf:KwotaA>1000</dtsf:KwotaA><dtsf:KwotaB>900</dtsf:KwotaB></sin:Pasywa_D_II_3_B>
+          </sin:Pasywa_D_II_3>
+        </sin:Pasywa_D_II>
+        <sin:Pasywa_D_III><dtsf:KwotaA>1750</dtsf:KwotaA><dtsf:KwotaB>1600</dtsf:KwotaB>
+          <sin:Pasywa_D_III_3><dtsf:KwotaA>1750</dtsf:KwotaA><dtsf:KwotaB>1600</dtsf:KwotaB>
+            <sin:Pasywa_D_III_3_A><dtsf:KwotaA>400</dtsf:KwotaA><dtsf:KwotaB>300</dtsf:KwotaB></sin:Pasywa_D_III_3_A>
+            <sin:Pasywa_D_III_3_F><dtsf:KwotaA>50</dtsf:KwotaA><dtsf:KwotaB>0</dtsf:KwotaB></sin:Pasywa_D_III_3_F>
+            <sin:Pasywa_D_III_3_D><dtsf:KwotaA>1300</dtsf:KwotaA><dtsf:KwotaB>1300</dtsf:KwotaB></sin:Pasywa_D_III_3_D>
+          </sin:Pasywa_D_III_3>
+        </sin:Pasywa_D_III>
+      </sin:Pasywa_D>
+    </sin:Pasywa>
+  </Bilans>
+  <RZiS>
+    <sin:RZiSKalk>
+      <sin:A><dtsf:KwotaA>6000</dtsf:KwotaA><dtsf:KwotaB>5500</dtsf:KwotaB></sin:A>
+      <sin:I><dtsf:KwotaA>400</dtsf:KwotaA><dtsf:KwotaB>350</dtsf:KwotaB></sin:I>
+      <sin:K><dtsf:KwotaA>120</dtsf:KwotaA><dtsf:KwotaB>110</dtsf:KwotaB>
+        <sin:K_I><dtsf:KwotaA>100</dtsf:KwotaA><dtsf:KwotaB>90</dtsf:KwotaB></sin:K_I>
+      </sin:K>
+      <sin:W><dtsf:KwotaA>200</dtsf:KwotaA><dtsf:KwotaB>150</dtsf:KwotaB></sin:W>
+    </sin:RZiSKalk>
+  </RZiS>
+  <RachPrzeplywow>
+    <sin:PrzeplywyPosr>
+      <sin:A><sin:A_II><sin:A_II_1><dtsf:KwotaA>150</dtsf:KwotaA><dtsf:KwotaB>140</dtsf:KwotaB></sin:A_II_1></sin:A_II></sin:A>
+      <sin:A_III><dtsf:KwotaA>380</dtsf:KwotaA><dtsf:KwotaB>300</dtsf:KwotaB></sin:A_III>
+    </sin:PrzeplywyPosr>
+  </RachPrzeplywow>
+</SkonsolidowanaJednostkaInna>

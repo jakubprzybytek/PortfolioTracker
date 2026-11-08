@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic test filing: single company, comparative income statement, amounts in złoty (schema 2-0E style). -->
+<tns:JednostkaInna xmlns:tns="http://www.mf.gov.pl/schematy/SF/DefinicjeTypySprawozdaniaFinansowe/2025/01/01/JednostkaInnaWZlotych" xmlns:dtsf="http://www.mf.gov.pl/schematy/SF/DefinicjeTypySprawozdaniaFinansowe/2025/01/01/DefinicjeTypySprawozdaniaFinansowe/" xmlns:jin="http://www.mf.gov.pl/schematy/SF/DefinicjeTypySprawozdaniaFinansowe/2025/01/01/JednostkaInnaStruktury">
+  <tns:Naglowek>
+    <dtsf:OkresOd>2025-01-01</dtsf:OkresOd>
+    <dtsf:OkresDo>2025-12-31</dtsf:OkresDo>
+    <dtsf:DataSporzadzenia>2026-03-20</dtsf:DataSporzadzenia>
+    <jin:KodSprawozdania kodSystemowy="SFJINZ (2)" wersjaSchemy="2-0E">SprFinJednostkaInnaWZlotych</jin:KodSprawozdania>
+  </tns:Naglowek>
+  <tns:WprowadzenieDoSprawozdaniaFinansowego>
+    <tns:P_1>
+      <tns:P_1A><dtsf:NazwaFirmy>TESTOWA DEWELOPER S.A.</dtsf:NazwaFirmy></tns:P_1A>
+      <tns:P_1B>SPÓŁKA AKCYJNA</tns:P_1B>
+      <tns:P_1C>4110Z</tns:P_1C>
+      <tns:P_1D>5252123456</tns:P_1D>
+      <tns:P_1E>0000123456</tns:P_1E>
+    </tns:P_1>
+  </tns:WprowadzenieDoSprawozdaniaFinansowego>
+  <tns:Bilans>
+    <jin:Aktywa><dtsf:KwotaA>1000000</dtsf:KwotaA><dtsf:KwotaB>900000</dtsf:KwotaB>
+      <jin:Aktywa_A><dtsf:KwotaA>300000</dtsf:KwotaA><dtsf:KwotaB>280000</dtsf:KwotaB>
+        <jin:Aktywa_A_I><dtsf:KwotaA>20000</dtsf:KwotaA><dtsf:KwotaB>15000</dtsf:KwotaB></jin:Aktywa_A_I>
+      </jin:Aktywa_A>
+      <jin:Aktywa_B><dtsf:KwotaA>700000</dtsf:KwotaA><dtsf:KwotaB>620000</dtsf:KwotaB>
+        <jin:Aktywa_B_I><dtsf:KwotaA>450000</dtsf:KwotaA><dtsf:KwotaB>400000</dtsf:KwotaB></jin:Aktywa_B_I>
+        <jin:Aktywa_B_III><dtsf:KwotaA>150000</dtsf:KwotaA><dtsf:KwotaB>120000</dtsf:KwotaB>
+          <jin:Aktywa_B_III_1><dtsf:KwotaA>150000</dtsf:KwotaA><dtsf:KwotaB>120000</dtsf:KwotaB>
+            <jin:Aktywa_B_III_1_C><dtsf:KwotaA>150000</dtsf:KwotaA><dtsf:KwotaB>120000</dtsf:KwotaB></jin:Aktywa_B_III_1_C>
+          </jin:Aktywa_B_III_1>
+        </jin:Aktywa_B_III>
+      </jin:Aktywa_B>
+    </jin:Aktywa>
+    <jin:Pasywa><dtsf:KwotaA>1000000</dtsf:KwotaA><dtsf:KwotaB>900000</dtsf:KwotaB>
+      <jin:Pasywa_A><dtsf:KwotaA>400000</dtsf:KwotaA><dtsf:KwotaB>350000</dtsf:KwotaB>
+        <jin:Pasywa_A_VI><dtsf:KwotaA>50000</dtsf:KwotaA><dtsf:KwotaB>40000</dtsf:KwotaB></jin:Pasywa_A_VI>
+      </jin:Pasywa_A>
+      <jin:Pasywa_B><dtsf:KwotaA>600000</dtsf:KwotaA><dtsf:KwotaB>550000</dtsf:KwotaB>
+        <jin:Pasywa_B_II><dtsf:KwotaA>250000</dtsf:KwotaA><dtsf:KwotaB>200000</dtsf:KwotaB>
+          <jin:Pasywa_B_II_1><dtsf:KwotaA>30000</dtsf:KwotaA><dtsf:KwotaB>30000</dtsf:KwotaB></jin:Pasywa_B_II_1>
+          <jin:Pasywa_B_II_3><dtsf:KwotaA>220000</dtsf:KwotaA><dtsf:KwotaB>170000</dtsf:KwotaB>
+            <jin:Pasywa_B_II_3_A><dtsf:KwotaA>70000</dtsf:KwotaA><dtsf:KwotaB>70000</dtsf:KwotaB></jin:Pasywa_B_II_3_A>
+            <jin:Pasywa_B_II_3_B><dtsf:KwotaA>150000</dtsf:KwotaA><dtsf:KwotaB>100000</dtsf:KwotaB></jin:Pasywa_B_II_3_B>
+          </jin:Pasywa_B_II_3>
+        </jin:Pasywa_B_II>
+        <jin:Pasywa_B_III><dtsf:KwotaA>350000</dtsf:KwotaA><dtsf:KwotaB>350000</dtsf:KwotaB>
+          <jin:Pasywa_B_III_3><dtsf:KwotaA>350000</dtsf:KwotaA><dtsf:KwotaB>350000</dtsf:KwotaB>
+            <jin:Pasywa_B_III_3_A><dtsf:KwotaA>20000</dtsf:KwotaA><dtsf:KwotaB>0</dtsf:KwotaB></jin:Pasywa_B_III_3_A>
+            <jin:Pasywa_B_III_3_B><dtsf:KwotaA>50000</dtsf:KwotaA><dtsf:KwotaB>60000</dtsf:KwotaB></jin:Pasywa_B_III_3_B>
+            <jin:Pasywa_B_III_3_C><dtsf:KwotaA>5000</dtsf:KwotaA><dtsf:KwotaB>4000</dtsf:KwotaB></jin:Pasywa_B_III_3_C>
+            <jin:Pasywa_B_III_3_D><dtsf:KwotaA>200000</dtsf:KwotaA><dtsf:KwotaB>210000</dtsf:KwotaB></jin:Pasywa_B_III_3_D>
+            <jin:Pasywa_B_III_3_E><dtsf:KwotaA>75000</dtsf:KwotaA><dtsf:KwotaB>76000</dtsf:KwotaB></jin:Pasywa_B_III_3_E>
+          </jin:Pasywa_B_III_3>
+        </jin:Pasywa_B_III>
+      </jin:Pasywa_B>
+    </jin:Pasywa>
+  </tns:Bilans>
+  <tns:RZiS>
+    <jin:RZiSPor>
+      <jin:A><dtsf:KwotaA>800000</dtsf:KwotaA><dtsf:KwotaB>700000</dtsf:KwotaB></jin:A>
+      <jin:B><dtsf:KwotaA>700000</dtsf:KwotaA><dtsf:KwotaB>620000</dtsf:KwotaB>
+        <jin:B_I><dtsf:KwotaA>10000</dtsf:KwotaA><dtsf:KwotaB>9000</dtsf:KwotaB></jin:B_I>
+      </jin:B>
+      <jin:F><dtsf:KwotaA>90000</dtsf:KwotaA><dtsf:KwotaB>75000</dtsf:KwotaB></jin:F>
+      <jin:H><dtsf:KwotaA>25000</dtsf:KwotaA><dtsf:KwotaB>22000</dtsf:KwotaB>
+        <jin:H_I><dtsf:KwotaA>24000</dtsf:KwotaA><dtsf:KwotaB>21000</dtsf:KwotaB></jin:H_I>
+      </jin:H>
+      <jin:L><dtsf:KwotaA>50000</dtsf:KwotaA><dtsf:KwotaB>40000</dtsf:KwotaB></jin:L>
+    </jin:RZiSPor>
+  </tns:RZiS>
+  <tns:RachPrzeplywow>
+    <jin:PrzeplywyPosr>
+      <jin:A_III><dtsf:KwotaA>-30000</dtsf:KwotaA><dtsf:KwotaB>45000</dtsf:KwotaB></jin:A_III>
+      <jin:B_II><dtsf:KwotaA>12000</dtsf:KwotaA><dtsf:KwotaB>8000</dtsf:KwotaB>
+        <jin:B_II_1><dtsf:KwotaA>12000</dtsf:KwotaA><dtsf:KwotaB>8000</dtsf:KwotaB></jin:B_II_1>
+      </jin:B_II>
+    </jin:PrzeplywyPosr>
+  </tns:RachPrzeplywow>
+</tns:JednostkaInna>

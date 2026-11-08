@@ -12,6 +12,11 @@ import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
 import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import type { ParsedFiling } from "@portfolio/core/catalyst/filings/filingParser";
+import { FilingRefused, storeFiling } from "../filings.ts";
 import { hasAnyGroup } from "../../lib/access.ts";
 import { jobRuns } from "../../lib/context.ts";
 import { JOB_NAMES, jobTable } from "../../lib/jobs.ts";
@@ -21,6 +26,7 @@ import { ASSUMPTIONS_SETTING, offersOn, VIEWS_SETTING } from "../metrics.ts";
 const ACCESS_GROUPS = (process.env["ACCESS_GROUPS"] ?? "portfolio-tracker").split(",");
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 const sqs = new SQSClient({});
+const s3 = new S3Client({});
 
 const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({ statusCode: status, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
@@ -134,8 +140,11 @@ const ROUTES: Record<string, Handler> = {
     const [names, links, bonds] = await Promise.all([catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
     const own = new Set(links.filter((l) => l.entityId === id).map((l) => l.isin));
     const theirs = bonds.filter((b) => own.has(b.isin));
+    const [years, filings] = await Promise.all([catalystRepo.listYears(id), catalystRepo.listFilings(id)]);
     return json(200, {
       company: entityView(entity),
+      years: years.map(({ PK: _p, SK: _s, lines, ...y }) => ({ ...y, lines: lines.length })),
+      filings: filings.map(({ PK: _p, SK: _s, ...f }) => f),
       names: names.filter((n) => n.entityId === id).map(stripKeys),
       bonds: theirs.map((b) => ({ isin: b.isin, code: b.code, status: b.status, maturity: b.maturity, segment: b.segment })),
       track: await trackOf(theirs, entity.legalName),
@@ -197,6 +206,53 @@ const ROUTES: Record<string, Handler> = {
     return switchEntity(id, { on: body.data.on, by: userOf(event), at: new Date().toISOString() });
   },
 
+  "POST /catalyst/filings/upload-url": async () => {
+    // Where the CLI puts a report before importing it (API Gateway takes at most 10 MB; ESEF packages run to 30).
+    const key = `catalyst/uploads/${randomUUID()}`;
+    const url = await getSignedUrl(s3, new PutObjectCommand({ Bucket: Resource.Files.name, Key: key }), { expiresIn: 900 });
+    return json(200, { key, url });
+  },
+
+  "POST /catalyst/filings": async (event) => {
+    // A report read on the user's machine: the parsed filing, checked again here and stored (../filings.ts).
+    const body = FilingInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
+    const b = body.data;
+    try {
+      const result = await storeFiling({
+        entityId: b.entityId,
+        filing: b.filing as unknown as ParsedFiling,
+        sha256: b.sha256,
+        extension: b.extension,
+        contentType: CONTENT_TYPE[b.extension],
+        fileName: b.fileName,
+        original: { uploadKey: b.uploadKey },
+        enteredBy: b.enteredBy ?? userOf(event),
+        force: b.force ?? false,
+        dryRun: b.dryRun ?? false,
+      });
+      const { rows, ...rest } = result;
+      return json(200, { ...rest, years: rows.map((r) => ({ period: r.period, column: r.column, months: r.months, figures: Object.fromEntries(Object.entries(r.figures).map(([k, v]) => [k, v?.value])) })) });
+    } catch (err) {
+      if (err instanceof FilingRefused) return json(422, { error: err.message });
+      throw err;
+    }
+  },
+
+  "PUT /catalyst/entities/{id}/years/{period}": async (event) => {
+    // Your review of a year: hand-checked (the figures match the printed report) or flagged (something's wrong).
+    const id = pathParam(event, "id");
+    const period = pathParam(event, "period");
+    const body = ReviewInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: 'body: { status: "parsed" | "hand-checked" | "flagged", note?: string }' });
+    const year = (await catalystRepo.listYears(id)).find((y) => y.period === period);
+    if (!year) return json(404, { error: `No year ${period} of ${id}` });
+    const { PK: _p, SK: _s, ...row } = year;
+    const review = { status: body.data.status, ...(body.data.note ? { note: body.data.note } : {}), at: new Date().toISOString(), by: userOf(event) };
+    await catalystRepo.putYears([{ ...row, review }]);
+    return json(200, { period, review });
+  },
+
   "GET /catalyst/settings/assumptions": async () => json(200, await assumptionsNow()),
 
   "PUT /catalyst/settings/assumptions": async (event) => {
@@ -249,6 +305,21 @@ export async function handler(event: APIGatewayProxyEventV2WithJWTAuthorizer): P
 
 // --- companies and names (phase 2, N2) ------------------------------------------------------------------------
 
+const CONTENT_TYPE: Record<"xml" | "zip" | "xhtml" | "pdf", string> = { xml: "application/xml", zip: "application/zip", xhtml: "application/xhtml+xml", pdf: "application/pdf" };
+const FilingInput = z
+  .object({
+    entityId: z.string().min(1).max(40),
+    uploadKey: z.string().regex(/^catalyst\/uploads\/[0-9a-f-]{36}$/),
+    sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    extension: z.enum(["xml", "zip", "xhtml", "pdf"]),
+    fileName: z.string().max(200),
+    filing: z.object({ format: z.enum(["krs-xml", "esef", "ifrs-text", "ai-pdf"]), scope: z.enum(["single", "group"]), periods: z.array(z.object({ periodEnd: z.string(), lines: z.array(z.unknown()) }).passthrough()).min(1), checks: z.array(z.string()) }).passthrough(),
+    enteredBy: z.string().max(100).optional(),
+    force: z.boolean().optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict();
+const ReviewInput = z.object({ status: z.enum(["parsed", "hand-checked", "flagged"]), note: z.string().max(500).optional() }).strict();
 const NameInput = z.object({ entityId: z.string().min(1).max(40).nullable().optional() }).strict();
 const SwitchInput = z.object({ on: z.boolean() }).strict();
 const EntityInput = z.object({ shortName: z.string().trim().min(1).max(60) }).partial().strict();

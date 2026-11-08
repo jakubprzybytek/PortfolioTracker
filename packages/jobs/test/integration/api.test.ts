@@ -792,6 +792,20 @@ describe(`API ${API}`, () => {
     expect((await send("PUT", `/catalyst/names/${encodeURIComponent("No Such Name S.A.")}`, { entityId: "0000000000" })).status).toBe(400);
   });
 
+  it("Catalyst: reports: an upload URL, an import refused for a company the module doesn't hold, a year's review", async () => {
+    const upload = await send<{ key: string; url: string }>("POST", "/catalyst/filings/upload-url", {});
+    expect(upload.status).toBe(200);
+    expect(upload.body.key).toMatch(/^catalyst\/uploads\/[0-9a-f-]{36}$/);
+    expect(upload.body.url).toContain("X-Amz-Signature");
+    expect((await send("POST", "/catalyst/filings", { entityId: "0000000000" })).status).toBe(400);
+    const filing = { format: "krs-xml", scope: "single", periods: [{ periodEnd: "2025-12-31", lines: [] }], checks: [] };
+    const refused = await send<{ error: string }>("POST", "/catalyst/filings", { entityId: "0000000000", uploadKey: upload.body.key, sha256: "0".repeat(64), extension: "xml", fileName: "x.xml", filing });
+    expect(refused.status).toBe(422);
+    expect(refused.body.error).toContain("No company");
+    expect((await send("PUT", "/catalyst/entities/0000000000/years/2025-12-31%23single", { status: "hand-checked" })).status).toBe(404);
+    expect((await send("PUT", "/catalyst/entities/0000000000/years/2025-12-31%23single", { status: "great" })).status).toBe(400);
+  });
+
   it("Catalyst: the screen, a bond, the assumptions and the saved views", async () => {
     const screen = await get<{ date: string | null; rows: unknown[]; curve: unknown }>("/catalyst/bonds");
     expect(screen.status).toBe(200);

@@ -105,7 +105,7 @@ Small changes before the milestones. None of them adds resources or changes data
 
 | # | Change | Status |
 |---|---|---|
-| Q1 | Dependencies: `fast-xml-parser` in core, `pdfjs-dist` in the CLI only (versions as CV's, checked for advisories); a zip reader (CV's own `zip.ts`, no new package) | Moved to N3, so each dependency comes with the code that uses it |
+| Q1 | Dependencies: `fast-xml-parser` in core, `pdfjs-dist` in the CLI only (versions as CV's, checked for advisories); a zip reader (CV's own `zip.ts`, no new package) | Done in N3: both in core (5.11.2, 4.10.38; no advisories), reached only through `catalyst/filings/index`, which no function imports |
 | Q2 | `CatalystView.tsx` (≈ 800 lines) split into `web/src/catalyst/` (table, filters, panel, chart, settings) before the issuer columns and dialog are added | Done 2026-11-07: `catalyst/` with `CatalystView.tsx`, `types.ts`, `labels.ts`, `filters.ts`, `parts.tsx`, `YieldChart.tsx`, `BondPanel.tsx`, `ViewsMenu.tsx`, `AssumptionsPanel.tsx` |
 | Q3 | `packages/cli` workspace skeleton: `npx catalyst --version` | Done 2026-11-07: `npx catalyst --version`, `--help`, `where --stage` (the stage's API, the settings directory in the user's profile); unit tests; in `typecheck`. The token login comes with N7 |
 
@@ -192,6 +192,19 @@ Changed on the way:
 Done when: on dev at least 90 % of the corporate issuer names are resolved automatically (CV: 192 of 208), the rest are listed as `unresolved` or `review`, and the bonds table's issuer column shows short names where they're known. This needs no approval: new items only, and the names can be resolved again.
 
 ### N3 Reading reports
+
+**Done 2026-11-08.** What was built:
+- **The parsers:** CatalystViewer's moved into `core/catalyst/filings/` behind their own entry point (`@portfolio/core/catalyst/filings/index`, so no function bundles the XML parser or `pdfjs-dist`). The KRS XML, ESEF and IFRS text parsers, the PDF transcript check and the statement lines, with their 175 tests and fixtures, unchanged in substance. The Bedrock call is gone; `filingFromTranscript` takes the agent's copy. The type fixes PT's stricter settings asked for are assertions only.
+- **`core/catalyst/financials.ts`:** the rows a filing gives, the most recent report winning (`planYears`), and the app's own checks of received rows (`rowChecks`: the balance sheet adds up, its lines add up to their totals). Also the known-answer comparison.
+- **`jobs/catalyst/filings.ts` (`storeFiling`):** the checks, the original's SHA-256, the original into `catalyst/filings/<entity>/…`, the years (replaced ones as `FINOLD#`), the filing record, the metrics queued.
+- **The API:** `POST /catalyst/filings/upload-url`, `POST /catalyst/filings` (422 when refused), `PUT /catalyst/entities/{id}/years/{period}` (review); the company view lists its years and filings.
+- **The scripts:** `catalyst-import-filing.ts`, `catalyst-cv-filings.ts`, `catalyst-filings-check.ts`.
+
+Dev:
+- **CatalystViewer's files:** all 85 originals read again, none downloaded from the sources. The 67 structured ones gave 103 financial years of 37 companies (2023–2025); every year's figures equal CatalystViewer's.
+- **Known answers:** the 21 ESEF ones match, both as stored and on a fresh read. The other 18 are PDFs, left for N5 with the 18 PDF files and one company not in the module yet (LEI 213800OVMJPFP79OB449).
+
+Not done here: a lifecycle rule for `catalyst/uploads/` (a change to the files bucket: yours to approve). An import deletes its upload; only abandoned ones (a dry run never followed) stay.
 
 The ported parsers, run locally, and the API that stores their result. The CLI's commands come in N7; until then a script (`scripts/catalyst-import-filing.ts`) parses locally and writes through the repository inside `sst shell`, as phase 1's scripts.
 

@@ -6,8 +6,9 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystEntityItem, type CatalystEventItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
 import type { ScreenRow } from "./screen.ts";
+import type { FinancialYear } from "./financials.ts";
 
 /** Batches of 25 written at once, at most. */
 const BATCH_WRITES_AT_ONCE = 4;
@@ -140,6 +141,36 @@ export class CatalystRepository {
 
   putEntities(items: Omit<CatalystEntityItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {
     return this.batchPut(items.map((e) => ({ ...catalystKeys.entity(e.entityId), GSI1PK: "ENTITY", GSI1SK: e.shortName, ...e })));
+  }
+
+  /** A company's financial years (current versions), oldest first. */
+  listYears(entityId: string): Promise<CatalystYearItem[]> {
+    return this.queryAll<CatalystYearItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :f)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":f": "FIN#" } });
+  }
+
+  /** Stores years; `replaced` rows are kept under FINOLD#. */
+  async putYears(rows: FinancialYear[], replaced: FinancialYear[] = []): Promise<number> {
+    const items = [
+      ...replaced.map((r) => ({ ...r, ...catalystKeys.replacedYear(r.entityId, r.period, r.importedAt) })),
+      ...rows.map((r) => ({ ...r, ...catalystKeys.year(r.entityId, r.period) })),
+    ];
+    return this.batchPut(items);
+  }
+
+  listFilings(entityId: string): Promise<CatalystFilingItem[]> {
+    return this.queryAll<CatalystFilingItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :f)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":f": "FILING#" } });
+  }
+
+  async putFiling(item: Omit<CatalystFilingItem, "PK" | "SK">): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.filing(item.entityId, item.sha256), ...item } }));
+  }
+
+  listKnown(): Promise<CatalystKnownItem[]> {
+    return this.queryAll<CatalystKnownItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "KNOWN" } });
+  }
+
+  putKnown(items: Omit<CatalystKnownItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[]): Promise<number> {
+    return this.batchPut(items.map((k) => ({ ...catalystKeys.known(k.entityId, k.period), GSI1PK: "KNOWN", GSI1SK: `${k.entityId}#${k.period}`, ...k })));
   }
 
   /** Every bond's terms (one query on the index). */

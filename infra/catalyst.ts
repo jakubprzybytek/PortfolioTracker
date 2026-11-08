@@ -133,6 +133,9 @@ export function catalystApi(
     "GET /catalyst/names",
     "PUT /catalyst/names/{name}",
     "PUT /catalyst/names/{name}/ai",
+    "POST /catalyst/filings/upload-url",
+    "POST /catalyst/filings",
+    "PUT /catalyst/entities/{id}/years/{period}",
   ])
     api.route(route, apiHandler, auth);
 }
