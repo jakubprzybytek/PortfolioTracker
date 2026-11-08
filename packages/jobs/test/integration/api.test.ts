@@ -11,7 +11,7 @@ const KRU = "PLKRK0000713"; // sample Catalyst corporate bond KRU0827 (BiznesRad
 const BUND = "DE0001102523"; // sample foreign bond at IBKR: calculated prices
 
 /** The sample's coupon periods of KRU (data/coupons.sample.json). */
-const samplePeriods = JSON.parse(readFileSync(path.join(repoRoot, "data/coupons.sample.json"), "utf8")) as { start: string; end: string; recordDate: string; rate: number }[];
+const samplePeriods = JSON.parse(readFileSync(path.join(repoRoot, "data/coupons.sample.json"), "utf8")) as { start: string; end: string; recordDate: string; paymentDate: string; rate: number }[];
 
 /** `date` moved by `days` (ISO dates). */
 const addDaysIso = (date: string, days: number): string => new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -164,7 +164,11 @@ describe(`API ${API}`, () => {
     const period = samplePeriods.find((p) => p.start <= settle && settle < p.end);
     if (period) {
       const days = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
-      const accrued = Math.round(100 * period.rate * (settle >= period.recordDate ? days(period.start, period.end) : days(period.start, settle)) / 365 * 100) / 100;
+      const coupon = (p: { rate: number; start: string; end: string }, to: string) => Math.round((100 * p.rate * days(p.start, to)) / 365 * 100) / 100;
+      // A period that ended by the settlement day but is paid after the valuation day still counts (e.g. valued on
+      // 9 November: T+2 is 12 November, past a period that ends then and is paid then).
+      const unpaid = samplePeriods.filter((p) => p.end <= settle && snap.date < p.paymentDate).reduce((s, p) => s + coupon(p, p.end), 0);
+      const accrued = Math.round((unpaid + coupon(period, settle >= period.recordDate ? period.end : settle)) * 100) / 100;
       expect(kru).toMatchObject({ accruedInterest: accrued, flags: [], rate: { current: period.rate } });
       expect(kru.value!).toBeCloseTo(40 * (kru.cleanPrice! + accrued), 1);
     } else expect(kru).toMatchObject({ accruedInterest: null, flags: ["no_coupon_rate"] }); // after the sample's last period
