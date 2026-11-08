@@ -219,6 +219,19 @@ Done when: every one of CV's 40 known-answer reports imports on dev with the sam
 
 ### N4 Scorecard, refinancing, confidence
 
+**Done 2026-11-08.** What was built:
+- **The port:** CatalystViewer's scorecard, scope, confidence, refinancing (`maturities.ts` → `refinancing.ts`), `filedYears` and NBP rates moved into `core/catalyst/issuers/` with their 72 tests. The type fixes are assertions only, and the ported tests run on PT's year rows.
+- **`company.ts`:** one company's analysis (state, rule set, the six dimensions with arrows, confidence, refinancing; `sixDimensions` turns Financial trend into arrows).
+- **Company fields:** `industry` (the fixed list), `financeRuleSet`, `ruleSetOverride`, set through `PUT /catalyst/entities/{id}`. CatalystViewer's name lists still apply until N5 moves them onto the companies.
+- **The company view** (`GET /catalyst/entities/{id}`) adds `analysis`.
+- **The metrics** copy each company's signals into its listed bonds' screen rows (`issuer`). On dev: 332 bonds, 148 of them scored.
+- **The methodology** moved to `Docs/catalyst-methodology.md`.
+
+**Compared with CatalystViewer** (`scripts/catalyst-compare-cv-scorecards.ts`, its industry for both, refinancing aside), 37 companies with years on dev:
+- **27** are equal dimension by dimension and metric by metric.
+- **8** differ because CatalystViewer has FY2025 (or a restated FY2024) read from a PDF, which comes in N5: Benefit Systems, Dom Development, Echo, Indos, KGHM, Marvipol, Polenergia, Unibep.
+- **2 lenders** differ slightly in debt due within a year, with no colour change: MCI 213.218 vs 213.233 m, Vehis 704.9 vs 705.9 m. Ours are fresh reads with the current parsers. CatalystViewer's stored rows (2026-11-04/05) came from earlier versions, and for Vehis its stored totals don't even match its stored lines.
+
 - `scope.ts`, `scorecard.ts`, `refinancing.ts`, `confidence.ts` ported. Rule sets (general, developer, contractor, consumer and services, collector, leasing and factoring, investment firm) with their thresholds; the finance map and overrides now live on the company items.
 - `GET /catalyst/entities/{id}` adds the scorecard, refinancing, confidence and track record, computed on read.
 - `catalyst-metrics`: per company, once a run, the signals (six colours, trend arrows, rule set, confidence, "no report", "not scored") copied into its bonds' screen rows. A company write queues the metrics.

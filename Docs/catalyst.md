@@ -2,7 +2,7 @@
 
 Status: proposal (2026-11-05), nothing built yet. It moves the functionality of CatalystViewer (CV) into PortfolioTracker as a separate module: the whole Catalyst bond market, not the bonds you hold. Functionality is migrated, not CV's solutions: sources, storage and mechanics follow PT.
 
-CV's **fundamental analysis specification** (`CatalystViewer/docs/fundamental-analysis-methodology.md`, state v1.75) is the reference for phase 2: identity, reports, statement lines, rule sets, thresholds, refinancing, data confidence, the judgement and the known exceptions. It moves into this repo as `Docs/catalyst-methodology.md` when its code does (plan, step 9); until then section numbers below (§) point into CV's copy.
+The **methodology** ([catalyst-methodology.md](catalyst-methodology.md), moved from CatalystViewer on 2026-11-08 at its state v1.75) is the reference for phase 2: identity, reports, statement lines, rule sets, thresholds, refinancing, data confidence, the judgement and the known exceptions. Section numbers below (§) point there.
 
 | Phase | Contents |
 |---|---|
@@ -242,7 +242,7 @@ Every line keeps its source and gets a **standard item** from one vocabulary (§
 
 ### Scorecard (app)
 
-As CV's specification, §10 to §12:
+**Built (N4, 2026-11-08):** `core/catalyst/issuers/` (the company view's `analysis`, the bonds' `issuer` signals). As the methodology, §10 to §12:
 
 - **Six dimensions:** Debt burden, Debt service, Liquidity, Profitability, Asset coverage, Refinancing; each green / yellow / red / n/a with its metrics and notes.
 - **Trend is an arrow, not a colour.** This changes CV v1.75, where Financial trend was dimension 6. Its metrics, over at least three years, sit on the dimension they describe: the slope of net debt / EBITDA on Debt burden; the EBITDA margin's slope and revenue growth on Profitability. The arrows are ↑ better, → flat, ↓ worse, and none under three years. An arrow doesn't change a colour; the judgement weighs it (§13: a borderline year at the end of a three-year slide reads worse than its colour). **No aggregate score** (§1 principle 1): the reader sees the dimensions, helped by the written judgement.

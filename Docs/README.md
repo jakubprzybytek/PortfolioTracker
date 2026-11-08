@@ -16,6 +16,7 @@ Status (2026-10-29, `v0.168`): **the whole portfolio is in production** at https
 | [Development.md](Development.md) | Running locally, checking changes in the browser, tests, continuous delivery (every change goes to prod; when to ask first) |
 | [catalyst.md](catalyst.md) | Catalyst module (proposal): the whole Catalyst bond market with yields, risk premium and liquidity; issuer analysis (CV's methodology: filed reports read by code, 7-dimension scorecard) with an AI agent working through a CLI |
 | [catalyst-phase1-plan.md](catalyst-phase1-plan.md) | Catalyst phase 1 implementation plan: decisions, code layout, milestones M0–M8, tests, risks |
+| [catalyst-methodology.md](catalyst-methodology.md) | How a Catalyst bond issuer is judged: identity, reports, statement lines, rule sets, thresholds, refinancing, data confidence, the judgement (moved from CatalystViewer, v1.75) |
 | [catalyst-phase2-plan.md](catalyst-phase2-plan.md) | Catalyst phase 2 implementation plan (issuers, scorecard, CLI and agent, interim reports): decisions, what's ported from CV, milestones N0–N9, tests, risks |
 | [nfr-analysis.md](nfr-analysis.md) | Non-functional review (observability, resilience, performance, security, durability, maintainability): findings and a suggested order of work |
 | [reference/ReferenceFeatures.md](reference/ReferenceFeatures.md) | Feature inventory of the Google Sheets tracker the app reproduces (with its Apps Script code) |

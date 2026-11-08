@@ -60,6 +60,17 @@ export type ScreenFlag = "stale" | "new-listing" | "no-terms" | "no-periods" | "
 /** Fewer sessions than this since listing: the liquidity rests on too few days (CAV1030: 2 of 2 traded, 2026-11-06). */
 export const NEW_LISTING_SESSIONS = 10;
 
+/** A company's analysis in short, as the bond table shows it. */
+export interface IssuerSignals {
+  state: "scored" | "no-report" | "out-of-scope";
+  ruleSet: string;
+  /** The six dimensions in their fixed order: colour and trend arrow. */
+  dimensions: { name: string; signal: "green" | "yellow" | "red" | "na"; arrow?: "up" | "flat" | "down" }[];
+  confidence?: "high" | "medium" | "low";
+  /** The latest year the scorecard rests on. */
+  latestPeriodEnd?: string;
+}
+
 export interface ScreenRow {
   isin: string;
   code: string;
@@ -88,6 +99,8 @@ export interface ScreenRow {
   premiumBasis: "fixed-curve" | "wz" | null;
   liquidity: Liquidity;
   flags: ScreenFlag[];
+  /** The issuer's signals (phase 2), copied by the metrics from its company's analysis for the table's filters. */
+  issuer?: IssuerSignals;
 }
 
 export interface ScreenInput {

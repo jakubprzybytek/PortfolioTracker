@@ -15,6 +15,8 @@ import {
 } from "@portfolio/core/catalyst/index";
 import { Repository, retailOffers, type RetailTerms } from "@portfolio/core";
 import { catalystRepo } from "./context.ts";
+import { analysisInputs, analysisOf } from "./analysis.ts";
+import type { IssuerSignals } from "@portfolio/core/catalyst/index";
 
 /** Bonds read at once (each two or three queries). */
 const AT_ONCE = 16;
@@ -85,6 +87,26 @@ export async function computeMetrics(): Promise<{ itemsWritten: number; note: st
     if (exitsNow?.suspended[row.isin]) row.flags.push("suspended");
     const issuer = termsBy.get(row.isin)?.issuer;
     if (issuer && marked.has(issuerKey(issuer))) row.flags.push("marked");
+  }
+  // The issuers' signals: each company with a listed bond, its analysis in short (phase 2).
+  const inputs = await analysisInputs(date);
+  const entities = await catalystRepo.listEntities();
+  const companyOf = new Map(inputs.links.filter((l) => l.entityId).map((l) => [l.isin, l.entityId!]));
+  const withListed = new Set(rows.map((r) => companyOf.get(r.isin)).filter(Boolean));
+  const signals = new Map<string, IssuerSignals>();
+  for (const e of entities.filter((x) => withListed.has(x.entityId))) {
+    const a = await analysisOf(e, inputs);
+    signals.set(e.entityId, {
+      state: a.state,
+      ruleSet: a.ruleSet,
+      dimensions: (a.scorecard?.dimensions ?? []).map((d) => ({ name: d.name, signal: d.signal, ...(d.trend ? { arrow: d.trend.arrow } : {}) })),
+      ...(a.scorecard?.confidence ? { confidence: a.scorecard.confidence.level } : {}),
+      ...(a.source ? { latestPeriodEnd: a.source.latestPeriodEnd } : {}),
+    });
+  }
+  for (const row of rows) {
+    const s = signals.get(companyOf.get(row.isin) ?? "");
+    if (s) row.issuer = s;
   }
   const written = await catalystRepo.putScreen(rows);
   const withYield = rows.filter((r) => r.yieldNet !== null).length;

@@ -192,6 +192,12 @@ export interface CatalystEntityItem {
   /** The KRS register: main business (PKD) and section 6 (a liquidation open, the kinds of entries it holds). */
   pkd?: string | null;
   register?: { liquidationOpen: boolean; entries: string[] };
+  /** From the fixed list (issuers/scope.ts, INDUSTRIES): it picks the rule set. Set by the agent or you. */
+  industry?: string;
+  /** A lender's kind (collector, leasing, investment): set by you; a Finance company has no scorecard without it. */
+  financeRuleSet?: "collector" | "leasing" | "investment";
+  /** Rules that fit the business model better than the industry's, with the reason (yours). */
+  ruleSetOverride?: { ruleSet: "general" | "developer" | "contractor" | "consumer" | "collector" | "leasing" | "investment"; reason: string };
   aiAnalysis?: AiSwitch;
   createdAt: string;
   updatedAt: string;

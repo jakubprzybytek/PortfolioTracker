@@ -5,7 +5,7 @@ import { fmtNum, fmtPct, fmtPln } from "./format.ts";
 import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
 import type { HistoryPoint } from "./types.ts";
 import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
-const NBSP = " ";
+
 const tooltipStyle = { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 };
 const yAxis = (narrow: boolean) => (narrow ? narrowYAxis : { width: 56, tick: { fontSize: 12 } });
 

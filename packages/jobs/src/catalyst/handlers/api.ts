@@ -17,6 +17,8 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { ParsedFiling } from "@portfolio/core/catalyst/filings/filingParser";
 import { FilingRefused, storeFiling } from "../filings.ts";
+import { INDUSTRIES } from "@portfolio/core/catalyst/issuers/index";
+import { analysisInputs, analysisOf } from "../analysis.ts";
 import { hasAnyGroup } from "../../lib/access.ts";
 import { jobRuns } from "../../lib/context.ts";
 import { JOB_NAMES, jobTable } from "../../lib/jobs.ts";
@@ -140,9 +142,10 @@ const ROUTES: Record<string, Handler> = {
     const [names, links, bonds] = await Promise.all([catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
     const own = new Set(links.filter((l) => l.entityId === id).map((l) => l.isin));
     const theirs = bonds.filter((b) => own.has(b.isin));
-    const [years, filings] = await Promise.all([catalystRepo.listYears(id), catalystRepo.listFilings(id)]);
+    const [years, filings, inputs] = await Promise.all([catalystRepo.listYears(id), catalystRepo.listFilings(id), analysisInputs(today())]);
     return json(200, {
       company: entityView(entity),
+      analysis: await analysisOf(entity, inputs, years),
       years: years.map(({ PK: _p, SK: _s, lines, ...y }) => ({ ...y, lines: lines.length })),
       filings: filings.map(({ PK: _p, SK: _s, ...f }) => f),
       names: names.filter((n) => n.entityId === id).map(stripKeys),
@@ -191,10 +194,17 @@ const ROUTES: Record<string, Handler> = {
   "PUT /catalyst/entities/{id}": async (event) => {
     const id = pathParam(event, "id");
     const body = EntityInput.safeParse(parseBody(event));
-    if (!body.success) return json(400, { error: "body: { shortName?: string }" });
+    if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
     const entity = await catalystRepo.getEntity(id);
     if (!entity) return json(404, { error: `No company ${id}` });
-    const next = { ...stripKeys(entity), ...body.data, ...(body.data.shortName ? { shortNameSet: true } : {}), updatedAt: new Date().toISOString() };
+    // null clears a kind or an override.
+    const { financeRuleSet, ruleSetOverride, ...set } = body.data;
+    const next: Entity = { ...stripKeys(entity), ...set, ...(body.data.shortName ? { shortNameSet: true } : {}), updatedAt: new Date().toISOString() };
+    if (financeRuleSet === null) delete next.financeRuleSet;
+    else if (financeRuleSet) next.financeRuleSet = financeRuleSet;
+    if (ruleSetOverride === null) delete next.ruleSetOverride;
+    else if (ruleSetOverride) next.ruleSetOverride = ruleSetOverride;
+    await queueCatalyst({ kind: "metrics" });
     await catalystRepo.putEntities([next]);
     return json(200, entityView(next));
   },
@@ -322,7 +332,16 @@ const FilingInput = z
 const ReviewInput = z.object({ status: z.enum(["parsed", "hand-checked", "flagged"]), note: z.string().max(500).optional() }).strict();
 const NameInput = z.object({ entityId: z.string().min(1).max(40).nullable().optional() }).strict();
 const SwitchInput = z.object({ on: z.boolean() }).strict();
-const EntityInput = z.object({ shortName: z.string().trim().min(1).max(60) }).partial().strict();
+const RULE_SETS = ["general", "developer", "contractor", "consumer", "collector", "leasing", "investment"] as const;
+const EntityInput = z
+  .object({
+    shortName: z.string().trim().min(1).max(60),
+    industry: z.enum(INDUSTRIES),
+    financeRuleSet: z.enum(["collector", "leasing", "investment"]).nullable(),
+    ruleSetOverride: z.object({ ruleSet: z.enum(RULE_SETS), reason: z.string().trim().min(1).max(300) }).strict().nullable(),
+  })
+  .partial()
+  .strict();
 
 function parseBody(event: APIGatewayProxyEventV2WithJWTAuthorizer): unknown {
   try {
@@ -366,6 +385,9 @@ function entityView(e: Entity) {
     legalForm: e.legalForm,
     pkd: e.pkd ?? null,
     register: e.register ?? null,
+    industry: e.industry ?? null,
+    financeRuleSet: e.financeRuleSet ?? null,
+    ruleSetOverride: e.ruleSetOverride ?? null,
     aiAnalysis: e.aiAnalysis ?? { on: false },
   };
 }
