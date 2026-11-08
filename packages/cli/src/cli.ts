@@ -132,7 +132,12 @@ async function dispatch({ positional, flags }: Args, io: Io): Promise<number> {
       apiUrl(stage);
       // From the clipboard ("Copy" in the token panel) where there's no terminal to type into, e.g. Claude Code's `!`.
       const token = (flags.has("--from-clipboard") ? await io.clipboard() : await io.secret(`Agent token for ${stage} (made in the Catalyst settings; not shown): `)).trim();
-      if (!/^[A-Za-z0-9_-]{40,60}$/.test(token)) throw new CliError("That doesn't look like an agent token (43 characters)");
+      if (!/^[A-Za-z0-9_-]{40,60}$/.test(token))
+        throw new CliError(
+          flags.has("--from-clipboard")
+            ? `The clipboard doesn't hold an agent token (${token.length ? `${token.length} characters of something else` : "it's empty"}). Click Copy by the token in the app (or Replace, if it's no longer shown), copy nothing else, then type this command again.`
+            : "That doesn't look like an agent token (43 characters)",
+        );
       saveToken(io, stage, token);
       // Checked at once: a wrong or revoked token is found now, not mid-session.
       try {
