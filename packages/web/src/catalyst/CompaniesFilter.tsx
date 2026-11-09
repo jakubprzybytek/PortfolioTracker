@@ -31,6 +31,7 @@ export function CompaniesFilter({ companies, params, setParams }: { companies: C
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const box = useRef<HTMLDivElement>(null);
+  const search = useRef<HTMLInputElement>(null);
   const list = companyList(params);
   const out = params["cm"] === "out";
   const nameOf = useMemo(() => new Map(companies.map((c) => [c.key, c.name])), [companies]);
@@ -40,6 +41,8 @@ export function CompaniesFilter({ companies, params, setParams }: { companies: C
 
   useEffect(() => {
     if (!open) return;
+    // Typing goes straight into the search.
+    search.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     const onDown = (e: Event) => !box.current?.contains(e.target as Node) && setOpen(false);
     window.addEventListener("keydown", onKey);
@@ -84,7 +87,7 @@ export function CompaniesFilter({ companies, params, setParams }: { companies: C
           ) : (
             <p className="muted">No companies yet: every company's bonds are shown. Add one below, or with ＋ by its name in the table.</p>
           )}
-          <input type="search" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Add a company…" aria-label="Add a company" data-testid="catalyst-co-search" />
+          <input ref={search} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Add a company…" aria-label="Add a company" data-testid="catalyst-co-search" />
           {found.length > 0 && (
             <ul className="cat-companies-found">
               {found.map((c) => (
