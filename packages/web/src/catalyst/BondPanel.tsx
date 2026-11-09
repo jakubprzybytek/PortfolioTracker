@@ -1,10 +1,12 @@
 // A bond's panel in the Catalyst view: price and liquidity, the yield's make-up, the coupons, the issuer's track record.
+import type { ReactNode } from "react";
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { fmtInt, fmtNum, today } from "../format.ts";
 import { useApi } from "../useApi.ts";
 import { chartMargin, useNarrow } from "../useNarrow.ts";
 import type { BondDetail, BondOutcome, BondRow } from "./types.ts";
-import { FLAG_TITLE, couponLabel, liquidityTitle, pct, pp } from "./labels.ts";
+import { FLAG_TITLE, LEVEL_LABEL, couponLabel, pct, pp } from "./labels.ts";
+import { LiquidityDots } from "./parts.tsx";
 
 export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; setTab: (t: string) => void }) {
   const detail = useApi<BondDetail>(`/catalyst/bonds/${row.isin}`);
@@ -40,12 +42,35 @@ export function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondD
   const l = row.liquidity;
   // The latest quoted session: the ask is what a buyer pays, the bid what a seller gets.
   const last = [...detail.quotes].reverse().find((q) => q.bid || q.ask);
-  const side = (label: string, s: { price: number; volume: number } | undefined) => (s ? `${label} ${fmtNum(s.price)} for ${fmtInt(s.volume)} bonds` : `no ${label}`);
+  const cur = row.currency === "PLN" ? "zł" : row.currency;
+  // Each figure with its label, in the words a buyer or seller uses.
+  const facts: [string, ReactNode, string?][] = [
+    ["Liquidity", <span key="l" className="cat-liq-level"><LiquidityDots level={l.level} /> {cap(LEVEL_LABEL[l.level])}</span>],
+    ["Traded", `${Math.round(l.traded30 * 30)} of the last 30 sessions`, `${Math.round(l.traded90 * 90)} of 90`],
+    ...(l.medianTurnover30 !== null ? [["Typical turnover", `${fmtInt(Math.round(l.medianTurnover30))} ${cur}`, "a session (median of 30)"] as [string, ReactNode, string]] : []),
+    ...(l.medianSpread30 !== null ? [["Bid–ask spread", `${fmtNum(l.medianSpread30)} pp`, "median of 30 sessions"] as [string, ReactNode, string]] : []),
+    ...(l.daysToSell10k !== null ? [[`To trade 10 000 ${cur}`, `≈ ${l.daysToSell10k} session${l.daysToSell10k === 1 ? "" : "s"}`, "at a fifth of a session's turnover"] as [string, ReactNode, string]] : []),
+    ...(last
+      ? [
+          ["Buy at (ask)", last.ask ? fmtNum(last.ask.price) : "–", last.ask ? `${fmtInt(last.ask.volume)} bonds offered` : "no offer"] as [string, ReactNode, string],
+          ["Sell at (bid)", last.bid ? fmtNum(last.bid.price) : "–", last.bid ? `${fmtInt(last.bid.volume)} bonds wanted` : "no bid"] as [string, ReactNode, string],
+        ]
+      : []),
+    ["Market", detail.market, last ? `quotes of ${last.date}` : undefined],
+  ];
   return (
     <div className="cat-price">
-      <p className="muted cat-facts" data-testid="catalyst-liquidity">
-        {liquidityTitle(l, row.currency)}.{last ? ` Quotes on ${last.date}: ${side("ask", last.ask)} • ${side("bid", last.bid)}.` : ""} Market {detail.market}.
-      </p>
+      <dl className="cat-stats" data-testid="catalyst-liquidity">
+        {facts.map(([label, value, note]) => (
+          <div key={label}>
+            <dt>{label}</dt>
+            <dd>
+              {value}
+              {note && <span className="muted"> · {note}</span>}
+            </dd>
+          </div>
+        ))}
+      </dl>
       <div className="cat-chart">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={chartMargin(narrow)}>
@@ -212,3 +237,5 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
   );
 }
 
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

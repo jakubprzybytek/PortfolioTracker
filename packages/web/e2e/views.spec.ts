@@ -1887,7 +1887,9 @@ test.describe("catalyst view", () => {
     await page.goto("/#/catalyst");
     await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).click();
     await expect(page.getByTestId("catalyst-panel-title")).toContainText("KRU0829");
-    await expect(page.getByTestId("catalyst-liquidity")).toContainText("ask 101,20 for 12 bonds • bid 100,80 for 50 bonds");
+    const liquidity = page.getByTestId("catalyst-liquidity");
+    await expect(liquidity).toContainText("Buy at (ask)101,20 · 12 bonds offered");
+    await expect(liquidity).toContainText("Sell at (bid)100,80 · 50 bonds wanted");
     await page.getByTestId("catalyst-tab-yield").click();
     await expect(page.getByTestId("catalyst-yield-facts")).toContainText("TOS1129 (retail, 3 y)");
     await page.getByTestId("catalyst-tab-coupons").click();

@@ -906,6 +906,13 @@ tr.neg td { color: var(--neg); }
 .cat-facts-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); align-content: start; gap: 12px 24px; margin: 0; overflow-y: auto; }
 /* The bond's interest periods: the current one tinted. */
 .cat-coupons tr.current td { background: var(--accent-soft); }
+/* The bond's liquidity and quotes: labelled figures in a row that wraps. */
+.cat-stats { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 0; font-size: var(--fs-14); }
+.cat-stats > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.cat-stats dt { font-size: var(--fs-12); font-weight: 600; color: var(--muted); }
+.cat-stats dd { margin: 0; font-variant-numeric: tabular-nums; }
+.cat-stats dd .muted { font-size: var(--fs-13); }
+.cat-liq-level { display: inline-flex; align-items: center; gap: 6px; }
 .cat-facts-list > div { display: flex; flex-direction: column; gap: 2px; }
 .cat-facts-list dt { font-size: var(--fs-12); font-weight: 600; }
 .cat-facts-list dd { margin: 0; }
