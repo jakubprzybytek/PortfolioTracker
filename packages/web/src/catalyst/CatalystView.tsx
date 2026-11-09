@@ -180,6 +180,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
             <tr>
               <SortTh label="Bond" sortKey="bond" sort={sort} onSort={(s) => set("sort", sortParam(s))} className="left" />
               <SortTh label="Issuer" sortKey="issuer" sort={sort} onSort={(s) => set("sort", sortParam(s))} className="left" />
+              <SortTh label="Scorecard" sortKey="scorecard" sort={sort} onSort={(s) => set("sort", sortParam(s))} className="left" firstDesc title={`The company's scorecard: ${DIMENSIONS.map((d) => d.label.toLowerCase()).join(", ")}; trend arrows, rule set, confidence`} />
               <SortTh label="Coupon" sortKey="coupon" sort={sort} onSort={(s) => set("sort", sortParam(s))} className="left" firstDesc />
               <SortTh label="Maturity" sortKey="maturity" sort={sort} onSort={(s) => set("sort", sortParam(s))} />
               <SortTh label="Price" sortKey="price" sort={sort} onSort={(s) => set("sort", sortParam(s))} />
@@ -187,7 +188,6 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
               <SortTh label="Vs alt." sortKey="vsalt" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="vs alt." testId="info-vsalt">{INFO.vsalt}</InfoTip>} />
               <SortTh label="Premium" sortKey="premium" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="premium" testId="info-premium">{INFO.premium}</InfoTip>} />
               <SortTh label="Liquidity" sortKey="liquidity" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc />
-              <SortTh label="Scorecard" sortKey="scorecard" sort={sort} onSort={(s) => set("sort", sortParam(s))} className="left" firstDesc title={`The company's scorecard: ${DIMENSIONS.map((d) => d.label.toLowerCase()).join(", ")}; trend arrows, rule set, confidence`} />
             </tr>
           }
         >
@@ -239,22 +239,6 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
                     </button>
                   )}
                 </td>
-                <td className="left" title={r.couponText ?? ""}>
-                  {couponLabel(r)}
-                </td>
-                <td title={r.maturity ?? ""}>{r.years === null ? "–" : `${fmtNum(r.years, 1)} y`}</td>
-                <td title={r.lastTraded ? `Last trade ${r.lastTraded}; accrued interest ${fmtNum(r.accruedInterest)}` : "No trade in the last 90 sessions"}>{r.price === null ? "–" : fmtNum(r.price)}</td>
-                <td title={r.yieldGross !== null ? `Before tax ${pct(r.yieldGross)}${r.projected ? "; future coupons at the assumed base rate" : ""}` : ""}>
-                  {pct(r.yieldNet)}
-                  {r.projected && r.yieldNet !== null && <span className="muted">*</span>}
-                </td>
-                <td className={r.vsAlternative === null ? "" : r.vsAlternative < 0 ? "neg" : "pos"} title={r.alternative ? `${r.alternative.label}: ${pct(r.alternative.yieldNet)} net` : ""}>
-                  {pp(r.vsAlternative)}
-                </td>
-                <td title={r.premiumBasis === "wz" ? "Floating: margin adjusted for price − WZ's" : r.premiumBasis === "fixed-curve" ? "Fixed: yield before tax − the State's curve" : ""}>{pp(r.premium)}</td>
-                <td title={liquidityTitle(r.liquidity, r.currency)}>
-                  <LiquidityDots level={r.liquidity.level} />
-                </td>
                 <td className="left cat-issuer-signals" data-testid="catalyst-scorecard">
                   {r.entityId ? (
                     <button
@@ -272,6 +256,22 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
                       –
                     </span>
                   )}
+                </td>
+                <td className="left" title={r.couponText ?? ""}>
+                  {couponLabel(r)}
+                </td>
+                <td title={r.maturity ?? ""}>{r.years === null ? "–" : `${fmtNum(r.years, 1)} y`}</td>
+                <td title={r.lastTraded ? `Last trade ${r.lastTraded}; accrued interest ${fmtNum(r.accruedInterest)}` : "No trade in the last 90 sessions"}>{r.price === null ? "–" : fmtNum(r.price)}</td>
+                <td title={r.yieldGross !== null ? `Before tax ${pct(r.yieldGross)}${r.projected ? "; future coupons at the assumed base rate" : ""}` : ""}>
+                  {pct(r.yieldNet)}
+                  {r.projected && r.yieldNet !== null && <span className="muted">*</span>}
+                </td>
+                <td className={r.vsAlternative === null ? "" : r.vsAlternative < 0 ? "neg" : "pos"} title={r.alternative ? `${r.alternative.label}: ${pct(r.alternative.yieldNet)} net` : ""}>
+                  {pp(r.vsAlternative)}
+                </td>
+                <td title={r.premiumBasis === "wz" ? "Floating: margin adjusted for price − WZ's" : r.premiumBasis === "fixed-curve" ? "Fixed: yield before tax − the State's curve" : ""}>{pp(r.premium)}</td>
+                <td title={liquidityTitle(r.liquidity, r.currency)}>
+                  <LiquidityDots level={r.liquidity.level} />
                 </td>
               </tr>
             ))}
