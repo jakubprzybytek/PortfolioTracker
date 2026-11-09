@@ -57,7 +57,7 @@ export function CompaniesFilter({ companies, params, setParams }: { companies: C
   return (
     <div className={`filter cat-companies${list.length ? "" : " unset"}`} ref={box} style={{ "--w": "10rem" } as CSSProperties}>
       <span className="muted">Companies</span>
-      <button type="button" className={`cat-companies-button${list.length ? " active" : ""}`} aria-expanded={open} onClick={() => setOpen((o) => !o)} title={list.length ? `${out ? "All companies except" : "Only"} ${list.map(label).join(", ")}` : "Every company's bonds"} data-testid="catalyst-co">
+      <button type="button" className="cat-companies-button" aria-expanded={open} onClick={() => setOpen((o) => !o)} title={list.length ? `${out ? "All companies except" : "Only"} ${list.map(label).join(", ")}` : "Every company's bonds"} data-testid="catalyst-co">
         <span>{summary}</span>
         <span aria-hidden="true">▾</span>
       </button>

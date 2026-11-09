@@ -1005,8 +1005,6 @@ td.cat-issuer { max-width: 11rem; }
 .cat-companies { position: relative; }
 .filters .cat-companies-button { width: var(--w, 10rem); display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; text-align: left; }
 .filters .cat-companies-button > :first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.filters .cat-companies-button.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); font-weight: 600; }
-.cat-companies.unset .cat-companies-button { color: var(--muted); }
 .cat-companies-pop { position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; width: min(22rem, calc(100vw - 32px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgb(0 0 0 / 0.15); color: var(--fg); font-weight: 400; font-size: var(--fs-14); }
 .cat-companies-pop > p { margin: 0; font-size: var(--fs-13); }
 .cat-companies-pop .segmented { align-self: flex-start; }
@@ -1025,6 +1023,7 @@ td.cat-issuer { max-width: 11rem; }
 .filters .cat-companies-pop .link-button { align-self: flex-start; height: auto; padding: 0; border: 0; background: none; color: var(--accent); }
 @media (max-width: 720px) {
   .filters .cat-companies-button { width: 100%; }
+  .cat-companies.unset .cat-companies-button { color: var(--muted); }
   .cat-companies-pop { position: fixed; top: auto; left: 16px; right: 16px; bottom: 16px; width: auto; }
 }
 /* ＋ by a company's name: shown on the row's hover; ticked when it's on the list, always on a greyed (other company's) row. */
