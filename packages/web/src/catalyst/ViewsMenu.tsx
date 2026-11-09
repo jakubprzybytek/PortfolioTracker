@@ -1,10 +1,28 @@
 // Saved views of the Catalyst view: filters and sort under a name. In the header, above the filters it holds.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiSend } from "../api.ts";
 import { Icon } from "../Icons.tsx";
 import { useApi } from "../useApi.ts";
 import type { SavedView } from "./types.ts";
 import { FILTER_KEYS } from "./filters.ts";
+
+/** The view last chosen (picked, saved or renamed), remembered in this browser: Catalyst opens with it. */
+const VIEW_KEY = "pt.catalyst.view";
+const remembered = (): string | null => {
+  try {
+    return localStorage.getItem(VIEW_KEY);
+  } catch {
+    return null; // storage blocked: not remembered
+  }
+};
+const remember = (name: string | undefined) => {
+  try {
+    if (name) localStorage.setItem(VIEW_KEY, name);
+    else localStorage.removeItem(VIEW_KEY);
+  } catch {
+    // storage blocked: not remembered
+  }
+};
 
 export function ViewsMenu({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const views = useApi<{ views: SavedView[] }>("/catalyst/views");
@@ -29,6 +47,23 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
   // The view in use: the one chosen (`view` in the URL), even after its filters changed, or one that matches them.
   const active = list.find((v) => v.name === params["view"]) ?? list.find(same);
   const changed = active !== undefined && !same(active);
+  // Opening Catalyst (a reload, the menu, a link) with no view and no filters in the URL: the remembered view. Not after
+  // "Clear filters" or choosing "None", which change the URL in place (no hashchange).
+  const [arrived, setArrived] = useState(0);
+  useEffect(() => {
+    const onHash = () => setArrived((n) => n + 1);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const handled = useRef(-1);
+  useEffect(() => {
+    if (!views.data || handled.current === arrived) return;
+    handled.current = arrived;
+    if (params["view"] || FILTER_KEYS.some((k) => params[k])) return;
+    const view = list.find((v) => v.name === remembered());
+    if (view) setParams({ ...view.params, view: view.name, bond: params["bond"], chart: params["chart"] });
+  }, [views.data, arrived, list, params, setParams]);
+
   const startNaming = (mode: "new" | "rename") => {
     setName(mode === "rename" && active ? active.name : "");
     setNaming(mode);
@@ -41,6 +76,7 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
         ? list.filter((v) => v === active || v.name !== n).map((v) => (v === active ? { name: n, params: v.params } : v))
         : [...list.filter((v) => v.name !== n), { name: n, params: current }];
     void save(next).then(() => {
+      remember(n);
       setNaming(null);
       setName("");
       setParams({ ...params, view: n });
@@ -76,6 +112,7 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
               onChange={(e) => {
                 setConfirming(false);
                 const view = list.find((x) => x.name === e.target.value);
+                remember(view?.name);
                 setParams({ ...(view?.params ?? {}), view: view?.name, bond: params["bond"], chart: params["chart"] });
               }}
               data-testid="catalyst-view"
@@ -109,6 +146,7 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
                     onClick={() =>
                       void save(list.filter((v) => v !== active)).then(() => {
                         setConfirming(false);
+                        if (remembered() === active.name) remember(undefined);
                         setParams({ ...params, view: undefined });
                       })
                     }
