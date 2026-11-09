@@ -13,7 +13,8 @@ import { useApi } from "../useApi.ts";
 import { useNarrow } from "../useNarrow.ts";
 import type { BondRow, Screen } from "./types.ts";
 import { FLAG_LABEL, FLAG_TITLE, SEGMENTS, SORT_KEYS, baseOf, couponLabel, liquidityTitle, pct, pp, sortValue } from "./labels.ts";
-import { FILTER_KEYS, LIQUIDITY, MATURITIES, MIN_PREMIUM, MIN_YIELD, NOMINALS, matches, opt } from "./filters.ts";
+import { FILTER_KEYS, LIQUIDITY, MATURITIES, MIN_PREMIUM, MIN_YIELD, NOMINALS, companyList, companyName, companyParam, inList, matches, opt, toggleCompany } from "./filters.ts";
+import { CompaniesFilter, companiesOf } from "./CompaniesFilter.tsx";
 import { BondTitle, LiquidityDots } from "./parts.tsx";
 import { YieldChart } from "./YieldChart.tsx";
 import { BondPanel } from "./BondPanel.tsx";
@@ -38,23 +39,42 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
   const all = screen.data?.rows ?? [];
   const sort = parseSort(params["sort"], SORT_KEYS);
   const set = (k: string, v: string | undefined) => setParams({ ...params, [k]: v || undefined });
+  const list = companyList(params);
+  const out = params["cm"] === "out";
+  // "Only these" companies: the other companies' bonds that pass the other filters (shown greyed on "Show").
+  const others = useMemo(() => {
+    const listed = companyList(params);
+    return listed.length && params["cm"] !== "out" ? all.filter((r) => !inList(r, listed) && matches(r, { ...params, co: "" })) : [];
+  }, [all, params]);
+  const peek = !!params["peek"] && others.length > 0;
   const shown = useMemo(() => {
-    const filtered = all.filter((r) => matches(r, params));
+    const filtered = all.filter((r) => matches(r, params) || (peek && others.includes(r)));
     // The view's own order: the best net yield first, those without one after.
     const byYield = sortRows(filtered, { key: "yield", desc: true }, sortValue);
     return sortRows(byYield, sort, sortValue);
-  }, [all, params, sort]);
+  }, [all, params, sort, peek, others]);
   const selected = params["bond"] ? all.find((r) => r.isin === params["bond"]) : undefined;
   const closeDialog = useCallback(() => setParams({ ...params, issuer: undefined, itab: undefined }), [params, setParams]);
   const openIssuer = (r: BondRow) => r.entityId && setParams({ ...params, issuer: r.entityId });
   const industries = useMemo(() => opt(all.map((r) => r.industry ?? "").filter(Boolean)), [all]);
   const rules = useMemo(() => opt(all.map((r) => r.scorecard?.ruleSet ?? "").filter(Boolean), (v) => RULE_SETS[v] ?? v), [all]);
-  const company = params["co"] ? all.find((r) => r.entityId === params["co"]) : undefined;
+  const companies = useMemo(() => companiesOf(all), [all]);
+  // A row's company on the view's list, or off it: ＋ by its name, the issuer dialog.
+  const toggleCompanyOf = (r: BondRow) => {
+    const next = toggleCompany(r, list);
+    setParams({ ...params, co: companyParam(next), cm: next.length ? params["cm"] : undefined });
+  };
+  const companyTitle = (r: BondRow) => {
+    const name = companyName(r);
+    if (out) return `Hide ${name}'s bonds in this view`;
+    if (inList(r, list)) return `${name} is in this view's companies: click to take it off`;
+    return list.length ? `Add ${name} to this view's companies` : `Show only ${name}'s bonds (this view's companies)`;
+  };
   const closePanel = useCallback(() => setParams({ ...params, bond: undefined }), [params, setParams]);
   const types = useMemo(() => opt(all.map((r) => r.segment), (v) => SEGMENTS[v] ?? v), [all]);
   const currencies = useMemo(() => opt(all.map((r) => r.currency)), [all]);
   const bases = useMemo(() => opt(all.map(baseOf).filter(Boolean), (v) => (v === "fixed" ? "Fixed" : v === "zero" ? "Zero coupon" : v)), [all]);
-  const activeFilters = FILTER_KEYS.filter((k) => k !== "sort" && k !== "stale" && params[k]).length;
+  const activeFilters = FILTER_KEYS.filter((k) => k !== "sort" && k !== "stale" && k !== "cm" && params[k]).length;
   // Stale bonds the other filters would show (hidden unless "Show stale").
   const staleCount = useMemo(() => all.filter((r) => r.flags.includes("stale") && matches(r, { ...params, stale: "1" })).length, [all, params]);
   const toggleRow = (r: BondRow) => setParams({ ...params, bond: params["bond"] === r.isin ? undefined : r.isin });
@@ -106,18 +126,23 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
           <FilterSelect label="Premium" value={params["prem"] ?? ""} options={MIN_PREMIUM} onChange={(v) => set("prem", v)} testId="catalyst-prem" width="7rem" />
           <FilterSelect label="Currency" value={params["cur"] ?? ""} options={currencies} onChange={(v) => set("cur", v)} testId="catalyst-cur" width="6rem" />
           <FilterSelect label="Scorecard" value={params["sc"] ?? ""} options={SCORECARD_FILTERS} onChange={(v) => set("sc", v)} testId="catalyst-sc" width="12rem" />
-          <FilterSelect label="Issuer" value={params["state"] ?? ""} options={STATE_FILTERS} onChange={(v) => set("state", v)} testId="catalyst-state" width="9rem" />
+          <FilterSelect label="Analysis" value={params["state"] ?? ""} options={STATE_FILTERS} onChange={(v) => set("state", v)} testId="catalyst-state" width="9rem" />
           <FilterSelect label="Confidence" value={params["conf"] ?? ""} options={CONFIDENCE_FILTERS} onChange={(v) => set("conf", v)} testId="catalyst-conf" width="9rem" />
           <FilterSelect label="AI analysis" value={params["ai"] ?? ""} options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]} onChange={(v) => set("ai", v)} testId="catalyst-ai" width="7rem" />
           <FilterSelect label="Industry" value={params["ind"] ?? ""} options={industries} onChange={(v) => set("ind", v)} testId="catalyst-ind" width="10rem" />
           <FilterSelect label="Rules" value={params["rule"] ?? ""} options={rules} onChange={(v) => set("rule", v)} testId="catalyst-rule" width="10rem" />
-          {params["co"] && (
-            <button type="button" className="cat-chip" onClick={() => set("co", undefined)} title="Show every company's bonds" data-testid="catalyst-co">
-              {company?.issuerShort ?? params["co"]} ✕
-            </button>
-          )}
+          <CompaniesFilter companies={companies} params={params} setParams={setParams} />
         </FilterBar>
       </div>
+
+      {others.length > 0 && (
+        <p className="muted cat-others" data-testid="catalyst-others">
+          {others.length === 1 ? "1 bond" : `${others.length} bonds`} from other companies {others.length === 1 ? "matches" : "match"} the other filters ·{" "}
+          <button type="button" className="link-button" onClick={() => set("peek", peek ? undefined : "1")} data-testid="catalyst-others-toggle">
+            {peek ? "Hide" : "Show"}
+          </button>
+        </p>
+      )}
 
       {params["chart"] && screen.data && (
         <YieldChart rows={shown} curve={screen.data.curve?.fixed ?? []} onPick={(isin) => setParams({ ...params, bond: isin })} dots={params["dots"] ?? "S"} setDots={(v) => set("dots", v === "S" ? undefined : v)} />
@@ -127,7 +152,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
         <ul className="hs-list panel catalyst-list" data-testid="catalyst-table">
           {!screen.data && screen.loading && <li className="muted">Loading…</li>}
           {shown.map((r) => (
-            <li key={r.isin} className={r.isin === params["bond"] ? "selected" : ""} data-testid="catalyst-row" data-code={r.code}>
+            <li key={r.isin} className={[r.isin === params["bond"] ? "selected" : "", peek && others.includes(r) ? "outside" : ""].filter(Boolean).join(" ")} data-testid="catalyst-row" data-code={r.code}>
               <button type="button" className="cat-row" onClick={() => toggleRow(r)} aria-expanded={r.isin === params["bond"]}>
               <div className="cat-line">
                 <strong>{r.code}</strong> <span className="muted">{r.issuerShort ?? r.issuer ?? ""}</span>
@@ -169,7 +194,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
           <tbody>
             {!screen.data && screen.loading && <SkeletonRows rows={12} cols={10} />}
             {shown.map((r) => (
-              <tr key={r.isin} className={`clickable${r.isin === params["bond"] ? " selected" : ""}${r.flags.includes("stale") ? " closed" : ""}`} onClick={() => toggleRow(r)} data-testid="catalyst-row" data-code={r.code}>
+              <tr key={r.isin} className={`clickable${r.isin === params["bond"] ? " selected" : ""}${r.flags.includes("stale") ? " closed" : ""}${peek && others.includes(r) ? " outside" : ""}`} onClick={() => toggleRow(r)} data-testid="catalyst-row" data-code={r.code}>
                 <td className="left cat-bond" title={`${r.isin} · ${SEGMENTS[r.segment] ?? r.segment} · ${r.markets.join(", ")}`}>
                   <strong>{r.code}</strong>
                   {r.segment !== "corporate" && <span className="flag">{(SEGMENTS[r.segment] ?? r.segment).toLowerCase()}</span>}
@@ -197,6 +222,21 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
                     </button>
                   ) : (
                     (r.issuer ?? <span className="muted">–</span>)
+                  )}
+                  {companyName(r) && (
+                    <button
+                      type="button"
+                      className={`icon-button cat-co-toggle${!out && inList(r, list) ? " on" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCompanyOf(r);
+                      }}
+                      title={companyTitle(r)}
+                      aria-label={companyTitle(r)}
+                      data-testid="catalyst-co-toggle"
+                    >
+                      <Icon name={out ? "eye-off" : inList(r, list) ? "check" : "plus"} size={14} />
+                    </button>
                   )}
                 </td>
                 <td className="left" title={r.couponText ?? ""}>
@@ -261,7 +301,11 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
           tab={params["itab"] ?? "bonds"}
           setTab={(t) => setParams({ ...params, itab: t === "bonds" ? undefined : t })}
           onClose={closeDialog}
-          onShowBonds={() => setParams({ ...params, co: params["issuer"], issuer: undefined, itab: undefined })}
+          onShowBonds={() => setParams({ ...params, co: params["issuer"], cm: undefined, issuer: undefined, itab: undefined })}
+          viewToggle={(() => {
+            const r = all.find((x) => x.entityId === params["issuer"]);
+            return r ? { label: out ? "Hide in this view" : inList(r, list) ? "In this view" : "Add to this view", on: !out && inList(r, list), title: companyTitle(r), toggle: () => toggleCompanyOf(r) } : undefined;
+          })()}
         />
       )}
     </div>

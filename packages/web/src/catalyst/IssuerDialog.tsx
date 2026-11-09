@@ -1,6 +1,7 @@
 // The issuer dialog (Docs/catalyst.md, "Issuer dialog"): one company's scorecard with its metrics, its bonds falling
 // due against cash, the track record and the judgement; tabs for its bonds, years, past bonds, judgements and reports.
 // Opened from any issuer name (`issuer=<entityId>` in the URL); full screen on a phone.
+import { Icon } from "../Icons.tsx";
 import { useEffect, useState } from "react";
 import { apiSend, api } from "../api.ts";
 import { fmtNum } from "../format.ts";
@@ -30,7 +31,7 @@ const periodLabel = (periodEnd: string, months: number) => {
   return months === 6 ? `H1 ${year}` : months === 3 ? `Q1 ${year}` : months === 9 ? `Q1–Q3 ${year}` : `${months} m to ${periodEnd}`;
 };
 
-export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds }: { entityId: string; rows: BondRow[]; tab: string; setTab: (t: string) => void; onClose: () => void; onShowBonds: () => void }) {
+export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds, viewToggle }: { entityId: string; rows: BondRow[]; tab: string; setTab: (t: string) => void; onClose: () => void; onShowBonds: () => void; viewToggle?: { label: string; on: boolean; title: string; toggle: () => void } }) {
   const detail = useApi<CompanyDetail>(`/catalyst/entities/${encodeURIComponent(entityId)}`);
   const d = detail.data;
   useEffect(() => {
@@ -74,6 +75,11 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
             )}
           </div>
           <div className="cat-issuer-actions">
+            {viewToggle && (
+              <button type="button" className={`cat-view-toggle${viewToggle.on ? " on" : ""}`} onClick={viewToggle.toggle} title={viewToggle.title} aria-pressed={viewToggle.on} data-testid="issuer-view-toggle">
+                <Icon name={viewToggle.label.startsWith("Hide") ? "eye-off" : viewToggle.on ? "check" : "plus"} size={14} /> {viewToggle.label}
+              </button>
+            )}
             {c && (
               <label className="cat-ai-switch" title={c.aiAnalysis.at ? `${ai ? "On" : "Off"} since ${c.aiAnalysis.at.slice(0, 10)}${c.aiAnalysis.by ? ` (${c.aiAnalysis.by})` : ""}` : "Off: the agent doesn't work on this company"}>
                 <input type="checkbox" checked={ai} disabled={busy} onChange={(e) => void setAi(e.target.checked)} data-testid="issuer-ai-switch" />

@@ -31,6 +31,9 @@ export interface BondRow {
   entityId?: string;
   issuerShort?: string;
   issuerLegal?: string;
+  /** A financing vehicle's group (its id and short name): the company it's listed under in a view. */
+  groupId?: string;
+  groupShort?: string;
   aiAnalysis?: boolean;
   /** AI analysis switched off again: since when (the scorecard isn't kept current). */
   aiOffSince?: string;

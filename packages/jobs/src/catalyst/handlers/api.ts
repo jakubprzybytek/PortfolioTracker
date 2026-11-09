@@ -104,7 +104,7 @@ const ROUTES: Record<string, Handler> = {
           markets: b.markets,
           maturity: b.maturity,
           nominal: b.nominal,
-          ...company(companyOf.get(b.isin)),
+          ...company(companyOf.get(b.isin), entityBy),
           ...(t && !t.notFound
             ? { issuer: t.issuer ?? null, coupon: t.coupon, couponText: t.couponText ?? null, secured: t.secured ?? null, issueAmount: t.issueValue ? (t.issueValue.amount * (b.nominal ?? t.issueValue.nominal)) / t.issueValue.nominal : null }
             : {}),
@@ -708,9 +708,11 @@ function entityView(e: Entity) {
 }
 
 /** A bond row's company fields. */
-function company(e: Entity | undefined) {
+function company(e: Entity | undefined, entityBy: Map<string, Entity>) {
+  // A financing vehicle's group: the bond table lists the vehicle's bonds under it.
+  const group = e?.financialsEntityId ? entityBy.get(e.financialsEntityId) : undefined;
   return e
-    ? { entityId: e.entityId, issuerShort: e.shortName, issuerLegal: e.legalName, aiAnalysis: e.aiAnalysis?.on ?? false, ...(e.aiAnalysis && !e.aiAnalysis.on ? { aiOffSince: e.aiAnalysis.at.slice(0, 10) } : {}), ...(e.industry ? { industry: e.industry } : {}) }
+    ? { entityId: e.entityId, issuerShort: e.shortName, issuerLegal: e.legalName, ...(group ? { groupId: group.entityId, groupShort: group.shortName } : {}), aiAnalysis: e.aiAnalysis?.on ?? false, ...(e.aiAnalysis && !e.aiAnalysis.on ? { aiOffSince: e.aiAnalysis.at.slice(0, 10) } : {}), ...(e.industry ? { industry: e.industry } : {}) }
     : {};
 }
 

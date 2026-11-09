@@ -2,7 +2,7 @@ import type { View } from "./route.ts";
 
 // Line icons (24 × 24, currentColor) for the menu and buttons.
 
-const paths: Record<View | "menu" | "close" | "logout" | "filter" | "clear-filters" | "reload" | "update-prices" | "back" | "edit" | "save" | "save-as" | "check" | "trash", string> = {
+const paths: Record<View | "menu" | "close" | "logout" | "filter" | "clear-filters" | "reload" | "update-prices" | "back" | "edit" | "save" | "save-as" | "check" | "trash" | "plus" | "eye-off", string> = {
   dashboard: "M4 3h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM15 3h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM15 12h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM4 17h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1z",
   // bars per year with a rising line: performance
   performance: "M4 20h16M6 16v-3M11 16v-6M16 16v-4M5 9l5-4 4 3 6-5",
@@ -41,6 +41,9 @@ const paths: Record<View | "menu" | "close" | "logout" | "filter" | "clear-filte
   "save-as": "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6",
   check: "M20 6L9 17l-5-5",
   trash: "M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6",
+  plus: "M12 5v14M5 12h14",
+  // a struck-out eye (Feather "eye-off"): hide
+  "eye-off": "M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24M1 1l22 22",
 };
 
 export function Icon({ name, size = 20, className }: { name: keyof typeof paths; size?: number; className?: string }) {

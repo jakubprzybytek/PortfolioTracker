@@ -1840,6 +1840,49 @@ test.describe("catalyst view", () => {
     await expect(page.getByTestId("catalyst-view-update")).toHaveCount(0);
   });
 
+  test("the view's companies: only these or all but these; other companies' bonds on demand; saved with the view", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    const rows = page.getByTestId("catalyst-table").locator("tbody tr");
+    await expect(rows).toHaveCount(3);
+    // ＋ by Kruk's name: only Kruk's bonds; the others that pass the filters on demand, greyed.
+    await rows.filter({ hasText: "KRU0829" }).hover();
+    await rows.filter({ hasText: "KRU0829" }).getByTestId("catalyst-co-toggle").click();
+    await expect(page).toHaveURL(/co=0000533217/);
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByTestId("catalyst-co")).toContainText("Only Kruk");
+    await expect(page.getByTestId("catalyst-others")).toContainText("2 bonds from other companies match the other filters");
+    await page.getByTestId("catalyst-others-toggle").click();
+    await expect(rows).toHaveCount(3);
+    await expect(rows.filter({ hasText: "ABC1227" })).toHaveClass(/outside/);
+    await rows.filter({ hasText: "ABC1227" }).getByTestId("catalyst-co-toggle").click();
+    await expect(page).toHaveURL(/co=0000533217%2C0000000001/);
+    // All but these: the bonds of every other company (here the one not linked).
+    await page.getByTestId("catalyst-co").click();
+    await expect(page.getByTestId("catalyst-co-list").locator("li")).toHaveCount(2);
+    await page.getByTestId("catalyst-co-except").click();
+    await expect(page).toHaveURL(/cm=out/);
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByTestId("catalyst-others")).toHaveCount(0);
+    await page.getByTestId("catalyst-co-clear").click();
+    await expect(page).not.toHaveURL(/co=|cm=/);
+    await expect(rows).toHaveCount(3);
+    // Added from the search; saved into a view.
+    await page.getByTestId("catalyst-co-search").fill("kru");
+    await page.getByTestId("catalyst-co-add").click();
+    await expect(rows).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("catalyst-co-pop")).toHaveCount(0);
+    await page.getByTestId("catalyst-view-new").click();
+    await page.getByTestId("catalyst-view-name").fill("Kruk only");
+    await page.getByTestId("catalyst-view-save").click();
+    await expect.poll(() => views.map((v) => [v.name, v.params["co"]])).toEqual([["Kruk only", "0000533217"]]);
+    // The issuer dialog takes it off the list too.
+    await rows.filter({ hasText: "KRU0829" }).getByTestId("catalyst-issuer").click();
+    await expect(page.getByTestId("issuer-view-toggle")).toHaveText("In this view");
+    await page.getByTestId("issuer-view-toggle").click();
+    await expect(page).not.toHaveURL(/co=/);
+  });
+
   test("a row opens its panel: price and liquidity, the yield's make-up, the coupons", async ({ page }) => {
     await page.goto("/#/catalyst");
     await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).click();
