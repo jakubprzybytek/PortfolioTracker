@@ -121,7 +121,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
           <FilterSelect label="Coupon" value={params["base"] ?? ""} options={bases} onChange={(v) => set("base", v)} testId="catalyst-base" width="9rem" />
           <FilterSelect label="Maturity" value={params["mat"] ?? ""} options={MATURITIES} onChange={(v) => set("mat", v)} testId="catalyst-mat" width="8rem" />
           <FilterSelect label="Nominal" value={params["nom"] ?? ""} options={NOMINALS} onChange={(v) => set("nom", v)} testId="catalyst-nom" width="7rem" />
-          <FilterSelect label="Liquidity" value={params["liq"] ?? ""} options={LIQUIDITY} onChange={(v) => set("liq", v)} testId="catalyst-liq" width="10rem" />
+          <FilterSelect label="Liquidity" value={params["liq"] ?? ""} options={LIQUIDITY} onChange={(v) => set("liq", v)} testId="catalyst-liq" width="11rem" />
           <FilterSelect label="Yield" value={params["yield"] ?? ""} options={MIN_YIELD} onChange={(v) => set("yield", v)} testId="catalyst-yield" width="8rem" />
           <FilterSelect label="Premium" value={params["prem"] ?? ""} options={MIN_PREMIUM} onChange={(v) => set("prem", v)} testId="catalyst-prem" width="7rem" />
           <FilterSelect label="Currency" value={params["cur"] ?? ""} options={currencies} onChange={(v) => set("cur", v)} testId="catalyst-cur" width="6rem" />
