@@ -160,6 +160,7 @@ Bonds are joined to reports **through the company's identity, never by matching 
 | Filing | `ENTITY#<entityId>` / `FILING#<sha256>` | – | Original document: format, fiscal year, scope, source URL, S3 key, import result |
 | Analysis | `ENTITY#<entityId>` / `ANALYSIS#<ts>`, mirror `ANALYSIS#LATEST` | – | The agent's written judgement (§13, §14 layout), red flags with source and quote, what to watch, sources read, model, and the scorecard version it saw |
 | Document | `ENTITY#<entityId>` / `DOC#<sha256>` | – | Another document a judgement rests on (auditor's report, management report, interim or current report, bond terms): kind, its date, title, where it came from, who stored it; the original at `catalyst/documents/<entity>/<date>-<kind>-<sha12>.<ext>`, once per SHA-256 (N8) |
+| Payment event | `ENTITY#<entityId>` / `PAY#<date>#<id>` | – | What the company's own report says about its bonds' payments ("Payment events" below): kind, date, the bonds (none: the company), text, amount, the report, the stored document's SHA-256 and the passage; who and when; `retracted` (who, when, why) instead of deletion |
 | Checklist entry | `CHECK#<entityId>` / `<year>#<scope>` | `CHECK` / `<status>` | A report to fetch: company, KRS, year, group/single/any, where it can be found, status (`missing`, `downloaded`, `imported`, `not available`) |
 | Known answer | `KNOWN#<entityId>` / `<period end>#<scope>` | – | Figures read by hand from printed statements (CV's `expected.json`, 40 reports), for `check-filings` |
 | Setting | `SETTING#<name>` / `META` | – | `assumptions` (WIBOR, WIRON, commission, tax, alternative), `views` (saved filters), `agentToken` (hash) |
@@ -271,6 +272,24 @@ Every line keeps its source and gets a **standard item** from one vocabulary (§
 
 Planned in CV (§11); here the data is at hand from the start: the daily-file archive since 2020 gives every bond's last session and last price, `catalyst-exits` gives GPW's reason (back to 2018) and markings. Per company: bonds repaid at maturity, redeemed early, ended below par, still listed past maturity, unknown; the period covered ("since 2020-01"), so a short record isn't read as a clean one; red flags (a missed payment, a marking, an extension, a buy-back below par). Inferred facts are labelled as inferred; confirmation of payment comes from issuers' current reports, read by the agent. Shown next to the scorecard, not as an eighth colour.
 
+#### Payment events (from the issuer's reports)
+
+**Built (2026-11-09):** `core/catalyst/paymentEvents.ts`. Trading shows *that* a bond left and at what price; only the issuer's own reports say whether it was paid. The agent reads the company's current reports (ESPI/EBI) and records what they say, each event resting on a stored document and the passage that says it:
+
+| Kind | Reads as |
+|---|---|
+| `missed-payment` (with `resolvedOn` when paid after all), `late-payment` | red flag; the bond's outcome becomes **not paid** (a missed payment not made since, even while it trades) or **paid late** (once it has ended) |
+| `terms-changed` (maturity moved, coupon changed), `covenant-breach`, `insolvency`, `buyback-below-par` | red flag |
+| `bondholders-meeting`, `waiver` | worth a look |
+| `paid` | confirms the outcome trading suggested: "inferred" becomes "report" |
+| `reviewed` | no document: the current reports were read up to its date and nothing else was found |
+
+- An event names its bonds (ISINs, which must be the company's) or none: then it's the company's and stands at the record's level.
+- **Checks:** the CLI reads the document's text (PDF or web page) and refuses a quote that isn't in it, whatever the line breaks and hyphenation; the API refuses a document that isn't stored for the company, bonds that aren't its own, a date in the future, and stores an event already recorded (same kind, date and bonds) only once. The API doesn't read files, so the quote check is the CLI's.
+- **Never overwritten:** a wrong event is retracted (who, when, why) and no longer read; it stays stored and in the monthly export (`payment-events.json`).
+- **`catalyst work`** lists a `payments` item for a company with AI analysis on whose reports were never read, or when a bond has ended or GPW took a measure (KNF's demand, bankruptcy, "participants' interest") after the date they were read to. Only a `reviewed` event sets that date: an event alone doesn't say the rest was read.
+- **Shown** in the Track record tab: "From the issuer's reports" (kind, date, bonds, text, the report with its link, the passage), the *Not paid* and *Paid late* figures when there is one, and how far the reports were read.
+
 ### AI analysis per company (on/off)
 
 The agent works only on companies you switch on. Each company has `aiAnalysis`: `off` (the default), or `on` with who switched it and when.
@@ -330,7 +349,7 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 
 | Command | Purpose |
 |---|---|
-| `catalyst work` | What needs doing, **only for companies (and names) with AI analysis on**: names `unresolved`/`review`; companies in scope without a report for a year that is due, or without an interim report that is due (for those that publish them); companies on fallback figures; Finance companies without a sub-type; analyses older than their latest report; new markings or bonds ending below par |
+| `catalyst work` | What needs doing, **only for companies (and names) with AI analysis on**: names `unresolved`/`review`; companies in scope without a report for a year that is due, or without an interim report that is due (for those that publish them); companies on fallback figures; Finance companies without a sub-type; analyses older than their latest report; new markings or bonds ending below par; the payment record never checked against the current reports, or bonds ended or GPW measures since they were read |
 | `catalyst bonds [--entity] [--filter …]`, `catalyst bond <code>` | Screen rows, amounts owed, liquidity (no obligacje.pl content) |
 | `catalyst entity <id>` | Identity, names, bonds, financial years with lines, scorecard, refinancing, confidence, track record, latest analysis |
 | `catalyst identity resolve [<name>]` | GLEIF and KRS lookups, made by the CLI itself (ISIN mapping, exact name match, by KRS or LEI, parent), printed with the evidence |
@@ -345,6 +364,7 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 | `catalyst known put <id> --file known.json` | Hand-read figures of a report, for `filings check` |
 | `catalyst figures put <id> --file fig.json` | Fallback figures from the web (operating companies only), marked as collected |
 | `catalyst analysis put <id> --file judgement.md --meta meta.json` | Store a judgement (layout below) |
+| `catalyst events list <id>`, `catalyst events put <id> --file event.json --document <file>`, `catalyst events retract <id> <event id> --reason "…"` | What the company's reports say about payments ("Payment events"): the document is one stored with `documents put`, and the event's quote must stand in it; kind `reviewed` goes without a document |
 | `catalyst schema <kind>` | JSON Schema of an input |
 
 **Agent skill** `catalyst-analyst` (`.claude/skills/` in this repo), built on the methodology document:

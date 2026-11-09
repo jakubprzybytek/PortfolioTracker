@@ -79,6 +79,27 @@ analysis, end to end".
    security, related-party dealings, and the last year's current reports (ESPI/EBI) for red flags. Each red flag
    needs a source and a short quote.
 
+   - **Payments (§11, "Repayment track record"):** when `catalyst work` lists `kind: "payments"`, or before any
+     judgement: read the company's current reports (ESPI for listed shares or bonds on the regulated market, EBI for
+     the alternative market) on the issuer's site, Bankier.pl or PAP Biznes, back to the date `entity <id>`'s
+     `track.reviewedTo` gives (never read: the last three years, and further for a bond that ended oddly). Look for
+     *niewykupienie*, *niedokonanie wykupu*, *nieterminowa wypłata odsetek*, *zgromadzenie obligatariuszy*, *zmiana
+     warunków emisji*, *naruszenie kowenantów*, *wniosek o otwarcie postępowania restrukturyzacyjnego / o ogłoszenie
+     upadłości*, and for *wykup obligacji* / *terminowy wykup* confirming a payment. For each one found:
+     1. save the report (the page as `.html`, or its PDF) and store it: `catalyst documents put <id> <file> --kind
+        current-report --date <its date> --title "ESPI 14/2019: …" --source <url>`;
+     2. write `event.json` (`catalyst schema event`): `kind`, `date` (the payment's due date or the meeting's, not
+        the report's), `isins` (from `entity <id>`'s bonds; none when it concerns the whole company), `text` (one
+        sentence, English), `source` ("ESPI 14/2019, 2019-06-03"), `sourceUrl`, `quote` (the passage as printed, in
+        Polish), `amount` and `resolvedOn` when stated;
+     3. `catalyst events put <id> --file event.json --document <the same file> --dry-run`, then without. A quote that
+        isn't in the document is refused: copy it again, don't paraphrase.
+
+     At the end, always one `reviewed` event (no document): `date` = the date read up to, `text` = what you found or
+     "nothing about payments", `source` = what you read and for which period. Record only what a report says; press
+     articles are leads to the report, never the source. A wrong event: `catalyst events retract <id> <event id>
+     --reason "…"`.
+
 8. **Judgement (§14):** `judgement.md` in this layout, then
    `catalyst analysis put <id> --file judgement.md --meta meta.json --dry-run`, then without `--dry-run`:
 

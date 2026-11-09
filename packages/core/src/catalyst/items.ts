@@ -1,6 +1,7 @@
 // Items of the Catalyst module's own table (`catalyst`, Docs/catalyst.md, "Storage"). The module is separate from the
 // portfolio: nothing here refers to transactions or holdings.
 
+import type { PaymentEvent } from "./paymentEvents.ts";
 import type { IsoDate } from "../dates.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
 import type { CatalystSegment } from "../gpw/catalystDailyFile.ts";
@@ -85,6 +86,7 @@ export const catalystKeys = {
   collected: (entityId: string, at: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `AIFIG#${at}` as const }),
   check: (entityId: string, year: number, scope: string) => ({ PK: `CHECK#${entityId}` as const, SK: `${year}#${scope}` }),
   document: (entityId: string, sha256: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `DOC#${sha256}` as const }),
+  paymentEvent: (entityId: string, date: IsoDate, id: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `PAY#${date}#${id}` as const }),
 };
 
 /**
@@ -109,6 +111,12 @@ export interface CatalystDocumentItem {
   by: string;
   at: string;
 }
+
+/**
+ * What a company's report says about its bonds' payments (paymentEvents.ts): recorded by the agent from a stored
+ * document, never overwritten, only retracted.
+ */
+export type CatalystPaymentEventItem = PaymentEvent & { PK: `ENTITY#${string}`; SK: `PAY#${string}`; entityId: string };
 
 /**
  * A report to fetch by hand from the KRS financial documents repository (it has no API and bot protection, so the

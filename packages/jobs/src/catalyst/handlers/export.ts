@@ -26,8 +26,8 @@ export async function handler() {
     // Each company's own rows (years with their lines, as the CLI's import would send them again).
     const own = await Promise.all(
       entities.map(async (e) => {
-        const [years, filings, analyses, collected, documents] = await Promise.all([catalystRepo.listYears(e.entityId), catalystRepo.listFilings(e.entityId), catalystRepo.listAnalyses(e.entityId), catalystRepo.listCollectedFigures(e.entityId), catalystRepo.listDocuments(e.entityId)]);
-        return { years: years.map(keys), filings: filings.map(keys), analyses: analyses.map(keys), collected: collected.map(keys), documents: documents.map(keys) };
+        const [years, filings, analyses, collected, documents, events] = await Promise.all([catalystRepo.listYears(e.entityId), catalystRepo.listFilings(e.entityId), catalystRepo.listAnalyses(e.entityId), catalystRepo.listCollectedFigures(e.entityId), catalystRepo.listDocuments(e.entityId), catalystRepo.listPaymentEvents(e.entityId)]);
+        return { years: years.map(keys), filings: filings.map(keys), analyses: analyses.map(keys), collected: collected.map(keys), documents: documents.map(keys), events: events.map(keys) };
       }),
     );
     const all = <K extends keyof (typeof own)[number]>(k: K): unknown[] => own.flatMap((o) => o[k] as unknown[]);
@@ -41,11 +41,12 @@ export async function handler() {
       ["analyses.json", all("analyses")],
       ["collected.json", all("collected")],
       ["documents.json", all("documents")],
+      ["payment-events.json", all("events")],
       ["known.json", known.map(strip)],
       ["checklist.json", checklist.map(strip)],
     ];
     for (const [name, body] of files)
       await s3.send(new PutObjectCommand({ Bucket: bucketName, Key: `exports/${date}/catalyst/${name}`, Body: JSON.stringify(body, null, 1), ContentType: "application/json" }));
-    return { itemsWritten: files.length, note: `exports/${date}/catalyst/: settings, ${entities.length} companies, ${names.length} names, ${links.length} links, ${all("years").length} years, ${all("filings").length} filings, ${all("analyses").length} judgements, ${all("documents").length} documents, ${known.length} known answers, ${checklist.length} checklist entries` };
+    return { itemsWritten: files.length, note: `exports/${date}/catalyst/: settings, ${entities.length} companies, ${names.length} names, ${links.length} links, ${all("years").length} years, ${all("filings").length} filings, ${all("analyses").length} judgements, ${all("documents").length} documents, ${all("events").length} payment events, ${known.length} known answers, ${checklist.length} checklist entries` };
   });
 }

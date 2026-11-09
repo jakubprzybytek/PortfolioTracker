@@ -6,8 +6,8 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { z } from "zod";
-import { AGENT_SCHEMAS, AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, KRS_REGISTER, krsExtract, leiByIsin, leiRecords, sameName, type Fetcher, type LeiRecord, type WorkItem } from "@portfolio/core/catalyst/index";
-import { isPdf, pdfStatementPages, readFiling, readPdfFiling, sha256Of } from "@portfolio/core/catalyst/filings/index";
+import { AGENT_SCHEMAS, AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, PaymentEventInput, RetractInput, plainText, quoteIn, KRS_REGISTER, krsExtract, leiByIsin, leiRecords, sameName, type Fetcher, type LeiRecord, type WorkItem } from "@portfolio/core/catalyst/index";
+import { isPdf, pdfStatementPages, readFiling, readPdfFiling, readPdfPages, sha256Of } from "@portfolio/core/catalyst/filings/index";
 import { ApiError, CliError, Client, enc, forgetToken, saveToken, type Io } from "./client.ts";
 import { apiUrl } from "./stage.ts";
 
@@ -48,15 +48,22 @@ Documents (what a judgement rests on beside the statements; never stored twice):
   documents put <id> <file> --kind <audit|management|interim|annual|current-report|terms|other> --date <yyyy-mm-dd>
                 [--title "…"] [--source <url>] [--dry-run]
 
+Payments (what the company's own reports say: missed or late payments, changed terms, meetings, breaches; or paid):
+  events list <id>                      the recorded events, the retracted ones too
+  events put <id> --file event.json --document <file> [--dry-run]
+                                        the document is one stored with documents put; the event's quote must stand in it
+  events put <id> --file event.json     kind "reviewed" only: the current reports were read to a date, nothing else found
+  events retract <id> <event id> --reason "…" [--dry-run]
+
 Judgement:
   analysis put <id> --file judgement.md --meta meta.json [--dry-run]
 
 Other:
-  schema <entity|name|analysis|figures|known|checklist|transcript>   an input as JSON Schema
+  schema <entity|name|analysis|figures|known|checklist|document|event|transcript>   an input as JSON Schema
   --version, --help`;
 
 type Args = { positional: string[]; flags: Map<string, string | true> };
-const VALUE_FLAGS = new Set(["--stage", "--by", "--entity", "--q", "--lei", "--krs", "--evidence", "--financials", "--file", "--meta", "--out", "--transcript", "--where", "--kind", "--date", "--title", "--source"]);
+const VALUE_FLAGS = new Set(["--stage", "--by", "--entity", "--q", "--lei", "--krs", "--evidence", "--financials", "--file", "--meta", "--out", "--transcript", "--where", "--kind", "--date", "--title", "--source", "--document", "--reason"]);
 
 function parse(args: string[]): Args {
   const positional: string[] = [];
@@ -314,6 +321,30 @@ async function dispatch({ positional, flags }: Args, io: Io): Promise<number> {
       const contentType = fileName.toLowerCase().endsWith(".pdf") ? "application/pdf" : fileName.toLowerCase().endsWith(".zip") ? "application/zip" : "application/octet-stream";
       const uploadKey = await c.upload(data, contentType);
       return print(await c.call("POST", `/entities/${enc(id)}/documents`, { uploadKey, ...meta }));
+    }
+
+    case "events": {
+      const id = rest[0] ?? fail("events list|put|retract <id>");
+      const c = client();
+      if (sub === "list") return print((await c.get<{ events?: unknown[] }>(`/entities/${enc(id)}`)).events ?? []);
+      if (sub === "retract") {
+        const eventId = rest[1] ?? fail("events retract <id> <event id> --reason …");
+        return print(await c.call("POST", `/entities/${enc(id)}/events/${enc(eventId)}/retract`, RetractInput.parse({ reason: need("--reason"), ...(dryRun ? { dryRun } : {}) })));
+      }
+      if (sub !== "put") throw new CliError("events list <id> | events put <id> --file event.json --document <file> | events retract <id> <event id> --reason …");
+      const raw = readJson(need("--file")) as Record<string, unknown>;
+      const file = flag("--document");
+      // The passage is checked here against the document's own text: an event whose quote isn't in it goes nowhere.
+      let documentSha: string | undefined;
+      if (file) {
+        const data = readFileSync(file);
+        documentSha = sha256Of(data);
+        const text = isPdf(data) ? (await readPdfPages(data)).flatMap((pg) => pg.lines).join(" ").replaceAll(" | ", " ") : plainText(data.toString("utf8"));
+        const quote = typeof raw["quote"] === "string" ? raw["quote"] : fail("the event needs a quote: the passage that says it, as printed");
+        if (!quoteIn(text, quote)) throw new CliError(`The quote isn't in ${basename(file)}: copy the passage as printed (line breaks and hyphenation don't matter).`);
+      } else if (raw["kind"] !== "reviewed") throw new CliError('--document <file> is needed: the stored document the quote is from (only kind "reviewed" goes without)');
+      const body = PaymentEventInput.parse({ ...raw, ...(documentSha ? { documentSha } : {}), ...(dryRun ? { dryRun } : {}) });
+      return print(await c.call("POST", `/entities/${enc(id)}/events`, body));
     }
 
     case "schema": {

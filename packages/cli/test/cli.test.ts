@@ -139,6 +139,30 @@ describe("catalyst CLI", () => {
     expect(sent.map((s) => `${s.method} ${s.url.replace(/^.*\/agent/, "")}`)).toEqual(["GET /entities/0000442287", "POST /filings/upload-url", "PUT https://s3.example/put", "POST /entities/0000442287/documents"]);
   });
 
+  it("events put: the quote must stand in the document; the document's SHA-256 goes with it", async () => {
+    const { cli, sent, dir } = setup({
+      "POST /entities/0000053415/events": (b) => ({ status: 201, body: { stored: true, id: "ab12cd34", ...(b as object) } }),
+      "POST /entities/0000053415/events/ab12cd34/retract": (b) => ({ body: { stored: true, retracted: b } }),
+    });
+    writeFileSync(join(dir, "espi.html"), "<html><body><p>Zarząd informuje, że Emitent nie dokonał\n wykupu obligacji serii F w&nbsp;terminie.</p></body></html>");
+    const event = { kind: "missed-payment", date: "2019-06-24", isins: ["PLZPMHK00044"], text: "series F not redeemed at maturity", source: "ESPI 31/2019" };
+    writeFileSync(join(dir, "wrong.json"), JSON.stringify({ ...event, quote: "Emitent dokonał wykupu obligacji serii F" }));
+    const bad = await cli("events", "put", "0000053415", "--file", join(dir, "wrong.json"), "--document", join(dir, "espi.html"));
+    expect(bad.code).toBe(1);
+    expect(bad.err).toContain("The quote isn't in espi.html");
+    writeFileSync(join(dir, "e.json"), JSON.stringify({ ...event, quote: "Emitent nie dokonał wykupu obligacji serii F w terminie" }));
+    expect((await cli("events", "put", "0000053415", "--file", join(dir, "e.json"))).err).toContain("--document <file> is needed");
+    expect(sent).toHaveLength(0);
+    const r = JSON.parse((await cli("events", "put", "0000053415", "--file", join(dir, "e.json"), "--document", join(dir, "espi.html"), "--dry-run")).out);
+    expect(r.documentSha).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.dryRun).toBe(true);
+    // Reports read, nothing found: no document.
+    writeFileSync(join(dir, "r.json"), JSON.stringify({ kind: "reviewed", date: "2026-11-01", text: "nothing about payments", source: "ESPI reports 2024-01 to 2026-11 on bankier.pl" }));
+    expect((await cli("events", "put", "0000053415", "--file", join(dir, "r.json"))).code).toBe(0);
+    expect((await cli("events", "retract", "0000053415", "ab12cd34", "--reason", "the wrong series")).code).toBe(0);
+    expect((sent.at(-1)!.body as { reason: string }).reason).toBe("the wrong series");
+  });
+
   it("schema: the inputs as JSON Schema", async () => {
     const { cli } = setup();
     const s = JSON.parse((await cli("schema", "analysis")).out);

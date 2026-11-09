@@ -6,7 +6,7 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystChecklistItem, type CatalystDocumentItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystChecklistItem, type CatalystDocumentItem, type CatalystPaymentEventItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
 import type { ScreenRow } from "./screen.ts";
 import type { FinancialYear } from "./financials.ts";
 
@@ -184,6 +184,15 @@ export class CatalystRepository {
 
   listDocuments(entityId: string): Promise<CatalystDocumentItem[]> {
     return this.queryAll<CatalystDocumentItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :d)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":d": "DOC#" } });
+  }
+
+  /** A company's payment events, the retracted ones included, oldest first. */
+  listPaymentEvents(entityId: string): Promise<CatalystPaymentEventItem[]> {
+    return this.queryAll<CatalystPaymentEventItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :d)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":d": "PAY#" } });
+  }
+
+  putPaymentEvents(items: Omit<CatalystPaymentEventItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut(items.map((e) => ({ ...catalystKeys.paymentEvent(e.entityId, e.date, e.id), ...e })));
   }
 
   putDocuments(items: Omit<CatalystDocumentItem, "PK" | "SK">[]): Promise<number> {

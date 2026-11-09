@@ -13,6 +13,7 @@
 //   POST /catalyst/entities/{id}/analyses|figures|known   a judgement, collected figures, hand-read figures
 //   GET  /catalyst/checklist, PUT /catalyst/checklist/{id}/{year}/{scope}   reports to download by hand
 //   POST /catalyst/entities/{id}/documents, GET …/documents/{sha}   a company's other documents, and a link to one
+//   POST /catalyst/entities/{id}/events, POST …/events/{eventId}/retract   what its reports say about payments
 //   GET|POST|DELETE /catalyst/agent-token  the agent's token (yours only: shown once, only its SHA-256 kept)
 //   ANY  /catalyst/agent/{proxy+}         the agent's way in (bearer token): the reads and the writes it may make
 //                                         (core/catalyst/agent.ts, AGENT_WRITES), as the routes above
@@ -21,10 +22,10 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
-import { DocumentInput } from "@portfolio/core/catalyst/index";
+import { DocumentInput, PaymentEventInput, RetractInput, type PaymentEvent } from "@portfolio/core/catalyst/index";
 import { storeDocument } from "../documents.ts";
 import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestPeriod, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
-import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
+import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, reviewedTo, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -176,7 +177,9 @@ const ROUTES: Record<string, Handler> = {
       documents: documents.map(({ PK: _p, SK: _s, key: _k, ...d }) => d).sort((a, b) => b.date.localeCompare(a.date)),
       names: names.filter((n) => n.entityId === id).map(stripKeys),
       bonds: theirs.map((b) => ({ isin: b.isin, code: b.code, status: b.status, maturity: b.maturity, segment: b.segment })),
-      track: await trackOf(theirs, entity.legalName),
+      track: { company: entity.shortName, prefix: null, ...(await trackOf(theirs, entity.legalName, id)) },
+      // What its reports say about payments, the retracted ones too (the track record reads the rest).
+      events: (await catalystRepo.listPaymentEvents(id)).map(paymentEventView).sort((a, b) => b.date.localeCompare(a.date)),
     });
   },
 
@@ -416,6 +419,42 @@ const ROUTES: Record<string, Handler> = {
     }
   },
 
+  "POST /catalyst/entities/{id}/events": async (event) => {
+    // What a report says about the company's payments: its bonds must be the company's, its document stored; one
+    // already recorded (same kind, date and bonds) isn't stored again. A dry run returns it without storing.
+    const id = pathParam(event, "id");
+    const body = PaymentEventInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
+    if (!(await catalystRepo.getEntity(id))) return json(404, { error: `No company ${id}` });
+    const { dryRun, ...b } = body.data;
+    if (b.date > today()) return json(422, { error: `date: ${b.date} is in the future` });
+    const [links, documents, held] = await Promise.all([catalystRepo.listLinks(), catalystRepo.listDocuments(id), catalystRepo.listPaymentEvents(id)]);
+    const own = new Set(links.filter((l) => l.entityId === id).map((l) => l.isin));
+    const foreign = b.isins.filter((i) => !own.has(i));
+    if (foreign.length) return json(422, { error: `isins: not this company's bonds: ${foreign.join(", ")}` });
+    if (b.documentSha && !documents.some((d) => d.sha256 === b.documentSha)) return json(422, { error: `documentSha: no stored document ${b.documentSha.slice(0, 12)}… of ${id} (catalyst documents put first)` });
+    const isins = [...new Set(b.isins)].sort();
+    const same = held.find((e) => !e.retracted && e.kind === b.kind && e.date === b.date && e.isins.join() === isins.join());
+    if (same) return json(200, { ...paymentEventView(same), stored: false, duplicate: true });
+    const item = { entityId: id, id: randomUUID().slice(0, 8), ...b, isins, by: userOf(event), at: new Date().toISOString() };
+    if (!dryRun) await catalystRepo.putPaymentEvents([item]);
+    return json(dryRun ? 200 : 201, { ...item, stored: !dryRun, duplicate: false });
+  },
+
+  "POST /catalyst/entities/{id}/events/{eventId}/retract": async (event) => {
+    const id = pathParam(event, "id");
+    const eventId = pathParam(event, "eventId");
+    const body = RetractInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
+    const held = (await catalystRepo.listPaymentEvents(id)).find((e) => e.id === eventId);
+    if (!held) return json(404, { error: `No event ${eventId} of ${id}` });
+    if (held.retracted) return json(200, { ...paymentEventView(held), stored: false });
+    const { PK: _p, SK: _s, ...rest } = held;
+    const item = { ...rest, retracted: { at: new Date().toISOString(), by: userOf(event), reason: body.data.reason } };
+    if (!body.data.dryRun) await catalystRepo.putPaymentEvents([item]);
+    return json(200, { ...item, stored: !body.data.dryRun });
+  },
+
   "GET /catalyst/entities/{id}/documents/{sha}": async (event) => {
     const id = pathParam(event, "id");
     const sha = pathParam(event, "sha");
@@ -591,6 +630,14 @@ async function work() {
       }),
     ),
   ]);
+  // The payment check: the date each company's current reports were read to, and its bonds that have ended.
+  const reviewed = await Promise.all(on.map(async (e) => [e.entityId, reviewedTo(await catalystRepo.listPaymentEvents(e.entityId)) ?? undefined] as const));
+  const ended = new Map(
+    on.map((e) => {
+      const own = new Set(links.filter((l) => l.entityId === e.entityId).map((l) => l.isin));
+      return [e.entityId, bonds.filter((b) => own.has(b.isin) && b.status === "ended").map((b) => ({ code: b.code, lastSeen: b.lastSeen }))] as const;
+    }),
+  );
   // Who needs a half-year report (plan N8): bonds due within 24 months, or debt service, liquidity or refinancing
   // yellow or red (the signals the metrics copied into its bonds' rows).
   const in24 = addDays(today(), 730);
@@ -617,6 +664,8 @@ async function work() {
     collected: defined(collected),
     checklist: checklist.map(stripKeys),
     measures: new Map(measures),
+    reviewedTo: defined(reviewed),
+    ended,
     lenderByName,
     needsInterim,
     outOfScope: (e) => !(e.financeRuleSet || e.ruleSetOverride || lenderByName(e.entityId)) && !isInFundamentalScope(e.industry),
@@ -731,8 +780,8 @@ async function passSwitch(entityId: string, ai: AiSwitch) {
 }
 
 /** The track record of a set of bonds (core/catalyst/trackRecord.ts), each with its GPW measures and last close. */
-async function trackOf(group: CatalystBondItem[], issuer: string | undefined) {
-  const exitsNow = await catalystRepo.getExitsNow();
+async function trackOf(group: CatalystBondItem[], issuer: string | undefined, entityId?: string) {
+  const [exitsNow, reported] = await Promise.all([catalystRepo.getExitsNow(), entityId ? catalystRepo.listPaymentEvents(entityId) : Promise.resolve([])]);
   const bonds: TrackBond[] = await Promise.all(
     group.map(async (b) => {
       const [events, last] = await Promise.all([catalystRepo.listEvents(b.isin), b.status === "ended" ? catalystRepo.lastSession(b.isin) : Promise.resolve(undefined)]);
@@ -749,7 +798,12 @@ async function trackOf(group: CatalystBondItem[], issuer: string | undefined) {
     }),
   );
   const markings = issuer ? (exitsNow?.marked ?? []).filter((m) => issuerKey(m.issuer) === issuerKey(issuer)).map((m) => m.marking) : [];
-  return trackRecord(bonds, today(), markings);
+  return trackRecord(bonds, today(), markings, reported.map(paymentEventView));
+}
+
+/** A stored payment event without its keys. */
+function paymentEventView<T extends PaymentEvent & { PK: string; SK: string }>({ PK: _p, SK: _s, ...e }: T): Omit<T, "PK" | "SK"> {
+  return e;
 }
 
 /**
@@ -761,7 +815,7 @@ async function issuerTrack(bond: CatalystBondItem, issuer: string | undefined) {
   if (link?.entityId) {
     const [links, bonds, entity] = await Promise.all([catalystRepo.listLinks(), catalystRepo.listBonds(), catalystRepo.getEntity(link.entityId)]);
     const own = new Set(links.filter((l) => l.entityId === link.entityId).map((l) => l.isin));
-    return { prefix: null, company: entity?.shortName ?? link.entityId, ...(await trackOf(bonds.filter((b) => own.has(b.isin)), issuer ?? entity?.legalName)) };
+    return { prefix: null, company: entity?.shortName ?? link.entityId, ...(await trackOf(bonds.filter((b) => own.has(b.isin)), issuer ?? entity?.legalName, link.entityId)) };
   }
   const prefix = codePrefix(bond.code);
   const group = (await catalystRepo.listBondsByPrefix(prefix)).filter((b) => codePrefix(b.code) === prefix);

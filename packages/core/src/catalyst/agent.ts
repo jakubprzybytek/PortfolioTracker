@@ -6,6 +6,7 @@ import { z } from "zod";
 import { INDUSTRIES } from "./issuers/scope.ts";
 import type { CatalystChecklistItem, CatalystEntityItem, CatalystEventItem, CatalystNameItem } from "./items.ts";
 import type { FinancialYear } from "./financials.ts";
+import { PAYMENT_EVENT_KINDS } from "./paymentEvents.ts";
 
 // ─── Inputs ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,42 @@ export const DocumentInput = z
   })
   .strict();
 
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "a date, yyyy-mm-dd");
+
+/**
+ * What a company's report says about its bonds' payments (`catalyst events put`, paymentEvents.ts). Every kind but
+ * `reviewed` rests on a stored document (`catalyst documents put` first) and the passage that says it; `reviewed`
+ * notes that the current reports were read up to `date` and nothing else was found.
+ */
+export const PaymentEventInput = z
+  .object({
+    kind: z.enum(PAYMENT_EVENT_KINDS),
+    /** When it happened (the payment's due date, the meeting's date); for `reviewed`, the date read up to. */
+    date: day,
+    /** The bonds it concerns (ISINs); none: the company as a whole. */
+    isins: z.array(z.string().regex(/^[A-Z]{2}[A-Z0-9]{9}\d$/, "an ISIN")).max(60).default([]),
+    text: z.string().trim().min(5).max(500),
+    amount: z.object({ value: z.number().positive(), currency: z.string().regex(/^[A-Z]{3}$/) }).strict().optional(),
+    /** A missed payment made after all: when. */
+    resolvedOn: day.optional(),
+    /** The report ("ESPI 14/2019, 2019-06-03"); for `reviewed`, what was read ("ESPI and EBI reports 2024-01..2026-11 on bankier.pl"). */
+    source: z.string().trim().min(3).max(300),
+    documentSha: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+    quote: z.string().trim().min(12).max(1000).optional(),
+    sourceUrl: z.string().url().max(500).optional(),
+    dryRun: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((e, ctx) => {
+    if (e.kind !== "reviewed" && !e.documentSha) ctx.addIssue({ code: "custom", path: ["documentSha"], message: "the stored document that says it (catalyst documents put first)" });
+    if (e.kind !== "reviewed" && !e.quote) ctx.addIssue({ code: "custom", path: ["quote"], message: "the passage that says it, as printed" });
+    if (e.resolvedOn && e.kind !== "missed-payment") ctx.addIssue({ code: "custom", path: ["resolvedOn"], message: "only for a missed payment" });
+    if (e.resolvedOn && e.resolvedOn < e.date) ctx.addIssue({ code: "custom", path: ["resolvedOn"], message: "before the payment's date" });
+  });
+
+/** Why a recorded payment event is withdrawn (`catalyst events retract`): it stays stored, marked, and is no longer read. */
+export const RetractInput = z.object({ reason: z.string().trim().min(5).max(500), dryRun: z.boolean().optional() }).strict();
+
 /** A report to download by hand from the KRS repository (`catalyst checklist --add`), or its new state. */
 export const ChecklistInput = z
   .object({
@@ -118,6 +155,7 @@ export const AGENT_SCHEMAS = {
   known: KnownInput,
   checklist: ChecklistInput,
   document: DocumentInput,
+  event: PaymentEventInput,
 } as const;
 
 // ─── The token's reach ──────────────────────────────────────────────────────────────────────────────────────────
@@ -136,6 +174,8 @@ export const AGENT_WRITES = [
   "POST /catalyst/entities/{id}/known",
   "PUT /catalyst/checklist/{id}/{year}/{scope}",
   "POST /catalyst/entities/{id}/documents",
+  "POST /catalyst/entities/{id}/events",
+  "POST /catalyst/entities/{id}/events/{eventId}/retract",
 ] as const;
 
 export function agentMayCall(routeKey: string): boolean {
@@ -146,7 +186,7 @@ export function agentMayCall(routeKey: string): boolean {
 // ─── What needs doing ───────────────────────────────────────────────────────────────────────────────────────────
 
 export interface WorkItem {
-  kind: "identity" | "profile" | "lender-kind" | "report" | "interim" | "checklist" | "collected" | "judgement" | "measure";
+  kind: "identity" | "profile" | "lender-kind" | "report" | "interim" | "checklist" | "collected" | "judgement" | "measure" | "payments";
   /** Who does it: the agent, or you (a lender's kind, a download from the KRS repository). */
   who: "agent" | "you";
   entityId: string | null;
@@ -167,6 +207,12 @@ export interface WorkInput {
   checklist: Omit<CatalystChecklistItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">[];
   /** GPW's measures on each company's bonds (distress and attention only). */
   measures: Map<string, Pick<CatalystEventItem, "code" | "published" | "reason" | "signal">[]>;
+  /**
+   * What the payment check goes by (plan: red flags from reports): the date each company's current reports were read
+   * to (its latest `reviewed` event, absent when never), and its bonds that have ended, with the day each left trading.
+   */
+  reviewedTo?: Map<string, string>;
+  ended?: Map<string, { code: string; lastSeen: string }[]>;
   /** Whether a company is a lender of a known kind through CatalystViewer's name lists (scorecard.ts). */
   lenderByName: (entityId: string) => boolean;
   /**
@@ -266,11 +312,22 @@ export function workItems(input: WorkInput): WorkItem[] {
       items.push({ kind: "judgement", who: "agent", entityId: e.entityId, name, detail: judgement ? `the judgement (${judgement.at.slice(0, 10)}) predates FY${latestYear.slice(0, 4)}, stored since${basedOn ? ` (it rests on FY${basedOn.slice(0, 4)})` : ""}` : "no judgement yet" });
     else if (interimStale)
       items.push({ kind: "judgement", who: "agent", entityId: e.entityId, name, detail: `the judgement (${judgement.at.slice(0, 10)}) predates the half-year report to ${interim.periodEnd}, stored since; read it and write a new one` });
+    // The payment record: never read, or bonds ended or GPW took a measure after the reports were last read.
+    if (input.ended) {
+      const read = input.reviewedTo?.get(e.entityId);
+      const ended = input.ended.get(e.entityId) ?? [];
+      const since = read ? ended.filter((b) => b.lastSeen > read) : ended;
+      const acted = (input.measures.get(e.entityId) ?? []).filter((m) => !read || m.published.slice(0, 10) > read);
+      const codes = (list: { code: string }[]) => `${list.slice(0, 4).map((b) => b.code).join(", ")}${list.length > 4 ? ` and ${list.length - 4} more` : ""}`;
+      const why = [...(since.length ? [`${since.length} bond${since.length === 1 ? "" : "s"} ended${read ? " since" : ""} (${codes(since)})`] : []), ...(acted.length ? [`${acted.length} GPW measure${acted.length === 1 ? "" : "s"}${read ? " since" : ""} (${codes(acted)})`] : [])];
+      if (why.length || !read)
+        items.push({ kind: "payments", who: "agent", entityId: e.entityId, name, detail: `${read ? `current reports read to ${read}; ` : "payment record never checked against the current reports; "}${why.join("; ") || "no bond has ended yet"}: read the ESPI/EBI reports${read ? ` after ${read}` : ""} and record what they say (catalyst events put)` });
+    }
     for (const m of (input.measures.get(e.entityId) ?? []).filter((x) => !judged || x.published > judged))
       items.push({ kind: "measure", who: "agent", entityId: e.entityId, name, detail: `GPW, ${m.published.slice(0, 10)}, ${m.code}: ${m.reason} (${m.signal}${judged ? ", after the judgement" : ""})` });
   }
   for (const c of input.checklist.filter((x) => x.status === "missing" && on.some((e) => e.entityId === x.entityId)))
     items.push({ kind: "checklist", who: "you", entityId: c.entityId, name: on.find((e) => e.entityId === c.entityId)!.shortName, detail: `download FY${c.year} (${c.scope}) from the KRS repository: ${c.where}` });
-  const order: WorkItem["kind"][] = ["identity", "profile", "report", "interim", "collected", "judgement", "measure", "lender-kind", "checklist"];
+  const order: WorkItem["kind"][] = ["identity", "profile", "report", "interim", "collected", "judgement", "measure", "payments", "lender-kind", "checklist"];
   return items.sort((a, b) => Number(a.who === "you") - Number(b.who === "you") || order.indexOf(a.kind) - order.indexOf(b.kind) || a.name.localeCompare(b.name));
 }

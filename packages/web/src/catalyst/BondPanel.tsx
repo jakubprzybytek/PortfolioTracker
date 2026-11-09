@@ -4,7 +4,7 @@ import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, 
 import { fmtInt, fmtNum, today } from "../format.ts";
 import { useApi } from "../useApi.ts";
 import { chartMargin, useNarrow } from "../useNarrow.ts";
-import type { BondDetail, BondOutcome, BondRow } from "./types.ts";
+import type { BondDetail, BondOutcome, BondRow, ReportedEvent } from "./types.ts";
 import { FLAG_TITLE, LEVEL_LABEL, couponLabel, pct, pp } from "./labels.ts";
 import { LiquidityDots } from "./parts.tsx";
 
@@ -159,6 +159,8 @@ const OUTCOME: Record<BondOutcome, string> = {
   early: "redeemed early",
   "below-par": "ended below par",
   "past-maturity": "past maturity",
+  "not-paid": "not paid",
+  "paid-late": "paid late",
   listed: "listed",
   unknown: "unknown",
 };
@@ -168,9 +170,35 @@ const STATS: [BondOutcome, string][] = [
   ["early", "Redeemed early"],
   ["below-par", "Ended below par"],
   ["past-maturity", "Past maturity"],
+  ["not-paid", "Not paid"],
+  ["paid-late", "Paid late"],
   ["unknown", "Unknown"],
   ["listed", "Still listed"],
 ];
+const REPORTED: Record<ReportedEvent["kind"], string> = {
+  "missed-payment": "Payment missed",
+  "late-payment": "Paid late",
+  "terms-changed": "Terms changed",
+  "bondholders-meeting": "Bondholders' meeting",
+  "covenant-breach": "Covenant breached",
+  waiver: "Waiver",
+  insolvency: "Insolvency proceedings",
+  "buyback-below-par": "Buy-back below par",
+  paid: "Paid",
+  reviewed: "Reports read",
+};
+const REPORTED_TONE: Record<ReportedEvent["kind"], string> = {
+  "missed-payment": "out-not-paid",
+  "late-payment": "out-paid-late",
+  "terms-changed": "out-below-par",
+  "covenant-breach": "out-below-par",
+  insolvency: "out-not-paid",
+  "buyback-below-par": "out-below-par",
+  "bondholders-meeting": "out-unknown",
+  waiver: "out-unknown",
+  paid: "out-repaid",
+  reviewed: "out-unknown",
+};
 const ACTION: Record<string, string> = { suspension: "suspended", lifting: "suspension lifted", exclusion: "excluded", other: "measure" };
 
 /** How the issuer's past bonds ended (the daily-file archive and GPW's measures), and this bond's measures. */
@@ -178,7 +206,10 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
   if (!detail) return <p className="muted">{loading ? "Loading…" : ""}</p>;
   const t = detail.track;
   const c = t.counts;
-  const ended = c.repaid + c.early + c["below-par"] + c.unknown;
+  const ended = c.repaid + c.early + c["below-par"] + c.unknown + c["not-paid"] + c["paid-late"];
+  const reported = t.reported ?? [];
+  // Rare outcomes are shown only when there is one: the strip stays short for a clean issuer.
+  const stats = STATS.filter(([k]) => (k !== "not-paid" && k !== "paid-late") || c[k] > 0);
   return (
     <div className="cat-track" data-testid="catalyst-track">
       {detail.events.length > 0 && (
@@ -194,7 +225,7 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
           <dt>{t.company ? `${t.company}'s bonds since` : t.prefix ? `Bonds coded ${t.prefix}… since` : "Bonds since"}</dt>
           <dd className="cat-stat-big">{t.since?.slice(0, 7) ?? "–"}</dd>
         </div>
-        {STATS.map(([k, label]) => (
+        {stats.map(([k, label]) => (
           <div key={k} className={c[k] ? `out-${k}` : "out-zero"}>
             <dt>{label}</dt>
             <dd className="cat-stat-big">{c[k]}</dd>
@@ -217,12 +248,45 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
         </div>
       ) : (
         <p className="cat-noflags">
-          <span aria-hidden="true">✓</span> No red flags <span className="muted">(GPW markings, suspensions at the KNF's demand, bankruptcy, ends below par, bonds past maturity)</span>
+          <span aria-hidden="true">✓</span> No red flags{" "}
+          <span className="muted">
+            (GPW markings, suspensions at the KNF's demand, bankruptcy, ends below par, bonds past maturity{t.reviewedTo ? `; the issuer's current reports, read to ${t.reviewedTo}` : ""})
+          </span>
         </p>
+      )}
+      {reported.length > 0 && (
+        <div className="cat-reported" data-testid="catalyst-track-reported">
+          <strong>From the issuer's reports</strong>
+          <ul>
+            {reported.map((e) => (
+              <li key={e.id}>
+                <span className={`cat-outcome ${REPORTED_TONE[e.kind]}`}>{REPORTED[e.kind]}</span>{" "}
+                <span className="num">{e.date}</span>
+                {e.codes.length > 0 && <span className="muted"> · {e.codes.join(", ")}</span>}
+                {e.resolvedOn && <span className="muted"> · paid {e.resolvedOn}</span>}
+                <span> · {e.text}</span>{" "}
+                <span className="muted">
+                  (
+                  {e.sourceUrl ? (
+                    <a href={e.sourceUrl} target="_blank" rel="noreferrer">
+                      {e.source}
+                    </a>
+                  ) : (
+                    e.source
+                  )}
+                  )
+                </span>
+                {e.quote && <blockquote className="cat-quote">{e.quote}</blockquote>}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
       {t.attention.length > 0 && (
         <details className="cat-facts" data-testid="catalyst-track-attention">
-          <summary>Worth a look: {t.attention.length} suspension{t.attention.length === 1 ? "" : "s"} "in the participants' interest and safety" (often short and technical)</summary>
+          <summary>
+            Worth a look: {t.attention.length} (suspensions "in the participants' interest and safety", often short and technical; bondholders' meetings and waivers from the issuer's reports)
+          </summary>
           <ul className="cat-flags">
             {t.attention.map((f) => (
               <li key={f}>{f}</li>
@@ -251,7 +315,7 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
                 </td>
                 <td>{b.lastClose === null ? "–" : fmtNum(b.lastClose)}</td>
                 <td className="left muted">
-                  {b.inferred ? "inferred: " : "GPW: "}
+                  {b.confirmed ? "report: " : b.inferred ? "inferred: " : "GPW: "}
                   {b.note}
                 </td>
               </tr>
@@ -260,7 +324,8 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
         </table>
       </div>
       <p className="muted cat-facts">
-        {t.company ? "The company's bonds (linked through GLEIF and GPW). " : "Grouped by the code's prefix: the bond isn't linked to a company yet. "}"Inferred" is read from trading (when a bond left, its last price); only the issuer's reports confirm a payment.
+        {t.company ? "The company's bonds (linked through GLEIF and GPW). " : "Grouped by the code's prefix: the bond isn't linked to a company yet. "}"Inferred" is read from trading (when a bond left, its last price); only the issuer's reports confirm a payment
+        {t.reviewedTo ? ` (read to ${t.reviewedTo})` : t.company ? " (not read yet for this company)" : ""}.
       </p>
     </div>
   );

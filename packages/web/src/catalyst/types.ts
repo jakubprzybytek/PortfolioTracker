@@ -114,7 +114,20 @@ export interface BondEvent {
   inForce: boolean;
 }
 
-export type BondOutcome = "repaid" | "early" | "below-par" | "past-maturity" | "listed" | "unknown";
+export type BondOutcome = "repaid" | "early" | "below-par" | "past-maturity" | "not-paid" | "paid-late" | "listed" | "unknown";
+
+/** What the issuer's own report says about a payment (recorded by the AI agent, with the passage that says it). */
+export interface ReportedEvent {
+  id: string;
+  kind: "missed-payment" | "late-payment" | "terms-changed" | "bondholders-meeting" | "covenant-breach" | "waiver" | "insolvency" | "buyback-below-par" | "paid" | "reviewed";
+  date: string;
+  codes: string[];
+  text: string;
+  resolvedOn?: string;
+  source: string;
+  quote?: string;
+  sourceUrl?: string;
+}
 
 export interface TrackRecord {
   /** The company whose bonds these are, or, until the bond is linked, the code prefix they share. */
@@ -122,9 +135,12 @@ export interface TrackRecord {
   prefix: string | null;
   since: string | null;
   counts: Record<BondOutcome, number>;
-  bonds: { isin: string; code: string; maturity: string | null; status: string; lastSeen: string; lastClose: number | null; outcome: BondOutcome; inferred: boolean; note: string; flags: string[]; attention: string[] }[];
+  bonds: { isin: string; code: string; maturity: string | null; status: string; lastSeen: string; lastClose: number | null; outcome: BondOutcome; inferred: boolean; confirmed?: boolean; note: string; flags: string[]; attention: string[] }[];
   flags: string[];
   attention: string[];
+  /** From the issuer's reports, newest first; and the date those reports were last read to (null: never). */
+  reported: ReportedEvent[];
+  reviewedTo: string | null;
 }
 
 /** What `catalyst work` lists (core/catalyst/agent.ts). */

@@ -1701,7 +1701,9 @@ test.describe("catalyst view", () => {
                 { isin: "z", code: "KRU0625", maturity: "2025-06-20", status: "ended", lastSeen: "2024-11-05", lastClose: 100.5, outcome: "early", inferred: false, note: "excluded 2024-11-06: przedterminowy wykup obligacji", flags: [], attention: [] },
               ],
               flags: [],
-              attention: [],
+              attention: ["KRU0829: 2026-03-02: bondholders' meeting: meeting called to change the security (ESPI 9/2026)"],
+              reported: [{ id: "ab12cd34", kind: "bondholders-meeting", date: "2026-03-02", codes: ["KRU0829"], text: "meeting called to change the security", source: "ESPI 9/2026", sourceUrl: "https://example.com/espi-9", quote: "Zarząd zwołuje zgromadzenie obligatariuszy" }],
+              reviewedTo: "2026-10-31",
             },
           }) }),
     );
@@ -1905,6 +1907,13 @@ test.describe("catalyst view", () => {
     await expect(page.getByTestId("catalyst-track-summary")).toContainText("Repaid1Redeemed early1");
     await expect(page.getByTestId("catalyst-events")).toContainText("2026-05-04 suspended (na wniosek emitenta)");
     await expect(page.getByTestId("catalyst-track").locator("tbody tr")).toHaveCount(3);
+    // What the issuer's own reports say, with the report and its passage; and how far they were read.
+    const reported = page.getByTestId("catalyst-track-reported");
+    await expect(reported).toContainText("Bondholders' meeting 2026-03-02 · KRU0829 · meeting called to change the security");
+    await expect(reported.getByRole("link", { name: "ESPI 9/2026" })).toHaveAttribute("href", "https://example.com/espi-9");
+    await expect(reported.locator("blockquote")).toHaveText("Zarząd zwołuje zgromadzenie obligatariuszy");
+    await expect(page.getByTestId("catalyst-track")).toContainText("the issuer's current reports, read to 2026-10-31");
+    await expect(page.getByTestId("catalyst-track-summary")).not.toContainText("Not paid");
   });
 
   test("the chart: the filtered bonds against the State's curve", async ({ page }) => {

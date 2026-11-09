@@ -800,6 +800,10 @@ describe(`API ${API}`, () => {
     expect((await agent("PUT", "/checklist/0000000000/2025/group", t, { where: "KRS repository" })).status).toBe(404);
     expect((await agent("POST", "/entities/0000000000/documents", t, { uploadKey: "catalyst/uploads/00000000-0000-0000-0000-000000000000", sha256: "0".repeat(64), fileName: "a.pdf", kind: "audit", date: "2026-03-31", title: "x" })).status).toBe(404);
     expect((await agent("GET", `/entities/0000000000/documents/${"0".repeat(64)}`, t)).status).toBe(404);
+    // Payment events: the input checked first (a missed payment needs its document and passage), then the company.
+    expect((await agent("POST", "/entities/0000000000/events", t, { kind: "missed-payment", date: "2026-01-20", text: "series A not redeemed", source: "ESPI 3/2026" })).status).toBe(400);
+    expect((await agent("POST", "/entities/0000000000/events", t, { kind: "reviewed", date: "2026-01-20", text: "nothing about payments", source: "ESPI reports to 2026-01", dryRun: true })).status).toBe(404);
+    expect((await agent("POST", "/entities/0000000000/events/abcd1234/retract", t, { reason: "the wrong series" })).status).toBe(404);
     expect((await agent("PUT", "/entities/0000000000", t, { industry: "Developer" })).status).toBe(404);
     expect((await agent("PUT", `/names/${encodeURIComponent("No Such Name S.A.")}`, t, { entityId: "0000000000" })).status).toBe(400); // no evidence
     expect((await agent("POST", "/filings", t, { entityId: "0000000000" })).status).toBe(400);

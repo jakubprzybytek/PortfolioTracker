@@ -12,6 +12,7 @@ export * from "./liquidity.ts";
 export * from "./screen.ts";
 export * from "./exits.ts";
 export * from "./trackRecord.ts";
+export * from "./paymentEvents.ts";
 export * from "./identity.ts";
 export * from "./financials.ts";
 export * from "./agent.ts";

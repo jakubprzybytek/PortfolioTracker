@@ -694,6 +694,11 @@ instalments, taps and buy-backs after the bond was first seen (section 18).
 
 ### Repayment track record (planned)
 
+In PortfolioTracker this is built: approaches 1 to 3 below by code (Docs/catalyst.md, "Repayment track record"), and
+approach 4 by the agent, which records what the issuer's current reports say as **payment events** (`catalyst events
+put`: missed or late payments, changed terms, bondholders' meetings, covenant breaches, insolvency, buy-backs below
+par, or a payment made), each with its report and the passage that says it.
+
 How an issuer handled its past bonds is direct evidence for the question this analysis asks. An issuer
 that has repaid twenty series on time, several of them early, is a different risk from one that extended
 maturities, paid late or restructured. Catalyst issuers often repay old bonds with new ones, so the record
