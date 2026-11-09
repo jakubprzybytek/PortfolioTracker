@@ -24,6 +24,12 @@ const remember = (name: string | undefined) => {
   }
 };
 
+const sameParams = (a: Record<string, string>, b: Record<string, string>) => {
+  // Only the filters and the sort count: another key stored with a view (an older one) doesn't make it "changed".
+  const keys = (o: Record<string, string>) => Object.keys(o).filter((k) => (FILTER_KEYS as readonly string[]).includes(k) && o[k] !== undefined && o[k] !== "");
+  return keys(a).length === keys(b).length && keys(a).every((k) => String(a[k]) === String(b[k]));
+};
+
 export function ViewsMenu({ params, setParams }: { params: Record<string, string>; setParams: (p: Record<string, string | undefined>) => void }) {
   const views = useApi<{ views: SavedView[] }>("/catalyst/views");
   // Naming a new view, or renaming the one in use.
@@ -34,16 +40,32 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
   const [confirming, setConfirming] = useState(false);
   const list = views.data?.views ?? [];
   const current = Object.fromEntries(FILTER_KEYS.filter((k) => params[k]).map((k) => [k, params[k]!]));
-  const save = async (next: SavedView[]) => {
+  const [saving, setSaving] = useState(false);
+  // A short confirmation beside the buttons ("Saved", "Renamed", "Deleted"), gone after 4 seconds.
+  const [flash, setFlash] = useState<{ text: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const t = window.setTimeout(() => setFlash(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [flash]);
+  /** Stores the views; true when it worked (then `done` is shown). */
+  const save = async (next: SavedView[], done: string): Promise<boolean> => {
     setError(null);
+    setSaving(true);
     try {
       await apiSend("PUT", "/catalyst/views", { views: next });
       views.reload();
+      setFlash({ text: done, at: Date.now() });
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
-  const same = (v: SavedView) => JSON.stringify(v.params) === JSON.stringify(current);
+  // The same filters whatever their order (a view comes back from the database with its keys in another order).
+  const same = (v: SavedView) => sameParams(v.params, current);
   // The view in use: the one chosen (`view` in the URL), even after its filters changed, or one that matches them.
   const active = list.find((v) => v.name === params["view"]) ?? list.find(same);
   const changed = active !== undefined && !same(active);
@@ -75,7 +97,8 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
       naming === "rename" && active
         ? list.filter((v) => v === active || v.name !== n).map((v) => (v === active ? { name: n, params: v.params } : v))
         : [...list.filter((v) => v.name !== n), { name: n, params: current }];
-    void save(next).then(() => {
+    void save(next, naming === "rename" ? `Renamed to "${n}"` : `Saved "${n}"`).then((ok) => {
+      if (!ok) return;
       remember(n);
       setNaming(null);
       setName("");
@@ -96,7 +119,7 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
         >
           {/* biome-ignore lint/a11y/noAutofocus: the name is what the button just asked for */}
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder={naming === "rename" ? "New name" : "View name"} aria-label={naming === "rename" ? "New name of the view" : "Name of the new view"} maxLength={60} autoFocus data-testid="catalyst-view-name" />
-          <button type="submit" className="icon-button" title={naming === "rename" ? "Rename" : "Save"} aria-label={naming === "rename" ? "Rename" : "Save"} disabled={!name.trim()} data-testid="catalyst-view-save">
+          <button type="submit" className="icon-button" title={naming === "rename" ? "Rename" : "Save"} aria-label={naming === "rename" ? "Rename" : "Save"} disabled={!name.trim() || saving} data-testid="catalyst-view-save">
             <Icon name="check" size={18} />
           </button>
           <button type="button" className="icon-button" onClick={() => setNaming(null)} title="Cancel" aria-label="Cancel" data-testid="catalyst-view-cancel">
@@ -126,7 +149,7 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
             </select>
           </label>
           {active && changed && (
-            <button type="button" className="icon-button" onClick={() => void save(list.map((v) => (v === active ? { name: v.name, params: current } : v)))} title={`Save changes: these filters and the sort into "${active.name}"`} aria-label="Save changes" data-testid="catalyst-view-update">
+            <button type="button" className="icon-button" onClick={() => void save(list.map((v) => (v === active ? { name: v.name, params: current } : v)), `Saved "${active.name}"`)} disabled={saving} title={`Save changes: these filters and the sort into "${active.name}"`} aria-label="Save changes" data-testid="catalyst-view-update">
               <Icon name="save" size={18} />
             </button>
           )}
@@ -144,7 +167,8 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
                     type="button"
                     className="danger"
                     onClick={() =>
-                      void save(list.filter((v) => v !== active)).then(() => {
+                      void save(list.filter((v) => v !== active), `Deleted "${active.name}"`).then((ok) => {
+                        if (!ok) return;
                         setConfirming(false);
                         if (remembered() === active.name) remember(undefined);
                         setParams({ ...params, view: undefined });
@@ -167,6 +191,11 @@ export function ViewsMenu({ params, setParams }: { params: Record<string, string
             </>
           )}
         </>
+      )}
+      {flash && (
+        <span key={flash.at} className="cat-view-flash" role="status" data-testid="catalyst-view-flash">
+          <Icon name="check" size={16} /> {flash.text}
+        </span>
       )}
       {error && <span className="error">{error}</span>}
     </div>

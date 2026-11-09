@@ -910,6 +910,10 @@ tr.neg td { color: var(--neg); }
 .cat-views .icon-button:disabled { opacity: 0.4; cursor: default; color: var(--muted); border-color: var(--border); }
 .cat-views .icon-button.view-delete:hover:not(:disabled) { color: var(--neg); border-color: currentColor; }
 .cat-view-name { display: inline-flex; gap: 6px; align-items: center; }
+/* "Saved" beside the view's buttons: fades in, stays a moment, fades out (the component removes it). */
+.cat-view-flash { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-13); font-weight: 600; color: var(--pos); white-space: nowrap; animation: cat-view-flash 4s ease forwards; }
+@keyframes cat-view-flash { 0% { opacity: 0; transform: translateY(2px); } 6%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cat-view-flash { animation: none; } }
 .cat-view-name input { font: inherit; height: var(--ctl); box-sizing: border-box; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--fg); width: 9rem; }
 .catalyst-list > li { padding: 8px 12px; }
 .catalyst-list .cat-line { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
