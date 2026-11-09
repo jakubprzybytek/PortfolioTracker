@@ -168,6 +168,15 @@ describe('computeScorecard', () => {
       expect(nm.value).toBeCloseTo(0.00164, 4);
       expect(nm.signal).toBe('red');
     });
+
+    it('negative revenue: no margin; a loss is red, never a green from two minus signs', () => {
+      // GetBack 2017: revenue -302 246, EBIT -1 175 391 would give +388.9%.
+      const sc = computeScorecard([{ ...exampleA[0]!, revenue: -302246, ebit: -1175391, netProfit: -1326879 }]);
+      const d4 = sc.dimensions.find(d => d.name === 'Profitability')!;
+      expect(d4.signal).toBe('red');
+      expect(d4.metrics.map(m => [m.value, m.formattedValue, m.signal])).toEqual([[null, 'n/m', 'red'], [null, 'n/m', 'red']]);
+      expect(d4.notes).toEqual(['Negative revenue: margins have no meaning; a loss counts as red']);
+    });
   });
 
   describe('Dimension 5 — Asset Coverage', () => {

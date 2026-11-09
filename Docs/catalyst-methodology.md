@@ -589,7 +589,7 @@ The direction: an issuer without a report gets a report imported, rather than a 
   "Higher is better": green above the first, yellow from the second inclusive, else red.
 - Without inputs, or on a division by zero: **n/a**, never a colour.
 - **Negative equity** makes D/E and net debt / equity red; **EBITDA ≤ 0** makes net debt / EBITDA red;
-  average equity ≤ 0 makes ROE red.
+  average equity ≤ 0 makes ROE red. **Negative revenue** (a lender's portfolio written down: GetBack 2017) gives no margins: a loss is red, a profit n/a.
 - A dimension takes the **worst** of its scored metrics, ignoring n/a; it is n/a when all are n/a.
 - **"Shown, not scored"** metrics are context only (grey on the card).
 - **Trend:** n/a with fewer than 3 years or no computable metric; red when 2 or more metrics are red;

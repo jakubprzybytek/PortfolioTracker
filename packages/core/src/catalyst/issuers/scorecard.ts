@@ -304,9 +304,15 @@ function computeLenderProfitability(year: FinancialYearData, previous: Financial
 
 function computeProfitability(year: FinancialYearData, rules: RuleSet, previous?: FinancialYearData): DimensionResult {
   if (isLender(rules)) return computeLenderProfitability(year, previous, rules);
+  const { ebit, net } = MARGINS[rules];
+  // Negative revenue (a lender's portfolio written down, GetBack 2017): a loss over it would come out as a positive
+  // margin. No margin then: red when the result is a loss, n/a otherwise.
+  if (year.revenue != null && year.revenue < 0) {
+    const noMargin = (name: string, result: number | undefined) => metric(name, null, 'n/m', result == null ? 'na' : result < 0 ? 'red' : 'na');
+    return dimension('Profitability', [noMargin('EBIT Margin', year.ebit), noMargin('Net Margin', year.netProfit)], ['Negative revenue: margins have no meaning; a loss counts as red']);
+  }
   const ebitMargin = div(year.ebit, year.revenue);
   const netMargin = div(year.netProfit, year.revenue);
-  const { ebit, net } = MARGINS[rules];
   return dimension('Profitability', [
     metric('EBIT Margin', ebitMargin, pct(ebitMargin), higher(...ebit)(ebitMargin)),
     metric('Net Margin', netMargin, pct(netMargin), higher(...net)(netMargin)),
