@@ -1901,7 +1901,8 @@ test.describe("catalyst view", () => {
     await expect(periods.nth(1)).not.toHaveClass(/current/);
     await expect(page).toHaveURL(/tab=coupons/);
     await page.getByTestId("catalyst-tab-track").click();
-    await expect(page.getByTestId("catalyst-track-summary")).toContainText("Bonds coded KRU… since 2020-01: 1 repaid • 1 redeemed early");
+    await expect(page.getByTestId("catalyst-track-summary")).toContainText("Bonds coded KRU… since2020-01");
+    await expect(page.getByTestId("catalyst-track-summary")).toContainText("Repaid1Redeemed early1");
     await expect(page.getByTestId("catalyst-events")).toContainText("2026-05-04 suspended (na wniosek emitenta)");
     await expect(page.getByTestId("catalyst-track").locator("tbody tr")).toHaveCount(3);
   });

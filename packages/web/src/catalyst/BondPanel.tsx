@@ -162,6 +162,15 @@ const OUTCOME: Record<BondOutcome, string> = {
   listed: "listed",
   unknown: "unknown",
 };
+/** The summary's figures, in the table's order of concern: how bonds ended, then those still trading. */
+const STATS: [BondOutcome, string][] = [
+  ["repaid", "Repaid"],
+  ["early", "Redeemed early"],
+  ["below-par", "Ended below par"],
+  ["past-maturity", "Past maturity"],
+  ["unknown", "Unknown"],
+  ["listed", "Still listed"],
+];
 const ACTION: Record<string, string> = { suspension: "suspended", lifting: "suspension lifted", exclusion: "excluded", other: "measure" };
 
 /** How the issuer's past bonds ended (the daily-file archive and GPW's measures), and this bond's measures. */
@@ -180,18 +189,36 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
             .join(" • ")}
         </p>
       )}
-      <p className="cat-facts" data-testid="catalyst-track-summary">
-        {t.company ? `${t.company}'s bonds` : `Bonds coded ${t.prefix}…`} since {t.since?.slice(0, 7) ?? "–"}: {c.repaid} repaid • {c.early} redeemed early • {c["below-par"]} ended below par • {c["past-maturity"]} past maturity • {c.unknown} unknown • {c.listed} listed
-        {ended === 0 ? " (none ended yet: no record)" : ""}.
-      </p>
+      <dl className="cat-stats" data-testid="catalyst-track-summary">
+        <div>
+          <dt>{t.company ? `${t.company}'s bonds since` : t.prefix ? `Bonds coded ${t.prefix}… since` : "Bonds since"}</dt>
+          <dd className="cat-stat-big">{t.since?.slice(0, 7) ?? "–"}</dd>
+        </div>
+        {STATS.map(([k, label]) => (
+          <div key={k} className={c[k] ? `out-${k}` : "out-zero"}>
+            <dt>{label}</dt>
+            <dd className="cat-stat-big">{c[k]}</dd>
+          </div>
+        ))}
+        <div className={t.flags.length ? "out-flag" : "out-zero"}>
+          <dt>Red flags</dt>
+          <dd className="cat-stat-big">{t.flags.length}</dd>
+        </div>
+      </dl>
+      {ended === 0 && <p className="muted cat-facts">None has ended yet: no record to judge by.</p>}
       {t.flags.length > 0 ? (
-        <ul className="cat-flags neg" data-testid="catalyst-track-flags">
-          {t.flags.map((f) => (
-            <li key={f}>{f}</li>
-          ))}
-        </ul>
+        <div className="cat-redflags" role="note" data-testid="catalyst-track-flags">
+          <strong>Red flags</strong>
+          <ul className="cat-flags">
+            {t.flags.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </div>
       ) : (
-        <p className="muted cat-facts">No red flags (GPW markings, suspensions at the KNF's demand, bankruptcy, ends below par, bonds past maturity).</p>
+        <p className="cat-noflags">
+          <span aria-hidden="true">✓</span> No red flags <span className="muted">(GPW markings, suspensions at the KNF's demand, bankruptcy, ends below par, bonds past maturity)</span>
+        </p>
       )}
       {t.attention.length > 0 && (
         <details className="cat-facts" data-testid="catalyst-track-attention">
@@ -216,10 +243,12 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
           </thead>
           <tbody>
             {t.bonds.map((b) => (
-              <tr key={b.isin} className={b.flags.length ? "neg" : undefined}>
+              <tr key={b.isin} className={b.flags.length ? "cat-flagged" : undefined}>
                 <td className="left">{b.code}</td>
                 <td className="left">{b.maturity ?? "–"}</td>
-                <td className="left">{OUTCOME[b.outcome]}</td>
+                <td className="left">
+                  <span className={`cat-outcome out-${b.outcome}`}>{OUTCOME[b.outcome]}</span>
+                </td>
                 <td>{b.lastClose === null ? "–" : fmtNum(b.lastClose)}</td>
                 <td className="left muted">
                   {b.inferred ? "inferred: " : "GPW: "}
