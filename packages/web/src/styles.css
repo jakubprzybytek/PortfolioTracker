@@ -902,8 +902,11 @@ td.cat-issuer { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
 .cat-track { display: flex; flex-direction: column; gap: 6px; }
 .cat-flags { margin: 0; padding-left: 1.2rem; font-size: var(--fs-13); }
 tr.neg td { color: var(--neg); }
-.cat-facts-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 6px 18px; margin: 0; overflow-y: auto; }
-.cat-facts-list > div { display: flex; flex-direction: column; }
+/* Rows as tall as their content, from the top: the panel can be taller than the facts. */
+.cat-facts-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); align-content: start; gap: 12px 24px; margin: 0; overflow-y: auto; }
+/* The bond's interest periods: the current one tinted. */
+.cat-coupons tr.current td { background: var(--accent-soft); }
+.cat-facts-list > div { display: flex; flex-direction: column; gap: 2px; }
 .cat-facts-list dt { font-size: var(--fs-12); font-weight: 600; }
 .cat-facts-list dd { margin: 0; }
 .cat-facts-list > p { grid-column: 1 / -1; font-size: var(--fs-13); }

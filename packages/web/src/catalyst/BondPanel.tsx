@@ -102,7 +102,7 @@ export function CouponsTab({ detail, loading }: { detail: BondDetail | undefined
   if (detail.coupons.length === 0) return <p className="muted">{detail.terms?.periodsProblem ? `obligacje.pl's periods don't add up: ${detail.terms.periodsProblem}.` : "No interest periods (terms not read yet, or a treasury series: yearly coupons)."}</p>;
   return (
     <div className="table-wrap">
-      <table className="static coupon-periods" data-testid="catalyst-coupons">
+      <table className="static cat-coupons" data-testid="catalyst-coupons">
         <thead>
           <tr>
             <th className="left">From</th>
