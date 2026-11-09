@@ -76,15 +76,23 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
           </div>
           <div className="cat-issuer-actions">
             {viewToggle && (
-              <button type="button" className={`cat-view-toggle${viewToggle.on ? " on" : ""}`} onClick={viewToggle.toggle} title={viewToggle.title} aria-pressed={viewToggle.on} data-testid="issuer-view-toggle">
-                <Icon name={viewToggle.label.startsWith("Hide") ? "eye-off" : viewToggle.on ? "check" : "plus"} size={14} /> {viewToggle.label}
+              <button type="button" className={`cat-toggle${viewToggle.on ? " on" : ""}`} onClick={viewToggle.toggle} title={viewToggle.title} aria-pressed={viewToggle.on} data-testid="issuer-view-toggle">
+                <Icon name={viewToggle.label.startsWith("Hide") ? "eye-off" : viewToggle.on ? "check" : "plus"} size={15} /> {viewToggle.label}
               </button>
             )}
             {c && (
-              <label className="cat-ai-switch" title={c.aiAnalysis.at ? `${ai ? "On" : "Off"} since ${c.aiAnalysis.at.slice(0, 10)}${c.aiAnalysis.by ? ` (${c.aiAnalysis.by})` : ""}` : "Off: the agent doesn't work on this company"}>
-                <input type="checkbox" checked={ai} disabled={busy} onChange={(e) => void setAi(e.target.checked)} data-testid="issuer-ai-switch" />
-                AI analysis
-              </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={ai}
+                className={`cat-toggle${ai ? " on" : ""}`}
+                disabled={busy}
+                onClick={() => void setAi(!ai)}
+                title={`The agent keeps this company's scorecard current (saved at once). ${c.aiAnalysis.at ? `${ai ? "On" : "Off"} since ${c.aiAnalysis.at.slice(0, 10)}${c.aiAnalysis.by ? ` (${c.aiAnalysis.by})` : ""}` : "Off: the agent doesn't work on this company"}`}
+                data-testid="issuer-ai-switch"
+              >
+                <span className="cat-toggle-dot" aria-hidden="true" /> AI analysis
+              </button>
             )}
             <button type="button" className="icon-button" onClick={onClose} aria-label="Close" data-testid="issuer-close">
               ✕
