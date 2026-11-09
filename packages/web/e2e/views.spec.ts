@@ -1963,6 +1963,23 @@ test.describe("catalyst view", () => {
     await expect(page).not.toHaveURL(/issuer=/);
   });
 
+  test("the issuer dialog while the company loads: its summary's shape, pulsing", async ({ page }) => {
+    let release = () => {};
+    const held = new Promise<void>((r) => {
+      release = r;
+    });
+    await page.route(/\/catalyst\/entities\/0000533217$/, async (r) => {
+      await held;
+      await r.fallback();
+    });
+    await page.goto("/#/catalyst?issuer=0000533217");
+    const dialog = page.getByTestId("issuer-dialog");
+    await expect(dialog.getByTestId("issuer-loading")).toBeVisible();
+    release();
+    await expect(dialog.getByTestId("issuer-judgement")).toBeVisible();
+    await expect(dialog.getByTestId("issuer-loading")).toHaveCount(0);
+  });
+
   test("AI analysis off: shown in place of the scorecard, enabled from the dialog", async ({ page }) => {
     await page.goto("/#/catalyst?issuer=0000000001");
     const dialog = page.getByTestId("issuer-dialog");

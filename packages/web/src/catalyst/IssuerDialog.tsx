@@ -145,6 +145,8 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
             )}
           </>
         )}
+        {!d && detail.loading && <SummarySkeleton />}
+        <div className="cat-tabs-scroll">
         <div className="segmented cat-tabs" role="tablist">
           {TABS.map(([k, label]) => (
             <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "active" : ""} onClick={() => setTab(k)} data-testid={`issuer-tab-${k}`}>
@@ -152,6 +154,7 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
               {k === "bonds" && own.length ? ` (${own.length})` : ""}
             </button>
           ))}
+        </div>
         </div>
         <div className="cat-issuer-tab">
           {tab === "bonds" && <BondsTab rows={own} onShowBonds={onShowBonds} />}
@@ -592,3 +595,26 @@ function DocumentsTab({ d }: { d: CompanyDetail }) {
 }
 
 const DOC_KIND: Record<string, string> = { audit: "auditor's report", management: "management report", interim: "interim report", annual: "annual report", "current-report": "current report", terms: "bond terms", other: "other" };
+
+/** The scorecard, bonds due and judgement while the company loads: their shape, pulsing. */
+function SummarySkeleton() {
+  return (
+    <div className="cat-issuer-loading" role="status" aria-busy="true" aria-label="Loading the company" data-testid="issuer-loading">
+      <span className="skeleton-bar" style={{ width: "55%" }} />
+      <div className="cat-issuer-top">
+        <div className="cat-issuer-side">
+          {[70, 62, 58, 66, 52, 80].map((w) => (
+            <span key={w} className="skeleton-bar" style={{ width: `${w}%` }} />
+          ))}
+        </div>
+        <div className="cat-issuer-side">
+          {[75, 40, 60, 85, 50].map((w) => (
+            <span key={w} className="skeleton-bar" style={{ width: `${w}%` }} />
+          ))}
+        </div>
+      </div>
+      <span className="skeleton-bar" style={{ width: "95%" }} />
+      <span className="skeleton-bar" style={{ width: "88%" }} />
+    </div>
+  );
+}

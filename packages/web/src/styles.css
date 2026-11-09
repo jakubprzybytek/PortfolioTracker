@@ -984,7 +984,11 @@ td.cat-issuer .link-button { color: var(--fg); }
   .cat-header .cat-views { order: 3; flex-basis: 100%; }
   .cat-header .cat-views select { flex: 1 1 auto; width: auto; min-width: 0; }
 }
-.cat-issuer-dialog .cat-tabs { max-width: 100%; overflow-x: auto; flex: none; }
+/* The tabs scroll sideways on a narrow screen, in a wrapper (its padding keeps the tabs' edges unclipped), without a scrollbar. */
+.cat-issuer-dialog .cat-tabs-scroll { max-width: 100%; flex: none; overflow-x: auto; overflow-y: hidden; padding: 1px; scrollbar-width: none; }
+.cat-issuer-dialog .cat-tabs-scroll::-webkit-scrollbar { display: none; }
+.cat-issuer-loading { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 8px; }
+.cat-issuer-loading .cat-issuer-side { gap: 10px; }
 .cat-issuer-dialog .cat-tabs button { white-space: nowrap; }
 .cat-years .link-button { color: var(--fg); }
 .cat-years .link-button:hover { color: var(--accent); }
