@@ -142,7 +142,7 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
 
   return (
     <div style={stickyStyle}>
-      <header className="view-header">
+      <header className="view-header cat-header">
         <h2 className="view-title">Catalyst</h2>
         <CatalystTabs current="issuers" />
       </header>

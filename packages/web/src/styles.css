@@ -333,13 +333,16 @@ tr.muted td { color: var(--muted); }
 .chart-panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .group-by { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 10px; }
 .group-by > .muted { font-size: var(--fs-13); white-space: nowrap; }
-/* A segmented control: one outlined button split in two, the chosen half filled. */
-.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
-.segmented button { font: inherit; font-size: var(--fs-14); height: calc(var(--ctl) - 2px); border: 0; background: transparent; color: var(--fg); padding: 0 14px; cursor: pointer; }
-.segmented button + button { border-left: 1px solid var(--border); }
-.segmented button:hover:not(.active) { background: var(--row); }
-.segmented button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-line); }
-.segmented button.active + button, .segmented button + button.active { border-left-color: var(--accent-line); }
+/* A segmented control: one outlined button split in two, the chosen half filled. Each part draws its own border over
+   the box's (no clipping, no inset shadow), so the chosen part's outline runs unbroken round the rounded corners. */
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
+.segmented > button, .segmented > a { box-sizing: border-box; font: inherit; font-size: var(--fs-14); height: var(--ctl); margin: -1px 0; border: 1px solid transparent; background: transparent; background-clip: padding-box; color: var(--fg); padding: 0 14px; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; }
+.segmented > :first-child { margin-left: -1px; border-radius: var(--radius) 0 0 var(--radius); }
+.segmented > :last-child { margin-right: -1px; border-radius: 0 var(--radius) var(--radius) 0; }
+.segmented > * + * { border-left-color: var(--border); }
+.segmented > :hover:not(.active) { background-color: var(--row); }
+.segmented > .active { background-color: var(--accent-soft); color: var(--accent); font-weight: 600; border-color: var(--accent-line); position: relative; }
+.segmented > .active + * { border-left-color: transparent; }
 /* Instrument view (the cog): one panel per property. */
 .instrument-sections { display: flex; flex-direction: column; gap: 14px; max-width: 900px; }
 .instrument-sections h3 { margin: 0 0 8px; font-size: var(--fs-15); }
@@ -888,6 +891,8 @@ td.cat-issuer { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
 .catalyst-panel { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
 .catalyst-panel > :not(.cat-tabs) { flex: 1; min-height: 0; overflow-y: auto; }
 .cat-tabs { align-self: flex-start; flex: none; }
+/* Above the sticky filter bar, which reaches 10px up (its negative margin): room for the tabs' bottom edge. */
+.cat-issuers-tabs { margin-bottom: 12px; }
 .cat-price { display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
 .cat-price .cat-chart { flex: 1; min-height: 120px; }
 .cat-facts { margin: 0; font-size: var(--fs-13); }
@@ -899,7 +904,11 @@ tr.neg td { color: var(--neg); }
 .cat-facts-list dt { font-size: var(--fs-12); font-weight: 600; }
 .cat-facts-list dd { margin: 0; }
 .cat-facts-list > p { grid-column: 1 / -1; font-size: var(--fs-13); }
-.cat-views { display: inline-flex; align-items: flex-end; gap: 8px; }
+.cat-views { display: inline-flex; align-items: center; gap: 6px; }
+.cat-views-pick { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-14); }
+.cat-views select { font: inherit; font-size: var(--fs-14); height: var(--ctl); padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--fg); width: 11rem; text-overflow: ellipsis; }
+.cat-views .icon-button:disabled { opacity: 0.4; cursor: default; color: var(--muted); border-color: var(--border); }
+.cat-views .icon-button.view-delete:hover:not(:disabled) { color: var(--neg); border-color: currentColor; }
 .cat-view-name { display: inline-flex; gap: 6px; align-items: center; }
 .cat-view-name input { font: inherit; height: var(--ctl); box-sizing: border-box; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--fg); width: 9rem; }
 .catalyst-list > li { padding: 8px 12px; }
@@ -909,11 +918,12 @@ tr.neg td { color: var(--neg); }
 .catalyst-list button.cat-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 /* Catalyst issuers (phase 2): the six dots, the issuer dialog, the issuers list. */
-.cat-view-tabs { margin-right: auto; align-self: center; }
-.cat-view-tabs a { font-size: var(--fs-14); height: calc(var(--ctl) - 2px); display: inline-flex; align-items: center; padding: 0 14px; color: var(--fg); text-decoration: none; }
-.cat-view-tabs a + a { border-left: 1px solid var(--border); }
-.cat-view-tabs a:hover:not(.active) { background: var(--row); }
-.cat-view-tabs a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px var(--accent-line); }
+/* The Catalyst header: title, Bonds / Issuers, the saved view, centred on one line. */
+.view-header.cat-header { align-items: center; margin-bottom: 14px; column-gap: 12px; }
+.cat-header .view-title { margin: 0; }
+.cat-view-tabs { margin-right: auto; }
+.cat-header:has(.cat-views) .cat-view-tabs { margin-right: 0; }
+.cat-header .cat-views { margin-right: auto; }
 .link-button { all: unset; cursor: pointer; color: var(--accent); }
 .link-button:hover { text-decoration: underline; }
 .link-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -966,6 +976,8 @@ td.cat-issuer .link-button { color: var(--fg); }
   .cat-issuer-head > div:first-child { min-width: 0; }
   .cat-issuer-actions { flex-direction: column-reverse; align-items: flex-end; gap: 6px; }
   .cat-view-tabs a { padding: 0 10px; }
+  .cat-header .cat-views { order: 3; flex-basis: 100%; }
+  .cat-header .cat-views select { flex: 1 1 auto; width: auto; min-width: 0; }
 }
 .cat-issuer-dialog .cat-tabs { max-width: 100%; overflow-x: auto; flex: none; }
 .cat-issuer-dialog .cat-tabs button { white-space: nowrap; }

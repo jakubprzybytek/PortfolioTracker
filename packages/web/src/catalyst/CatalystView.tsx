@@ -61,9 +61,10 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
 
   return (
     <div style={{ ...stickyStyle, paddingBottom: panelHeight }}>
-      <header className="view-header">
+      <header className="view-header cat-header">
         <h2 className="view-title">Catalyst</h2>
         <CatalystTabs current="bonds" />
+        <ViewsMenu params={params} setParams={setParams} />
         <span className="view-meta">
           <span className="muted" data-testid="catalyst-date">
             {screen.data?.date ? <>as of <span className="nowrap">{screen.data.date}</span></> : screen.loading ? "Loading…" : ""}
@@ -93,7 +94,6 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
             <>
               <FilterToggle label="Show stale" checked={!!params["stale"]} onChange={(on) => set("stale", on ? "1" : undefined)} testId="catalyst-stale" title="Also the bonds without a trade in the last 30 sessions" />
               <FilterToggle label="Chart" checked={!!params["chart"]} onChange={(on) => set("chart", on ? "1" : undefined)} testId="catalyst-chart-toggle" title="Yield against years to maturity, with the State's curve" />
-              <ViewsMenu params={params} setParams={setParams} />
             </>
           }
         >
