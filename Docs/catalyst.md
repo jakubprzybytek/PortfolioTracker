@@ -526,6 +526,8 @@ Judgement: …  Red flags: none found in FY2025 report, auditor's report.  Watch
 [Bonds (9)] [Financials] [Track record] [Judgements] [Documents]
 ```
 
+- **Scorecard:** a dimension opens into its metrics; each scored ratio shows a gauge of red, yellow and green zones (worse to better, left to right) with its two thresholds under the borders and a mark at the value. The thresholds come with the metric from the API (`bands`).
+- **Bonds falling due:** one bar per year of maturity and one for cash, on one scale, with the amounts beside them.
 - **Bonds:** its bonds (all its names and financing vehicles) with maturity, amount owed, net yield, premium, liquidity; "Show in table" filters the bonds view to the company.
 - **Financials:** up to six years with the source per year (link to the original), and the interim periods after the last year with the TTM column; a figure opens the lines behind it; *Full statements*: a year's lines as printed; review status per year (parsed / hand-checked / flagged), with buttons to mark it; collected figures marked, and years where collected and filed figures differ by more than 2 %.
 - **Track record:** past bonds with how and when they ended, last price, source.

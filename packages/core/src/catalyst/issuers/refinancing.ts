@@ -3,7 +3,7 @@
 
 // Bond maturities vs cash: an issuer's listed bonds due in the next 12 and 24 months against the cash
 // and operating cash flow of its latest imported report. Design: docs/superpowers/specs/2026-11-03-bond-maturities-vs-cash-design.md
-import type { DimensionResult, Signal } from "./scorecard.ts";
+import type { Bands, DimensionResult, Signal } from "./scorecard.ts";
 import type { DbIssuerFinancialsRecord } from "./financialsRecord.ts";
 
 // issueValue: the amount still owed (issued, less instalments already repaid); issued: as issued, when more
@@ -135,6 +135,7 @@ export function refinancing(bonds: ListedBond[], report: DbIssuerFinancialsRecor
     };
 }
 
+const COVER_BANDS: Bands = { better: 'higher', green: GREEN, yellow: YELLOW, unit: 'x' };
 const coverSignal = (v: number | undefined, nothingDue: boolean): Signal =>
     v === undefined ? (nothingDue ? 'green' : 'na') : v >= GREEN ? 'green' : v >= YELLOW ? 'yellow' : 'red';
 
@@ -150,8 +151,8 @@ export function refinancingDimension(r: Refinancing): DimensionResult | undefine
         metrics: [
             { name: 'Bonds due in 12 months', value: rep.due12, formattedValue: money(rep.due12), signal: 'na' },
             { name: 'Bonds due in 24 months', value: rep.due24, formattedValue: money(rep.due24), signal: 'na' },
-            { name: 'Cash cover, 12 months', value: rep.cashCover12 ?? null, formattedValue: ratio(rep.cashCover12, rep.due12 === 0), signal: rep.cash === undefined ? 'na' : coverSignal(rep.cashCover12, rep.due12 === 0) },
-            { name: 'Cash + operating cash flow cover, 24 months', value: rep.liquidityCover24 ?? null, formattedValue: ratio(rep.liquidityCover24, rep.due24 === 0), signal: rep.cash === undefined ? 'na' : coverSignal(rep.liquidityCover24, rep.due24 === 0) },
+            { name: 'Cash cover, 12 months', value: rep.cashCover12 ?? null, formattedValue: ratio(rep.cashCover12, rep.due12 === 0), signal: rep.cash === undefined ? 'na' : coverSignal(rep.cashCover12, rep.due12 === 0), bands: COVER_BANDS },
+            { name: 'Cash + operating cash flow cover, 24 months', value: rep.liquidityCover24 ?? null, formattedValue: ratio(rep.liquidityCover24, rep.due24 === 0), signal: rep.cash === undefined ? 'na' : coverSignal(rep.liquidityCover24, rep.due24 === 0), bands: COVER_BANDS },
         ],
         notes: r.notes,
     };

@@ -113,7 +113,7 @@ export function stateMatches(s: IssuerSignals | undefined, ai: boolean | undefin
 }
 
 /** The colour of one dimension, for the chart's dots. */
-export const SIGNAL_COLOR: Record<Signal | "none", string> = { green: "var(--pos)", yellow: "var(--brand)", red: "var(--neg)", na: "var(--faint)", none: "var(--border)" };
+export const SIGNAL_COLOR: Record<Signal | "none", string> = { green: "var(--sig-green)", yellow: "var(--sig-yellow)", red: "var(--sig-red)", na: "var(--faint)", none: "var(--border)" };
 export const dimensionSignal = (s: IssuerSignals | undefined, short: string): Signal | "none" => {
   const name = DIMENSIONS.find((d) => d.short === short)?.name;
   return s?.state === "scored" ? (s.dimensions.find((d) => d.name === name)?.signal ?? "na") : "none";

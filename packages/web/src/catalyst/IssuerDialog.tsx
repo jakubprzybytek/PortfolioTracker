@@ -11,7 +11,7 @@ import { TrackTab } from "./BondPanel.tsx";
 import { ARROW, ARROW_LABEL, DIMENSIONS, RULE_SETS, SIGNAL_LABEL } from "./issuer.tsx";
 import { pct, pp } from "./labels.ts";
 import { LiquidityDots } from "./parts.tsx";
-import type { AiSwitch, BondRow, CompanyDetail, CompanyYear, Dimension, ReviewStatus, YearLines } from "./types.ts";
+import type { AiSwitch, BondRow, CompanyDetail, CompanyYear, Dimension, Metric, ReviewStatus, YearLines } from "./types.ts";
 
 const TABS = [
   ["bonds", "Bonds"],
@@ -137,18 +137,21 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
               </p>
             )}
             <div className="cat-issuer-top">
-              <Scorecard d={d} />
-              <div className="cat-issuer-side">
+              <section className="cat-panel">
+                <h3 className="cat-panel-title">Scorecard</h3>
+                <Scorecard d={d} />
+              </section>
+              <section className="cat-panel cat-issuer-side">
                 <Due d={d} />
-                <p className="cat-facts" data-testid="issuer-track-line">
+                <p className="cat-facts cat-track-line" data-testid="issuer-track-line">
                   Track record since {d.track.since?.slice(0, 7) ?? "–"}: {d.track.counts.repaid} repaid, {d.track.counts.early} early, {d.track.counts["below-par"]} below par
                   {d.track.flags.length ? <span className="neg"> · {d.track.flags.length} red flag{d.track.flags.length === 1 ? "" : "s"}</span> : " · no red flags"}
                 </p>
-              </div>
+              </section>
             </div>
-            {latest && (
+            {latest && judgementLine(latest.markdown) && (
               <p className="cat-facts cat-judgement-line" data-testid="issuer-judgement">
-                <strong>Judgement:</strong> {firstParagraph(latest.markdown)}
+                <strong>Judgement:</strong> {judgementLine(latest.markdown)}
               </p>
             )}
           </>
@@ -176,14 +179,20 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
   );
 }
 
-/** The judgement in short: its "Judgement:" paragraph (the §14 layout), else the first one, without Markdown's marks. */
-const firstParagraph = (md: string) => {
+/**
+ * The judgement in short: its "Judgement:" paragraph (the §14 layout), else the first paragraph of prose, without
+ * Markdown's marks. Paragraphs of metadata ("Date: … Model: …", "Notes: …") and code don't count: a judgement
+ * imported from CatalystViewer has only those, and then there is no line.
+ */
+const judgementLine = (md: string) => {
   const paragraphs = md
+    .replace(/```[\s\S]*?```/g, "")
     .split(/\n\s*\n/)
     .map((p) => p.replace(/^#+\s.*$/gm, "").replace(/[*_`]/g, "").trim())
-    .filter((p) => p && !p.startsWith("|"));
+    .filter((p) => p && !p.startsWith("|") && !p.startsWith("-"));
   const judgement = paragraphs.find((p) => /^Judgement:/i.test(p));
-  return judgement ? judgement.replace(/^Judgement:\s*/i, "") : (paragraphs[0] ?? "");
+  if (judgement) return judgement.replace(/^Judgement:\s*/i, "");
+  return paragraphs.find((p) => !/^[A-Z][\w ]{0,20}:/.test(p)) ?? "";
 };
 
 function Scorecard({ d }: { d: CompanyDetail }) {
@@ -203,6 +212,7 @@ function Scorecard({ d }: { d: CompanyDetail }) {
 function DimensionRow({ label, x }: { label: string; x: Dimension }) {
   const scored = x.metrics.filter((m) => m.scored !== false);
   const shown = x.metrics.filter((m) => m.scored === false);
+  const trend = x.trend?.metrics ?? [];
   return (
     <li data-testid="issuer-dimension">
       <details>
@@ -214,23 +224,73 @@ function DimensionRow({ label, x }: { label: string; x: Dimension }) {
               {ARROW[x.trend.arrow]}
             </span>
           )}{" "}
-          <span className="muted">{scored.map((m) => `${m.name} ${m.formattedValue}`).join(" · ")}</span>
+          <span className="muted cat-dim-values">{scored.map((m) => `${m.name} ${m.formattedValue}`).join(" · ")}</span>
         </summary>
         <ul className="cat-metrics">
-          {[...scored, ...shown, ...(x.trend?.metrics ?? [])].map((m) => (
-            <li key={m.name}>
-              <span className={`cat-dot small ${m.signal}`} /> {m.name}: {m.formattedValue}
-              {m.scored === false && <span className="muted"> (for context)</span>}
-            </li>
+          {[...scored, ...shown].map((m) => (
+            <MetricRow key={m.name} m={m} />
           ))}
-          {x.notes?.map((n) => (
-            <li key={n} className="muted">
-              {n}
-            </li>
+          {trend.length > 0 && <li className="cat-metrics-sub">Trend over the years</li>}
+          {trend.map((m) => (
+            <MetricRow key={`trend-${m.name}`} m={m} />
           ))}
         </ul>
+        {x.notes && x.notes.length > 0 && (
+          <ul className="cat-dim-notes">
+            {x.notes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+        )}
       </details>
     </li>
+  );
+}
+
+/** A metric: its dot, name and value, and where the value sits against its thresholds. */
+function MetricRow({ m }: { m: Metric }) {
+  return (
+    <li className="cat-metric">
+      <span className="cat-metric-name">
+        <span className={`cat-dot small ${m.signal}`} /> {m.name}
+        {m.scored === false && <span className="muted"> · for context</span>}
+      </span>
+      <span className="cat-metric-value">{m.formattedValue}</span>
+      {m.bands ? <Gauge m={m} bands={m.bands} /> : <span />}
+    </li>
+  );
+}
+
+type Bands = NonNullable<Metric["bands"]>;
+const bandValue = (v: number, unit: Bands["unit"]) =>
+  unit === "%" ? `${+(v * 100).toFixed(Math.abs(v) < 0.01 && v !== 0 ? 2 : 1)}%` : unit === "slope" ? `${+v.toFixed(3)}` : `${+v.toFixed(2)}×`;
+
+/**
+ * Red, yellow and green zones of equal width, worse to better from left to right (whichever way the ratio is good),
+ * the two thresholds under their borders and a mark at the value. Beyond the yellow zone the scale runs on at the
+ * same rate for one more width of it, so the mark's distance from a border says how far the value is from it.
+ */
+function Gauge({ m, bands }: { m: Metric; bands: Bands }) {
+  const { better, green, yellow, unit } = bands;
+  const width = Math.abs(green - yellow) || 1;
+  const t = m.value === null ? null : (better === "higher" ? m.value - yellow : yellow - m.value) / width;
+  const at = t === null ? null : Math.min(1, Math.max(0, (1 + t) / 3));
+  const g = bandValue(green, unit);
+  const y = bandValue(yellow, unit);
+  const title = better === "higher" ? `Green above ${g}, yellow ${y} to ${g}, red below ${y}` : `Green below ${g}, yellow ${g} to ${y}, red above ${y}`;
+  return (
+    <span className="cat-gauge" title={title} role="img" aria-label={`${m.name} ${m.formattedValue}. ${title}`}>
+      <span className="cat-gauge-track">
+        <span className="red" />
+        <span className="yellow" />
+        <span className="green" />
+        {at !== null && <span className={`cat-gauge-mark${at === 0 ? " off-left" : at === 1 ? " off-right" : ""}`} style={{ left: `${at * 100}%` }} />}
+      </span>
+      <span className="cat-gauge-ticks">
+        <span style={{ left: "33.333%" }}>{y}</span>
+        <span style={{ left: "66.667%" }}>{g}</span>
+      </span>
+    </span>
   );
 }
 
@@ -242,28 +302,37 @@ function Due({ d }: { d: CompanyDetail }) {
   for (const b of r.bonds) byYear.set(b.maturityDay.slice(0, 4), (byYear.get(b.maturityDay.slice(0, 4)) ?? 0) + (b.inReportCurrency ?? b.amount));
   const max = Math.max(...byYear.values(), r.report?.cash ?? 0);
   const cur = r.report?.currency ?? "PLN";
+  const bar = (v: number) => ({ width: `${max > 0 ? (v / max) * 100 : 0}%` });
   return (
     <div className="cat-due" data-testid="issuer-due">
-      <p className="cat-facts">
-        <strong>Bonds falling due</strong> (m {cur}): 12 months {mln(r.report?.due12)} · 24 months {mln(r.report?.due24)} · cash {mln(r.report?.cash)}
-        {r.report?.cashCover12 !== undefined && ` · cash covers ${fmtNum(r.report.cashCover12, 1)}× the next 12 months`}
-      </p>
+      <h3 className="cat-panel-title">
+        Bonds falling due <span className="cat-panel-unit">m {cur}, by year of maturity, against cash</span>
+      </h3>
       <div className="cat-due-bars">
         {[...byYear].map(([year, v]) => (
-          <div key={year} title={`${year}: ${mln(v)} m ${cur}`}>
-            <span className="bar" style={{ width: `${(v / max) * 100}%` }} />
-            <span className="muted">
-              {year} {mln(v)}
+          <div key={year} className="cat-due-row" title={`Bonds maturing in ${year}: ${mln(v)} m ${cur}`}>
+            <span className="cat-due-label">{year}</span>
+            <span className="cat-due-track">
+              <span className="bar" style={bar(v)} />
             </span>
+            <span className="cat-due-value">{mln(v)}</span>
           </div>
         ))}
         {r.report?.cash !== undefined && (
-          <div title={`Cash at ${r.report.periodEnd}`}>
-            <span className="bar cash" style={{ width: `${(r.report.cash / max) * 100}%` }} />
-            <span className="muted">cash {mln(r.report.cash)}</span>
+          <div className="cat-due-row cash" title={`Cash at ${r.report.periodEnd}: ${mln(r.report.cash)} m ${cur}`}>
+            <span className="cat-due-label">Cash</span>
+            <span className="cat-due-track">
+              <span className="bar cash" style={bar(r.report.cash)} />
+            </span>
+            <span className="cat-due-value">{mln(r.report.cash)}</span>
           </div>
         )}
       </div>
+      <p className="cat-facts muted">
+        Due in 12 months {mln(r.report?.due12)}, in 24 months {mln(r.report?.due24)}
+        {r.report?.cashCover12 !== undefined && `; cash covers ${fmtNum(r.report.cashCover12, 1)}× the next 12 months`}
+        {r.report?.periodEnd && ` (cash at ${r.report.periodEnd})`}
+      </p>
     </div>
   );
 }

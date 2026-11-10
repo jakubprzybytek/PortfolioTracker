@@ -292,6 +292,17 @@ describe('computeScorecard', () => {
     });
   });
 
+  describe('thresholds', () => {
+    it('go with each scored ratio, the way it is good', () => {
+      const sc = computeScorecard(exampleA);
+      const bands = (dim: string, name: string) => sc.dimensions.find(d => d.name === dim)!.metrics.find(m => m.name === name)!.bands;
+      expect(bands('Debt Burden', 'D/E')).toEqual({ better: 'lower', green: 1.0, yellow: 2.0, unit: 'x' });
+      expect(bands('Debt Service', 'ICR')).toEqual({ better: 'higher', green: 3.0, yellow: 1.5, unit: 'x' });
+      expect(bands('Profitability', 'EBIT Margin')).toEqual({ better: 'higher', green: 0.10, yellow: 0.05, unit: '%' });
+      expect(bands('Financial Trend', 'Net Debt/EBITDA Trend')).toEqual({ better: 'lower', green: -0.1, yellow: 0.1, unit: 'slope' });
+    });
+  });
+
   describe('overall scorecard', () => {
     it('Polmech has no red dimensions', () => {
       const sc = computeScorecard(exampleA);

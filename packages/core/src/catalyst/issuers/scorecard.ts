@@ -44,7 +44,11 @@ export type MetricResult = {
   formattedValue: string;
   signal: Signal;
   scored?: false;      // shown for context, not counted in the dimension's signal
+  bands?: Bands;       // the thresholds the signal came from, for the UI
 };
+
+// A metric's thresholds: green beyond `green`, yellow up to `yellow`, red past it; `better` says which way is good.
+export type Bands = { better: 'higher' | 'lower'; green: number; yellow: number; unit: 'x' | '%' | 'slope' };
 
 export type DimensionResult = {
   name: string;
@@ -152,13 +156,18 @@ function ebitNotes(year: FinancialYearData): string[] {
   ];
 }
 
-const metric = (name: string, value: number | null, formattedValue: string, signal: Signal): MetricResult => ({ name, value, formattedValue, signal });
+const metric = (name: string, value: number | null, formattedValue: string, signal: Signal, bands?: Bands): MetricResult => ({ name, value, formattedValue, signal, ...(bands ? { bands } : {}) });
 const shown = (name: string, value: number | null, formattedValue: string): MetricResult => ({ name, value, formattedValue, signal: 'na', scored: false });
 const dimension = (name: string, metrics: MetricResult[], notes: string[] = []): DimensionResult => ({
   name, signal: worstSignal(metrics.filter(m => m.scored !== false)), metrics, ...(notes.length ? { notes } : {}),
 });
 const lower = (green: number, yellow: number) => (v: number | null) => signalFromValue(v, x => x < green, x => x <= yellow);
 const higher = (green: number, yellow: number) => (v: number | null) => signalFromValue(v, x => x > green, x => x >= yellow);
+const lowerBands = (green: number, yellow: number, unit: Bands['unit'] = 'x'): Bands => ({ better: 'lower', green, yellow, unit });
+const higherBands = (green: number, yellow: number, unit: Bands['unit'] = 'x'): Bands => ({ better: 'higher', green, yellow, unit });
+/** A ratio judged by its thresholds, which go with it to the UI. */
+const judged = (name: string, value: number | null, formattedValue: string, bands: Bands): MetricResult =>
+  metric(name, value, formattedValue, (bands.better === 'higher' ? higher : lower)(bands.green, bands.yellow)(value), bands);
 
 // ─── Dimension 1 — Debt Burden ────────────────────────────────────────────────
 
@@ -166,7 +175,7 @@ function deMetric(year: FinancialYearData, name = 'D/E', green = 1.0, yellow = 2
   const de = div(debt, year.equity);
   // Negative equity means the company owes more than it owns — always red
   const signal: Signal = de == null ? 'na' : year.equity != null && year.equity <= 0 ? 'red' : lower(green, yellow)(de);
-  return metric(name, de, mult(de), signal);
+  return metric(name, de, mult(de), signal, lowerBands(green, yellow));
 }
 
 function ndEbitdaMetric(year: FinancialYearData, name: string, green: number, yellow: number, netDebt = netDebtOf(year)): MetricResult {
@@ -174,7 +183,7 @@ function ndEbitdaMetric(year: FinancialYearData, name: string, green: number, ye
   const value = div(netDebt, ebitda);
   // Negative EBITDA means no operating cash generation — always red
   const signal: Signal = value == null ? 'na' : ebitda != null && ebitda <= 0 ? 'red' : lower(green, yellow)(value);
-  return metric(name, value, mult(value), signal);
+  return metric(name, value, mult(value), signal, lowerBands(green, yellow));
 }
 
 function lenderDebtNotes(year: FinancialYearData): string[] {
@@ -192,7 +201,7 @@ function computeLenderDebtBurden(year: FinancialYearData, rules: FinanceRuleSet)
   const bondsMetric = shown('Bonds/Financial Debt', bondsShare, pct(bondsShare));
   if (rules === 'investment') {
     const ltv = div(netDebt, year.totalAssets);
-    return dimension('Debt Burden', [metric('Net Debt/Total Assets', ltv, pct(ltv), lower(0.25, 0.40)(ltv)), bondsMetric], notes);
+    return dimension('Debt Burden', [judged('Net Debt/Total Assets', ltv, pct(ltv), lowerBands(0.25, 0.40, '%')), bondsMetric], notes);
   }
   const [green, yellow] = rules === 'collector' ? [1.5, 2.5] : [4.0, 6.0];
   return dimension('Debt Burden', [deMetric(year, 'Net Debt/Equity', green, yellow, netDebt), bondsMetric], notes);
@@ -206,7 +215,7 @@ function computeDebtBurden(year: FinancialYearData, rules: RuleSet): DimensionRe
     const stock = year.inventory != null ? year.inventory + (year.investmentProperty ?? 0) : undefined;
     const ndStock = div(netDebt, stock);
     return dimension('Debt Burden', [
-      metric('Net Debt/(Inventory + Investment Property)', ndStock, mult(ndStock), lower(0.3, 0.6)(ndStock)),
+      judged('Net Debt/(Inventory + Investment Property)', ndStock, mult(ndStock), lowerBands(0.3, 0.6)),
       deMetric(year, 'Net Debt/Equity', 0.5, 1.0, netDebt),
     ]);
   }
@@ -220,7 +229,7 @@ function computeDebtBurden(year: FinancialYearData, rules: RuleSet): DimensionRe
     return dimension('Debt Burden', [
       ndEbitdaMetric(year, 'Net Debt incl. Leases/EBITDA', 3.0, 4.5),
       shown('Net Debt excl. Leases/EBITDA', exLeasesRatio, mult(exLeasesRatio)),
-      metric('Free Cash Flow/Net Debt', fcfToDebt, netDebt != null && netDebt <= 0 && fcf != null ? 'net cash' : pct(fcfToDebt), fcfSignal),
+      metric('Free Cash Flow/Net Debt', fcfToDebt, netDebt != null && netDebt <= 0 && fcf != null ? 'net cash' : pct(fcfToDebt), fcfSignal, higherBands(0.15, 0.05, '%')),
     ], notes);
   }
   return dimension('Debt Burden', [deMetric(year), ndEbitdaMetric(year, 'Net Debt/EBITDA', 2.5, 4.0)], notes);
@@ -241,23 +250,24 @@ function computeDebtService(year: FinancialYearData, rules: RuleSet): DimensionR
     const name = pbtCover != null ? 'ICR (profit before tax + interest)' : 'ICR';
     if (rules === 'investment') return dimension('Debt Service', [shown(name, lenderIcr, mult(lenderIcr))]);
     const [green, yellow] = rules === 'collector' ? [2.5, 1.5] : [1.5, 1.2];
-    return dimension('Debt Service', [metric(name, lenderIcr, mult(lenderIcr), higher(green, yellow)(lenderIcr))], pbtCover != null ? [] : ebitNotes(year));
+    return dimension('Debt Service', [judged(name, lenderIcr, mult(lenderIcr), higherBands(green, yellow))], pbtCover != null ? [] : ebitNotes(year));
   }
-  return dimension('Debt Service', [metric(paid ? 'ICR (interest paid)' : 'ICR', icr, mult(icr), higher(3.0, 1.5)(icr))], ebitNotes(year));
+  return dimension('Debt Service', [judged(paid ? 'ICR (interest paid)' : 'ICR', icr, mult(icr), higherBands(3.0, 1.5))], ebitNotes(year));
 }
 
 // ─── Dimension 3 — Liquidity ──────────────────────────────────────────────────
 
 function computeLiquidity(year: FinancialYearData, rules: RuleSet): DimensionResult {
   const cr = div(year.currentAssets, year.currentLiabilities);
-  const crMetric = (green: number, yellow: number) => metric('Current Ratio', cr, mult(cr), higher(green, yellow)(cr));
+  const crMetric = (green: number, yellow: number) => judged('Current Ratio', cr, mult(cr), higherBands(green, yellow));
   if (isLender(rules)) {
     // Buying portfolios or writing leases is an operating outflow: operating cash flow is shown, not scored
     const due = year.debtDueWithinYear;
     const cashToDue = due === 0 && year.cash != null ? null : div(year.cash, due);
-    const signal: Signal = due === 0 && year.cash != null ? 'green' : rules === 'leasing' ? higher(0.3, 0.1)(cashToDue) : higher(0.5, 0.2)(cashToDue);
+    const bands = rules === 'leasing' ? higherBands(0.3, 0.1) : higherBands(0.5, 0.2);
+    const signal: Signal = due === 0 && year.cash != null ? 'green' : higher(bands.green, bands.yellow)(cashToDue);
     return dimension('Liquidity', [
-      metric('Cash/Debt due within 12 Months', cashToDue, due === 0 && year.cash != null ? 'none due' : mult(cashToDue), signal),
+      metric('Cash/Debt due within 12 Months', cashToDue, due === 0 && year.cash != null ? 'none due' : mult(cashToDue), signal, bands),
       shown('Operating Cash Flow', year.operatingCashFlow ?? null, year.operatingCashFlow == null ? 'n/a' : `${year.operatingCashFlow.toLocaleString('en-US', { maximumFractionDigits: 1 })} m`),
     ]);
   }
@@ -267,11 +277,11 @@ function computeLiquidity(year: FinancialYearData, rules: RuleSet): DimensionRes
   }
   if (rules === 'contractor') {
     const netOfAdvances = year.cash != null && year.contractLiabilities != null ? div(year.cash - year.contractLiabilities, year.revenue) : null;
-    return dimension('Liquidity', [crMetric(1.2, 1.0), metric('Cash net of Advances/Revenue', netOfAdvances, pct(netOfAdvances), signalFromValue(netOfAdvances, v => v > 0.05, v => v >= 0))]);
+    return dimension('Liquidity', [crMetric(1.2, 1.0), judged('Cash net of Advances/Revenue', netOfAdvances, pct(netOfAdvances), higherBands(0.05, 0, '%'))]);
   }
   if (rules === 'consumer') {
     const ocfCl = div(year.operatingCashFlow, year.currentLiabilities);
-    return dimension('Liquidity', [metric('Operating Cash Flow/Current Liabilities', ocfCl, mult(ocfCl), higher(0.5, 0.3)(ocfCl)), shown('Current Ratio', cr, mult(cr))]);
+    return dimension('Liquidity', [judged('Operating Cash Flow/Current Liabilities', ocfCl, mult(ocfCl), higherBands(0.5, 0.3)), shown('Current Ratio', cr, mult(cr))]);
   }
   return dimension('Liquidity', [crMetric(1.5, 1.0)]);
 }
@@ -296,8 +306,8 @@ function computeLenderProfitability(year: FinancialYearData, previous: Financial
   }
   const roeSignal: Signal = averageEquity != null && averageEquity <= 0 ? 'red' : higher(0.12, 0.06)(roe);
   return dimension('Profitability', [
-    metric('Return on Equity', roe, pct(roe), roeSignal),
-    metric('Return on Assets', roa, pct(roa), rules === 'collector' ? higher(0.05, 0.02)(roa) : higher(0.015, 0.0075)(roa)),
+    metric('Return on Equity', roe, pct(roe), roeSignal, higherBands(0.12, 0.06, '%')),
+    judged('Return on Assets', roa, pct(roa), rules === 'collector' ? higherBands(0.05, 0.02, '%') : higherBands(0.015, 0.0075, '%')),
   ], year.netProfit != null && year.revenue != null && year.revenue > 0 && year.netProfit > year.revenue
     ? ['Net profit above revenue: a one-off or a revaluation is likely in it'] : []);
 }
@@ -314,8 +324,8 @@ function computeProfitability(year: FinancialYearData, rules: RuleSet, previous?
   const ebitMargin = div(year.ebit, year.revenue);
   const netMargin = div(year.netProfit, year.revenue);
   return dimension('Profitability', [
-    metric('EBIT Margin', ebitMargin, pct(ebitMargin), higher(...ebit)(ebitMargin)),
-    metric('Net Margin', netMargin, pct(netMargin), higher(...net)(netMargin)),
+    judged('EBIT Margin', ebitMargin, pct(ebitMargin), higherBands(...ebit, '%')),
+    judged('Net Margin', netMargin, pct(netMargin), higherBands(...net, '%')),
   ], year.ebitDerived ? ebitNotes(year).slice(0, 1) : []);
 }
 
@@ -335,11 +345,11 @@ function computeAssetCoverage(year: FinancialYearData, rules: RuleSet): Dimensio
   const equityRatio = div(year.equity, year.totalAssets);
   if (isLender(rules)) {
     // A lender's assets are its loans and portfolios, which the equity ratio already weighs against debt
-    return dimension('Asset Coverage', [metric('Equity Ratio', equityRatio, pct(equityRatio), higher(...EQUITY_RATIO[rules])(equityRatio))]);
+    return dimension('Asset Coverage', [judged('Equity Ratio', equityRatio, pct(equityRatio), higherBands(...EQUITY_RATIO[rules], '%'))]);
   }
   return dimension('Asset Coverage', [
-    rules === 'consumer' ? shown('Asset Coverage Ratio', acr, mult(acr)) : metric('Asset Coverage Ratio', acr, mult(acr), higher(1.5, 1.0)(acr)),
-    metric('Equity Ratio', equityRatio, pct(equityRatio), higher(...EQUITY_RATIO[rules])(equityRatio)),
+    rules === 'consumer' ? shown('Asset Coverage Ratio', acr, mult(acr)) : judged('Asset Coverage Ratio', acr, mult(acr), higherBands(1.5, 1.0)),
+    judged('Equity Ratio', equityRatio, pct(equityRatio), higherBands(...EQUITY_RATIO[rules], '%')),
   ]);
 }
 
@@ -384,6 +394,7 @@ function computeTrend(years: FinancialYearData[]): DimensionResult {
     value: revCagrValue,
     formattedValue: pct(revCagrValue),
     signal: signalFromValue(revCagrValue, v => v > 0.05, v => v >= 0),
+    bands: higherBands(0.05, 0, '%'),
   };
 
   // EBITDA Margin Trend (slope of EBITDA/revenue across years, sorted ascending)
@@ -412,6 +423,7 @@ function computeTrend(years: FinancialYearData[]): DimensionResult {
     value: ebitdaSlopeValue,
     formattedValue: ebitdaSlopeValue != null ? `slope ${ebitdaSlopeValue.toFixed(3)}` : 'n/a',
     signal: ebitdaMarginSignal,
+    bands: higherBands(0, -0.005, 'slope'),   // also green when flat with a margin above 10%
   };
 
   // Net Debt/EBITDA Trend (slope ascending = worsening if positive)
@@ -439,6 +451,7 @@ function computeTrend(years: FinancialYearData[]): DimensionResult {
     value: ndEbitdaSlopeValue,
     formattedValue: ndEbitdaSlopeValue != null ? `slope ${ndEbitdaSlopeValue.toFixed(3)}` : 'n/a',
     signal: ndEbitdaTrendSignal,
+    bands: lowerBands(-0.1, 0.1, 'slope'),
   };
 
   const metrics = [revCagrMetric, ebitdaMarginMetric, ndEbitdaTrendMetric];

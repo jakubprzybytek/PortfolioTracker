@@ -204,6 +204,8 @@ export interface Metric {
   formattedValue: string;
   signal: Signal;
   scored?: false;
+  /** The thresholds behind the signal: green beyond `green`, red past `yellow`. */
+  bands?: { better: "higher" | "lower"; green: number; yellow: number; unit: "x" | "%" | "slope" };
 }
 export interface Dimension {
   name: string;
