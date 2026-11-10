@@ -27,12 +27,13 @@ env:
   NODE_VERSION: "24"
 
 jobs:
-  # One job: deploy int, run the tests against it, tag the commit (from main). The tag marks a release that passed int.
+  # Deploy int and run the tests against it. Read-only: it runs npm packages and the tests, so it holds no token that
+  # can push (a malicious dependency could otherwise push to main, which deploys prod); `tag` pushes the version tag.
   int:
     name: Deploy int + test
     runs-on: ubuntu-latest
     permissions:
-      contents: write # push the version tag
+      contents: read
       id-token: write # OIDC → AWS (infra/github/README.md)
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -41,6 +42,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # the tags, for the next version
+          persist-credentials: false # no GitHub token left in .git/config for npm or the tests
       # From main, releases only go forward: the latest vM.N tag + 1 (v0.152 -> v0.153); `major` gives v(M+1).0.
       # `major` works from a commit already released too. Otherwise a commit that already has a tag (a re-run) keeps it.
       # From another ref: no new version; the footer shows the tag name, or <branch>-<short sha>.
@@ -102,8 +104,24 @@ jobs:
           name: playwright-results
           path: packages/web/test-results
           retention-days: 7
+
+  # The tag marks a release that passed int. Its own job: the only one with a token that can push, and it runs no npm
+  # code. Always runs after int (the step is skipped for a non-release), so prod can depend on it.
+  tag:
+    name: Tag release
+    needs: int
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the version tag
+    env:
+      APP_VERSION: ${{ needs.int.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.int.outputs.release == 'true'
+        with:
+          fetch-depth: 0 # the existing tags
       - name: Tag ${{ env.APP_VERSION }}
-        if: steps.version.outputs.release == 'true'
+        if: needs.int.outputs.release == 'true'
         run: |
           if git rev-parse -q --verify "refs/tags/$APP_VERSION" >/dev/null; then echo "$APP_VERSION already tagged"; exit 0; fi
           git config user.name "github-actions[bot]"
@@ -114,7 +132,7 @@ jobs:
   # prod deploys once int passed: a release from its tag, any other ref from the commit int was tested on.
   prod:
     name: Deploy prod
-    needs: int
+    needs: [int, tag]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -125,6 +143,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.int.outputs.release == 'true' && format('refs/tags/{0}', needs.int.outputs.version) || github.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}

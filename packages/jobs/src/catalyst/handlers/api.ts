@@ -557,7 +557,9 @@ async function agentHandler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Pro
   const token = /^Bearer (\S+)$/.exec(auth)?.[1];
   const stored = (await catalystRepo.getSetting<FeedToken | null>(AGENT_TOKEN_SETTING)) ?? undefined;
   if (!tokenMatches(token, stored)) return json(401, { error: "No agent token, or not the current one (make one in the Catalyst settings)" });
-  if (shouldTouch(stored!)) await catalystRepo.putSetting(AGENT_TOKEN_SETTING, { ...stored, lastUsedAt: new Date().toISOString() });
+  // Only the one field, and only while the hash is still this token's: a put of what was read could bring back a token
+  // revoked or replaced in between.
+  if (shouldTouch(stored!)) await catalystRepo.setSettingFieldIfHash(AGENT_TOKEN_SETTING, stored!.hash, "lastUsedAt", new Date().toISOString());
   const rest = event.rawPath.split("/catalyst/agent/")[1] ?? "";
   const path = `/catalyst/${rest}`;
   const method = event.requestContext.http.method;

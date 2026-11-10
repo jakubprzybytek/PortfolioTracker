@@ -10,6 +10,9 @@ import { PAYMENT_EVENT_KINDS } from "./paymentEvents.ts";
 
 // ─── Inputs ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
+/** A link the app shows: http or https only (a javascript: or data: URL would run when clicked). */
+const webUrl = z.url({ protocol: /^https?$/, error: "an http or https address" }).max(500);
+
 const entityId = z.string().regex(/^(\d{10}|LEI:[A-Z0-9]{20})$/, "a KRS number (10 digits) or LEI:<lei>");
 
 /** A company's description (`catalyst entity set`). Not its lender kind, override or AI analysis switch: those are yours. */
@@ -18,7 +21,8 @@ export const AgentEntityInput = z
     shortName: z.string().trim().min(1).max(60),
     industry: z.enum(INDUSTRIES),
     businessSummary: z.string().trim().min(1).max(1500),
-    website: z.string().trim().max(200).regex(/^(https?:\/\/)?[^\s/$.?#].[^\s]*$/, "a web address"),
+    // A host with a dot, optionally after http(s)://: no other scheme (javascript:, data: …), since the app links it.
+    website: z.string().trim().max(200).regex(/^(https?:\/\/)?[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)+(:\d+)?([/?#]\S*)?$/iu, "a web address (http or https)"),
     /** A financing vehicle judged on its group's reports. */
     financialsEntityId: entityId.nullable(),
   })
@@ -96,7 +100,7 @@ export const DocumentInput = z
     kind: z.enum(["audit", "management", "interim", "annual", "current-report", "terms", "other"]),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     title: z.string().trim().min(1).max(300),
-    sourceUrl: z.string().url().max(500).optional(),
+    sourceUrl: webUrl.optional(),
     dryRun: z.boolean().optional(),
   })
   .strict();
@@ -123,7 +127,7 @@ export const PaymentEventInput = z
     source: z.string().trim().min(3).max(300),
     documentSha: z.string().regex(/^[0-9a-f]{64}$/).optional(),
     quote: z.string().trim().min(12).max(1000).optional(),
-    sourceUrl: z.string().url().max(500).optional(),
+    sourceUrl: webUrl.optional(),
     dryRun: z.boolean().optional(),
   })
   .strict()

@@ -5,7 +5,7 @@ import { fmtInt, fmtNum, today } from "../format.ts";
 import { useApi } from "../useApi.ts";
 import { chartMargin, useNarrow } from "../useNarrow.ts";
 import type { BondDetail, BondOutcome, BondRow, ReportedEvent } from "./types.ts";
-import { FLAG_TITLE, LEVEL_LABEL, couponLabel, pct, pp } from "./labels.ts";
+import { FLAG_TITLE, LEVEL_LABEL, couponLabel, pct, pp, webHref } from "./labels.ts";
 import { LiquidityDots } from "./parts.tsx";
 
 export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; setTab: (t: string) => void }) {
@@ -267,8 +267,8 @@ export function TrackTab({ detail, loading }: { detail: Pick<BondDetail, "track"
                 <span> · {e.text}</span>{" "}
                 <span className="muted">
                   (
-                  {e.sourceUrl ? (
-                    <a href={e.sourceUrl} target="_blank" rel="noreferrer">
+                  {webHref(e.sourceUrl) ? (
+                    <a href={webHref(e.sourceUrl)} target="_blank" rel="noopener noreferrer">
                       {e.source}
                     </a>
                   ) : (

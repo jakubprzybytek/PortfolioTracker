@@ -9,7 +9,7 @@ import { MarkdownText } from "../NotesView.tsx";
 import { useApi } from "../useApi.ts";
 import { TrackTab } from "./BondPanel.tsx";
 import { ARROW, ARROW_LABEL, DIMENSIONS, RULE_SETS, SIGNAL_LABEL } from "./issuer.tsx";
-import { pct, pp } from "./labels.ts";
+import { pct, pp, webHref } from "./labels.ts";
 import { LiquidityDots } from "./parts.tsx";
 import type { AiSwitch, BondRow, CompanyDetail, CompanyYear, Dimension, Metric, ReviewStatus, YearLines } from "./types.ts";
 
@@ -118,10 +118,10 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
               <details className="cat-summary-line">
                 <summary className="muted">What the company does</summary>
                 {c.businessSummary}
-                {c.website && (
+                {c.website && webHref(c.website) && (
                   <>
                     {" "}
-                    <a href={c.website.startsWith("http") ? c.website : `https://${c.website}`} target="_blank" rel="noopener noreferrer">
+                    <a href={webHref(c.website)} target="_blank" rel="noopener noreferrer">
                       {c.website.replace(/^https?:\/\//, "")}
                     </a>
                   </>
@@ -649,8 +649,8 @@ function DocumentsTab({ d }: { d: CompanyDetail }) {
                     <button type="button" className="link-button" onClick={() => void open(x.sha256, "documents")} title={`Open ${x.fileName}`}>
                       {x.title}
                     </button>
-                    {x.sourceUrl && (
-                      <a className="muted" href={x.sourceUrl} target="_blank" rel="noopener noreferrer" title="Where it came from">
+                    {webHref(x.sourceUrl) && (
+                      <a className="muted" href={webHref(x.sourceUrl)} target="_blank" rel="noopener noreferrer" title="Where it came from">
                         {" "}
                         ↗
                       </a>

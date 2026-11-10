@@ -2,7 +2,7 @@
 // functions link only this table.
 
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, type QueryCommandInput } from "@aws-sdk/lib-dynamodb";
+import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, UpdateCommand, type QueryCommandInput } from "@aws-sdk/lib-dynamodb";
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
@@ -262,6 +262,27 @@ export class CatalystRepository {
 
   async putSetting(name: string, value: unknown): Promise<void> {
     await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.setting(name), value, updatedAt: new Date().toISOString() } }));
+  }
+
+  /**
+   * Sets one field of a stored setting's value, only while its `hash` is still `hash`: a token replaced or revoked
+   * meanwhile stays so (a read-then-put would write the old one back). Does nothing otherwise.
+   */
+  async setSettingFieldIfHash(name: string, hash: string, field: string, value: unknown): Promise<void> {
+    try {
+      await this.doc.send(
+        new UpdateCommand({
+          TableName: this.table(),
+          Key: catalystKeys.setting(name),
+          UpdateExpression: "SET #v.#f = :x",
+          ConditionExpression: "#v.#h = :h",
+          ExpressionAttributeNames: { "#v": "value", "#f": field, "#h": "hash" },
+          ExpressionAttributeValues: { ":x": value, ":h": hash },
+        }),
+      );
+    } catch (e) {
+      if ((e as Error).name !== "ConditionalCheckFailedException") throw e;
+    }
   }
 
   getQuoteDay(date: IsoDate): Promise<CatalystQuoteDayItem | undefined> {

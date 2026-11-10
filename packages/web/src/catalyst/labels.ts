@@ -93,3 +93,14 @@ export function liquidityTitle(l: Liquidity, currency: string): string {
   ];
   return `${LEVEL_LABEL[l.level]}: ${parts.filter(Boolean).join(" • ")}`;
 }
+
+/**
+ * A link from stored data (the agent's or yours): an http(s) address as it is, a bare one ("kruk.eu") as https; none
+ * for any other scheme (javascript:, data: …), which would run when clicked. The API refuses those too.
+ */
+export function webHref(url: string | null | undefined): string | undefined {
+  const u = url?.trim();
+  if (!u) return undefined;
+  if (/^https?:\/\//i.test(u)) return u;
+  return /^[a-z][a-z0-9+.-]*:/i.test(u) ? undefined : `https://${u}`;
+}

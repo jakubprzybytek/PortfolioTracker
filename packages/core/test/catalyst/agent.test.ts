@@ -160,4 +160,16 @@ describe("the agent's inputs", () => {
     expect(AGENT_SCHEMAS.entity.safeParse({ financeRuleSet: "collector" }).success).toBe(false);
     expect(AGENT_SCHEMAS.entity.safeParse({ aiAnalysis: { on: true } }).success).toBe(false);
   });
+  it("links are http or https only (the app shows them as links)", () => {
+    const site = (website: string) => AGENT_SCHEMAS.entity.safeParse({ website }).success;
+    expect(["kruk.eu", "https://www.kruk.eu/relacje", "http://łódź.pl", "ghelamco.com:8080/x?y=1"].map(site)).toEqual([true, true, true, true]);
+    expect(["javascript:alert(1)", "data:text/html,x", "localhost", "https://"].map(site)).toEqual([false, false, false, false]);
+    const doc = { uploadKey: "catalyst/uploads/00000000-0000-0000-0000-000000000000", sha256: "a".repeat(64), fileName: "r.pdf", kind: "audit", date: "2026-04-30", title: "Audit" };
+    const source = (sourceUrl: string) => AGENT_SCHEMAS.document.safeParse({ ...doc, sourceUrl }).success;
+    expect(source("https://espi.example.pl/r/1")).toBe(true);
+    expect(["javascript:alert(1)", "data:text/html,x", "ftp://a.pl/r"].map(source)).toEqual([false, false, false]);
+    const event = { kind: "reviewed", date: "2026-11-01", text: "Nothing found", source: "ESPI 2024-2026" };
+    expect(AGENT_SCHEMAS.event.safeParse({ ...event, sourceUrl: "javascript:alert(1)" }).success).toBe(false);
+    expect(AGENT_SCHEMAS.event.safeParse({ ...event, sourceUrl: "https://bankier.pl/x" }).success).toBe(true);
+  });
 });
