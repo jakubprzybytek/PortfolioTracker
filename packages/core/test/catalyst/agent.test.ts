@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGENT_SCHEMAS, AnalysisInput, agentMayCall, annualDue, assumedBasis, halfYearDue, latestPeriod, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
+import { AGENT_SCHEMAS, AnalysisInput, MAX_UPLOAD_BYTES, UploadUrlInput, agentMayCall, annualDue, assumedBasis, halfYearDue, latestPeriod, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
 
 const entity = (entityId: string, over: Partial<WorkInput["entities"][number]> = {}): WorkInput["entities"][number] => ({
   entityId,
@@ -159,6 +159,11 @@ describe("the agent's inputs", () => {
     expect(AGENT_SCHEMAS.entity.safeParse({ industry: "Developer" }).success).toBe(true);
     expect(AGENT_SCHEMAS.entity.safeParse({ financeRuleSet: "collector" }).success).toBe(false);
     expect(AGENT_SCHEMAS.entity.safeParse({ aiAnalysis: { on: true } }).success).toBe(false);
+  });
+  it("an upload URL is asked for the file's size, at most 50 MB", () => {
+    expect(UploadUrlInput.safeParse({ size: 1 }).success).toBe(true);
+    expect(UploadUrlInput.safeParse({ size: MAX_UPLOAD_BYTES }).success).toBe(true);
+    for (const body of [{}, { size: 0 }, { size: 1.5 }, { size: MAX_UPLOAD_BYTES + 1 }, { size: "10" }]) expect(UploadUrlInput.safeParse(body).success).toBe(false);
   });
   it("links are http or https only (the app shows them as links)", () => {
     const site = (website: string) => AGENT_SCHEMAS.entity.safeParse({ website }).success;

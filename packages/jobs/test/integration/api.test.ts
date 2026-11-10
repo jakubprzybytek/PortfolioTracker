@@ -856,10 +856,15 @@ describe(`API ${API}`, () => {
   });
 
   it("Catalyst: reports: an upload URL, an import refused for a company the module doesn't hold, a year's review", async () => {
-    const upload = await send<{ key: string; url: string }>("POST", "/catalyst/filings/upload-url", {});
+    const upload = await send<{ key: string; url: string }>("POST", "/catalyst/filings/upload-url", { size: 10 });
     expect(upload.status).toBe(200);
     expect(upload.body.key).toMatch(/^catalyst\/uploads\/[0-9a-f-]{36}$/);
     expect(upload.body.url).toContain("X-Amz-Signature");
+    // The size is required and capped, and S3 takes only a file of the size the URL was made for.
+    expect((await send("POST", "/catalyst/filings/upload-url", {})).status).toBe(400);
+    expect((await send("POST", "/catalyst/filings/upload-url", { size: 51 * 1024 * 1024 })).status).toBe(413);
+    expect((await fetch(upload.body.url, { method: "PUT", body: "0123456789x" })).ok).toBe(false);
+    expect((await fetch(upload.body.url, { method: "PUT", body: "0123456789" })).status).toBe(200);
     expect((await send("POST", "/catalyst/filings", { entityId: "0000000000" })).status).toBe(400);
     const filing = { format: "krs-xml", scope: "single", periods: [{ periodEnd: "2025-12-31", lines: [] }], checks: [] };
     const refused = await send<{ error: string }>("POST", "/catalyst/filings", { entityId: "0000000000", uploadKey: upload.body.key, sha256: "0".repeat(64), extension: "xml", fileName: "x.xml", filing });

@@ -137,6 +137,8 @@ describe("catalyst CLI", () => {
     const r = JSON.parse((await cli("documents", "put", "0000442287", join(dir, "audit.pdf"), "--kind", "audit", "--date", "2026-03-31", "--title", "Auditor's report FY2025")).out);
     expect(r).toMatchObject({ stored: true, kind: "audit", fileName: "audit.pdf", uploadKey: "catalyst/uploads/11111111-1111-1111-1111-111111111111" });
     expect(sent.map((s) => `${s.method} ${s.url.replace(/^.*\/agent/, "")}`)).toEqual(["GET /entities/0000442287", "POST /filings/upload-url", "PUT https://s3.example/put", "POST /entities/0000442287/documents"]);
+    // The URL is asked for the file's exact size (signed into it).
+    expect(sent[1]!.body).toEqual({ size: "%PDF-1.4 audit".length });
   });
 
   it("events put: the quote must stand in the document; the document's SHA-256 goes with it", async () => {

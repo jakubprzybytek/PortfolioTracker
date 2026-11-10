@@ -150,6 +150,12 @@ export const ChecklistInput = z
   })
   .strict();
 
+/** The largest report or document the CLI may upload (ESEF packages run to 30 MB). */
+export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+
+/** An upload URL (`POST /catalyst/filings/upload-url`): the file's exact size, signed into the URL, so S3 takes no other. */
+export const UploadUrlInput = z.object({ size: z.number().int().positive().max(MAX_UPLOAD_BYTES, `at most ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`) }).strict();
+
 /** The inputs `catalyst schema <kind>` prints. */
 export const AGENT_SCHEMAS = {
   entity: AgentEntityInput,

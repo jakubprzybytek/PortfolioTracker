@@ -3,6 +3,7 @@
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { MAX_UPLOAD_BYTES } from "@portfolio/core/catalyst/index";
 import { apiUrl, configDir } from "./stage.ts";
 
 export interface Io {
@@ -90,9 +91,10 @@ export class Client {
     return this.call<T>("GET", path);
   }
 
-  /** Puts a file where the API can read it (a presigned URL; uploads expire after 7 days). */
+  /** Puts a file where the API can read it (a presigned URL for its exact size; uploads expire after 7 days). */
   async upload(data: Uint8Array, contentType: string): Promise<string> {
-    const { key, url } = await this.call<{ key: string; url: string }>("POST", "/filings/upload-url", {});
+    if (data.byteLength > MAX_UPLOAD_BYTES) throw new CliError(`upload: the file is ${(data.byteLength / 1024 / 1024).toFixed(1)} MB; at most ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`);
+    const { key, url } = await this.call<{ key: string; url: string }>("POST", "/filings/upload-url", { size: data.byteLength });
     const res = await this.io.fetch(url, { method: "PUT", body: new Blob([new Uint8Array(data)]), headers: { "content-type": contentType } });
     if (!res.ok) throw new CliError(`upload: ${res.status} ${(await res.text()).slice(0, 200)}`);
     return key;

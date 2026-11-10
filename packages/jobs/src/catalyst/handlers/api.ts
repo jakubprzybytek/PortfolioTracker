@@ -22,7 +22,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
-import { DocumentInput, PaymentEventInput, RetractInput, type PaymentEvent } from "@portfolio/core/catalyst/index";
+import { DocumentInput, MAX_UPLOAD_BYTES, PaymentEventInput, RetractInput, UploadUrlInput, type PaymentEvent } from "@portfolio/core/catalyst/index";
 import { storeDocument } from "../documents.ts";
 import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestPeriod, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
 import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, reviewedTo, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
@@ -265,10 +265,17 @@ const ROUTES: Record<string, Handler> = {
     return switchEntity(id, { on: body.data.on, by: userOf(event), at: new Date().toISOString() });
   },
 
-  "POST /catalyst/filings/upload-url": async () => {
-    // Where the CLI puts a report before importing it (API Gateway takes at most 10 MB; ESEF packages run to 30).
+  "POST /catalyst/filings/upload-url": async (event) => {
+    // Where the CLI puts a report before importing it (API Gateway takes at most 10 MB; ESEF packages run to 30). The
+    // size is signed into the URL (content-length), so S3 refuses a file of any other size: none above the limit.
+    const body = UploadUrlInput.safeParse(parseBody(event));
+    if (!body.success) {
+      const size = (parseBody(event) as { size?: unknown } | undefined)?.size;
+      if (typeof size === "number" && size > MAX_UPLOAD_BYTES) return json(413, { error: `The file is ${(size / 1024 / 1024).toFixed(1)} MB; at most ${MAX_UPLOAD_BYTES / 1024 / 1024} MB` });
+      return json(400, { error: "body: { size }: the file's size in bytes" });
+    }
     const key = `catalyst/uploads/${randomUUID()}`;
-    const url = await getSignedUrl(s3, new PutObjectCommand({ Bucket: Resource.Files.name, Key: key }), { expiresIn: 900 });
+    const url = await getSignedUrl(s3, new PutObjectCommand({ Bucket: Resource.Files.name, Key: key, ContentLength: body.data.size }), { expiresIn: 900 });
     return json(200, { key, url });
   },
 

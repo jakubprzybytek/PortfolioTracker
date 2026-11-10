@@ -5,7 +5,7 @@
 
 import { createHash } from "node:crypto";
 import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { filingKey, filingRows, planYears, rowChecks, type FinancialYear } from "@portfolio/core/catalyst/index";
+import { filingKey, filingRows, MAX_UPLOAD_BYTES, planYears, rowChecks, type FinancialYear } from "@portfolio/core/catalyst/index";
 import type { ParsedFiling } from "@portfolio/core/catalyst/filings/filingParser";
 import { bucketName } from "../lib/context.ts";
 import { catalystRepo, queueCatalyst } from "./context.ts";
@@ -52,7 +52,7 @@ export async function storeFiling(input: StoreFilingInput): Promise<StoreFilingR
   if (checks.length > 0 && !force) throw new FilingRefused(`The filing doesn't add up:\n  ${checks.join("\n  ")}\nLook at it; if it's right, import it with force`);
 
   // The original must be the file the figures came from.
-  const data = "data" in input.original ? input.original.data : await read(input.original.uploadKey);
+  const data = "data" in input.original ? input.original.data : await readUpload(input.original.uploadKey);
   const actual = createHash("sha256").update(data).digest("hex");
   if (actual !== sha256) throw new FilingRefused(`The file isn't the one read (SHA-256 ${actual.slice(0, 12)}…, expected ${sha256.slice(0, 12)}…)`);
 
@@ -86,7 +86,12 @@ export async function storeFiling(input: StoreFilingInput): Promise<StoreFilingR
   return result;
 }
 
-async function read(key: string): Promise<Uint8Array> {
+/** An upload's bytes; one above the limit (the URL is signed for its size, so only a file put there otherwise) is refused unread. */
+export async function readUpload(key: string): Promise<Uint8Array> {
   const res = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: key }));
+  if ((res.ContentLength ?? 0) > MAX_UPLOAD_BYTES) {
+    res.Body?.transformToWebStream().cancel().catch(() => {});
+    throw new FilingRefused(`The upload is ${((res.ContentLength ?? 0) / 1024 / 1024).toFixed(1)} MB; at most ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`);
+  }
   return new Uint8Array(await res.Body!.transformToByteArray());
 }

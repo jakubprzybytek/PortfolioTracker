@@ -3,11 +3,11 @@
 // catalyst/documents/<company>/<date>-<kind>-<sha12>.<ext>, never downloaded twice (one SHA-256, one copy).
 
 import { createHash } from "node:crypto";
-import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { CatalystDocumentItem } from "@portfolio/core/catalyst/index";
 import { bucketName } from "../lib/context.ts";
 import { catalystRepo } from "./context.ts";
-import { FilingRefused } from "./filings.ts";
+import { FilingRefused, readUpload } from "./filings.ts";
 
 const s3 = new S3Client({});
 
@@ -37,8 +37,7 @@ export async function storeDocument(input: StoreDocumentInput): Promise<{ docume
     const { PK: _p, SK: _s, ...document } = held;
     return { document, stored: false, duplicate: true };
   }
-  const res = await s3.send(new GetObjectCommand({ Bucket: bucketName, Key: input.uploadKey }));
-  const data = new Uint8Array(await res.Body!.transformToByteArray());
+  const data = await readUpload(input.uploadKey);
   const actual = createHash("sha256").update(data).digest("hex");
   if (actual !== input.sha256) throw new FilingRefused(`The file isn't the one read (SHA-256 ${actual.slice(0, 12)}…, expected ${input.sha256.slice(0, 12)}…)`);
   const extension = (/\.([a-z0-9]{2,5})$/i.exec(input.fileName)?.[1] ?? "bin").toLowerCase();
