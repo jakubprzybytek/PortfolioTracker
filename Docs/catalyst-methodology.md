@@ -1059,7 +1059,7 @@ In the order the roadmap would take them:
 6. **Instalments and amounts in circulation:** the dates of later instalments (from the terms of issue);
    re-reading the amount in circulation for taps and buy-backs.
 7. **Trailing 12 months** from half-year and quarterly reports.
-8. **Calibration** on past Catalyst defaults (GetBack 2018 and others) and Polish bankruptcy models. The
+8. **Calibration** on past Catalyst defaults (GetBack 2018 and others) and Polish bankruptcy models (started, on hold: [catalyst-default-calibration.md](catalyst-default-calibration.md)). The
    sample is small, so this is calibration, not machine learning.
 9. **Holding-company flag** (structural subordination), and a holding view for developers working
    through joint ventures (BBI).
