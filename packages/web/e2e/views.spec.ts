@@ -2025,6 +2025,8 @@ test.describe("catalyst view", () => {
 
   test("the yield headings explain themselves: an 'i' that opens on hover or a tap, without sorting", async ({ page }) => {
     await page.goto("/#/catalyst");
+    // The view's own order, the best net yield first, is marked on its column.
+    await expect(page.getByTestId("catalyst-table").getByRole("columnheader", { name: /Yield net/ })).toHaveAttribute("aria-sort", "descending");
     await page.getByTestId("info-yield").hover();
     await expect(page.getByTestId("info-yield-text")).toContainText("after the 19% tax");
     await page.getByTestId("info-premium").click();

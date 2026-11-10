@@ -6,7 +6,7 @@ import { fmtNum } from "../format.ts";
 import { Icon } from "../Icons.tsx";
 import { InfoTip } from "../InfoTip.tsx";
 import { SkeletonRows } from "../Placeholders.tsx";
-import { parseSort, sortParam, sortRows } from "../sort.ts";
+import { parseSort, sortParam, sortRows, type Sort } from "../sort.ts";
 import { SortTh } from "../SortTh.tsx";
 import { StickyTable, useStickyToolbar } from "../sticky.tsx";
 import { useApi } from "../useApi.ts";
@@ -37,7 +37,8 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
   const [panelHeight, setPanelHeight] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const all = screen.data?.rows ?? [];
-  const sort = parseSort(params["sort"], SORT_KEYS);
+  // Without a sort in the URL: the view's own order, the best net yield first, marked on its column.
+  const sort = parseSort(params["sort"], SORT_KEYS) ?? DEFAULT_SORT;
   const set = (k: string, v: string | undefined) => setParams({ ...params, [k]: v || undefined });
   const list = companyList(params);
   const out = params["cm"] === "out";
@@ -49,8 +50,8 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
   const peek = !!params["peek"] && others.length > 0;
   const shown = useMemo(() => {
     const filtered = all.filter((r) => matches(r, params) || (peek && others.includes(r)));
-    // The view's own order: the best net yield first, those without one after.
-    const byYield = sortRows(filtered, { key: "yield", desc: true }, sortValue);
+    // Ties keep the view's own order: the best net yield first, those without one after.
+    const byYield = sortRows(filtered, DEFAULT_SORT, sortValue);
     return sortRows(byYield, sort, sortValue);
   }, [all, params, sort, peek, others]);
   const selected = params["bond"] ? all.find((r) => r.isin === params["bond"]) : undefined;
@@ -313,6 +314,9 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
 }
 
 /** What the yield columns are (the "i" by their headings). */
+/** The view's own order: the best net yield first. */
+const DEFAULT_SORT: Sort = { key: "yield", desc: true };
+
 const INFO = {
   yield: (
     <>

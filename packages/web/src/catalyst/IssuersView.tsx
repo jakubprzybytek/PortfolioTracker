@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { apiSend } from "../api.ts";
 import { FilterBar, FilterSelect, FilterText, matchesAny } from "../Filters.tsx";
 import { SkeletonRows } from "../Placeholders.tsx";
-import { parseSort, sortParam, sortRows, type SortValue } from "../sort.ts";
+import { parseSort, sortParam, sortRows, type Sort, type SortValue } from "../sort.ts";
 import { SortTh } from "../SortTh.tsx";
 import { StickyTable, useStickyToolbar } from "../sticky.tsx";
 import { useApi } from "../useApi.ts";
@@ -31,6 +31,7 @@ interface IssuerRow {
   work: WorkItem[];
 }
 
+const DEFAULT_SORT: Sort = { key: "name", desc: false };
 const KEYS = ["name", "ai", "industry", "rule", "bonds", "owed", "due12", "premium", "scorecard", "confidence", "year", "judged", "work"] as const;
 const median = (xs: number[]) => {
   if (xs.length === 0) return null;
@@ -80,7 +81,8 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
   const [toolbar, stickyStyle] = useStickyToolbar();
   const [error, setError] = useState<string | null>(null);
   const set = (k: string, v: string | undefined) => setParams({ ...params, [k]: v || undefined });
-  const sort = parseSort(params["sort"], KEYS);
+  // Without a sort in the URL: by name, marked on its column.
+  const sort = parseSort(params["sort"], KEYS) ?? DEFAULT_SORT;
 
   const all = useMemo<IssuerRow[]>(() => {
     const rows = screen.data?.rows ?? [];
@@ -115,7 +117,7 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
         (!p["state"] || stateMatches(r.signals, r.c.aiAnalysis.on, p["state"])) &&
         (!p["work"] || (p["work"] === "you" ? r.work.some((w) => w.who === "you") : r.work.length > 0)),
     );
-    return sortRows(sortRows(filtered, { key: "name", desc: false }, value), sort, value);
+    return sortRows(sortRows(filtered, DEFAULT_SORT, value), sort, value);
   }, [all, params, sort]);
 
   const industries = useMemo(() => opt(all.map((r) => r.c.industry ?? "").filter(Boolean)), [all]);
