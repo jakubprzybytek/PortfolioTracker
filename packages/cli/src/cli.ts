@@ -189,11 +189,12 @@ async function dispatch({ positional, flags }: Args, io: Io): Promise<number> {
         const raw = readJson(need("--file")) as Record<string, unknown>;
         const file = need("--document");
         const data = readFileSync(file);
-        // The passage is checked against the document's text; scanned terms (pages without text) can't be.
+        // The passage is checked against the document's text; scanned terms can't be: pages with little more text than
+        // a running header (under 200 characters; a typed page has thousands).
         const quote = typeof raw["quote"] === "string" ? raw["quote"] : fail("the schedule needs a quote: the passage of the terms that sets the redemption, as printed");
         const pages = isPdf(data) ? await readPdfPages(data) : [{ lines: [plainText(data.toString("utf8"))] }];
         const text = pages.flatMap((pg) => pg.lines).join(" ").replaceAll(" | ", " ");
-        const scanned = pages.some((pg) => pg.lines.join("").trim().length < 20);
+        const scanned = isPdf(data) && pages.some((pg) => pg.lines.join("").trim().length < 200);
         if (!quoteIn(text, quote) && !scanned) throw new CliError(`The quote isn't in ${basename(file)}: copy the passage as printed (line breaks and hyphenation don't matter).`);
         if (!quoteIn(text, quote)) io.err(`Note: the quote couldn't be checked (${basename(file)} has scanned pages without text).`);
         const body = ScheduleInput.parse({ ...raw, documentSha: sha256Of(data), ...(dryRun ? { dryRun } : {}) });
