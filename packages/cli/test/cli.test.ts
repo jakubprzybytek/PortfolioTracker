@@ -123,6 +123,33 @@ describe("catalyst CLI", () => {
     expect((sent[0]!.body as { dryRun: boolean }).dryRun).toBe(true);
   });
 
+  it("analysis put --provisional: asks the app to store it marked provisional", async () => {
+    const { cli, sent, dir } = setup({ "POST /entities/0000442287/analyses": () => ({ status: 201, body: { stored: true } }) });
+    writeFileSync(join(dir, "j.md"), "# Corpus Iuris. The bonds amortize from July 2027; covenants are met with headroom.");
+    writeFileSync(join(dir, "m.json"), JSON.stringify({ model: "claude-opus-5-5", sources: ["H1 2026 report"], redFlags: [] }));
+    await cli("analysis", "put", "0000442287", "--file", join(dir, "j.md"), "--meta", join(dir, "m.json"), "--provisional");
+    expect((sent[0]!.body as { provisional?: boolean }).provisional).toBe(true);
+  });
+
+  it("bonds schedule: checks the quote against the terms, then sends the schedule with the document's hash", async () => {
+    const { cli, sent, dir } = setup({
+      "GET /bonds": () => ({ body: { date: "2026-11-10", rows: [{ code: "GCI0729", isin: "PLO448400013" }] } }),
+      "PUT /bonds/PLO448400013/schedule": (b) => ({ status: 201, body: { stored: true, ...(b as object) } }),
+    });
+    writeFileSync(join(dir, "terms.txt"), "9.4 Emitent dokona obniżenia wartości nominalnej Obligacji do 800 zł w dniu 30 lipca 2027 r.");
+    const schedule = { issuedNominal: 1000, instalments: [{ date: "2027-07-30", nominalAfter: 800 }], source: "Warunki emisji serii K, pkt 9.4", quote: "obniżenia wartości nominalnej Obligacji do 800 zł" };
+    writeFileSync(join(dir, "s.json"), JSON.stringify(schedule));
+    const r = await cli("bonds", "schedule", "GCI0729", "--file", join(dir, "s.json"), "--document", join(dir, "terms.txt"));
+    expect(r.code).toBe(0);
+    const put = sent.find((s) => s.method === "PUT")!;
+    expect(put.url).toContain("/bonds/PLO448400013/schedule");
+    expect((put.body as { documentSha: string }).documentSha).toMatch(/^[0-9a-f]{64}$/);
+    writeFileSync(join(dir, "bad.json"), JSON.stringify({ ...schedule, quote: "a passage that is not in the terms" }));
+    const bad = await cli("bonds", "schedule", "GCI0729", "--file", join(dir, "bad.json"), "--document", join(dir, "terms.txt"));
+    expect(bad.code).toBe(1);
+    expect(bad.err).toContain("The quote isn't in terms.txt");
+  });
+
   it("documents put: one already held isn't uploaded again; a new one is uploaded, then stored", async () => {
     const { cli, sent, dir } = setup({
       "GET /entities/0000442287": () => ({ body: { documents: [{ sha256: "x".repeat(64), title: "held" }] } }),

@@ -54,6 +54,11 @@ export const AnalysisInput = z
         scorecard: z.unknown().optional(),
       })
       .strict(),
+    /**
+     * Store it although the bond terms or the recent current reports weren't read (judgementGaps): marked provisional,
+     * with what's missing. Without it, such a judgement is refused.
+     */
+    provisional: z.boolean().optional(),
     dryRun: z.boolean().optional(),
   })
   .strict();
@@ -138,6 +143,30 @@ export const PaymentEventInput = z
     if (e.resolvedOn && e.resolvedOn < e.date) ctx.addIssue({ code: "custom", path: ["resolvedOn"], message: "before the payment's date" });
   });
 
+/**
+ * A bond's amortization schedule from its terms of issue (`catalyst bonds schedule <code>`): the nominal per bond after
+ * each instalment before maturity, oldest first; `instalments: []` for a bond repaid at maturity in one go. It rests on
+ * the terms stored with `documents put` and the passage that sets the instalments (or the single redemption).
+ */
+export const ScheduleInput = z
+  .object({
+    issuedNominal: z.number().positive(),
+    instalments: z.array(z.object({ date: day, nominalAfter: z.number().positive() }).strict()).max(60),
+    /** Where in the terms: "Warunki emisji obligacji serii K, pkt 8.3". */
+    source: z.string().trim().min(3).max(300),
+    documentSha: z.string().regex(/^[0-9a-f]{64}$/),
+    quote: z.string().trim().min(12).max(1000),
+    dryRun: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((s, ctx) => {
+    s.instalments.forEach((i, n) => {
+      const prev = n === 0 ? undefined : s.instalments[n - 1]!;
+      if (i.nominalAfter >= (prev?.nominalAfter ?? s.issuedNominal)) ctx.addIssue({ code: "custom", path: ["instalments", n, "nominalAfter"], message: "each instalment lowers the nominal" });
+      if (prev && i.date <= prev.date) ctx.addIssue({ code: "custom", path: ["instalments", n, "date"], message: "instalments oldest first, one per date" });
+    });
+  });
+
 /** Why a recorded payment event is withdrawn (`catalyst events retract`): it stays stored, marked, and is no longer read. */
 export const RetractInput = z.object({ reason: z.string().trim().min(5).max(500), dryRun: z.boolean().optional() }).strict();
 
@@ -166,6 +195,7 @@ export const AGENT_SCHEMAS = {
   checklist: ChecklistInput,
   document: DocumentInput,
   event: PaymentEventInput,
+  schedule: ScheduleInput,
 } as const;
 
 // ─── The token's reach ──────────────────────────────────────────────────────────────────────────────────────────
@@ -186,11 +216,32 @@ export const AGENT_WRITES = [
   "POST /catalyst/entities/{id}/documents",
   "POST /catalyst/entities/{id}/events",
   "POST /catalyst/entities/{id}/events/{eventId}/retract",
+  "PUT /catalyst/bonds/{isin}/schedule",
 ] as const;
 
 export function agentMayCall(routeKey: string): boolean {
   if (routeKey.startsWith("GET /catalyst/")) return !routeKey.startsWith("GET /catalyst/agent-token");
   return (AGENT_WRITES as readonly string[]).includes(routeKey);
+}
+
+// ─── What a judgement must rest on ─────────────────────────────────────────────────────────────────────────────
+
+/** A judgement needs the current reports read to within this many days. */
+export const REPORTS_READ_WITHIN_DAYS = 45;
+
+/**
+ * What a judgement written today would miss (an empty list: nothing): the terms of each listed bond, shown by its
+ * stored amortization schedule (amortization, covenants, collateral and call options are all in the terms), and the
+ * company's current reports read recently (its latest `reviewed` event).
+ */
+export function judgementGaps(input: { listed: { isin: string; code: string }[]; schedules: Set<string>; reviewedTo: string | null; today: string }): string[] {
+  const gaps: string[] = [];
+  const unread = input.listed.filter((b) => !input.schedules.has(b.isin)).map((b) => b.code).sort();
+  if (unread.length) gaps.push(`terms of issue not read for ${unread.join(", ")}: read each bond's terms (amortization, covenants, collateral, call) and store its schedule (catalyst bonds schedule <code>)`);
+  const since = new Date(Date.parse(`${input.today}T00:00:00Z`) - REPORTS_READ_WITHIN_DAYS * 86_400_000).toISOString().slice(0, 10);
+  if (!input.reviewedTo || input.reviewedTo < since)
+    gaps.push(`current reports ${input.reviewedTo ? `read only to ${input.reviewedTo}` : "never read"}: read the ESPI/EBI reports to within ${REPORTS_READ_WITHIN_DAYS} days and record it (catalyst events put, kind "reviewed")`);
+  return gaps;
 }
 
 // ─── What needs doing ───────────────────────────────────────────────────────────────────────────────────────────

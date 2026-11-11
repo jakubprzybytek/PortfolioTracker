@@ -79,6 +79,19 @@ analysis, end to end".
    security, related-party dealings, and the last year's current reports (ESPI/EBI) for red flags. Each red flag
    needs a source and a short quote.
 
+   - **Bond terms (required):** read the terms of issue of every listed bond (`entity <id>`'s `bonds`; for a
+     prospectus or information document, the "Warunki emisji" section, often scanned: read the page images). Note
+     amortization, covenants and their headroom, collateral (what is pledged, whose, and its cover), call options
+     and their premiums, dividend caps. Store the terms (`documents put --kind terms`), then each bond's schedule:
+     `catalyst bonds schedule <code> --file schedule.json --document <terms file>` (`catalyst schema schedule`:
+     `issuedNominal`, `instalments` as `{ date, nominalAfter }` oldest first, `[]` when it's repaid at maturity in
+     one go, `source`, `quote`). Refinancing then counts the instalments on their dates.
+   - **Question the greens.** All green is a reason to look harder, not to stop. For lenders: is profit
+     revaluation rather than cash (net profit above revenue; operating cash flow near zero)? Are dividends paid
+     from new debt (dividends paid vs operating cash flow and borrowings raised)? Is the collateral the group's own
+     assets (its own funds' certificates), and how close is its cover to the covenant floor? Is the item you'd
+     "watch" already settled in a current report?
+
    - **Payments (§11, "Repayment track record"):** when `catalyst work` lists `kind: "payments"`, or before any
      judgement: read the company's current reports (ESPI for listed shares or bonds on the regulated market, EBI for
      the alternative market) on the issuer's site, Bankier.pl or PAP Biznes, back to the date `entity <id>`'s
@@ -101,7 +114,10 @@ analysis, end to end".
      --reason "…"`.
 
 8. **Judgement (§14):** `judgement.md` in this layout, then
-   `catalyst analysis put <id> --file judgement.md --meta meta.json --dry-run`, then without `--dry-run`:
+   `catalyst analysis put <id> --file judgement.md --meta meta.json --dry-run`, then without `--dry-run`. The app
+   refuses it while a listed bond has no schedule or the current reports weren't read within 45 days (`entity
+   <id>`'s `judgementGaps` lists them): close the gaps. Only when they can't be closed (the terms aren't published),
+   add `--provisional` and say why in the judgement; it's stored marked provisional.
 
    ```
    # <Company>

@@ -66,6 +66,7 @@ export const catalystKeys = {
   session: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `D#${date}#${market}` as const }),
   day: (date: IsoDate) => ({ PK: "DAYS" as const, SK: date }),
   terms: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "TERMS" as const }),
+  schedule: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "SCHEDULE" as const }),
   coupon: (isin: string, start: IsoDate) => ({ PK: `BOND#${isin}` as const, SK: `COUPON#${start}` as const }),
   quoteDay: (date: IsoDate) => ({ PK: "QUOTEDAYS" as const, SK: date }),
   screen: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "SCREEN" as const }),
@@ -88,6 +89,28 @@ export const catalystKeys = {
   document: (entityId: string, sha256: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `DOC#${sha256}` as const }),
   paymentEvent: (entityId: string, date: IsoDate, id: string) => ({ PK: `ENTITY#${entityId}` as const, SK: `PAY#${date}#${id}` as const }),
 };
+
+/**
+ * A bond's amortization schedule, read from its terms of issue by the agent (`catalyst bonds schedule`): the nominal
+ * per bond after each instalment before maturity; none for a bond repaid at maturity in one go. Refinancing counts the
+ * instalments on their dates; a judgement needs one for every listed bond of its company (the terms were read).
+ */
+export interface CatalystScheduleItem {
+  PK: `BOND#${string}`;
+  SK: "SCHEDULE";
+  GSI1PK: "SCHEDULE";
+  GSI1SK: string; // isin
+  isin: string;
+  entityId: string;
+  issuedNominal: number;
+  instalments: { date: IsoDate; nominalAfter: number }[];
+  /** Where in the terms ("Warunki emisji serii K, pkt 9.4"), the stored document and the passage. */
+  source: string;
+  documentSha: string;
+  quote: string;
+  by: string;
+  at: string;
+}
 
 /**
  * A company's other document (plan N8): the auditor's report, the management report, an interim report, a current
@@ -185,6 +208,8 @@ export interface CatalystAnalysisItem {
   redFlags?: { text: string; source: string; quote?: string }[];
   /** The latest full year stored when it was written (its period end): a later one makes it stale. */
   basedOn?: string;
+  /** Stored although it missed these (the bonds' terms, the recent current reports): provisional. */
+  provisional?: string[];
 }
 
 /**

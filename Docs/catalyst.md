@@ -363,7 +363,8 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 | `catalyst filings check [--entity <id>]` | Compare stored rows and fresh parses with the known answers |
 | `catalyst known put <id> --file known.json` | Hand-read figures of a report, for `filings check` |
 | `catalyst figures put <id> --file fig.json` | Fallback figures from the web (operating companies only), marked as collected |
-| `catalyst analysis put <id> --file judgement.md --meta meta.json` | Store a judgement (layout below) |
+| `catalyst bonds schedule <code> --file schedule.json --document <terms>` | A bond's amortization schedule from its terms of issue (the nominal per bond after each instalment; `instalments: []` for a bullet bond): Refinancing counts instalments on their dates. The terms are stored with `documents put` first; the quote is checked against their text unless they're scanned |
+| `catalyst analysis put <id> --file judgement.md --meta meta.json [--provisional]` | Store a judgement (layout below). Refused while a listed bond has no schedule (its terms unread) or the current reports weren't read within 45 days (`entity <id>` shows `judgementGaps`); `--provisional` stores it marked so, with the gaps, shown in the app |
 | `catalyst events list <id>`, `catalyst events put <id> --file event.json --document <file>`, `catalyst events retract <id> <event id> --reason "…"` | What the company's reports say about payments ("Payment events"): the document is one stored with `documents put`, and the event's quote must stand in it; kind `reviewed` goes without a document |
 | `catalyst schema <kind>` | JSON Schema of an input |
 
@@ -375,7 +376,7 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 4. Reports: latest full year, group first; then the interim reports after it (quarterly or half-year, same scope), once the annual path is in place. Issuer site, Bankier (listed), filings.xbrl.org; download into a new directory, 2 s apart; the KRS repository only through `checklist --add` for you.
 5. `filings import --dry-run`, then import; a PDF via `filings pages` → transcript (copy, never compute) → import. Refused? Read the checks, fix the transcript, never `--force` without asking.
 6. No report available and an operating company: `figures put`, avoiding §9's failure modes (part years, today's date, units, the wrong company).
-7. `entity <id>`: read the scorecard against the rule set (§13); read the auditor's opinion, going-concern notes, covenants, security, related parties, current reports for red flags, each with a source and quote.
+7. `entity <id>`: read the scorecard against the rule set (§13); read each listed bond's terms of issue (amortization, covenants, collateral, call) and store its schedule (`bonds schedule`); read the auditor's opinion, going-concern notes, related parties, current reports for red flags, each with a source and quote.
 8. `analysis put` in the §14 layout: header (company, identity, industry, rule set), bonds and amounts due, figures and confidence, the 6 dimensions and trend arrows, judgement (2–5 sentences), red flags (or "none found in <documents read>"), what to watch, sources.
 
 Limits: at most N companies per session; never touch bonds or market data. It runs by hand in Claude Code, or later as a scheduled cloud routine with the token as a secret (the KRS checklist then waits for you).

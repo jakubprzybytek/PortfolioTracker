@@ -299,18 +299,22 @@ function Due({ d }: { d: CompanyDetail }) {
   const r = d.analysis.refinancing;
   if (!r || r.bonds.length === 0) return <p className="muted cat-facts">No listed bonds outstanding.</p>;
   const byYear = new Map<string, number>();
-  for (const b of r.bonds) byYear.set(b.maturityDay.slice(0, 4), (byYear.get(b.maturityDay.slice(0, 4)) ?? 0) + (b.inReportCurrency ?? b.amount));
+  // Instalments in their own years when the schedule is known, else the whole amount at maturity.
+  for (const b of r.bonds)
+    for (const p of b.payments ?? [{ date: b.maturityDay, amount: b.amount, inReportCurrency: b.inReportCurrency }])
+      byYear.set(p.date.slice(0, 4), (byYear.get(p.date.slice(0, 4)) ?? 0) + (p.inReportCurrency ?? p.amount));
+  const years = [...byYear].sort(([a], [b]) => a.localeCompare(b));
   const max = Math.max(...byYear.values(), r.report?.cash ?? 0);
   const cur = r.report?.currency ?? "PLN";
   const bar = (v: number) => ({ width: `${max > 0 ? (v / max) * 100 : 0}%` });
   return (
     <div className="cat-due" data-testid="issuer-due">
       <h3 className="cat-panel-title">
-        Bonds falling due <span className="cat-panel-unit">m {cur}, by year of maturity, against cash</span>
+        Bonds falling due <span className="cat-panel-unit">m {cur}, by year of repayment, against cash</span>
       </h3>
       <div className="cat-due-bars">
-        {[...byYear].map(([year, v]) => (
-          <div key={year} className="cat-due-row" title={`Bonds maturing in ${year}: ${mln(v)} m ${cur}`}>
+        {years.map(([year, v]) => (
+          <div key={year} className="cat-due-row" title={`Bonds repaid in ${year} (instalments included): ${mln(v)} m ${cur}`}>
             <span className="cat-due-label">{year}</span>
             <span className="cat-due-track">
               <span className="bar" style={bar(v)} />
@@ -559,12 +563,21 @@ function JudgementsTab({ d }: { d: CompanyDetail }) {
       <p className="muted cat-facts">
         {latest!.at.slice(0, 10)} · {latest!.by}
         {latest!.source === "CatalystViewer" ? " (from CatalystViewer)" : ""}
+        {latest!.provisional && <span className="neg"> · provisional</span>}
       </p>
+      {latest!.provisional && (
+        <ul className="cat-facts neg" data-testid="issuer-judgement-provisional">
+          {latest!.provisional.map((g) => (
+            <li key={g}>Missed: {g}</li>
+          ))}
+        </ul>
+      )}
       <MarkdownText text={latest!.markdown} />
       {earlier.map((j) => (
         <details key={j.at}>
           <summary>
             {j.at.slice(0, 10)} · {j.by}
+            {j.provisional ? " · provisional" : ""}
           </summary>
           <MarkdownText text={j.markdown} />
         </details>

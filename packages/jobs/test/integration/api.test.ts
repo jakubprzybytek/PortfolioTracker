@@ -804,6 +804,10 @@ describe(`API ${API}`, () => {
     expect((await agent("POST", "/entities/0000000000/events", t, { kind: "missed-payment", date: "2026-01-20", text: "series A not redeemed", source: "ESPI 3/2026" })).status).toBe(400);
     expect((await agent("POST", "/entities/0000000000/events", t, { kind: "reviewed", date: "2026-01-20", text: "nothing about payments", source: "ESPI reports to 2026-01", dryRun: true })).status).toBe(404);
     expect((await agent("POST", "/entities/0000000000/events/abcd1234/retract", t, { reason: "the wrong series" })).status).toBe(404);
+    // A bond's amortization schedule: the input checked first (each instalment lowers the nominal), then the bond.
+    const schedule = { issuedNominal: 1000, instalments: [{ date: "2027-07-30", nominalAfter: 800 }], source: "Warunki emisji, pkt 9", documentSha: "0".repeat(64), quote: "obniżenie wartości nominalnej do 800 zł", dryRun: true };
+    expect((await agent("PUT", "/bonds/PLNOSUCH0000/schedule", t, { ...schedule, instalments: [{ date: "2027-07-30", nominalAfter: 1000 }] })).status).toBe(400);
+    expect((await agent("PUT", "/bonds/PLNOSUCH0000/schedule", t, schedule)).status).toBe(404);
     expect((await agent("PUT", "/entities/0000000000", t, { industry: "Developer" })).status).toBe(404);
     expect((await agent("PUT", `/names/${encodeURIComponent("No Such Name S.A.")}`, t, { entityId: "0000000000" })).status).toBe(400); // no evidence
     expect((await agent("POST", "/filings", t, { entityId: "0000000000" })).status).toBe(400);

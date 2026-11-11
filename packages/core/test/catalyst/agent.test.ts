@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGENT_SCHEMAS, AnalysisInput, MAX_UPLOAD_BYTES, UploadUrlInput, agentMayCall, annualDue, assumedBasis, halfYearDue, latestPeriod, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
+import { AGENT_SCHEMAS, AnalysisInput, MAX_UPLOAD_BYTES, ScheduleInput, UploadUrlInput, agentMayCall, judgementGaps, annualDue, assumedBasis, halfYearDue, latestPeriod, workItems, type WorkInput } from "../../src/catalyst/agent.ts";
 
 const entity = (entityId: string, over: Partial<WorkInput["entities"][number]> = {}): WorkInput["entities"][number] => ({
   entityId,
@@ -176,5 +176,36 @@ describe("the agent's inputs", () => {
     const event = { kind: "reviewed", date: "2026-11-01", text: "Nothing found", source: "ESPI 2024-2026" };
     expect(AGENT_SCHEMAS.event.safeParse({ ...event, sourceUrl: "javascript:alert(1)" }).success).toBe(false);
     expect(AGENT_SCHEMAS.event.safeParse({ ...event, sourceUrl: "https://bankier.pl/x" }).success).toBe(true);
+  });
+});
+
+describe("judgementGaps", () => {
+  const listed = [{ isin: "PLO448400013", code: "GCI0729" }, { isin: "PLO448400021", code: "GC10729" }];
+  it("lists the bonds whose terms weren't read and current reports not read recently", () => {
+    const gaps = judgementGaps({ listed, schedules: new Set(["PLO448400013"]), reviewedTo: "2026-09-01", today: "2026-11-11" });
+    expect(gaps).toHaveLength(2);
+    expect(gaps[0]).toContain("terms of issue not read for GC10729:");
+    expect(gaps[1]).toContain("current reports read only to 2026-09-01");
+    expect(judgementGaps({ listed, schedules: new Set(), reviewedTo: null, today: "2026-11-11" })[1]).toContain("never read");
+  });
+  it("is empty once every listed bond has its schedule and the reports were read within 45 days", () => {
+    expect(judgementGaps({ listed, schedules: new Set(listed.map((b) => b.isin)), reviewedTo: "2026-09-27", today: "2026-11-11" })).toEqual([]);
+    expect(judgementGaps({ listed: [], schedules: new Set(), reviewedTo: "2026-11-01", today: "2026-11-11" })).toEqual([]);
+  });
+});
+
+describe("ScheduleInput", () => {
+  const base = { issuedNominal: 1000, source: "Warunki emisji serii K, pkt 9", documentSha: "a".repeat(64), quote: "obniżenie wartości nominalnej do 800 zł" };
+  it("takes instalments oldest first, each lowering the nominal; none for a bullet bond", () => {
+    expect(ScheduleInput.safeParse({ ...base, instalments: [{ date: "2027-07-30", nominalAfter: 800 }, { date: "2028-07-30", nominalAfter: 600 }] }).success).toBe(true);
+    expect(ScheduleInput.safeParse({ ...base, instalments: [] }).success).toBe(true);
+    expect(ScheduleInput.safeParse({ ...base, instalments: [{ date: "2027-07-30", nominalAfter: 1000 }] }).success).toBe(false);
+    expect(ScheduleInput.safeParse({ ...base, instalments: [{ date: "2028-07-30", nominalAfter: 800 }, { date: "2027-07-30", nominalAfter: 600 }] }).success).toBe(false);
+    expect(ScheduleInput.safeParse({ ...base, quote: "", instalments: [] }).success).toBe(false);
+  });
+  it("is a write the agent may make", () => {
+    expect(agentMayCall("PUT /catalyst/bonds/{isin}/schedule")).toBe(true);
+    expect(AGENT_SCHEMAS.schedule).toBe(ScheduleInput);
+    expect(AnalysisInput.safeParse({ markdown: "x".repeat(60), meta: { model: "m", sources: ["s"], redFlags: [] }, provisional: true }).success).toBe(true);
   });
 });

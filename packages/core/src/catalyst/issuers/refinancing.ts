@@ -6,8 +6,27 @@
 import type { Bands, DimensionResult, Signal } from "./scorecard.ts";
 import type { DbIssuerFinancialsRecord } from "./financialsRecord.ts";
 
-// issueValue: the amount still owed (issued, less instalments already repaid); issued: as issued, when more
-export type ListedBond = { isin: string; name: string; currency: string; issueValue: number; maturityDay: string; issued?: number };
+// issueValue: the amount still owed (issued, less instalments already repaid); issued: as issued, when more;
+// instalments: the payments still due before maturity (from the terms of issue: an amortization schedule), the
+// rest of the amount owed at maturity. Absent: the schedule isn't known; empty: none (a bullet bond).
+export type Instalment = { date: string; amount: number };
+export type ListedBond = { isin: string; name: string; currency: string; issueValue: number; maturityDay: string; issued?: number; instalments?: Instalment[] };
+
+/**
+ * The instalments still ahead of a bond, in its currency, from its amortization schedule (the nominal per bond after
+ * each instalment): `issueValue` as issued at `issuedNominal`, the bond at `nominal` now. An instalment whose nominal
+ * the bond is already at or below has been paid.
+ */
+export function instalmentsAhead(issueValue: number, issuedNominal: number, nominal: number, schedule: { date: string; nominalAfter: number }[]): Instalment[] {
+    const out: Instalment[] = [];
+    let before = nominal;
+    for (const s of [...schedule].sort((a, b) => a.date.localeCompare(b.date))) {
+        if (s.nominalAfter >= before) continue;
+        out.push({ date: s.date, amount: issueValue * (before - s.nominalAfter) / issuedNominal });
+        before = s.nominalAfter;
+    }
+    return out;
+}
 
 // What a bond still owes: the issue value at its current nominal. An instalment redemption lowers the nominal
 // (Kruk KRU0228: 1,000 → 550), so 350m issued is 192.5m owed; `issued` is set then. An indexed nominal
@@ -29,6 +48,8 @@ export type ScheduledBond = {
     amount: number;           // owed, units of its currency
     issued?: number;          // as issued, when instalments have been repaid
     inReportCurrency?: number;  // undefined when there's no rate for its currency
+    // Every payment of principal still due, instalments first, the rest at maturity; only when the schedule is known.
+    payments?: { date: string; amount: number; inReportCurrency?: number }[];
 };
 
 export type Refinancing = {
@@ -77,10 +98,16 @@ export function refinancing(bonds: ListedBond[], report: DbIssuerFinancialsRecor
         .map((b): ScheduledBond => {
             const from = rate(b.currency);
             const to = rate(reportCurrency);
+            const conv = (v: number) => (from && to ? { inReportCurrency: v * from / to } : {});
+            const maturityDay = b.maturityDay.slice(0, 10);
+            const ahead = b.instalments?.filter(i => i.date >= today && i.date < maturityDay && i.amount > 0);
+            const early = ahead?.reduce((s, i) => s + i.amount, 0) ?? 0;
+            const payments = ahead && [...ahead, { date: maturityDay, amount: Math.max(0, b.issueValue - early) }].map(p => ({ ...p, ...conv(p.amount) }));
             return {
-                isin: b.isin, name: b.name, maturityDay: b.maturityDay.slice(0, 10), currency: b.currency, amount: b.issueValue,
+                isin: b.isin, name: b.name, maturityDay, currency: b.currency, amount: b.issueValue,
                 ...(b.issued !== undefined ? { issued: b.issued } : {}),
-                ...(from && to ? { inReportCurrency: b.issueValue * from / to } : {}),
+                ...conv(b.issueValue),
+                ...(payments && payments.length > 1 ? { payments } : {}),
             };
         })
         .sort((a, b) => a.maturityDay.localeCompare(b.maturityDay) || a.name.localeCompare(b.name));
@@ -90,7 +117,10 @@ export function refinancing(bonds: ListedBond[], report: DbIssuerFinancialsRecor
     if (unconverted.length) notes.push(`no exchange rate for ${unconverted.join(', ')}: those bonds are left out of the totals`);
     if (!report) return { bonds: scheduled, signal: 'na', notes };
 
-    const due = (until: string) => scheduled.filter(b => b.maturityDay <= until).reduce((s, b) => s + (b.inReportCurrency ?? 0), 0);
+    // Instalments on their own dates when the schedule is known, else the whole amount at maturity.
+    const due = (until: string) => scheduled.reduce((s, b) => s + (b.inReportCurrency === undefined ? 0
+        : b.payments ? b.payments.filter(p => p.date <= until).reduce((t, p) => t + (p.inReportCurrency ?? 0), 0)
+        : b.maturityDay <= until ? b.inReportCurrency : 0), 0);
     const due12 = due(addMonths(today, 12));
     const due24 = due(addMonths(today, 24));
     const listed = scheduled.reduce((s, b) => s + (b.inReportCurrency ?? 0), 0);
@@ -112,8 +142,10 @@ export function refinancing(bonds: ListedBond[], report: DbIssuerFinancialsRecor
 
     notes.push(`cash from the report at ${report.periodEnd}; bonds due counted from ${today}`);
     notes.push('listed bonds only, as issued less instalments repaid: loans, unlisted bonds and bonds bought back are not included');
-    const instalments = scheduled.filter(b => b.issued !== undefined);
-    if (instalments.length) notes.push(`${instalments.map(b => b.name).join(', ')}: repaid in instalments, the amount still owed is counted at maturity (the dates of later instalments aren't known)`);
+    const amortizing = scheduled.filter(b => b.payments);
+    if (amortizing.length) notes.push(`${amortizing.map(b => `${b.name} (${b.payments!.slice(0, -1).map(p => `${(p.amount / 1_000_000).toLocaleString('en-US', { maximumFractionDigits: 1 })} m on ${p.date}`).join(', ')})`).join('; ')}: instalments counted on their dates, from the terms of issue`);
+    const unknown = scheduled.filter(b => b.issued !== undefined && !b.payments && !bonds.find(x => x.isin === b.isin)?.instalments);
+    if (unknown.length) notes.push(`${unknown.map(b => b.name).join(', ')}: repaid in instalments, the amount still owed is counted at maturity (the dates of later instalments aren't known)`);
     if (balanceSheetBonds !== undefined && balanceSheetBonds > 0 && Math.abs(listed - balanceSheetBonds) > 0.05 * balanceSheetBonds) {
         notes.push(`listed bonds ${fmt(listed)} m vs ${fmt(balanceSheetBonds)} m of bonds in the balance sheet`);
     }

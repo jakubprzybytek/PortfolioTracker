@@ -6,7 +6,7 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystChecklistItem, type CatalystDocumentItem, type CatalystPaymentEventItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystChecklistItem, type CatalystDocumentItem, type CatalystPaymentEventItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem, type CatalystScheduleItem } from "./items.ts";
 import type { ScreenRow } from "./screen.ts";
 import type { FinancialYear } from "./financials.ts";
 
@@ -222,6 +222,15 @@ export class CatalystRepository {
 
   async putTerms(item: Omit<CatalystTermsItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">): Promise<void> {
     await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.terms(item.isin), GSI1PK: "TERMS", GSI1SK: item.isin, ...item } }));
+  }
+
+  /** Every bond's amortization schedule (one query on the index). */
+  listSchedules(): Promise<CatalystScheduleItem[]> {
+    return this.queryAll<CatalystScheduleItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "SCHEDULE" } });
+  }
+
+  async putSchedule(item: Omit<CatalystScheduleItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">): Promise<void> {
+    await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.schedule(item.isin), GSI1PK: "SCHEDULE", GSI1SK: item.isin, ...item } }));
   }
 
   /** A bond's interest periods, oldest first. */

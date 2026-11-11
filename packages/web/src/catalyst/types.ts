@@ -231,6 +231,8 @@ export interface ScheduledBond {
   amount: number;
   issued?: number;
   inReportCurrency?: number;
+  /** Instalments then the rest at maturity, when the amortization schedule is known. */
+  payments?: { date: string; amount: number; inReportCurrency?: number }[];
 }
 export interface Refinancing {
   bonds: ScheduledBond[];
@@ -287,6 +289,8 @@ export interface Judgement {
   markdown: string;
   by: string;
   source: "agent" | "you" | "CatalystViewer";
+  /** Stored although it missed these (bond terms, recent current reports). */
+  provisional?: string[];
 }
 export interface CompanyDetail {
   company: Company;

@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { z } from "zod";
-import { AGENT_SCHEMAS, AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, PaymentEventInput, RetractInput, plainText, quoteIn, KRS_REGISTER, krsExtract, leiByIsin, leiRecords, sameName, type Fetcher, type LeiRecord, type WorkItem } from "@portfolio/core/catalyst/index";
+import { AGENT_SCHEMAS, AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, PaymentEventInput, REPORTS_READ_WITHIN_DAYS, RetractInput, ScheduleInput, plainText, quoteIn, KRS_REGISTER, krsExtract, leiByIsin, leiRecords, sameName, type Fetcher, type LeiRecord, type WorkItem } from "@portfolio/core/catalyst/index";
 import { isPdf, pdfStatementPages, readFiling, readPdfFiling, readPdfPages, sha256Of } from "@portfolio/core/catalyst/filings/index";
 import { ApiError, CliError, Client, enc, forgetToken, saveToken, type Io } from "./client.ts";
 import { apiUrl } from "./stage.ts";
@@ -55,11 +55,18 @@ Payments (what the company's own reports say: missed or late payments, changed t
   events put <id> --file event.json     kind "reviewed" only: the current reports were read to a date, nothing else found
   events retract <id> <event id> --reason "…" [--dry-run]
 
+Bond terms (read each listed bond's terms of issue before a judgement):
+  bonds schedule <code> --file schedule.json --document <file> [--dry-run]
+                                        its amortization schedule (instalments: [] when repaid at maturity in one go);
+                                        the document is the terms, stored with documents put
+
 Judgement:
-  analysis put <id> --file judgement.md --meta meta.json [--dry-run]
+  analysis put <id> --file judgement.md --meta meta.json [--dry-run] [--provisional]
+                                        refused while a listed bond's terms or the last ${REPORTS_READ_WITHIN_DAYS} days of current reports
+                                        are unread (entity <id> shows judgementGaps); --provisional stores it marked so
 
 Other:
-  schema <entity|name|analysis|figures|known|checklist|document|event|transcript>   an input as JSON Schema
+  schema <entity|name|analysis|figures|known|checklist|document|event|schedule|transcript>   an input as JSON Schema
   --version, --help`;
 
 type Args = { positional: string[]; flags: Map<string, string | true> };
@@ -174,6 +181,24 @@ async function dispatch({ positional, flags }: Args, io: Io): Promise<number> {
 
     case "bonds":
     case "bond": {
+      if (command === "bonds" && sub === "schedule") {
+        const code = rest[0] ?? fail("bonds schedule <code> --file schedule.json --document <file>");
+        const c = client();
+        const { rows } = await c.get<{ rows: BondRow[] }>("/bonds");
+        const row = rows.find((r) => r.code === code.toUpperCase() || r.isin === code.toUpperCase()) ?? fail(`No listed bond ${code}`);
+        const raw = readJson(need("--file")) as Record<string, unknown>;
+        const file = need("--document");
+        const data = readFileSync(file);
+        // The passage is checked against the document's text; scanned terms (pages without text) can't be.
+        const quote = typeof raw["quote"] === "string" ? raw["quote"] : fail("the schedule needs a quote: the passage of the terms that sets the redemption, as printed");
+        const pages = isPdf(data) ? await readPdfPages(data) : [{ lines: [plainText(data.toString("utf8"))] }];
+        const text = pages.flatMap((pg) => pg.lines).join(" ").replaceAll(" | ", " ");
+        const scanned = pages.some((pg) => pg.lines.join("").trim().length < 20);
+        if (!quoteIn(text, quote) && !scanned) throw new CliError(`The quote isn't in ${basename(file)}: copy the passage as printed (line breaks and hyphenation don't matter).`);
+        if (!quoteIn(text, quote)) io.err(`Note: the quote couldn't be checked (${basename(file)} has scanned pages without text).`);
+        const body = ScheduleInput.parse({ ...raw, documentSha: sha256Of(data), ...(dryRun ? { dryRun } : {}) });
+        return print(await c.call("PUT", `/bonds/${enc(row.isin)}/schedule`, body));
+      }
       const { date, rows } = await client().get<{ date: string; rows: BondRow[] }>("/bonds");
       // Figures the app derived, never obligacje.pl's text.
       const slim = rows.map(({ couponText: _c, ...r }) => r);
@@ -299,7 +324,7 @@ async function dispatch({ positional, flags }: Args, io: Io): Promise<number> {
         json(await c.call("POST", `/entities/${enc(id)}/figures`, body));
         return 0;
       }
-      const body = AnalysisInput.parse({ markdown: readFileSync(need("--file"), "utf8"), meta: readJson(need("--meta")), ...(dryRun ? { dryRun } : {}) });
+      const body = AnalysisInput.parse({ markdown: readFileSync(need("--file"), "utf8"), meta: readJson(need("--meta")), ...(dryRun ? { dryRun } : {}), ...(flags.has("--provisional") ? { provisional: true } : {}) });
       json(await c.call("POST", `/entities/${enc(id)}/analyses`, body));
       return 0;
     }

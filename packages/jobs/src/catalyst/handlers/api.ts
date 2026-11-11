@@ -14,6 +14,7 @@
 //   GET  /catalyst/checklist, PUT /catalyst/checklist/{id}/{year}/{scope}   reports to download by hand
 //   POST /catalyst/entities/{id}/documents, GET …/documents/{sha}   a company's other documents, and a link to one
 //   POST /catalyst/entities/{id}/events, POST …/events/{eventId}/retract   what its reports say about payments
+//   PUT  /catalyst/bonds/{isin}/schedule  a bond's amortization schedule, read from its terms of issue
 //   GET|POST|DELETE /catalyst/agent-token  the agent's token (yours only: shown once, only its SHA-256 kept)
 //   ANY  /catalyst/agent/{proxy+}         the agent's way in (bearer token): the reads and the writes it may make
 //                                         (core/catalyst/agent.ts, AGENT_WRITES), as the routes above
@@ -22,7 +23,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, APIGatewayProxyResultV2 }
 import { GetQueueAttributesCommand, SQSClient } from "@aws-sdk/client-sqs";
 import { Resource } from "sst";
 import { addDays, today } from "@portfolio/core";
-import { DocumentInput, MAX_UPLOAD_BYTES, PaymentEventInput, RetractInput, UploadUrlInput, type PaymentEvent } from "@portfolio/core/catalyst/index";
+import { DocumentInput, judgementGaps, MAX_UPLOAD_BYTES, PaymentEventInput, RetractInput, ScheduleInput, UploadUrlInput, type PaymentEvent } from "@portfolio/core/catalyst/index";
 import { storeDocument } from "../documents.ts";
 import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestPeriod, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
 import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, reviewedTo, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
@@ -176,10 +177,12 @@ const ROUTES: Record<string, Handler> = {
       collected: collected.map(({ PK: _p, SK: _s, ...c }) => c).sort((a, b) => b.at.localeCompare(a.at)),
       documents: documents.map(({ PK: _p, SK: _s, key: _k, ...d }) => d).sort((a, b) => b.date.localeCompare(a.date)),
       names: names.filter((n) => n.entityId === id).map(stripKeys),
-      bonds: theirs.map((b) => ({ isin: b.isin, code: b.code, status: b.status, maturity: b.maturity, segment: b.segment })),
+      bonds: theirs.map((b) => ({ isin: b.isin, code: b.code, status: b.status, maturity: b.maturity, segment: b.segment, ...(inputs.schedules.has(b.isin) ? { schedule: scheduleView(inputs.schedules.get(b.isin)!) } : {}) })),
       track: { company: entity.shortName, prefix: null, ...(await trackOf(theirs, entity.legalName, id)) },
       // What its reports say about payments, the retracted ones too (the track record reads the rest).
       events: (await catalystRepo.listPaymentEvents(id)).map(paymentEventView).sort((a, b) => b.date.localeCompare(a.date)),
+      // What a judgement written now would miss (refused without --provisional).
+      judgementGaps: await judgementGapsOf(id),
     });
   },
 
@@ -377,10 +380,13 @@ const ROUTES: Record<string, Handler> = {
     if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
     const entity = await catalystRepo.getEntity(id);
     if (!entity) return json(404, { error: `No company ${id}` });
-    const { markdown, meta, dryRun } = body.data;
+    const { markdown, meta, dryRun, provisional } = body.data;
     // What it rests on: the latest full year stored now (a later one makes it stale in `catalyst work`).
     const basedOn = latestPeriod(await catalystRepo.listYears(entity.financialsEntityId ?? id));
-    const item = { entityId: id, at: new Date().toISOString(), ...(basedOn ? { basedOn } : {}), markdown, by: isAgent(event) ? meta.model : userOf(event), source: isAgent(event) ? ("agent" as const) : ("you" as const), sources: meta.sources, redFlags: meta.redFlags, ...(meta.scorecard !== undefined ? { scorecard: meta.scorecard } : {}) };
+    // What it would miss: the bonds' terms, the recent current reports. Refused, unless stored as provisional.
+    const gaps = await judgementGapsOf(id);
+    if (gaps.length && !provisional) return json(422, { error: `The judgement would miss: ${gaps.join("; ")}. Do that first, or store it as provisional (--provisional).`, gaps });
+    const item = { entityId: id, at: new Date().toISOString(), ...(basedOn ? { basedOn } : {}), markdown, by: isAgent(event) ? meta.model : userOf(event), source: isAgent(event) ? ("agent" as const) : ("you" as const), sources: meta.sources, redFlags: meta.redFlags, ...(meta.scorecard !== undefined ? { scorecard: meta.scorecard } : {}), ...(gaps.length ? { provisional: gaps } : {}) };
     if (!dryRun) await catalystRepo.putAnalyses([item]);
     return json(dryRun ? 200 : 201, { ...item, stored: !dryRun });
   },
@@ -446,6 +452,25 @@ const ROUTES: Record<string, Handler> = {
     const item = { entityId: id, id: randomUUID().slice(0, 8), ...b, isins, by: userOf(event), at: new Date().toISOString() };
     if (!dryRun) await catalystRepo.putPaymentEvents([item]);
     return json(dryRun ? 200 : 201, { ...item, stored: !dryRun, duplicate: false });
+  },
+
+  "PUT /catalyst/bonds/{isin}/schedule": async (event) => {
+    // A bond's amortization schedule from its terms: the bond listed and linked to a company, the terms stored as
+    // that company's document, the dates before maturity. Replaces the one held; a dry run returns it without storing.
+    const isin = pathParam(event, "isin");
+    const body = ScheduleInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
+    const [bond, link] = await Promise.all([catalystRepo.getBond(isin), catalystRepo.getLink(isin)]);
+    if (!bond) return json(404, { error: `No bond ${isin}` });
+    if (!link?.entityId) return json(422, { error: `${bond.code} isn't linked to a company yet` });
+    const { dryRun, ...b } = body.data;
+    const documents = await catalystRepo.listDocuments(link.entityId);
+    if (!documents.some((d) => d.sha256 === b.documentSha)) return json(422, { error: `documentSha: no stored document ${b.documentSha.slice(0, 12)}… of ${link.entityId} (catalyst documents put first)` });
+    const late = b.instalments.filter((i) => bond.maturity && i.date >= bond.maturity);
+    if (late.length) return json(422, { error: `instalments: ${late.map((i) => i.date).join(", ")} not before maturity (${bond.maturity}); the final repayment isn't an instalment` });
+    const item = { isin, entityId: link.entityId, ...b, by: userOf(event), at: new Date().toISOString() };
+    if (!dryRun) await catalystRepo.putSchedule(item);
+    return json(dryRun ? 200 : 201, { ...scheduleView(item), code: bond.code, stored: !dryRun });
   },
 
   "POST /catalyst/entities/{id}/events/{eventId}/retract": async (event) => {
@@ -811,6 +836,18 @@ async function trackOf(group: CatalystBondItem[], issuer: string | undefined, en
 }
 
 /** A stored payment event without its keys. */
+/** A schedule as the API shows it. */
+const scheduleView = (s: { issuedNominal: number; instalments: { date: string; nominalAfter: number }[]; source: string; documentSha: string; quote: string; by: string; at: string }) =>
+  ({ issuedNominal: s.issuedNominal, instalments: s.instalments, source: s.source, documentSha: s.documentSha, quote: s.quote, by: s.by, at: s.at });
+
+/** What a judgement of the company written now would miss (core/catalyst/agent.ts, judgementGaps). */
+async function judgementGapsOf(entityId: string): Promise<string[]> {
+  const [links, bonds, schedules, events] = await Promise.all([catalystRepo.listLinks(), catalystRepo.listBonds(), catalystRepo.listSchedules(), catalystRepo.listPaymentEvents(entityId)]);
+  const own = new Set(links.filter((l) => l.entityId === entityId).map((l) => l.isin));
+  const listed = bonds.filter((b) => own.has(b.isin) && b.status === "listed").map((b) => ({ isin: b.isin, code: b.code }));
+  return judgementGaps({ listed, schedules: new Set(schedules.map((s) => s.isin)), reviewedTo: reviewedTo(events), today: today() });
+}
+
 function paymentEventView<T extends PaymentEvent & { PK: string; SK: string }>({ PK: _p, SK: _s, ...e }: T): Omit<T, "PK" | "SK"> {
   return e;
 }

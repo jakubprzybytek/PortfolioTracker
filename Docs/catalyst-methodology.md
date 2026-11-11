@@ -172,8 +172,11 @@ For these:
   moves with new tranches (taps) and buy-backs. IZ0836 read 1.1bn PLN in prod and 24.2bn on dev, because
   the Treasury keeps issuing it.
 - **Instalments are payments due before maturity.** They belong in the 12 and 24 month windows on their
-  own dates (from the terms of issue). The app doesn't know them: the remainder is counted at maturity,
-  noted.
+  own dates, from the terms of issue: the agent stores each bond's amortization schedule (`catalyst bonds
+  schedule`, the nominal per bond after each instalment) and Refinancing counts the instalments on their
+  dates. Without a schedule the remainder is counted at maturity, noted. A bond that hasn't paid its first
+  instalment yet looks like a bullet bond in the market data (Corpus Iuris GCI0729 and GC10729: 20% of the
+  issue on 30 Jul 2027 and 2028 each, which turned Refinancing from "nothing due" to yellow).
 - **Interest and accrued interest** run on the current nominal.
 
 **Inflation-linked treasury bonds (IZ series: IZ0831, IZ0836).** Nominal = 1,000 PLN × the index ratio,
@@ -675,7 +678,8 @@ its business makes, or does it depend on refinancing? **Built** for every issuer
 (design `2026-11-03-bond-maturities-vs-cash-design.md`).
 
 - **Schedule:** the company's active listed bonds under all its names, plus a group's financing vehicle;
-  one per ISIN; maturity ≥ today; at the amount owed (step 1), by maturity date.
+  one per ISIN; maturity ≥ today; at the amount owed (step 1), by maturity date; instalments still ahead
+  on their own dates when the bond's amortization schedule is stored (step 1, "Instalment redemptions").
 - **Currency:** converted to the report's currency at the NBP table A mid rate; a bond without a rate is
   shown but left out of the totals, noted.
 - **Windows:** 12 and 24 months from **today**; the cash is from the report date; both dates are given.
@@ -686,11 +690,11 @@ its business makes, or does it depend on refinancing? **Built** for every issuer
 - **Signal** from the weaker cover: green ≥ 1.5×, or nothing due within 24 months; yellow ≥ 0.75×; red
   below; n/a without a cash figure.
 - **Notes:** the cash report date; "listed bonds only, as issued less instalments repaid: loans, unlisted
-  bonds and bonds bought back are not included"; instalment bonds by name; listed bonds vs the balance
+  bonds and bonds bought back are not included"; instalments counted on their dates, or instalment bonds
+  without a schedule by name; listed bonds vs the balance
   sheet's bonds when they differ by more than 5% (Cyfrowy Polsat: 2,670m listed vs 4,020m).
 
-Not included yet: bank loans due, undrawn credit lines, developers' escrow accounts, the dates of later
-instalments, taps and buy-backs after the bond was first seen (section 18).
+Not included yet: bank loans due, undrawn credit lines, developers' escrow accounts, taps and buy-backs after the bond was first seen (section 18).
 
 ### Repayment track record (planned)
 

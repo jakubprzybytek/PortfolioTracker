@@ -149,6 +149,7 @@ export function catalystApi(
     "GET /catalyst/entities/{id}/documents/{sha}",
     "POST /catalyst/entities/{id}/events",
     "POST /catalyst/entities/{id}/events/{eventId}/retract",
+    "PUT /catalyst/bonds/{isin}/schedule",
     "GET /catalyst/agent-token",
     "POST /catalyst/agent-token",
     "DELETE /catalyst/agent-token",

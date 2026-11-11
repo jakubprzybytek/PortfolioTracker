@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amountOwed, latestReport, refinancing, refinancingDimension, type ListedBond } from "../../../src/catalyst/issuers/refinancing.ts";
+import { amountOwed, instalmentsAhead, latestReport, refinancing, refinancingDimension, type ListedBond } from "../../../src/catalyst/issuers/refinancing.ts";
 import { nbpRates, parseNbpTable } from "../../../src/catalyst/issuers/nbp.ts";
 import type { DbIssuerFinancialsRecord } from "../../../src/catalyst/issuers/financialsRecord.ts";
 
@@ -136,5 +136,38 @@ describe('nbpRates', () => {
 
     it('gives no rates when NBP fails', async () => {
         expect(await nbpRates(async () => { throw new Error('down'); })()).toEqual({});
+    });
+});
+
+describe('instalments', () => {
+    // Corpus Iuris GCI0729: 33 m at 1,000, cut to 800 on 2027-07-30 and to 600 on 2028-07-30, the rest on 2029-07-30
+    const SCHEDULE = [{ date: '2027-07-30', nominalAfter: 800 }, { date: '2028-07-30', nominalAfter: 600 }];
+
+    it('turns a schedule of nominals into the instalments still ahead', () => {
+        expect(instalmentsAhead(33 * M, 1000, 1000, SCHEDULE)).toEqual([{ date: '2027-07-30', amount: 6.6 * M }, { date: '2028-07-30', amount: 6.6 * M }]);
+        // After the first instalment the bond is at 800: only the second is ahead
+        expect(instalmentsAhead(33 * M, 1000, 800, SCHEDULE)).toEqual([{ date: '2028-07-30', amount: 6.6 * M }]);
+        expect(instalmentsAhead(33 * M, 1000, 1000, [])).toEqual([]);
+    });
+
+    it('counts instalments on their dates in the 12 and 24 month windows, the rest at maturity', () => {
+        const gci = { ...bond('GCI0729', '2029-07-30', 33), instalments: instalmentsAhead(33 * M, 1000, 1000, SCHEDULE) };
+        const gc1 = { ...bond('GC10729', '2029-07-30', 35), instalments: instalmentsAhead(35 * M, 1000, 1000, SCHEDULE) };
+        const r = refinancing([gci, gc1], report({ cash: 34, operatingCashFlow: 2 }), '2026-11-11', {});
+        expect(r.report!.due12).toBeCloseTo(13.6 * M);
+        expect(r.report!.due24).toBeCloseTo(27.2 * M);
+        expect(r.report!.cashCover12).toBeCloseTo(34 / 13.6);
+        // (34 + 2 × 2) / 27.2 = 1.40: yellow, where counting everything at maturity gave "nothing due", green
+        expect(r.report!.liquidityCover24).toBeCloseTo(38 / 27.2);
+        expect(r.signal).toBe('yellow');
+        expect(r.bonds[0]!.payments!.map(p => [p.date, p.amount / M])).toEqual([['2027-07-30', 7], ['2028-07-30', 7], ['2029-07-30', 21]]);
+        expect(r.notes).toContain('GC10729 (7 m on 2027-07-30, 7 m on 2028-07-30); GCI0729 (6.6 m on 2027-07-30, 6.6 m on 2028-07-30): instalments counted on their dates, from the terms of issue');
+        expect(refinancing([bond('GCI0729', '2029-07-30', 33), bond('GC10729', '2029-07-30', 35)], report({ cash: 34, operatingCashFlow: 2 }), '2026-11-11', {}).signal).toBe('green');
+    });
+
+    it('a bullet bond (empty schedule) has no payments and no note about unknown instalments', () => {
+        const r = refinancing([{ ...bond('B', '2030-01-01', 50), instalments: [] }], report({ cash: 10 }), TODAY, {});
+        expect(r.bonds[0]!.payments).toBeUndefined();
+        expect(r.notes.join(' ')).not.toMatch(/counted at maturity|counted on their dates/);
     });
 });
