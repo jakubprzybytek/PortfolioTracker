@@ -27,7 +27,7 @@ import { addDays, today } from "@portfolio/core";
 import { DocumentInput, judgementGaps, MAX_UPLOAD_BYTES, PaymentEventInput, RetractInput, ScheduleInput, UploadUrlInput, type PaymentEvent } from "@portfolio/core/catalyst/index";
 import { storeDocument } from "../documents.ts";
 import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestPeriod, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
-import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, reviewedTo, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
+import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, reviewedTo, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystPaymentEventItem, type CatalystScheduleItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -132,17 +132,26 @@ const ROUTES: Record<string, Handler> = {
   "GET /catalyst/bonds/{isin}": async (event) => {
     const isin = event.pathParameters?.["isin"] ?? "";
     if (!ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
-    const bond = await catalystRepo.getBond(isin);
-    if (!bond) return json(404, { error: `No bond ${isin}` });
-    const to = (await catalystRepo.latestDay())?.date ?? today();
     const fromParam = event.queryStringParameters?.["from"];
     if (fromParam !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(fromParam)) return json(400, { error: "from: YYYY-MM-DD" });
+    // Everything at once: the bond, its link and company, then its sessions and the issuer's track record.
+    const [bond, latest, link] = await Promise.all([catalystRepo.getBond(isin), catalystRepo.latestDay(), catalystRepo.getLink(isin)]);
+    if (!bond) return json(404, { error: `No bond ${isin}` });
+    const to = latest?.date ?? today();
     const from = fromParam ?? addDays(to, -365);
     const market = bond.markets.find((m) => m.startsWith("GPW")) ?? bond.markets[0] ?? "";
-    const [terms, coupons, sessions, quotes] = await Promise.all([catalystRepo.listTerms().then((all) => all.find((t) => t.isin === isin) ?? null), catalystRepo.listCoupons(isin), catalystRepo.listSessions(isin, from, to), catalystRepo.listQuotes(isin, from, to)]);
+    const termsRead = catalystRepo.getTerms(isin).then((t) => t ?? null);
+    const entityRead = link?.entityId ? catalystRepo.getEntity(link.entityId) : Promise.resolve(undefined);
+    const [terms, coupons, sessions, quotes, events, entity, track] = await Promise.all([
+      termsRead,
+      catalystRepo.listCoupons(isin),
+      catalystRepo.listSessions(isin, from, to),
+      catalystRepo.listQuotes(isin, from, to),
+      catalystRepo.listEvents(isin),
+      entityRead,
+      Promise.all([termsRead, entityRead]).then(([t, e]) => issuerTrack(bond, t?.issuer, { link, entity: e })),
+    ]);
     const strip = <T extends { PK: string; SK: string }>({ PK: _p, SK: _s, ...rest }: T) => rest;
-    const [events, track, link] = await Promise.all([catalystRepo.listEvents(isin), issuerTrack(bond, terms?.issuer), catalystRepo.getLink(isin)]);
-    const entity = link?.entityId ? await catalystRepo.getEntity(link.entityId) : undefined;
     return json(200, {
       bond: strip(bond),
       terms: terms ? strip(terms) : null,
@@ -161,7 +170,7 @@ const ROUTES: Record<string, Handler> = {
     const [entities, names, links, bonds] = await Promise.all([catalystRepo.listEntities(), catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
     const status = new Map(bonds.map((b) => [b.isin, b.status]));
     // The latest judgement's date: only companies whose AI analysis was ever on have judgements.
-    const judged = new Map(await Promise.all(entities.filter((e) => e.aiAnalysis).map(async (e) => [e.entityId, (await catalystRepo.listAnalyses(e.entityId)).map((a) => a.at).sort().at(-1) ?? null] as const)));
+    const judged = new Map(await Promise.all(entities.filter((e) => e.aiAnalysis).map(async (e) => [e.entityId, (await catalystRepo.listAnalysisHeads(e.entityId)).map((a) => a.at).sort().at(-1) ?? null] as const)));
     return json(200, {
       entities: entities.map((e) => {
         const own = links.filter((l) => l.entityId === e.entityId);
@@ -172,28 +181,38 @@ const ROUTES: Record<string, Handler> = {
 
   "GET /catalyst/entities/{id}": async (event) => {
     const id = pathParam(event, "id");
-    const entity = await catalystRepo.getEntity(id);
+    // Every read at once; the whole-table lists (bonds, links, names, terms, schedules) once, through analysisInputs.
+    const [entity, inputs, years, filings, analyses, collected, documents, payments, exitsNow] = await Promise.all([
+      catalystRepo.getEntity(id),
+      analysisInputs(today()),
+      catalystRepo.listYears(id),
+      catalystRepo.listFilings(id),
+      catalystRepo.listAnalyses(id),
+      catalystRepo.listCollectedFigures(id),
+      catalystRepo.listDocuments(id),
+      catalystRepo.listPaymentEvents(id),
+      catalystRepo.getExitsNow(),
+    ]);
     if (!entity) return json(404, { error: `No company ${id}` });
-    const [names, links, bonds] = await Promise.all([catalystRepo.listNames(), catalystRepo.listLinks(), catalystRepo.listBonds()]);
-    const own = new Set(links.filter((l) => l.entityId === id).map((l) => l.isin));
-    const theirs = bonds.filter((b) => own.has(b.isin));
-    const [years, filings, inputs, analyses, collected, documents] = await Promise.all([catalystRepo.listYears(id), catalystRepo.listFilings(id), analysisInputs(today()), catalystRepo.listAnalyses(id), catalystRepo.listCollectedFigures(id), catalystRepo.listDocuments(id)]);
+    const own = new Set(inputs.links.filter((l) => l.entityId === id).map((l) => l.isin));
+    const theirs = inputs.bonds.filter((b) => own.has(b.isin));
+    const [analysis, track] = await Promise.all([analysisOf(entity, inputs, years), trackOf(theirs, entity.legalName, id, { payments, exitsNow })]);
     return json(200, {
       company: entityView(entity),
-      analysis: await analysisOf(entity, inputs, years),
+      analysis,
       years: years.map(({ PK: _p, SK: _s, lines, ...y }) => ({ ...y, lines: lines.length })),
       filings: filings.map(({ PK: _p, SK: _s, ...f }) => f),
       // Newest first.
       analyses: analyses.map(({ PK: _p, SK: _s, ...a }) => a).sort((a, b) => b.at.localeCompare(a.at)),
       collected: collected.map(({ PK: _p, SK: _s, ...c }) => c).sort((a, b) => b.at.localeCompare(a.at)),
       documents: documents.map(({ PK: _p, SK: _s, key: _k, ...d }) => d).sort((a, b) => b.date.localeCompare(a.date)),
-      names: names.filter((n) => n.entityId === id).map(stripKeys),
+      names: inputs.names.filter((n) => n.entityId === id).map(stripKeys),
       bonds: theirs.map((b) => ({ isin: b.isin, code: b.code, status: b.status, maturity: b.maturity, segment: b.segment, ...(inputs.schedules.has(b.isin) ? { schedule: scheduleView(inputs.schedules.get(b.isin)!) } : {}) })),
-      track: { company: entity.shortName, prefix: null, ...(await trackOf(theirs, entity.legalName, id)) },
+      track: { company: entity.shortName, prefix: null, ...track },
       // What its reports say about payments, the retracted ones too (the track record reads the rest).
-      events: (await catalystRepo.listPaymentEvents(id)).map(paymentEventView).sort((a, b) => b.date.localeCompare(a.date)),
+      events: payments.map(paymentEventView).sort((a, b) => b.date.localeCompare(a.date)),
       // What a judgement written now would miss (refused without --provisional).
-      judgementGaps: await judgementGapsOf(id),
+      judgementGaps: await judgementGapsOf(id, { links: inputs.links, bonds: inputs.bonds, schedules: [...inputs.schedules.values()], payments }),
     });
   },
 
@@ -673,10 +692,11 @@ async function work() {
   const [entities, names, checklist, links, bonds, screen] = await Promise.all([catalystRepo.listEntities(), catalystRepo.listNames(), catalystRepo.listChecklist(), catalystRepo.listLinks(), catalystRepo.listBonds(), catalystRepo.listScreen()]);
   const on = entities.filter((e) => e.aiAnalysis?.on);
   const ids = [...new Set(on.flatMap((e) => [e.entityId, ...(e.financialsEntityId ? [e.financialsEntityId] : [])]))];
-  const [years, judged, collected, measures] = await Promise.all([
-    Promise.all(ids.map(async (id) => [id, (await catalystRepo.listYears(id)).map((y) => ({ periodEnd: y.periodEnd, scope: y.scope, months: y.months, importedAt: y.importedAt }))] as const)),
-    Promise.all(on.map(async (e) => [e.entityId, (await catalystRepo.listAnalyses(e.entityId)).sort((a, b) => a.at.localeCompare(b.at)).map((a) => ({ at: a.at, basedOn: a.basedOn })).at(-1)] as const)),
-    Promise.all(on.map(async (e) => [e.entityId, (await catalystRepo.listCollectedFigures(e.entityId)).map((a) => a.at).sort().at(-1)] as const)),
+  // Only the fields used: a year's statement lines and a judgement's text are most of their items.
+  const [years, judged, collected, measures, reviewed] = await Promise.all([
+    Promise.all(ids.map(async (id) => [id, (await catalystRepo.listYearHeads(id)).map((y) => ({ periodEnd: y.periodEnd, scope: y.scope, months: y.months, importedAt: y.importedAt }))] as const)),
+    Promise.all(on.map(async (e) => [e.entityId, (await catalystRepo.listAnalysisHeads(e.entityId)).sort((a, b) => a.at.localeCompare(b.at)).map((a) => ({ at: a.at, basedOn: a.basedOn })).at(-1)] as const)),
+    Promise.all(on.map(async (e) => [e.entityId, (await catalystRepo.listCollectedDates(e.entityId)).sort().at(-1)] as const)),
     Promise.all(
       on.map(async (e) => {
         const own = links.filter((l) => l.entityId === e.entityId);
@@ -684,9 +704,10 @@ async function work() {
         return [e.entityId, events.filter((x) => x.signal === "distress" || x.signal === "attention")] as const;
       }),
     ),
+    // The payment check: the date each company's current reports were read to.
+    Promise.all(on.map(async (e) => [e.entityId, reviewedTo(await catalystRepo.listPaymentEvents(e.entityId)) ?? undefined] as const)),
   ]);
-  // The payment check: the date each company's current reports were read to, and its bonds that have ended.
-  const reviewed = await Promise.all(on.map(async (e) => [e.entityId, reviewedTo(await catalystRepo.listPaymentEvents(e.entityId)) ?? undefined] as const));
+  // Its bonds that have ended.
   const ended = new Map(
     on.map((e) => {
       const own = new Set(links.filter((l) => l.entityId === e.entityId).map((l) => l.isin));
@@ -835,8 +856,12 @@ async function passSwitch(entityId: string, ai: AiSwitch) {
 }
 
 /** The track record of a set of bonds (core/catalyst/trackRecord.ts), each with its GPW measures and last close. */
-async function trackOf(group: CatalystBondItem[], issuer: string | undefined, entityId?: string) {
-  const [exitsNow, reported] = await Promise.all([catalystRepo.getExitsNow(), entityId ? catalystRepo.listPaymentEvents(entityId) : Promise.resolve([])]);
+/** `read`: what the caller has already read (the company's payment events, the measures in force). */
+async function trackOf(group: CatalystBondItem[], issuer: string | undefined, entityId?: string, read: { payments?: CatalystPaymentEventItem[]; exitsNow?: CatalystExitsNowItem | undefined } = {}) {
+  const [exitsNow, reported] = await Promise.all([
+    "exitsNow" in read ? read.exitsNow : catalystRepo.getExitsNow(),
+    read.payments ?? (entityId ? catalystRepo.listPaymentEvents(entityId) : Promise.resolve([])),
+  ]);
   const bonds: TrackBond[] = await Promise.all(
     group.map(async (b) => {
       const [events, last] = await Promise.all([catalystRepo.listEvents(b.isin), b.status === "ended" ? catalystRepo.lastSession(b.isin) : Promise.resolve(undefined)]);
@@ -862,8 +887,9 @@ const scheduleView = (s: { issuedNominal: number; instalments: { date: string; n
   ({ issuedNominal: s.issuedNominal, instalments: s.instalments, source: s.source, documentSha: s.documentSha, quote: s.quote, by: s.by, at: s.at });
 
 /** What a judgement of the company written now would miss (core/catalyst/agent.ts, judgementGaps). */
-async function judgementGapsOf(entityId: string): Promise<string[]> {
-  const [links, bonds, schedules, events] = await Promise.all([catalystRepo.listLinks(), catalystRepo.listBonds(), catalystRepo.listSchedules(), catalystRepo.listPaymentEvents(entityId)]);
+/** `read`: the lists the caller has already read. */
+async function judgementGapsOf(entityId: string, read?: { links: CatalystLinkItem[]; bonds: CatalystBondItem[]; schedules: CatalystScheduleItem[]; payments: CatalystPaymentEventItem[] }): Promise<string[]> {
+  const [links, bonds, schedules, events] = read ? [read.links, read.bonds, read.schedules, read.payments] : await Promise.all([catalystRepo.listLinks(), catalystRepo.listBonds(), catalystRepo.listSchedules(), catalystRepo.listPaymentEvents(entityId)]);
   const own = new Set(links.filter((l) => l.entityId === entityId).map((l) => l.isin));
   const listed = bonds.filter((b) => own.has(b.isin) && b.status === "listed").map((b) => ({ isin: b.isin, code: b.code }));
   return judgementGaps({ listed, schedules: new Set(schedules.map((s) => s.isin)), reviewedTo: reviewedTo(events), today: today() });
@@ -877,10 +903,11 @@ function paymentEventView<T extends PaymentEvent & { PK: string; SK: string }>({
  * The repayment track record of a bond's issuer: its company's bonds once the bond is linked, else the bonds sharing
  * its code's prefix ("KRU0228", "KRU0829").
  */
-async function issuerTrack(bond: CatalystBondItem, issuer: string | undefined) {
-  const link = await catalystRepo.getLink(bond.isin);
+async function issuerTrack(bond: CatalystBondItem, issuer: string | undefined, read: { link: CatalystLinkItem | undefined; entity: CatalystEntityItem | undefined }) {
+  const { link } = read;
   if (link?.entityId) {
-    const [links, bonds, entity] = await Promise.all([catalystRepo.listLinks(), catalystRepo.listBonds(), catalystRepo.getEntity(link.entityId)]);
+    const [links, bonds] = await Promise.all([catalystRepo.listLinks(), catalystRepo.listBonds()]);
+    const entity = read.entity;
     const own = new Set(links.filter((l) => l.entityId === link.entityId).map((l) => l.isin));
     return { prefix: null, company: entity?.shortName ?? link.entityId, ...(await trackOf(bonds.filter((b) => own.has(b.isin)), issuer ?? entity?.legalName, link.entityId)) };
   }

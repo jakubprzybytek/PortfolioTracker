@@ -10,6 +10,11 @@ import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type Cata
 import type { ScreenRow } from "./screen.ts";
 import type { FinancialYear } from "./financials.ts";
 
+/** Reads only these attributes (names escaped: some, like `scope`, are reserved words). */
+function projection(fields: string[]): Pick<QueryCommandInput, "ProjectionExpression" | "ExpressionAttributeNames"> {
+  return { ProjectionExpression: fields.map((_, i) => `#p${i}`).join(", "), ExpressionAttributeNames: Object.fromEntries(fields.map((f, i) => [`#p${i}`, f])) };
+}
+
 /** Batches of 25 written at once, at most. */
 const BATCH_WRITES_AT_ONCE = 4;
 
@@ -149,6 +154,11 @@ export class CatalystRepository {
   }
 
   /** Stores years; `replaced` rows are kept under FINOLD#. */
+  /** A company's financial years without their statement lines: what's stored, not the figures (`catalyst work`). */
+  listYearHeads(entityId: string): Promise<Pick<CatalystYearItem, "periodEnd" | "scope" | "months" | "importedAt">[]> {
+    return this.queryAll({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :f)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":f": "FIN#" }, ...projection(["periodEnd", "scope", "months", "importedAt"]) });
+  }
+
   async putYears(rows: FinancialYear[], replaced: FinancialYear[] = []): Promise<number> {
     const items = [
       ...replaced.map((r) => ({ ...r, ...catalystKeys.replacedYear(r.entityId, r.period, r.importedAt) })),
@@ -170,12 +180,23 @@ export class CatalystRepository {
     return this.queryAll<CatalystAnalysisItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :a)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":a": "ANALYSIS#" } });
   }
 
+  /** A company's judgements without their text, oldest first. */
+  listAnalysisHeads(entityId: string): Promise<Pick<CatalystAnalysisItem, "at" | "basedOn">[]> {
+    return this.queryAll({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :a)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":a": "ANALYSIS#" }, ...projection(["at", "basedOn"]) });
+  }
+
   putAnalyses(items: Omit<CatalystAnalysisItem, "PK" | "SK">[]): Promise<number> {
     return this.batchPut(items.map((a) => ({ ...catalystKeys.analysis(a.entityId, a.at), ...a })));
   }
 
   listCollectedFigures(entityId: string): Promise<CatalystCollectedFiguresItem[]> {
     return this.queryAll<CatalystCollectedFiguresItem>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :a)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":a": "AIFIG#" } });
+  }
+
+  /** When figures were collected for a company, oldest first. */
+  async listCollectedDates(entityId: string): Promise<string[]> {
+    const items = await this.queryAll<{ at: string }>({ KeyConditionExpression: "PK = :pk AND begins_with(SK, :a)", ExpressionAttributeValues: { ":pk": `ENTITY#${entityId}`, ":a": "AIFIG#" }, ...projection(["at"]) });
+    return items.map((i) => i.at);
   }
 
   putCollectedFigures(items: Omit<CatalystCollectedFiguresItem, "PK" | "SK">[]): Promise<number> {
@@ -218,6 +239,10 @@ export class CatalystRepository {
   /** Every bond's terms (one query on the index). */
   listTerms(): Promise<CatalystTermsItem[]> {
     return this.queryAll<CatalystTermsItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "TERMS" } });
+  }
+
+  getTerms(isin: string): Promise<CatalystTermsItem | undefined> {
+    return this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.terms(isin) })).then((r) => r.Item as CatalystTermsItem | undefined);
   }
 
   async putTerms(item: Omit<CatalystTermsItem, "PK" | "SK" | "GSI1PK" | "GSI1SK">): Promise<void> {

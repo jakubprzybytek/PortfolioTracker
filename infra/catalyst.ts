@@ -111,14 +111,17 @@ export function catalystApi(
   { table, queue, deadLetter, seriesReader }: ReturnType<typeof catalystModule>,
   { defaults, link, api, auth, accessGroups }: CatalystShared & { api: sst.aws.ApiGatewayV2; auth: sst.aws.ApiGatewayV2RouteArgs; accessGroups: string },
 ) {
-  const apiHandler = {
+  // One function behind every route: one warm container instead of a cold start per route (each route had its own
+  // function, the same bundle). 1 GB for the CPU: the screen and the company views unmarshal a few MB of items.
+  const apiFunction = new sst.aws.Function("CatalystApi", {
     ...defaults,
     handler: "packages/jobs/src/catalyst/handlers/api.handler",
-    timeout: "30 seconds" as const,
+    timeout: "30 seconds",
+    memory: "1 GB",
     link: [...link, table, queue, deadLetter],
     environment: { ACCESS_GROUPS: accessGroups, ...seriesReader.environment },
     permissions: seriesReader.permissions,
-  };
+  });
   for (const route of [
     "GET /catalyst/status",
     "GET /catalyst/bonds",
@@ -154,7 +157,7 @@ export function catalystApi(
     "POST /catalyst/agent-tokens",
     "DELETE /catalyst/agent-tokens/{id}",
   ])
-    api.route(route, apiHandler, auth);
+    api.route(route, apiFunction.arn, auth);
   // The agent's way in: no Cognito login; the function checks the agent token and what it may call (N7).
-  api.route("ANY /catalyst/agent/{proxy+}", apiHandler);
+  api.route("ANY /catalyst/agent/{proxy+}", apiFunction.arn);
 }
