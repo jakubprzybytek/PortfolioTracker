@@ -2,7 +2,7 @@
 // due against cash, the track record and the judgement; tabs for its bonds, years, past bonds, judgements and reports.
 // Opened from any issuer name (`issuer=<entityId>` in the URL); full screen on a phone.
 import { Icon } from "../Icons.tsx";
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { apiSend, api } from "../api.ts";
 import { fmtNum } from "../format.ts";
 import { MarkdownText } from "../NotesView.tsx";
@@ -11,6 +11,7 @@ import { TrackTab } from "./BondPanel.tsx";
 import { ARROW, ARROW_LABEL, DIMENSIONS, RULE_SETS, SIGNAL_LABEL } from "./issuer.tsx";
 import { pct, pp, webHref } from "./labels.ts";
 import { LiquidityDots } from "./parts.tsx";
+import { lineShapes } from "./statementTree.ts";
 import type { AiSwitch, BondRow, CompanyDetail, CompanyYear, Dimension, Metric, ReviewStatus, YearLines } from "./types.ts";
 
 const TABS = [
@@ -386,26 +387,46 @@ function BondsTab({ rows, onShowBonds }: { rows: BondRow[]; onShowBonds: () => v
   );
 }
 
-/** The figures the scorecard reads, in the order of the statements. */
-const FIGURES: [string, string][] = [
-  ["revenue", "Revenue"],
-  ["ebit", "EBIT"],
-  ["depreciation", "Depreciation"],
-  ["interestExpense", "Interest expense"],
-  ["netProfit", "Net profit"],
-  ["totalAssets", "Total assets"],
-  ["intangibleAssets", "Intangible assets"],
-  ["currentAssets", "Current assets"],
-  ["inventory", "Inventory"],
-  ["cash", "Cash"],
-  ["equity", "Equity"],
-  ["minorityInterests", "Minority interests"],
-  ["financialDebt", "Financial debt"],
-  ["bonds", "Bonds"],
-  ["currentLiabilities", "Current liabilities"],
-  ["operatingCashFlow", "Operating cash flow"],
-  ["capex", "Capex"],
+/**
+ * The figures the scorecard reads, by statement; the level is how far a figure is part of the one above it (current
+ * assets are part of total assets, cash part of current assets, bonds part of financial debt). Minority interests stay
+ * beside equity: under the accounting act they're outside it.
+ */
+const SECTIONS: { title: string; figures: [key: string, label: string, level: number][] }[] = [
+  {
+    title: "Balance sheet",
+    figures: [
+      ["totalAssets", "Total assets", 0],
+      ["intangibleAssets", "Intangible assets", 1],
+      ["currentAssets", "Current assets", 1],
+      ["inventory", "Inventory", 2],
+      ["cash", "Cash", 2],
+      ["equity", "Equity", 0],
+      ["minorityInterests", "Minority interests", 0],
+      ["financialDebt", "Financial debt", 0],
+      ["bonds", "Bonds", 1],
+      ["currentLiabilities", "Current liabilities", 0],
+    ],
+  },
+  {
+    title: "Income statement",
+    figures: [
+      ["revenue", "Revenue", 0],
+      ["ebit", "EBIT", 0],
+      ["depreciation", "Depreciation", 1],
+      ["interestExpense", "Interest expense", 0],
+      ["netProfit", "Net profit", 0],
+    ],
+  },
+  {
+    title: "Cash flow",
+    figures: [
+      ["operatingCashFlow", "Operating cash flow", 0],
+      ["capex", "Capex", 0],
+    ],
+  },
 ];
+const FIGURES = SECTIONS.flatMap((s) => s.figures);
 const REVIEW: Record<ReviewStatus, string> = { parsed: "parsed", "hand-checked": "hand-checked", flagged: "flagged" };
 
 function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => void }) {
@@ -427,7 +448,7 @@ function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => 
     }
   };
   if (years.length === 0) return <p className="muted">{d.company.financialsEntityId ? `Read on the reports of its group (${d.company.financialsEntityId}).` : "No years stored."}</p>;
-  const shown = FIGURES.filter(([k]) => years.some((y) => y.figures[k]));
+  const sections = SECTIONS.map((s) => ({ ...s, figures: s.figures.filter(([k]) => years.some((y) => y.figures[k])) })).filter((s) => s.figures.length > 0);
   return (
     <div className="cat-track">
       {error && <p className="error">{error}</p>}
@@ -446,9 +467,15 @@ function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => 
             </tr>
           </thead>
           <tbody>
-            {shown.map(([k, label]) => (
-              <tr key={k}>
-                <td className="left">{label}</td>
+            {sections.flatMap((s) => [
+              <tr key={s.title} className="cat-section-row">
+                <th className="left" colSpan={years.length + 1} scope="colgroup">
+                  {s.title}
+                </th>
+              </tr>,
+              ...s.figures.map(([k, label, level]) => (
+              <tr key={k} className={level === 0 ? "cat-top" : undefined}>
+                <td className="left cat-indent" style={{ "--depth": level } as CSSProperties}>{label}</td>
                 {years.map((y) => {
                   const f = y.figures[k];
                   return (
@@ -464,7 +491,8 @@ function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => 
                   );
                 })}
               </tr>
-            ))}
+              )),
+            ])}
             <tr className="cat-review-row">
               <td className="left">Review</td>
               {years.map((y) => (
@@ -515,15 +543,29 @@ const STATEMENT: Record<string, string> = { balance: "Balance sheet", income: "I
 /** A year's lines as printed: all of them, or the ones behind one figure. */
 function YearLinesView({ entityId, period, field, onClose }: { entityId: string; period: string; field: string | undefined; onClose: () => void }) {
   const y = useApi<YearLines>(`/catalyst/entities/${encodeURIComponent(entityId)}/years/${encodeURIComponent(period)}`);
+  const [showEmpty, setShowEmpty] = useState(false);
+  const shapes = useMemo(() => lineShapes(y.data?.lines ?? []), [y.data]);
   if (!y.data) return <p className="muted">{y.error ?? "Loading…"}</p>;
   const source = field ? (y.data.figures[field]?.source ?? []) : [];
   const behind = (l: { code?: string; label: string }) => source.some((s) => (l.code && (s === l.code || s.endsWith(`/${l.code}`))) || s === l.label || s.endsWith(`/${l.label}`));
-  const lines = field ? y.data.lines.filter(behind) : y.data.lines;
+  const shapeOf = (l: { statement: string; order: number }) => shapes.get(`${l.statement}#${l.order}`);
+  const all = field ? y.data.lines.filter(behind) : y.data.lines;
+  // The whole statements hide empty lines (zero, nothing under them: most of the KRS template) unless asked.
+  const emptyCount = field ? 0 : all.filter((l) => shapeOf(l)?.empty).length;
+  const lines = field || showEmpty ? all : all.filter((l) => !shapeOf(l)?.empty);
   const label = field ? FIGURES.find(([k]) => k === field)?.[1] : undefined;
   return (
     <section className="cat-lines" data-testid="issuer-lines">
       <p className="cat-facts">
         <strong>{label ? `${label}, FY${period.slice(0, 4)}` : `FY${period.slice(0, 4)}, ${period.split("#")[1]} accounts: the statements`}</strong> (m {y.data.currency}){" "}
+        {emptyCount > 0 && (
+          <>
+            <button type="button" className="link-button" onClick={() => setShowEmpty(!showEmpty)} data-testid="issuer-lines-empty">
+              {showEmpty ? "hide" : "show"} {emptyCount} empty line{emptyCount === 1 ? "" : "s"}
+            </button>{" "}
+            ·{" "}
+          </>
+        )}
         <button type="button" className="link-button" onClick={onClose}>
           close
         </button>
@@ -537,15 +579,20 @@ function YearLinesView({ entityId, period, field, onClose }: { entityId: string;
             <summary>{title}</summary>
             <table className="static">
               <tbody>
-                {these.map((l) => (
-                  <tr key={`${l.order}`} className={l.item ? "" : "muted"}>
-                    <td className="left">
+                {these.map((l) => {
+                  const shape = shapeOf(l);
+                  // Only lines behind one figure: no indentation (their parents may not be shown).
+                  const depth = field ? 0 : (shape?.depth ?? 0);
+                  return (
+                  <tr key={`${l.order}`} className={`${l.item ? "" : "muted"}${shape?.subtotal ? " cat-subtotal" : ""}`} data-depth={depth}>
+                    <td className="left cat-indent" style={{ "--depth": depth } as CSSProperties}>
                       {l.label}
                       {l.page ? <span className="muted"> · p. {l.page}</span> : null}
                     </td>
                     <td>{mln(l.value)}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </details>

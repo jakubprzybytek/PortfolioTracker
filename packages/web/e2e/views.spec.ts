@@ -1727,7 +1727,7 @@ test.describe("catalyst view", () => {
         return body(url.pathname.endsWith("/ai") ? { aiAnalysis: { on: data.on, by: "test", at: "2026-11-08T10:00:00Z" } } : { review: { status: data.status } });
       }
       if (url.pathname.endsWith("/catalyst/entities")) return body({ entities: [company("0000533217", "Kruk", true, "2026-11-02T09:00:00Z"), company("0000000001", "Abc", abcAi, null)] });
-      if (url.pathname.includes("/years/")) return body({ period: "2025-12-31#group", currency: "PLN", presentedUnit: 1000, figures: { revenue: { value: 2_900_000_000, source: ["Revenue"] } }, lines: [{ statement: "income", order: 0, label: "Revenue", value: 2_900_000_000, page: 12 }, { statement: "income", order: 1, label: "Cost of sales", value: -900_000_000, page: 12 }] });
+      if (url.pathname.includes("/years/")) return body({ period: "2025-12-31#group", currency: "PLN", presentedUnit: 1000, figures: { revenue: { value: 2_900_000_000, source: ["Revenue"] } }, lines: [{ statement: "income", order: 0, label: "Revenue", value: 2_900_000_000, page: 12 }, { statement: "income", order: 1, label: "Cost of sales", value: -900_000_000, page: 12 }, { statement: "balance", order: 0, label: "Cash", value: 400_000_000, parent: 2, item: "cash" }, { statement: "balance", order: 1, label: "Goodwill", value: 0, parent: 2 }, { statement: "balance", order: 2, label: "Total assets", value: 400_000_000, item: "totalAssets" }] });
       if (url.pathname.endsWith("/0000000001")) return body(detail(company("0000000001", "Abc", abcAi, null), { state: "no-report", ruleSet: "general" }, []));
       return body(
         detail(
@@ -1963,12 +1963,22 @@ test.describe("catalyst view", () => {
     await dialog.getByTestId("issuer-tab-financials").click();
     await expect(page).toHaveURL(/itab=financials/);
     await expect(dialog.getByTestId("issuer-years")).toContainText("2 900,0");
+    // Figures by statement, the balance sheet first.
+    await expect(dialog.getByTestId("issuer-years").locator("tr.cat-section-row")).toHaveText(["Balance sheet", "Income statement"]);
     await dialog.getByTestId("issuer-year-check").click();
     await expect.poll(() => writes).toEqual([`/entities/0000533217/years/${encodeURIComponent("2025-12-31#group")} {"status":"hand-checked"}`]);
     await expect(dialog.getByTestId("issuer-year-review")).toContainText("hand-checked");
     await dialog.getByTestId("issuer-years").getByRole("button", { name: "2 900,0" }).click();
     await expect(dialog.getByTestId("issuer-lines")).toContainText("Revenue, FY2025");
     await expect(dialog.getByTestId("issuer-lines").locator("tbody tr")).toHaveCount(1);
+    // The whole statements: indented by their parent links, the total in bold, empty lines hidden until asked.
+    await dialog.getByTestId("issuer-year-lines").click();
+    const balance = dialog.getByTestId("issuer-lines").locator("details").first();
+    await expect(balance.locator("tbody tr")).toHaveCount(2);
+    await expect(balance.locator('tr[data-depth="1"]')).toContainText("Cash");
+    await expect(balance.locator("tr.cat-subtotal")).toContainText("Total assets");
+    await dialog.getByTestId("issuer-lines-empty").click();
+    await expect(balance.locator("tbody tr")).toHaveCount(3);
     // Judgements render as GitHub Markdown (a table); other documents are listed with the statements.
     await dialog.getByTestId("issuer-tab-judgements").click();
     await expect(dialog.getByTestId("issuer-judgements").locator("table")).toHaveCount(1);

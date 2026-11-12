@@ -1060,6 +1060,13 @@ td.cat-issuer .link-button { color: var(--fg); }
 .cat-years td, .cat-years th { white-space: nowrap; }
 .cat-lines { border-top: 1px solid var(--border); padding-top: 8px; }
 .cat-lines table { width: 100%; }
+/* Statements as a tree (statementTree.ts): each level indented, subtotals in bold; the summary's sections as headings. */
+.cat-years td.cat-indent, .cat-lines td.cat-indent { padding-left: calc(8px + var(--depth, 0) * 1.1rem); }
+.cat-lines tr.cat-subtotal td { font-weight: 600; }
+/* Long labels (KRS template, indented) wrap instead of running off a phone screen. */
+.cat-lines td.cat-indent { white-space: normal; }
+.cat-years tr.cat-section-row th { padding-top: 14px; text-align: left; font-size: var(--fs-12); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+.cat-years tbody tr.cat-section-row:first-child th { padding-top: 6px; }
 @media (max-width: 720px) {
   .modal.cat-issuer-dialog { width: 100%; }
   .cat-issuer-top { grid-template-columns: minmax(0, 1fr); }
