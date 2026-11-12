@@ -775,17 +775,23 @@ describe(`API ${API}`, () => {
     expect((await get<{ feed: unknown }>("/cash-flows")).body.feed).toBeNull();
   });
 
-  it("the agent token: reads and the allowed writes through /catalyst/agent; the switches, reviews, settings, the token and PT refused; replaced and revoked tokens rejected", async () => {
-    // Replaces this stage's agent token: on dev, log the CLI in again afterwards.
+  it("agent tokens: reads and the allowed writes through /catalyst/agent; the switches, reviews, settings, the tokens and PT refused; several named tokens, a revoked one rejected", async () => {
+    // Makes its own named tokens and revokes them at the end: the stage's other tokens go on working.
     const agent = async (method: string, route: string, token: string | null, body?: unknown) => {
       const res = await fetch(`${API}/catalyst/agent${route}`, { method, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), "x-catalyst-by": "integration test", ...(body ? { "content-type": "application/json" } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
       return { status: res.status, body: (await res.json().catch(() => null)) as Record<string, unknown> | null };
     };
-    const made = await send<{ token: string; createdAt: string }>("POST", "/catalyst/agent-token");
+    type View = { id: string; name: string; createdAt: string; lastUsedAt: string | null };
+    const tokens = async () => (await get<{ tokens: View[] }>("/catalyst/agent-tokens")).body.tokens;
+    const suffix = Date.now().toString(36);
+    const made = await send<View & { token: string }>("POST", "/catalyst/agent-tokens", { name: `Integration A ${suffix}` });
     expect(made.status).toBe(201);
     expect(made.body.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const t = made.body.token;
-    expect((await get<{ token: unknown }>("/catalyst/agent-token")).body.token).toEqual({ createdAt: made.body.createdAt, lastUsedAt: null });
+    expect((await tokens()).find((x) => x.id === made.body.id)).toEqual({ id: made.body.id, name: `Integration A ${suffix}`, createdAt: made.body.createdAt, lastUsedAt: null });
+    // A name is required and unique.
+    expect((await send("POST", "/catalyst/agent-tokens", {})).status).toBe(400);
+    expect((await send("POST", "/catalyst/agent-tokens", { name: `integration a ${suffix}` })).status).toBe(409);
 
     // Reads.
     expect((await agent("GET", "/work", t)).status).toBe(200);
@@ -793,7 +799,7 @@ describe(`API ${API}`, () => {
     expect((await agent("GET", "/bonds", t)).status).toBe(200);
     expect((await agent("GET", "/entities", t)).status).toBe(200);
     expect((await agent("GET", "/checklist", t)).status).toBe(200);
-    expect((await get<{ token: { lastUsedAt: string | null } }>("/catalyst/agent-token")).body.token.lastUsedAt).not.toBeNull();
+    expect((await tokens()).find((x) => x.id === made.body.id)?.lastUsedAt).not.toBeNull();
     // Allowed writes reach their route (no such company here: 404, or the input refused: 400).
     expect((await agent("POST", "/entities/0000000000/analyses", t, { markdown: "x".repeat(60), meta: { model: "test", sources: ["none"], redFlags: [] }, dryRun: true })).status).toBe(404);
     expect((await agent("POST", "/entities/0000000000/figures", t, { currency: "PLN", unit: "thousands", years: [{ periodEnd: "2025-12-31", months: 12, scope: "group", figures: { revenue: 1 }, source: "x" }], dryRun: true })).status).toBe(404);
@@ -819,23 +825,28 @@ describe(`API ${API}`, () => {
       ["PUT", "/entities/0000000000/years/2025-12-31%23group", { status: "hand-checked" }],
       ["PUT", "/settings/assumptions", { reset: true }],
       ["PUT", "/views", { views: [] }],
-      ["GET", "/agent-token", undefined],
-      ["POST", "/agent-token", {}],
-      ["DELETE", "/agent-token", undefined],
+      ["GET", "/agent-tokens", undefined],
+      ["POST", "/agent-tokens", { name: "by the agent" }],
+      ["DELETE", `/agent-tokens/${made.body.id}`, undefined],
     ] as const)
       expect((await agent(method, route, t, body)).status, `${method} ${route}`).toBe(403);
     // Nothing of PT through it.
     expect((await agent("GET", "/../holdings", t)).status).not.toBe(200);
     expect((await agent("GET", "/holdings", t)).status).toBe(404);
-    // No token, a wrong one, a replaced one, a revoked one.
+    // No token, a wrong one; a second token beside the first; a revoked one, while the other goes on.
     expect((await agent("GET", "/work", null)).status).toBe(401);
     expect((await agent("GET", "/work", "A".repeat(43))).status).toBe(401);
-    const next = await send<{ token: string }>("POST", "/catalyst/agent-token");
+    const next = await send<View & { token: string }>("POST", "/catalyst/agent-tokens", { name: `Integration B ${suffix}` });
+    expect(next.status).toBe(201);
+    expect((await agent("GET", "/work", t)).status).toBe(200);
+    expect((await agent("GET", "/work", next.body.token)).status).toBe(200);
+    expect((await send("DELETE", `/catalyst/agent-tokens/${made.body.id}`)).status).toBe(200);
     expect((await agent("GET", "/work", t)).status).toBe(401);
     expect((await agent("GET", "/work", next.body.token)).status).toBe(200);
-    expect((await send("DELETE", "/catalyst/agent-token")).status).toBe(200);
+    expect((await send("DELETE", `/catalyst/agent-tokens/${next.body.id}`)).status).toBe(200);
     expect((await agent("GET", "/work", next.body.token)).status).toBe(401);
-    expect((await get<{ token: unknown }>("/catalyst/agent-token")).body.token).toBeNull();
+    expect((await send("DELETE", `/catalyst/agent-tokens/${next.body.id}`)).status).toBe(404);
+    expect((await tokens()).some((x) => x.id === made.body.id || x.id === next.body.id)).toBe(false);
   });
 
   it("GET /catalyst/status: the Catalyst module's bonds, its jobs' latest runs and its dead-letter queue", async () => {

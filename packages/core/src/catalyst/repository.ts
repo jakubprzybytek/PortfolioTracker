@@ -294,6 +294,28 @@ export class CatalystRepository {
     }
   }
 
+  /**
+   * Sets one field of the entry at `index` of a stored setting's list, only while that entry's `hash` is still `hash`:
+   * a token revoked or moved meanwhile isn't written back. Does nothing otherwise.
+   */
+  async setSettingListFieldIfHash(name: string, index: number, hash: string, field: string, value: unknown): Promise<void> {
+    if (!Number.isInteger(index) || index < 0) return;
+    try {
+      await this.doc.send(
+        new UpdateCommand({
+          TableName: this.table(),
+          Key: catalystKeys.setting(name),
+          UpdateExpression: `SET #v[${index}].#f = :x`,
+          ConditionExpression: `#v[${index}].#h = :h`,
+          ExpressionAttributeNames: { "#v": "value", "#f": field, "#h": "hash" },
+          ExpressionAttributeValues: { ":x": value, ":h": hash },
+        }),
+      );
+    } catch (e) {
+      if ((e as Error).name !== "ConditionalCheckFailedException") throw e;
+    }
+  }
+
   getQuoteDay(date: IsoDate): Promise<CatalystQuoteDayItem | undefined> {
     return this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.quoteDay(date) })).then((r) => r.Item as CatalystQuoteDayItem | undefined);
   }

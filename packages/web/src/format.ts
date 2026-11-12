@@ -92,6 +92,10 @@ const warsawTime = new Intl.DateTimeFormat("pl-PL", { timeZone: "Europe/Warsaw",
 /** Time of day in Warsaw, e.g. "13:38". */
 export const fmtTime = (iso: string): string => warsawTime.format(new Date(iso));
 
+const warsawDateTime = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+/** A moment as Warsaw's date and time: "2026-11-08 11:00". */
+export const fmtDateTime = (iso: string): string => warsawDateTime.format(new Date(iso));
+
 /**
  * How fresh a price is, when it's worth saying: the time of a price fetched during the day ("Refresh prices"), or the
  * date of one older than the newest price shown (no trade since). Nothing for an ordinary close.

@@ -825,6 +825,11 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .cf-made { margin: 8px 0; }
 .cf-formula { display: flex; gap: 8px; align-items: center; max-width: 70rem; }
 .cf-formula input { flex: 1; min-width: 0; font: var(--fs-13) ui-monospace, monospace; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--row); color: var(--fg); }
+.cat-token-list { list-style: none; margin: 8px 0; padding: 0; }
+.cat-token-list li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.cat-token-list .confirm { display: inline-flex; align-items: center; gap: 6px; color: var(--neg); }
+.cat-token-list li > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.cat-agent-token form input { flex: 1; min-width: 0; max-width: 20rem; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--row); color: var(--fg); }
 .cf-made p { margin: 4px 0 0; font-size: var(--fs-12); }
 .cf-buttons { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; font-size: var(--fs-14); }
 

@@ -47,7 +47,7 @@ Put such probes and screenshots in `temp/<subfolder>/`, not in `packages/web/e2e
 |---|---|
 | Type check | `npm run typecheck` |
 | Unit (Vitest) | `npm test` |
-| Integration (API) | `npx sst shell --stage dev -- npm run test:integration` (replaces the stage's Catalyst agent token: log the CLI in again afterwards) |
+| Integration (API) | `npx sst shell --stage dev -- npm run test:integration` (makes and revokes its own named Catalyst agent tokens; the stage's others go on working) |
 | E2E (Playwright) | `WEB_URL=https://dev.portfoliotracker.albedoonline.com npx sst shell --stage dev -- npm run test:e2e` (without `WEB_URL`: http://localhost:5173) |
 
 - Integration and E2E tests seed the stage with the sample data (`data/instruments.json`, `data/transactions.sample.json`).

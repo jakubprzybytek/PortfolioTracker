@@ -1750,15 +1750,19 @@ test.describe("catalyst view", () => {
       if (r.request().method() === "PUT") writes.push(`${new URL(r.request().url()).pathname.replace(/^.*\/catalyst/, "")} ${r.request().postData()}`);
       await r.fulfill({ contentType: "application/json", body: JSON.stringify({ checklist: [{ entityId: "0000000001", krs: "0000000001", year: 2025, scope: "group", where: "KRS repository, KRS 0000000001", status: "missing", by: "agent", at: "2026-11-08T10:00:00Z" }] }) });
     });
-    agentToken = null;
-    await page.route("**/catalyst/agent-token", async (r) => {
+    agentTokens = [{ id: "a1", name: "Laptop", createdAt: "2026-11-08T10:00:00Z", lastUsedAt: "2026-11-09T10:00:00Z" }];
+    await page.route("**/catalyst/agent-tokens**", async (r) => {
       const method = r.request().method();
-      if (method === "POST") agentToken = { createdAt: "2026-11-08T10:00:00Z", lastUsedAt: null };
-      if (method === "DELETE") agentToken = null;
-      await r.fulfill({ status: method === "POST" ? 201 : 200, contentType: "application/json", body: JSON.stringify(method === "POST" ? { token: "T".repeat(43), createdAt: "2026-11-08T10:00:00Z" } : { token: agentToken }) });
+      if (method === "POST") {
+        const made = { id: "b2", name: (r.request().postDataJSON() as { name: string }).name, createdAt: "2026-11-12T10:00:00Z", lastUsedAt: null };
+        agentTokens.push(made);
+        return r.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ...made, token: "T".repeat(43) }) });
+      }
+      if (method === "DELETE") agentTokens = agentTokens.filter((t) => !r.request().url().endsWith(`/${t.id}`));
+      await r.fulfill({ contentType: "application/json", body: JSON.stringify({ tokens: agentTokens }) });
     });
   });
-  let agentToken: { createdAt: string; lastUsedAt: string | null } | null = null;
+  let agentTokens: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] = [];
   let writes: string[] = [];
   let review = "parsed";
   let abcAi = false;
@@ -2038,19 +2042,31 @@ test.describe("catalyst view", () => {
     await expect(page.getByTestId("info-vsalt-text")).toContainText("safe alternative");
   });
 
-  test("the agent's token: made in the settings, shown once, with the login command; revoked after a confirmation", async ({ page }) => {
+  test("the agent's tokens: a named one made beside the others, shown once, with the login command; one revoked after a confirmation", async ({ page }) => {
     await page.goto("/#/catalyst");
     await page.getByTestId("catalyst-settings-toggle").click();
     const panel = page.getByTestId("agent-token");
-    await expect(panel.getByTestId("agent-token-state")).toHaveText("No token.");
+    const rows = panel.getByTestId("agent-token-row");
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText("Laptop");
+    await expect(panel.getByTestId("agent-token-create")).toBeDisabled();
+    await panel.getByTestId("agent-token-name").fill("Desktop");
     await panel.getByTestId("agent-token-create").click();
     await expect(panel.getByTestId("agent-token-value")).toHaveValue("T".repeat(43));
+    await expect(panel.getByTestId("agent-token-made")).toContainText('"Desktop"');
     await expect(panel).toContainText("npx catalyst login --stage");
-    await expect(panel.getByTestId("agent-token-state")).toContainText("not used yet");
-    await panel.getByTestId("agent-token-revoke").click();
+    await expect(rows).toHaveCount(2);
+    await expect(rows.filter({ hasText: "Desktop" })).toContainText("not used yet");
+    await expect(panel.getByTestId("agent-token-name")).toHaveValue("");
+    // Revoking the new one: only it goes, and its one-time display with it.
+    await rows.filter({ hasText: "Desktop" }).getByTestId("agent-token-revoke").click();
+    await panel.getByTestId("agent-token-confirm").click();
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText("Laptop");
+    await expect(panel.getByTestId("agent-token-value")).toHaveCount(0);
+    await rows.first().getByTestId("agent-token-revoke").click();
     await panel.getByTestId("agent-token-confirm").click();
     await expect(panel.getByTestId("agent-token-state")).toHaveText("No token.");
-    await expect(panel.getByTestId("agent-token-value")).toHaveCount(0);
   });
 
   test("the issuers view: what needs doing per company, and the reports checklist", async ({ page }) => {

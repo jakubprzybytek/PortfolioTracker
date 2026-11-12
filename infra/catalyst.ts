@@ -150,9 +150,9 @@ export function catalystApi(
     "POST /catalyst/entities/{id}/events",
     "POST /catalyst/entities/{id}/events/{eventId}/retract",
     "PUT /catalyst/bonds/{isin}/schedule",
-    "GET /catalyst/agent-token",
-    "POST /catalyst/agent-token",
-    "DELETE /catalyst/agent-token",
+    "GET /catalyst/agent-tokens",
+    "POST /catalyst/agent-tokens",
+    "DELETE /catalyst/agent-tokens/{id}",
   ])
     api.route(route, apiHandler, auth);
   // The agent's way in: no Cognito login; the function checks the agent token and what it may call (N7).

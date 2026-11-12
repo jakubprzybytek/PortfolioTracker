@@ -145,7 +145,7 @@ describe("the agent token's reach", () => {
     expect(agentMayCall("GET /catalyst/work")).toBe(true);
     expect(agentMayCall("POST /catalyst/entities/{id}/analyses")).toBe(true);
     expect(agentMayCall("PUT /catalyst/names/{name}")).toBe(true);
-    for (const refused of ["GET /catalyst/agent-token", "POST /catalyst/agent-token", "PUT /catalyst/entities/{id}/ai", "PUT /catalyst/names/{name}/ai", "PUT /catalyst/entities/{id}/years/{period}", "PUT /catalyst/settings/assumptions", "PUT /catalyst/views", "GET /holdings"])
+    for (const refused of ["GET /catalyst/agent-tokens", "POST /catalyst/agent-tokens", "DELETE /catalyst/agent-tokens/{id}", "PUT /catalyst/entities/{id}/ai", "PUT /catalyst/names/{name}/ai", "PUT /catalyst/entities/{id}/years/{period}", "PUT /catalyst/settings/assumptions", "PUT /catalyst/views", "GET /holdings"])
       expect(agentMayCall(refused)).toBe(false);
   });
 });

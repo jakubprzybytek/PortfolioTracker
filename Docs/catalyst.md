@@ -344,7 +344,7 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 - **Location:** `packages/cli` in this repo, TypeScript, run with `npx catalyst …`. It uses `core`'s zod schemas and parsers (the same ones the API uses); `catalyst schema <kind>` prints an input as JSON Schema.
 - **Where the work runs:** on your machine. The CLI imports `core`'s parsers, checks, scorecard and identity clients, so none of these needs the backend: sorting files, finding PDF pages, parsing, the checks, GLEIF and KRS lookups, and a dry run (with the scorecard the import would give). The app is called only to read a company's stored rows and to write results.
 - **Transport:** only the API (`/api/catalyst/agent/*`), never DynamoDB directly. The server checks what it receives (the zod schemas, the arithmetic checks re-run on the submitted lines, the original's SHA-256) and stores the original; it doesn't parse files. `filings check` re-parses the stored originals locally against the known answers at any time. JSON output by default, `--table` for people, `--dry-run` on every write.
-- **Auth:** an agent token (same pattern as the spreadsheet feed token: 32 random bytes shown once, only the SHA-256 stored, one at a time, revocable), made in the Catalyst view. It allows reads of `/api/catalyst/*` and writes of names, companies (not finance sub-types, overrides or the AI analysis switch), filings, collected figures, analyses and checklist entries; not market data, settings or anything of PT. `catalyst login --stage <stage>` stores it outside the repo. Tests use the test user on `int`, never prod.
+- **Auth:** an agent token (same pattern as the spreadsheet feed token: 32 random bytes shown once, only the SHA-256 stored, revocable), made in the Catalyst view: several at once, one per machine or routine, each with a name; what the agent writes records `agent (<model>; <token name>)`. It allows reads of `/api/catalyst/*` and writes of names, companies (not finance sub-types, overrides or the AI analysis switch), filings, collected figures, analyses and checklist entries; not market data, settings or anything of PT. `catalyst login --stage <stage>` stores it outside the repo. Tests use the test user on `int`, never prod.
 - **Review:** everything the agent writes records `enteredBy` and keeps history (analyses are append-only; a replaced financial year keeps the previous version). Imported years start as `parsed`; you mark them `hand-checked` or `flagged`. Identities whose legal name differs from the listed name stay `review` until you confirm them.
 
 | Command | Purpose |
@@ -390,12 +390,12 @@ How one company goes from "analyse it" to a scorecard in the app. The example is
 - **the app** stores, recomputes the bonds' signals and shows them.
 
 **0. The agent's access (once per stage).**
-1. You create an agent token in the Catalyst settings. It's shown once; the app keeps only its SHA-256.
+1. You create an agent token in the Catalyst settings, named after the machine or routine that will use it. It's shown once; the app keeps only its SHA-256. Other machines' tokens go on working.
 2. In Claude Code you type `! npx catalyst login --stage prod` and paste the token at a hidden prompt. The CLI stores it in your user profile, outside the repo, and prints only its last four characters, so the agent never sees it.
 3. Every call the CLI makes sends `Authorization: Bearer <token>` to `/api/catalyst/agent/…`. The function compares the hash and applies an allow-list:
    - **allowed:** reads, and writes of names, company descriptions, filings, collected figures, analyses and checklist entries;
    - **refused:** market data, settings, finance sub-types and PT.
-4. You can revoke the token in the settings. Dev and prod have separate tokens.
+4. You can revoke a token in the settings; the others go on working. Dev and prod have separate tokens.
 
 **1. The decision.** You switch AI analysis on for the company (or its listed name) in the issuer dialog: it is off by default ("AI analysis per company"). Then you ask ("analyse the issuer of ABC1227", "work through the list"), and the agent runs one of:
 - `catalyst work`: what needs doing, i.e. unresolved names, reports due, judgements older than the latest report, new markings;
@@ -543,7 +543,7 @@ One row per company with listed bonds. Columns: short name, AI analysis (off / o
 
 ### Settings
 
-A cog in the view: assumptions (WIBOR, WIRON, commission, alternative: nearest retail bond or a rate), the agent token (create, revoke, last used).
+A cog in the view: assumptions (WIBOR, WIRON, commission, alternative: nearest retail bond or a rate), the agent's named tokens (make, revoke each, last used).
 
 ## Testing
 

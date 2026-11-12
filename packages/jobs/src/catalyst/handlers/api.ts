@@ -15,7 +15,8 @@
 //   POST /catalyst/entities/{id}/documents, GET …/documents/{sha}   a company's other documents, and a link to one
 //   POST /catalyst/entities/{id}/events, POST …/events/{eventId}/retract   what its reports say about payments
 //   PUT  /catalyst/bonds/{isin}/schedule  a bond's amortization schedule, read from its terms of issue
-//   GET|POST|DELETE /catalyst/agent-token  the agent's token (yours only: shown once, only its SHA-256 kept)
+//   GET|POST /catalyst/agent-tokens, DELETE …/{id}   the agent's named tokens (yours only: each shown once, only its
+//                                         SHA-256 kept; several at once, one per machine)
 //   ANY  /catalyst/agent/{proxy+}         the agent's way in (bearer token): the reads and the writes it may make
 //                                         (core/catalyst/agent.ts, AGENT_WRITES), as the routes above
 
@@ -34,7 +35,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { ParsedFiling } from "@portfolio/core/catalyst/filings/filingParser";
 import { FilingRefused, storeFiling } from "../filings.ts";
 import { financeRuleSetFor, INDUSTRIES, isInFundamentalScope } from "@portfolio/core/catalyst/issuers/index";
-import { newFeedToken, shouldTouch, tokenMatches, type FeedToken } from "../../lib/feedToken.ts";
+import { shouldTouch, type FeedToken } from "../../lib/feedToken.ts";
+import { AGENT_TOKENS_SETTING, AgentTokenInput, LEGACY_AGENT_TOKEN_SETTING, LEGACY_ID, addToken, allTokens, matchToken, removeToken, viewOf, type AgentToken } from "../agentTokens.ts";
 import { fetchSource } from "../../lib/http.ts";
 import { analysisInputs, analysisOf } from "../analysis.ts";
 import { hasAnyGroup } from "../../lib/access.ts";
@@ -44,8 +46,17 @@ import { catalystRepo, queueCatalyst } from "../context.ts";
 import { ASSUMPTIONS_SETTING, offersOn, VIEWS_SETTING } from "../metrics.ts";
 
 const ACCESS_GROUPS = (process.env["ACCESS_GROUPS"] ?? "portfolio-tracker").split(",");
-/** Where the agent token's hash is kept (the module's settings). */
-const AGENT_TOKEN_SETTING = "agentToken";
+/** The agent's tokens in force: the list, and the single token of before while it's in its own setting (agentTokens.ts). */
+async function agentTokens(): Promise<{ list: AgentToken[] | null; legacy: FeedToken | null; all: AgentToken[] }> {
+  const [list, legacy] = await Promise.all([catalystRepo.getSetting<AgentToken[] | null>(AGENT_TOKENS_SETTING), catalystRepo.getSetting<FeedToken | null>(LEGACY_AGENT_TOKEN_SETTING)]);
+  return { list: list ?? null, legacy: legacy ?? null, all: allTokens(list, legacy) };
+}
+
+/** Stores the list; the legacy token, now in it (or revoked), leaves its own setting. */
+async function saveAgentTokens(list: AgentToken[], hadLegacy: boolean): Promise<void> {
+  await catalystRepo.putSetting(AGENT_TOKENS_SETTING, list);
+  if (hadLegacy) await catalystRepo.putSetting(LEGACY_AGENT_TOKEN_SETTING, null);
+}
 const ISIN = /^[A-Z]{2}[A-Z0-9]{9}\d$/;
 const sqs = new SQSClient({});
 const s3 = new S3Client({});
@@ -517,21 +528,26 @@ const ROUTES: Record<string, Handler> = {
     return json(200, item);
   },
 
-  "GET /catalyst/agent-token": async () => {
-    const t = await catalystRepo.getSetting<FeedToken | null>(AGENT_TOKEN_SETTING);
-    return json(200, { token: t ? { createdAt: t.createdAt, lastUsedAt: t.lastUsedAt ?? null } : null });
+  "GET /catalyst/agent-tokens": async () => json(200, { tokens: (await agentTokens()).all.map(viewOf) }),
+
+  "POST /catalyst/agent-tokens": async (event) => {
+    // A new named token beside the others; the token itself is returned only here.
+    const body = AgentTokenInput.safeParse(parseBody(event));
+    if (!body.success) return json(400, { error: `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
+    const { legacy, all } = await agentTokens();
+    const added = addToken(all, body.data.name);
+    if ("error" in added) return json(409, { error: added.error });
+    await saveAgentTokens(added.list, !!legacy);
+    return json(201, { ...viewOf(added.made), token: added.token });
   },
 
-  "POST /catalyst/agent-token": async () => {
-    // A new token, replacing any before it (that one stops working at once); returned only here.
-    const { token, stored } = newFeedToken();
-    await catalystRepo.putSetting(AGENT_TOKEN_SETTING, stored);
-    return json(201, { token, createdAt: stored.createdAt });
-  },
-
-  "DELETE /catalyst/agent-token": async () => {
-    await catalystRepo.putSetting(AGENT_TOKEN_SETTING, null);
-    return json(200, { token: null });
+  "DELETE /catalyst/agent-tokens/{id}": async (event) => {
+    // Only this token stops working, at once; the others go on.
+    const { legacy, all } = await agentTokens();
+    const list = removeToken(all, pathParam(event, "id"));
+    if (!list) return json(404, { error: "No such token" });
+    await saveAgentTokens(list, !!legacy);
+    return json(200, { tokens: list.map(viewOf) });
   },
 
   "GET /catalyst/views": async () => json(200, { views: (await catalystRepo.getSetting<CatalystViews>(VIEWS_SETTING)) ?? [] }),
@@ -582,16 +598,21 @@ const PATTERNS = Object.keys(ROUTES).map((key) => {
 
 /**
  * `/catalyst/agent/<route>` with `Authorization: Bearer <agent token>`: the token's hash against the stored one, then
- * the route if the agent may call it (core/catalyst/agent.ts), as `agent (<x-catalyst-by>)`.
+ * the route if the agent may call it (core/catalyst/agent.ts), as `agent (<x-catalyst-by>; <the token's name>)`.
  */
 async function agentHandler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Promise<APIGatewayProxyResultV2> {
   const auth = event.headers["authorization"] ?? event.headers["Authorization"] ?? "";
   const token = /^Bearer (\S+)$/.exec(auth)?.[1];
-  const stored = (await catalystRepo.getSetting<FeedToken | null>(AGENT_TOKEN_SETTING)) ?? undefined;
-  if (!tokenMatches(token, stored)) return json(401, { error: "No agent token, or not the current one (make one in the Catalyst settings)" });
-  // Only the one field, and only while the hash is still this token's: a put of what was read could bring back a token
-  // revoked or replaced in between.
-  if (shouldTouch(stored!)) await catalystRepo.setSettingFieldIfHash(AGENT_TOKEN_SETTING, stored!.hash, "lastUsedAt", new Date().toISOString());
+  const list = (await agentTokens()).all;
+  const stored = matchToken(token, list);
+  if (!stored) return json(401, { error: "Not an agent token in force (make one in the Catalyst settings)" });
+  // Only the one field, and only while the entry's hash is still this token's: a put of what was read could bring back
+  // a token revoked in between.
+  if (shouldTouch(stored)) {
+    const at = new Date().toISOString();
+    if (stored.id === LEGACY_ID) await catalystRepo.setSettingFieldIfHash(LEGACY_AGENT_TOKEN_SETTING, stored.hash, "lastUsedAt", at);
+    else await catalystRepo.setSettingListFieldIfHash(AGENT_TOKENS_SETTING, list.indexOf(stored) - (list[0]?.id === LEGACY_ID ? 1 : 0), stored.hash, "lastUsedAt", at);
+  }
   const rest = event.rawPath.split("/catalyst/agent/")[1] ?? "";
   const path = `/catalyst/${rest}`;
   const method = event.requestContext.http.method;
@@ -603,7 +624,7 @@ async function agentHandler(event: APIGatewayProxyEventV2WithJWTAuthorizer): Pro
     ...event,
     routeKey: match.p.key,
     pathParameters: Object.fromEntries(match.p.names.map((n, i) => [n, match.m![i + 1]!])),
-    requestContext: { ...event.requestContext, authorizer: { principalId: "agent", integrationLatency: 0, jwt: { claims: { email: `agent (${by})`, agent: "true" }, scopes: [] } } },
+    requestContext: { ...event.requestContext, authorizer: { principalId: "agent", integrationLatency: 0, jwt: { claims: { email: `agent (${by}; ${stored.name})`, agent: "true" }, scopes: [] } } },
   };
   try {
     return await ROUTES[match.p.key]!(routed);
