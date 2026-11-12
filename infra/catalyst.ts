@@ -112,12 +112,14 @@ export function catalystApi(
   { defaults, link, api, auth, accessGroups }: CatalystShared & { api: sst.aws.ApiGatewayV2; auth: sst.aws.ApiGatewayV2RouteArgs; accessGroups: string },
 ) {
   // One function behind every route: one warm container instead of a cold start per route (each route had its own
-  // function, the same bundle). 1 GB for the CPU: the screen and the company views unmarshal a few MB of items.
+  // function, the same bundle). 2 GB for the CPU (it grows with memory): the routes are CPU-bound, unmarshalling the
+  // lists and making many small queries; on dev 2 GB took 0.4-0.45x the time of 1 GB (screen 0.97 -> 0.41 s, work
+  // 2.0 -> 0.9 s), so about the same cost in GB-seconds.
   const apiFunction = new sst.aws.Function("CatalystApi", {
     ...defaults,
     handler: "packages/jobs/src/catalyst/handlers/api.handler",
     timeout: "30 seconds",
-    memory: "1 GB",
+    memory: "2 GB",
     link: [...link, table, queue, deadLetter],
     environment: { ACCESS_GROUPS: accessGroups, ...seriesReader.environment },
     permissions: seriesReader.permissions,
