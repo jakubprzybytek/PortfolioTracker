@@ -2,7 +2,7 @@ import type { View } from "./route.ts";
 
 // Line icons (24 × 24, currentColor) for the menu and buttons.
 
-const paths: Record<View | "menu" | "close" | "logout" | "filter" | "clear-filters" | "reload" | "update-prices" | "back" | "edit" | "save" | "save-as" | "check" | "trash" | "plus" | "eye-off", string> = {
+const paths: Record<View | "menu" | "close" | "logout" | "filter" | "clear-filters" | "reload" | "update-prices" | "back" | "edit" | "save" | "save-as" | "check" | "trash" | "plus" | "eye-off" | "flag" | "undo" | "chevron-down", string> = {
   dashboard: "M4 3h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM15 3h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM15 12h5a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1zM4 17h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1z",
   // bars per year with a rising line: performance
   performance: "M4 20h16M6 16v-3M11 16v-6M16 16v-4M5 9l5-4 4 3 6-5",
@@ -39,6 +39,9 @@ const paths: Record<View | "menu" | "close" | "logout" | "filter" | "clear-filte
   save: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8",
   // a page with a plus: save as a new one
   "save-as": "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M12 18v-6M9 15h6",
+  flag: "M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z M4 22v-7",
+  undo: "M9 14 4 9l5-5 M4 9h10.5a5.5 5.5 0 0 1 0 11H11",
+  "chevron-down": "m6 9 6 6 6-6",
   check: "M20 6L9 17l-5-5",
   trash: "M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6",
   plus: "M12 5v14M5 12h14",

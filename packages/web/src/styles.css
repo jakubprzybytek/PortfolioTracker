@@ -1065,8 +1065,24 @@ td.cat-issuer .link-button { color: var(--fg); }
 .cat-lines tr.cat-subtotal td { font-weight: 600; }
 /* Long labels (KRS template, indented) wrap instead of running off a phone screen. */
 .cat-lines td.cat-indent { white-space: normal; }
-.cat-years tr.cat-section-row th { padding-top: 14px; text-align: left; font-size: var(--fs-12); text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
-.cat-years tbody tr.cat-section-row:first-child th { padding-top: 6px; }
+/* A section of the summary (balance sheet, income statement, cash flow): a tinted band, as the holdings' account rows. */
+.cat-years tr.cat-section-row th { background: var(--band); color: var(--fg); text-align: left; font-size: var(--fs-13); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding-top: 8px; padding-bottom: 8px; border-top: 1px solid var(--band-line); border-bottom: 1px solid var(--band-line); }
+/* A figure opens the lines behind it: dotted underline, so it reads as a link. */
+.cat-years td .link-button { text-decoration: underline dotted var(--faint); text-underline-offset: 3px; }
+.cat-years td .link-button:hover { text-decoration-color: currentColor; }
+/* Small outlined buttons: a year's statements, its review actions. */
+.cat-mini { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; font: inherit; font-size: var(--fs-12); font-weight: 500; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); color: var(--fg); cursor: pointer; white-space: nowrap; }
+.cat-mini:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.cat-mini:disabled { opacity: 0.5; cursor: progress; }
+.cat-mini.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+.cat-mini .cat-mini-caret { transition: transform 0.15s ease; }
+.cat-mini.on .cat-mini-caret { transform: rotate(180deg); }
+.cat-review { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.cat-review .flag { margin-left: 0; }
+.cat-review-actions { display: inline-flex; gap: 4px; }
+.flag.cat-review-hand-checked { color: var(--pos); border-color: currentColor; background: transparent; }
+.flag.cat-review-flagged { color: var(--neg); border-color: currentColor; background: transparent; }
+.cat-years tr.cat-review-row td, .cat-years tr.cat-statements-row td { vertical-align: top; }
 @media (max-width: 720px) {
   .modal.cat-issuer-dialog { width: 100%; }
   .cat-issuer-top { grid-template-columns: minmax(0, 1fr); }

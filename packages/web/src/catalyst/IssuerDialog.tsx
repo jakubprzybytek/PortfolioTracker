@@ -27,6 +27,9 @@ const mln = (v: number | null | undefined) => (v === null || v === undefined ? "
 const FORMAT: Record<string, string> = { "krs-xml": "KRS e-report (XML)", esef: "ESEF", pdf: "PDF", "ifrs-text": "IFRS text" };
 const formatLabel = (f: string) => FORMAT[f] ?? f;
 /** An interim period's name: "H1 2026", "Q1 2026", "Q1–Q3 2026" (as core/catalyst/issuers/interim.ts). */
+/** A stored period's name: "FY2025", or "H1 2026" for a half-year. */
+const yearLabel = (y: { periodEnd: string; months: number }) => (y.months < 12 ? periodLabel(y.periodEnd, y.months) : `FY${y.periodEnd.slice(0, 4)}`);
+
 const periodLabel = (periodEnd: string, months: number) => {
   const year = periodEnd.slice(0, 4);
   return months === 6 ? `H1 ${year}` : months === 3 ? `Q1 ${year}` : months === 9 ? `Q1–Q3 ${year}` : `${months} m to ${periodEnd}`;
@@ -459,7 +462,7 @@ function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => 
               <th className="left">m {years[0]!.currency}</th>
               {years.map((y) => (
                 <th key={y.period} title={`${y.periodStart} – ${y.periodEnd}, ${y.months} months; from the ${y.reportPeriodEnd.slice(0, 4)} report (${y.column === "current" ? "its year" : "its comparative"}); ${formatLabel(y.filing.format)}; imported by ${y.enteredBy}`}>
-                  {y.months < 12 ? periodLabel(y.periodEnd, y.months) : `FY${y.periodEnd.slice(0, 4)}`}
+                  {yearLabel(y)}
                   <br />
                   <span className="muted">{y.scope}</span>
                 </th>
@@ -497,34 +500,49 @@ function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => 
               <td className="left">Review</td>
               {years.map((y) => (
                 <td key={y.period} data-testid="issuer-year-review" data-period={y.period}>
-                  <span className={y.review.status === "flagged" ? "neg" : y.review.status === "hand-checked" ? "pos" : "muted"} title={y.review.note ?? (y.review.at ? `${y.review.at.slice(0, 10)} ${y.review.by ?? ""}` : "")}>
-                    {REVIEW[y.review.status]}
-                  </span>
-                  <br />
-                  {y.review.status !== "hand-checked" && (
-                    <button type="button" className="link-button" disabled={busy === y.period} onClick={() => void review(y, "hand-checked")} title="The figures match the printed report" data-testid="issuer-year-check">
-                      check
-                    </button>
-                  )}{" "}
-                  {y.review.status !== "flagged" && (
-                    <button type="button" className="link-button" disabled={busy === y.period} onClick={() => void review(y, "flagged")} title="Something's wrong in this year" data-testid="issuer-year-flag">
-                      flag
-                    </button>
-                  )}{" "}
-                  {y.review.status !== "parsed" && (
-                    <button type="button" className="link-button" disabled={busy === y.period} onClick={() => void review(y, "parsed")} title="Back to parsed">
-                      undo
-                    </button>
-                  )}
+                  <div className="cat-review">
+                    <span className={`flag cat-review-${y.review.status}`} title={y.review.note ?? (y.review.at ? `${y.review.at.slice(0, 10)} ${y.review.by ?? ""}` : "Read by code, not checked against the printed report yet")}>
+                      {REVIEW[y.review.status]}
+                    </span>
+                    <span className="cat-review-actions">
+                      {y.review.status !== "hand-checked" && (
+                        <button type="button" className="cat-mini" disabled={busy === y.period} onClick={() => void review(y, "hand-checked")} title="Mark as hand-checked: the figures match the printed report" aria-label={`Mark ${yearLabel(y)} hand-checked`} data-testid="issuer-year-check">
+                          <Icon name="check" size={13} />
+                          Check
+                        </button>
+                      )}
+                      {y.review.status !== "flagged" && (
+                        <button type="button" className="cat-mini" disabled={busy === y.period} onClick={() => void review(y, "flagged")} title="Flag: something's wrong in this year" aria-label={`Flag ${yearLabel(y)}`} data-testid="issuer-year-flag">
+                          <Icon name="flag" size={13} />
+                          Flag
+                        </button>
+                      )}
+                      {y.review.status !== "parsed" && (
+                        <button type="button" className="cat-mini" disabled={busy === y.period} onClick={() => void review(y, "parsed")} title="Back to parsed" aria-label={`Undo the review of ${yearLabel(y)}`}>
+                          <Icon name="undo" size={13} />
+                          Undo
+                        </button>
+                      )}
+                    </span>
+                  </div>
                 </td>
               ))}
             </tr>
-            <tr>
+            <tr className="cat-statements-row">
               <td className="left">Statements</td>
               {years.map((y) => (
                 <td key={y.period}>
-                  <button type="button" className="link-button" onClick={() => setOpen({ period: y.period })} data-testid="issuer-year-lines">
+                  <button
+                    type="button"
+                    className={`cat-mini${open?.period === y.period && !open.field ? " on" : ""}`}
+                    aria-expanded={open?.period === y.period && !open.field}
+                    onClick={() => setOpen(open?.period === y.period && !open.field ? null : { period: y.period })}
+                    title={`The ${yearLabel(y)} statements as printed: balance sheet, income statement, cash flow`}
+                    data-testid="issuer-year-lines"
+                  >
+                    <Icon name="notes" size={13} />
                     {y.lines} lines
+                    <Icon name="chevron-down" size={13} className="cat-mini-caret" />
                   </button>
                 </td>
               ))}
@@ -532,7 +550,7 @@ function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => 
           </tbody>
         </table>
       </div>
-      {open && <YearLinesView entityId={d.company.entityId} period={open.period} field={open.field} onClose={() => setOpen(null)} />}
+      {open && <YearLinesView entityId={d.company.entityId} period={open.period} months={years.find((y) => y.period === open.period)?.months} field={open.field} onClose={() => setOpen(null)} />}
       {d.collected.length > 0 && <p className="muted cat-facts">Figures collected from the web (no report available): {d.collected.length} set{d.collected.length === 1 ? "" : "s"}, the latest {d.collected[0]!.at.slice(0, 10)}.</p>}
     </div>
   );
@@ -541,7 +559,7 @@ function FinancialsTab({ d, onReviewed }: { d: CompanyDetail; onReviewed: () => 
 const STATEMENT: Record<string, string> = { balance: "Balance sheet", income: "Income statement", cashFlow: "Cash flow statement" };
 
 /** A year's lines as printed: all of them, or the ones behind one figure. */
-function YearLinesView({ entityId, period, field, onClose }: { entityId: string; period: string; field: string | undefined; onClose: () => void }) {
+function YearLinesView({ entityId, period, months, field, onClose }: { entityId: string; period: string; months?: number; field: string | undefined; onClose: () => void }) {
   const y = useApi<YearLines>(`/catalyst/entities/${encodeURIComponent(entityId)}/years/${encodeURIComponent(period)}`);
   const [showEmpty, setShowEmpty] = useState(false);
   const shapes = useMemo(() => lineShapes(y.data?.lines ?? []), [y.data]);
@@ -554,10 +572,11 @@ function YearLinesView({ entityId, period, field, onClose }: { entityId: string;
   const emptyCount = field ? 0 : all.filter((l) => shapeOf(l)?.empty).length;
   const lines = field || showEmpty ? all : all.filter((l) => !shapeOf(l)?.empty);
   const label = field ? FIGURES.find(([k]) => k === field)?.[1] : undefined;
+  const name = months ? yearLabel({ periodEnd: period.slice(0, 10), months }) : `FY${period.slice(0, 4)}`;
   return (
     <section className="cat-lines" data-testid="issuer-lines">
       <p className="cat-facts">
-        <strong>{label ? `${label}, FY${period.slice(0, 4)}` : `FY${period.slice(0, 4)}, ${period.split("#")[1]} accounts: the statements`}</strong> (m {y.data.currency}){" "}
+        <strong>{label ? `${label}, ${name}` : `${name}, ${period.split("#")[1]} accounts: the statements`}</strong> (m {y.data.currency}){" "}
         {emptyCount > 0 && (
           <>
             <button type="button" className="link-button" onClick={() => setShowEmpty(!showEmpty)} data-testid="issuer-lines-empty">
