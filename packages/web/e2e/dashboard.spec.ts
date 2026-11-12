@@ -9,7 +9,7 @@ test.describe("dashboard", () => {
 
   test("shows the valuation date and totals", async ({ page }) => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Portfolio Tracker");
-    await expect(page.getByTestId("snapshot-date")).toHaveText(/Valuation as of \d{4}-\d{2}-\d{2}/);
+    await expect(page.getByTestId("snapshot-date")).toHaveText(/Valuation as of \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
     await expect(page.getByTestId("total-deposits")).toContainText("66 403,69 zł");
     await expect(page.getByTestId("total-profit")).toContainText("%");
     // XIRR has its own card, equal to the Accounts table's total

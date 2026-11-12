@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fmtPct, fmtPln, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
+import { fmtPct, fmtPln, fmtTime, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
 import { AccountsTable, type AccountsResponse } from "./AccountsTable.tsx";
 import { Allocation } from "./Allocation.tsx";
 import { Skeleton } from "./Placeholders.tsx";
@@ -82,7 +82,7 @@ export function DashboardView() {
         <h2 className="view-title">Dashboard</h2>
         <span className="view-meta">
           <span className="muted" data-testid="snapshot-date">
-            {snap ? <><span className="wide-only">Valuation </span>as of <span className="nowrap">{snap.date}</span></> : holdings.loading ? "Loading…" : holdings.error ?? ""}
+            {snap ? <><span className="wide-only">Valuation </span>as of <span className="nowrap">{snap.date}{snap.computedAt && ` ${fmtTime(snap.computedAt)}`}</span></> : holdings.loading ? "Loading…" : holdings.error ?? ""}
           </span>
           <RefreshPrices />
         </span>
