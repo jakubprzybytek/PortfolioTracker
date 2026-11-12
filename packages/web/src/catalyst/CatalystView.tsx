@@ -81,7 +81,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
   const toggleRow = (r: BondRow) => setParams({ ...params, bond: params["bond"] === r.isin ? undefined : r.isin });
 
   return (
-    <div style={{ ...stickyStyle, paddingBottom: panelHeight }}>
+    <div className="cat-view" style={{ ...stickyStyle, paddingBottom: panelHeight }}>
       <header className="view-header cat-header">
         <h2 className="view-title">Catalyst</h2>
         <CatalystTabs current="bonds" />

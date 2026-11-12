@@ -1088,6 +1088,10 @@ td.cat-issuer .link-button { color: var(--fg); }
 /* The bonds table fits a laptop's width: a bond's tags wrap under its code, long issuer names end in "…". */
 td.cat-bond { white-space: normal; min-width: 6.5rem; max-width: 11rem; }
 td.cat-issuer { max-width: 11rem; }
+/* A wide screen gets wider Catalyst tables (as the transactions list), and the room goes first to issuers' names. */
+main:has(> .cat-view) { max-width: 1760px; }
+@media (min-width: 1500px) { td.cat-issuer { max-width: 16rem; } }
+@media (min-width: 1800px) { td.cat-issuer { max-width: 22rem; } }
 .cat-subhead { margin: 6px 0 2px; font-size: var(--fs-14); }
 
 /* The view's companies (CompaniesFilter): a button like the dropdowns that opens the list. */
