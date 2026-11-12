@@ -26,6 +26,10 @@ declare module "sst" {
       "name": string
       "type": "sst.aws.Dynamo"
     }
+    "CatalystApi": {
+      "name": string
+      "type": "sst.aws.Function"
+    }
     "CatalystDeadLetter": {
       "type": "sst.aws.Queue"
       "url": string
