@@ -1,3 +1,4 @@
+import "./zodConfig.ts"; // before any module that builds a zod schema
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";

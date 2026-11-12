@@ -7,6 +7,20 @@ test.describe("dashboard", () => {
     await page.goto("/");
   });
 
+  test("no view breaks the Content Security Policy (e.g. a library probing for eval)", async ({ page }) => {
+    // The CSP comes from CloudFront: checked on a deployed stage (WEB_URL), vacuous on the local dev server.
+    await page.addInitScript(() => {
+      const w = window as unknown as { cspViolations: string[] };
+      w.cspViolations = [];
+      document.addEventListener("securitypolicyviolation", (e) => w.cspViolations.push(`${e.violatedDirective} ${e.blockedURI} ${e.sourceFile}:${e.lineNumber}`));
+    });
+    for (const view of ["/", "/#/performance", "/#/holdings", "/#/prices", "/#/hold-sell", "/#/sales", "/#/cash-flows", "/#/indicators", "/#/transactions", "/#/notes", "/#/status", "/#/catalyst"]) {
+      await page.goto(view);
+      await page.waitForLoadState("networkidle");
+      expect(await page.evaluate(() => (window as unknown as { cspViolations: string[] }).cspViolations), view).toEqual([]);
+    }
+  });
+
   test("shows the valuation date and totals", async ({ page }) => {
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Portfolio Tracker");
     await expect(page.getByTestId("snapshot-date")).toHaveText(/Valuation as of \d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
