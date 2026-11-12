@@ -197,7 +197,18 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
             {shown.map((r) => (
               <tr key={r.isin} className={`clickable${r.isin === params["bond"] ? " selected" : ""}${r.flags.includes("stale") ? " closed" : ""}${peek && others.includes(r) ? " outside" : ""}`} onClick={() => toggleRow(r)} data-testid="catalyst-row" data-code={r.code}>
                 <td className="left cat-bond" title={`${r.isin} · ${SEGMENTS[r.segment] ?? r.segment} · ${r.markets.join(", ")}`}>
-                  <strong>{r.code}</strong>
+                  <button
+                    type="button"
+                    className="link-button cat-name"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleRow(r);
+                    }}
+                    aria-expanded={r.isin === params["bond"]}
+                    data-testid="catalyst-bond"
+                  >
+                    <strong>{r.code}</strong>
+                  </button>
                   {r.segment !== "corporate" && <span className="flag">{(SEGMENTS[r.segment] ?? r.segment).toLowerCase()}</span>}
                   {r.currency !== "PLN" && <span className="flag">{r.currency}</span>}
                   {r.flags
@@ -212,7 +223,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
                   {r.entityId ? (
                     <button
                       type="button"
-                      className="link-button"
+                      className="link-button cat-name"
                       onClick={(e) => {
                         e.stopPropagation();
                         openIssuer(r);
@@ -291,7 +302,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
       </p>
 
       {selected && (
-        <ChartPanel title={<BondTitle r={selected} />} onClose={closePanel} onHeight={setPanelHeight}>
+        <ChartPanel title={<BondTitle r={selected} onIssuer={() => openIssuer(selected)} />} onClose={closePanel} onHeight={setPanelHeight}>
           <BondPanel row={selected} tab={params["tab"] ?? "price"} setTab={(t) => setParams({ ...params, tab: t === "price" ? undefined : t })} />
         </ChartPanel>
       )}
@@ -303,6 +314,8 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
           setTab={(t) => setParams({ ...params, itab: t === "bonds" ? undefined : t })}
           onClose={closeDialog}
           onShowBonds={() => setParams({ ...params, co: params["issuer"], cm: undefined, issuer: undefined, itab: undefined })}
+          // The dialog gives way to the bond's panel; the panel's issuer name opens the dialog again.
+          onOpenBond={(isin) => setParams({ ...params, bond: isin, tab: undefined, issuer: undefined, itab: undefined })}
           viewToggle={(() => {
             const r = all.find((x) => x.entityId === params["issuer"]);
             return r ? { label: out ? "Hide in this view" : inList(r, list) ? "In this view" : "Add to this view", on: !out && inList(r, list), title: companyTitle(r), toggle: () => toggleCompanyOf(r) } : undefined;

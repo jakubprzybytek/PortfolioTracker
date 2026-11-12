@@ -13,10 +13,20 @@ export function LiquidityDots({ level }: { level: Level }) {
   );
 }
 
-export function BondTitle({ r }: { r: BondRow }) {
+/** `onIssuer`: the issuer's name opens its dialog (a bond linked to a company). */
+export function BondTitle({ r, onIssuer }: { r: BondRow; onIssuer?: () => void }) {
+  const issuer = r.issuerShort ?? r.issuer ?? "";
   return (
     <span data-testid="catalyst-panel-title">
-      <strong>{r.code}</strong> {r.issuerShort ?? r.issuer ?? ""} <span className="muted">{r.couponText ?? couponLabel(r)} · matures {r.maturity ?? "–"}</span>
+      <strong>{r.code}</strong>{" "}
+      {onIssuer && r.entityId ? (
+        <button type="button" className="link-button cat-name" onClick={onIssuer} title="The issuer: scorecard, financials, judgements" data-testid="catalyst-panel-issuer">
+          {issuer}
+        </button>
+      ) : (
+        issuer
+      )}{" "}
+      <span className="muted">{r.couponText ?? couponLabel(r)} · matures {r.maturity ?? "–"}</span>
     </span>
   );
 }

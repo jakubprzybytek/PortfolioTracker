@@ -283,6 +283,10 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
           onShowBonds={() => {
             window.location.hash = `#/catalyst?co=${encodeURIComponent(params["issuer"]!)}`;
           }}
+          // The bonds view with the bond's panel open (filters off, so it's in the table).
+          onOpenBond={(isin) => {
+            window.location.hash = `#/catalyst?bond=${encodeURIComponent(isin)}`;
+          }}
         />
       )}
     </div>

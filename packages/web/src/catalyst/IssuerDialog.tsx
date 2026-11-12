@@ -35,7 +35,8 @@ const periodLabel = (periodEnd: string, months: number) => {
   return months === 6 ? `H1 ${year}` : months === 3 ? `Q1 ${year}` : months === 9 ? `Q1–Q3 ${year}` : `${months} m to ${periodEnd}`;
 };
 
-export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds, viewToggle }: { entityId: string; rows: BondRow[]; tab: string; setTab: (t: string) => void; onClose: () => void; onShowBonds: () => void; viewToggle?: { label: string; on: boolean; title: string; toggle: () => void } }) {
+/** `onOpenBond`: a bond's code in the Bonds tab opens its panel. */
+export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds, onOpenBond, viewToggle }: { entityId: string; rows: BondRow[]; tab: string; setTab: (t: string) => void; onClose: () => void; onShowBonds: () => void; onOpenBond: (isin: string) => void; viewToggle?: { label: string; on: boolean; title: string; toggle: () => void } }) {
   const detail = useApi<CompanyDetail>(`/catalyst/entities/${encodeURIComponent(entityId)}`);
   const d = detail.data;
   useEffect(() => {
@@ -172,7 +173,7 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
         </div>
         </div>
         <div className="cat-issuer-tab">
-          {tab === "bonds" && <BondsTab rows={own} onShowBonds={onShowBonds} />}
+          {tab === "bonds" && <BondsTab rows={own} onShowBonds={onShowBonds} onOpenBond={onOpenBond} />}
           {tab === "financials" && d && <FinancialsTab d={d} onReviewed={detail.reload} />}
           {tab === "track" && <TrackTab detail={d ? { track: d.track, events: [] } : undefined} loading={detail.loading} />}
           {tab === "judgements" && d && <JudgementsTab d={d} />}
@@ -345,7 +346,7 @@ function Due({ d }: { d: CompanyDetail }) {
   );
 }
 
-function BondsTab({ rows, onShowBonds }: { rows: BondRow[]; onShowBonds: () => void }) {
+function BondsTab({ rows, onShowBonds, onOpenBond }: { rows: BondRow[]; onShowBonds: () => void; onOpenBond: (isin: string) => void }) {
   if (rows.length === 0) return <p className="muted">No listed bonds.</p>;
   return (
     <div className="cat-track">
@@ -367,7 +368,9 @@ function BondsTab({ rows, onShowBonds }: { rows: BondRow[]; onShowBonds: () => v
               .map((r) => (
                 <tr key={r.isin}>
                   <td className="left">
-                    <strong>{r.code}</strong>
+                    <button type="button" className="link-button cat-name" onClick={() => onOpenBond(r.isin)} title="Open the bond: price, yield, coupons, track record" data-testid="issuer-bond">
+                      <strong>{r.code}</strong>
+                    </button>
                   </td>
                   <td className="left">{r.maturity ?? "–"}</td>
                   <td>{r.issueAmount ? `${mln(r.issueAmount)}${r.currency !== "PLN" ? ` ${r.currency}` : ""}` : "–"}</td>

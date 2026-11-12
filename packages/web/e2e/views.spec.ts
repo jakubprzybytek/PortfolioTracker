@@ -1889,6 +1889,31 @@ test.describe("catalyst view", () => {
     await expect(page).not.toHaveURL(/co=/);
   });
 
+  test("a bond's panel and its issuer's dialog lead to each other", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    const row = page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" });
+    const dialog = page.getByTestId("issuer-dialog");
+    const title = page.getByTestId("catalyst-panel-title");
+    // The issuer's dialog: a bond's code there gives way to that bond's panel.
+    await row.getByTestId("catalyst-issuer").click();
+    await dialog.getByTestId("issuer-bond").filter({ hasText: "KRU0829" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(title).toContainText("KRU0829");
+    await expect(page).not.toHaveURL(/issuer=/);
+    // The panel's issuer name opens the dialog again, over the panel.
+    await page.getByTestId("catalyst-panel-issuer").click();
+    await expect(dialog).toBeVisible();
+    await expect(page).toHaveURL(/issuer=0000533217/);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(title).toContainText("KRU0829");
+    // The bond's code in the table is a link too, as the issuer's name: it closes the panel and opens it.
+    await row.getByTestId("catalyst-bond").click();
+    await expect(title).toHaveCount(0);
+    await row.getByTestId("catalyst-bond").click();
+    await expect(title).toContainText("KRU0829");
+  });
+
   test("a row opens its panel: price and liquidity, the yield's make-up, the coupons", async ({ page }) => {
     await page.goto("/#/catalyst");
     await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).click();

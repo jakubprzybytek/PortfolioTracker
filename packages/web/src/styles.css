@@ -984,7 +984,8 @@ tr.cat-flagged td { background: color-mix(in srgb, var(--neg) 7%, transparent); 
 .link-button:disabled { color: var(--faint); cursor: default; text-decoration: none; }
 .link-button.plain { color: inherit; }
 .link-button.plain:hover { text-decoration: none; }
-td.cat-issuer .link-button { color: var(--fg); }
+/* A bond's code and an issuer's name open their panel or dialog: the same link, in the text's colour. */
+.link-button.cat-name { color: var(--fg); }
 .cat-chip { font: inherit; font-size: var(--fs-13); align-self: flex-end; height: var(--ctl); padding: 0 10px; border-radius: 999px; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent); cursor: pointer; }
 .cat-signals { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .cat-rule { font-size: var(--fs-12); }

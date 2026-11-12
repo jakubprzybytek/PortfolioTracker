@@ -26,7 +26,8 @@ export function ChartPanel({ title, actions, onClose, onHeight, children }: { ti
 
   useEffect(() => {
     const onResize = () => setViewport(window.innerHeight);
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // Escape closes the topmost layer only: a dialog open over the panel (the issuer's) closes first.
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !document.querySelector('[aria-modal="true"]') && onClose();
     window.addEventListener("resize", onResize);
     window.addEventListener("keydown", onKey);
     return () => {
