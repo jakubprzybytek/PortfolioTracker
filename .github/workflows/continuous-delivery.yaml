@@ -69,6 +69,9 @@ jobs:
             echo "latest=${latest:-none} current=${current:-none}"
           fi
           echo "ref=$GITHUB_REF version=$version release=$release"
+          # On the run's page from the start (Annotations), before prod is reached.
+          if [ "$release" = true ]; then echo "::notice title=Version $version::Release $version: tagged and deployed to prod if int and the tests pass"
+          else echo "::notice title=Version $version::$version (no new release): deployed to prod if int and the tests pass"; fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
@@ -108,7 +111,7 @@ jobs:
   # The tag marks a release that passed int. Its own job: the only one with a token that can push, and it runs no npm
   # code. Always runs after int (the step is skipped for a non-release), so prod can depend on it.
   tag:
-    name: Tag release
+    name: Tag ${{ needs.int.outputs.release == 'true' && needs.int.outputs.version || '(no release)' }}
     needs: int
     runs-on: ubuntu-latest
     permissions:
@@ -131,7 +134,7 @@ jobs:
 
   # prod deploys once int passed: a release from its tag, any other ref from the commit int was tested on.
   prod:
-    name: Deploy prod
+    name: Deploy prod ${{ needs.int.outputs.version }}
     needs: [int, tag]
     runs-on: ubuntu-latest
     permissions:
@@ -157,3 +160,14 @@ jobs:
           mask-aws-account-id: true
       - name: Deploy prod
         run: npx sst deploy --stage prod
+      # The version at the top of the run's summary page, and as an annotation.
+      - name: Summary
+        env:
+          RELEASE: ${{ needs.int.outputs.release }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          if [ "$RELEASE" = true ]; then what="Released [$APP_VERSION]($REPO_URL/tree/$APP_VERSION) and deployed it to prod"
+          else what="Deployed $APP_VERSION to prod (no new release)"; fi
+          echo "## $APP_VERSION on prod" >> "$GITHUB_STEP_SUMMARY"
+          echo "$what, commit ${GITHUB_SHA::7}." >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice title=$APP_VERSION on prod::$APP_VERSION deployed to prod"
