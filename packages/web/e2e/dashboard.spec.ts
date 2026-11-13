@@ -394,10 +394,8 @@ test.describe("on a phone", () => {
       await page.evaluate((s) => {
         document.documentElement.style.fontSize = s;
       }, size);
-      const [brand, plus, reload, menu] = await Promise.all(
-        [page.locator("h1.brand"), page.getByTestId("tx-add"), page.locator("button.reload"), page.getByTestId("menu-toggle")].map((l) => l.boundingBox()),
-      );
-      for (const b of [plus, reload, menu]) expect(Math.abs(b!.y - menu!.y)).toBeLessThan(2);
+      const [brand, plus, menu] = await Promise.all([page.locator("h1.brand"), page.getByTestId("tx-add"), page.getByTestId("menu-toggle")].map((l) => l.boundingBox()));
+      expect(Math.abs(plus!.y - menu!.y)).toBeLessThan(2);
       expect(menu!.y).toBeLessThan(brand!.y + brand!.height);
       expect(menu!.x + menu!.width).toBeLessThanOrEqual(360);
     }

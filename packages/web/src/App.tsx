@@ -9,7 +9,7 @@ import { useRoute, VIEWS } from "./route.ts";
 import { TransactionForm } from "./TransactionForm.tsx";
 import { TxFormContext } from "./txForm.ts";
 import type { Status, Transaction } from "./types.ts";
-import { clearApiCache, reloadAll, useApiBusy } from "./useApi.ts";
+import { clearApiCache, reloadAll } from "./useApi.ts";
 
 // Each view loads with its first visit (its code and the libraries only it uses), not before the login form.
 const DashboardView = lazy(() => import("./DashboardView.tsx").then((m) => ({ default: m.DashboardView })));
@@ -122,7 +122,6 @@ function Shell({ email }: { email: string }) {
     () => ({ open: (editing?: Transaction) => setForm({ editing }), saved, refreshPrices: () => void refreshPrices(), busy }),
     [saved, refreshPrices, busy],
   );
-  const fetching = useApiBusy();
   // Phone: the menu opens over the page from the ☰ button; any navigation, a tap outside or Escape closes it.
   const [menuOpen, setMenuOpen] = useState(false);
   const hash = window.location.hash;
@@ -152,18 +151,6 @@ function Shell({ email }: { email: string }) {
             <button type="button" className="primary add-tx" onClick={() => setForm({})} aria-label="Add transaction" data-testid="tx-add">
               <span aria-hidden>+</span>
               <span className="label"> Add transaction</span>
-            </button>
-            <button
-              type="button"
-              className="reload"
-              onClick={reloadAll}
-              title="Reload this view's data from the server (doesn't fetch new prices)"
-              aria-label="Reload"
-              aria-busy={fetching}
-              data-testid="reload"
-            >
-              <Icon name="reload" size={16} className={fetching ? "spin" : undefined} />
-              <span className="label">Reload</span>
             </button>
             <button
               type="button"

@@ -3,7 +3,7 @@ import { useTxForm } from "./txForm.ts";
 
 /**
  * "Update prices" next to the valuation date (Dashboard, Holdings, Prices): today's quotes of the instruments with a
- * live source, then a revaluation of today. Not the "Reload" of the app frame, which only refetches what's shown. Disabled while that or any other revaluation runs; the icon turns while prices
+ * live source, then a revaluation of today. Disabled while that or any other revaluation runs; the icon turns while prices
  * are fetched. Progress and the outcome show in the corner (App). On a phone only the icon, so it fits on the title's row.
  */
 export function RefreshPrices() {

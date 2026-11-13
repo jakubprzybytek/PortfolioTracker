@@ -1,4 +1,3 @@
-import { useSyncExternalStore } from "react";
 import useSWR, { mutate } from "swr";
 import { api, clearAnswers } from "./api.ts";
 import { apiKey, parseApiKey } from "./apiKey.ts";
@@ -25,13 +24,12 @@ export function useApi<T>(path: string | null, params: Record<string, string | u
 
 function fetcher<T>(key: string): Promise<T> {
   const { path, params } = parseApiKey(key);
-  inFlight.change(1);
-  return api<T>(path, params).finally(() => inFlight.change(-1));
+  return api<T>(path, params);
 }
 
 /**
- * Refetches everything on screen (the mounted hooks; the rest refetches when next shown, as always). After a save,
- * a finished valuation, and the "Reload" button.
+ * Refetches everything on screen (the mounted hooks; the rest refetches when next shown, as always). After a save and
+ * a finished valuation. (SWR also refetches what's shown when the tab gets the focus back or the network returns.)
  */
 export const reloadAll = () => void mutate(() => true);
 
@@ -40,22 +38,3 @@ export const clearApiCache = () => {
   clearAnswers();
   void mutate(() => true, undefined, { revalidate: false });
 };
-
-/** How many requests of useApi are under way: the "Reload" icon turns while any is. */
-const inFlight = (() => {
-  let count = 0;
-  const listeners = new Set<() => void>();
-  return {
-    get: () => count,
-    change(by: number) {
-      count += by;
-      for (const l of listeners) l();
-    },
-    subscribe(l: () => void) {
-      listeners.add(l);
-      return () => void listeners.delete(l);
-    },
-  };
-})();
-
-export const useApiBusy = () => useSyncExternalStore(inFlight.subscribe, inFlight.get) > 0;

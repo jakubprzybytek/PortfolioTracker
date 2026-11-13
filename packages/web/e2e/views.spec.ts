@@ -24,7 +24,7 @@ test.describe("navigation", () => {
   });
 });
 
-test.describe("cached data and Reload", () => {
+test.describe("cached data", () => {
   const slow = (ms: number) => async (route: import("@playwright/test").Route) => {
     await new Promise((r) => setTimeout(r, ms));
     await route.continue();
@@ -43,39 +43,35 @@ test.describe("cached data and Reload", () => {
     await page.getByTestId("nav-transactions").click();
     await expect(rows).toHaveCount(30, { timeout: 1000 }); // from the cache, while the request is held back
     await refetch;
-    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "true");
-    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "false", { timeout: 10_000 });
+    await page.waitForResponse("**/transactions", { timeout: 10_000 });
     await expect(rows).toHaveCount(30);
   });
 
-  test("Reload refetches the view's data and keeps it on screen meanwhile", async ({ page }) => {
-    await page.goto("/#/transactions");
-    const rows = page.getByTestId("transaction-row");
-    await expect(rows).toHaveCount(30);
-    await page.route("**/transactions", slow(1500));
-    const refetch = page.waitForRequest("**/transactions");
-    await page.getByTestId("reload").click();
-    await refetch;
-    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "true");
-    await expect(rows).toHaveCount(30);
-    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "false", { timeout: 10_000 });
+  test("a tablet in landscape: the cards' values fit, the whole menu is in view", async ({ page }) => {
+    // A 10" tablet in Chrome (1333 × 657 CSS px): six cards in a row, a short window.
+    await page.setViewportSize({ width: 1333, height: 657 });
+    await page.goto("/");
+    await expect(page.getByTestId("total-all")).toBeVisible();
+    // Values as long as a real portfolio's: none overflows its card.
+    const overflowing = await page.evaluate(() =>
+      [...document.querySelectorAll<HTMLElement>(".card .value")]
+        .map((v) => {
+          v.textContent = "1 562 317,43 zł";
+          return v.scrollWidth > v.clientWidth + 1 || v.getBoundingClientRect().right > v.closest(".card")!.getBoundingClientRect().right;
+        })
+        .filter(Boolean).length,
+    );
+    expect(overflowing).toBe(0);
+    // The menu's last link and the footer fit without scrolling.
+    const status = await page.getByTestId("nav-status").boundingBox();
+    expect(status!.y + status!.height).toBeLessThanOrEqual(657);
   });
 
-  test("'Reload' (the frame) and 'Update prices' (the view header) are separate buttons", async ({ page }) => {
+  test("the menu frame has no Reload: 'Update prices' in the view header is the one refresh button", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByTestId("refresh-prices")).toHaveText("Update prices");
-    await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /refresh/i })).toHaveCount(0);
-    // Reload doesn't start the live prices
-    let started = false;
-    await page.route("**/prices/refresh", (route) => {
-      started = true;
-      return route.abort();
-    });
-    await page.getByTestId("reload").click();
-    await expect(page.getByTestId("reload")).toHaveAttribute("aria-busy", "false");
-    await expect(page.getByTestId("recalc")).toHaveCount(0);
-    expect(started).toBe(false);
   });
 });
 
