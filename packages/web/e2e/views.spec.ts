@@ -1579,7 +1579,15 @@ test.describe("sticky filters and header (Holdings, Prices)", () => {
         await page.setViewportSize({ width, height: 420 });
         await page.goto(`/#/${view}`);
         await expect(page.getByTestId(id).locator("tbody tr").nth(3)).toBeVisible();
-        await page.evaluate(() => window.scrollTo(0, 400));
+        // Room to scroll whatever the sample's rows: 7 prices barely outgrow a 420 px window (the menu doesn't make
+        // the page taller: it scrolls in its own column). Next to the table: its floating header sticks within the
+        // table's box, the filters within the view's (which holds it).
+        await page.getByTestId(`${id}-head`).evaluate((head) => {
+          const room = document.createElement("div");
+          room.style.height = "1000px";
+          head.parentElement!.append(room);
+          window.scrollTo(0, 400);
+        });
         const tools = (await page.getByTestId(`${view}-toolbar`).boundingBox())!;
         const top = width < 720 ? (await page.locator(".sidebar").boundingBox())!.height : 0;
         expect(Math.abs(tools.y - top)).toBeLessThan(3);
@@ -1886,6 +1894,30 @@ test.describe("catalyst view", () => {
     await expect(page.getByTestId("issuer-view-toggle")).toHaveText("In this view");
     await page.getByTestId("issuer-view-toggle").click();
     await expect(page).not.toHaveURL(/co=/);
+  });
+
+  test("a bond's drawer is over the sticky filters, except while a filter is being used", async ({ page }) => {
+    // A short window with the drawer pulled up high: it reaches up over the filters.
+    await page.setViewportSize({ width: 1333, height: 500 });
+    await page.addInitScript(() => window.localStorage.setItem("portfolio-tracker.chartPanel.height", "0.75"));
+    await page.goto("/#/catalyst");
+    await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).getByTestId("catalyst-bond").click();
+    await expect(page.getByTestId("catalyst-panel-title")).toBeVisible();
+    const onTop = () =>
+      page.evaluate(() => {
+        const bar = document.querySelector('[data-testid="catalyst-toolbar"]')!.getBoundingClientRect();
+        const drawer = document.querySelector(".chart-panel")!.getBoundingClientRect();
+        // A point both cover: the filters' bottom edge, below the drawer's top.
+        if (drawer.top > bar.bottom - 6) return "no overlap";
+        const el = document.elementFromPoint(bar.left + bar.width / 2, bar.bottom - 4);
+        return el?.closest(".chart-panel") ? "drawer" : el?.closest('[data-testid="catalyst-toolbar"]') ? "filters" : "other";
+      });
+    await expect.poll(onTop).toBe("drawer");
+    // Typing in a filter brings the filters up; done with them, the drawer is back on top.
+    await page.getByTestId("catalyst-q").focus();
+    await expect.poll(onTop).toBe("filters");
+    await page.getByTestId("catalyst-q").blur();
+    await expect.poll(onTop).toBe("drawer");
   });
 
   test("a bond's panel and its issuer's dialog lead to each other", async ({ page }) => {

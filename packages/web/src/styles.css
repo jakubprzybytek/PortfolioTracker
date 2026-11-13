@@ -214,6 +214,9 @@ td.tx-account { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
    the header under the filters: --bar-h, both measured). The table doesn't scroll sideways (a scrolling box would hold
    its header): on narrower screens the least needed columns go instead (asset type, then fee and note: in the form). */
 .tx-toolbar, .sticky-toolbar { position: sticky; top: var(--sticky-top, 0px); z-index: 15; background: var(--bg); padding-top: 10px; margin-top: -10px; }
+/* Under a bond's drawer (.chart-panel, 20), except while it's being used: a control in it focused, the companies'
+   pop-up or the phone's filters sheet open (they live in its layer). */
+.tx-toolbar:focus-within, .sticky-toolbar:focus-within, .sticky-toolbar:has(.cat-companies-pop, .sheet-backdrop) { z-index: 25; }
 .tx-toolbar .filters, .sticky-toolbar .filters { margin-bottom: 0; padding-bottom: 12px; }
 /* Holdings, Prices (StickyTable): the table scrolls sideways on narrower screens, so a copy of its header floats above
    it, under the filters, following its sideways scroll; the copy is the box's top (border, rounded corners), the
@@ -329,7 +332,7 @@ form.login button.link { align-self: center; font-size: var(--fs-14); }
 .card .note { font-size: var(--fs-12); margin-top: 2px; }
 tr.muted td { color: var(--muted); }
 /* Chart panel docked to the bottom (Holdings row charts); left edge follows the menu. */
-.chart-panel { position: fixed; bottom: 0; left: 200px; right: 0; z-index: 10; background: var(--panel); border-top: 1px solid var(--border); box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; padding: 0 24px 8px; }
+.chart-panel { position: fixed; bottom: 0; left: 200px; right: 0; z-index: 20; background: var(--panel); border-top: 1px solid var(--border); box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; padding: 0 24px 8px; }
 .chart-panel-handle { height: 10px; margin: 0 -24px; cursor: ns-resize; touch-action: none; position: relative; }
 .chart-panel-handle::after { content: ""; position: absolute; left: 50%; top: 3px; width: 48px; height: 4px; margin-left: -24px; border-radius: 2px; background: var(--border); }
 .chart-panel-handle:hover::after { background: var(--muted); }
