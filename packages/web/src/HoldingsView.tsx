@@ -958,8 +958,20 @@ export function HoldingsView({
     <NewestPrice.Provider value={newestPrice}>
     <HoldSellVerdicts.Provider value={verdicts}>
     <div style={stickyStyle}>
-      <header className="view-header">
+      <header className="view-header with-switch">
         <h2 className="view-title">Holdings</h2>
+        {/* Group by: next to the title, as Catalyst's Bonds / Issuers (one control split in three: the chosen part filled). */}
+        {/* biome-ignore lint/a11y/useSemanticElements: a segmented control; a <fieldset> would bring its own box and legend */}
+        <span className="segmented view-switch" data-testid="group-by" role="group" aria-label="Group by" title="Group by">
+          {(["account", "class", "instrument"] as const).map((g) => {
+            const active = g === (params["group"] ?? "account");
+            return (
+              <button key={g} type="button" className={active ? "active" : ""} aria-pressed={active} title={`Group by ${GROUP_LABELS[g].toLowerCase()}`} onClick={() => setParams({ ...params, group: g === "account" ? undefined : g })}>
+                {GROUP_LABELS[g]}
+              </button>
+            );
+          })}
+        </span>
         <span className="view-meta">
           <span className="muted" data-testid="holdings-date">
             {snap.data ? (
@@ -977,38 +989,6 @@ export function HoldingsView({
         </span>
       </header>
       {snap.error && <p className="error">{snap.error}</p>}
-
-      {/* One control split in two (segmented): the chosen half filled. */}
-      <div className="group-by">
-        <span className="muted">Group by</span>
-        {/* biome-ignore lint/a11y/useSemanticElements: a segmented control; a <fieldset> would bring its own box and legend */}
-        <span
-          className="segmented"
-          data-testid="group-by"
-          role="group"
-          aria-label="Group by"
-        >
-          {(["account", "class", "instrument"] as const).map((g) => {
-            const active = g === (params["group"] ?? "account");
-            return (
-              <button
-                key={g}
-                type="button"
-                className={active ? "active" : ""}
-                aria-pressed={active}
-                onClick={() =>
-                  setParams({
-                    ...params,
-                    group: g === "account" ? undefined : g,
-                  })
-                }
-              >
-                {GROUP_LABELS[g]}
-              </button>
-            );
-          })}
-        </span>
-      </div>
 
       <div className="sticky-toolbar" ref={toolbar} data-testid="holdings-toolbar">
       <FilterBar
