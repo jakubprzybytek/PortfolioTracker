@@ -2,6 +2,8 @@ import { CartesianGrid, ComposedChart, Line, ReferenceDot, ResponsiveContainer, 
 import { fmtNum } from "./format.ts";
 import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
 import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
+import { timeAxis } from "./timeAxis.ts";
+import { timeAxisProps, yearLines } from "./TimeTick.tsx";
 import type { Price, Transaction } from "./types.ts";
 
 /**
@@ -27,6 +29,7 @@ export function PriceChart({
   if (prices.length === 0) return <ChartPlaceholder loading={loading} height={height ?? "100%"}>No prices in this range.</ChartPlaceholder>;
   const data = prices.map((p) => ({ date: p.date, close: p.close, traded: p.traded, volume: p.volume, nominal: p.nominal ?? null }));
   const withNominal = data.some((d) => d.nominal !== null);
+  const time = timeAxis(data.map((d) => d.date), narrow ? 6 : 12);
   const byDate = new Map(data.map((d) => [d.date, d.close]));
   // Buys/sells shown on the price line at their date (or the next available session).
   const markers = transactions
@@ -42,7 +45,7 @@ export function PriceChart({
       <ResponsiveContainer>
         <ComposedChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
+          <XAxis dataKey="date" stroke="var(--muted)" {...timeAxisProps(time)} />
           <YAxis yAxisId="price" {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 12 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 1)} />
           {withNominal && (
             <YAxis yAxisId="nominal" orientation="right" {...(narrow ? narrowYAxis : { width: 60, tick: { fontSize: 12 } })} stroke="var(--muted)" domain={["auto", "auto"]} tickFormatter={(v: number) => fmtNum(v, 0)} />
@@ -57,6 +60,7 @@ export function PriceChart({
             }
             contentStyle={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 }}
           />
+          {yearLines(time, "price")}
           <Line yAxisId="price" type="linear" dataKey="close" stroke="var(--accent)" dot={false} strokeWidth={1.5} isAnimationActive={false} />
           {withNominal && (
             <Line yAxisId="nominal" type="linear" dataKey="nominal" stroke="var(--muted)" strokeDasharray="4 3" dot={false} strokeWidth={1.5} isAnimationActive={false} connectNulls={false} />

@@ -7,6 +7,8 @@ import { chartMargin, useNarrow } from "../useNarrow.ts";
 import type { BondDetail, BondOutcome, BondRow, ReportedEvent } from "./types.ts";
 import { FLAG_TITLE, LEVEL_LABEL, couponLabel, pct, pp, webHref } from "./labels.ts";
 import { LiquidityDots } from "./parts.tsx";
+import { timeAxis } from "../timeAxis.ts";
+import { timeAxisProps, yearLines } from "../TimeTick.tsx";
 
 export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; setTab: (t: string) => void }) {
   const detail = useApi<BondDetail>(`/catalyst/bonds/${row.isin}`);
@@ -39,6 +41,8 @@ export function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondD
   if (!detail) return <p className="muted">{loading ? "Loading…" : ""}</p>;
   const quotes = new Map(detail.quotes.map((q) => [q.date, q]));
   const data = detail.sessions.map((s) => ({ date: s.date, close: s.trades > 0 ? s.close : null, reference: s.close, turnover: s.turnover, bid: quotes.get(s.date)?.bid?.price ?? null, ask: quotes.get(s.date)?.ask?.price ?? null }));
+  // Months (or weeks, or years) on their first session, the year's start stronger.
+  const axis = timeAxis(data.map((d) => d.date), narrow ? 6 : 12);
   const l = row.liquidity;
   // The latest quoted session: the ask is what a buyer pays, the bid what a seller gets.
   const last = [...detail.quotes].reverse().find((q) => q.bid || q.ask);
@@ -75,11 +79,12 @@ export function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondD
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
-          <XAxis dataKey="date" tickFormatter={(d: string) => d.slice(5)} minTickGap={30} />
+          <XAxis dataKey="date" {...timeAxisProps(axis)} />
           {/* Whole percents: "auto" picks fractional ticks (101.25) that don't fit the axis once prices pass 100. */}
           <YAxis yAxisId="p" domain={[(min: number) => Math.floor(min), (max: number) => Math.ceil(max)]} allowDecimals={false} tickFormatter={(v: number) => fmtInt(v)} width={narrow ? 36 : 44} />
           <YAxis yAxisId="t" orientation="right" hide />
           <Tooltip formatter={(v, name) => [name === "turnover" ? fmtInt(Math.round(Number(v))) : fmtNum(Number(v)), String(name)]} />
+          {yearLines(axis, "p")}
           <Bar yAxisId="t" dataKey="turnover" fill="var(--line)" isAnimationActive={false} />
           <Line yAxisId="p" dataKey="reference" name="reference" stroke="var(--border)" dot={false} isAnimationActive={false} />
           <Line yAxisId="p" dataKey="close" name="close (traded)" stroke="var(--accent)" dot={{ r: 2 }} connectNulls={false} isAnimationActive={false} />

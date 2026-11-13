@@ -5,6 +5,8 @@ import { fmtNum, fmtPct, fmtPln } from "./format.ts";
 import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
 import type { HistoryPoint } from "./types.ts";
 import { chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
+import { timeAxis } from "./timeAxis.ts";
+import { timeAxisProps, yearLines } from "./TimeTick.tsx";
 
 const tooltipStyle = { background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 };
 const yAxis = (narrow: boolean) => (narrow ? narrowYAxis : { width: 56, tick: { fontSize: 12 } });
@@ -21,6 +23,7 @@ export function DrawdownChart({ history, loading, height = 220 }: { history: His
   const worst = Math.min(...data.map((d) => d.drawdown));
   const step = [0.5, 1, 2, 5, 10, 20].find((s) => s * 4 >= -worst) ?? 25;
   const ticks = Array.from({ length: Math.max(1, Math.ceil(-worst / step)) + 1 }, (_, i) => (i ? -i * step : 0));
+  const time = timeAxis(data.map((d) => d.date), narrow ? 6 : 12);
   return (
     <div className="chart-frame" data-testid="drawdown-chart" style={{ width: "100%", height }}>
       <ResponsiveContainer>
@@ -32,9 +35,10 @@ export function DrawdownChart({ history, loading, height = 220 }: { history: His
             </linearGradient>
           </defs>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
+          <XAxis dataKey="date" stroke="var(--muted)" {...timeAxisProps(time)} />
           <YAxis {...yAxis(narrow)} stroke="var(--muted)" domain={[ticks.at(-1)!, 0]} ticks={ticks} interval={0} tickFormatter={(v: number) => `${fmtNum(v, step < 1 ? 1 : 0)}%`} />
           <Tooltip formatter={(v) => [fmtPct(Number(v)), "Below the best so far"]} contentStyle={tooltipStyle} />
+          {yearLines(time)}
           <Area type="monotone" dataKey="drawdown" baseValue={0} stroke="var(--neg)" fill="url(#drawdown-fill)" dot={false} isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
@@ -55,12 +59,13 @@ export function AllocationChart({ history, loading, height = 220 }: { history: H
   if (data.length === 0) return <ChartPlaceholder loading={loading} height={height}>No valuation history in this range.</ChartPlaceholder>;
   // Only the classes held at some point in the range.
   const classes = ASSET_CLASSES.filter((k) => data.some((d) => (d[k] as number) > 0));
+  const time = timeAxis(data.map((d) => d.date as string), narrow ? 6 : 12);
   return (
     <div className="chart-frame" data-testid="allocation-chart" style={{ width: "100%", height }}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={chartMargin(narrow)}>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
+          <XAxis dataKey="date" stroke="var(--muted)" {...timeAxisProps(time)} />
           <YAxis {...yAxis(narrow)} stroke="var(--muted)" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} interval={0} allowDataOverflow tickFormatter={(v: number) => `${v}%`} />
           <Tooltip
             formatter={(v, name, item) => [`${fmtNum(Number(v), 1)}%  ·  ${fmtPln(Number((item.payload as Record<string, number>)[`${String(name)}_pln`]))}`, CLASS_LABELS[name as keyof typeof CLASS_LABELS]]}
@@ -70,6 +75,7 @@ export function AllocationChart({ history, loading, height = 220 }: { history: H
           {classes.map((k) => (
             <Area key={k} type="monotone" dataKey={k} stackId="mix" stroke={CLASS_COLORS[k]} fill={CLASS_COLORS[k]} fillOpacity={0.55} dot={false} isAnimationActive={false} />
           ))}
+          {yearLines(time)}
         </AreaChart>
       </ResponsiveContainer>
       <ChartBusy busy={loading} />

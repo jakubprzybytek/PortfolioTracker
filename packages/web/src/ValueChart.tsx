@@ -2,6 +2,8 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { fmtCompact, fmtPln } from "./format.ts";
 import { ChartBusy, ChartPlaceholder } from "./Placeholders.tsx";
 import { amountAxis, chartMargin, narrowYAxis, useNarrow } from "./useNarrow.ts";
+import { timeAxis } from "./timeAxis.ts";
+import { timeAxisProps, yearLines } from "./TimeTick.tsx";
 
 export interface ValuePoint {
   date: string;
@@ -31,6 +33,7 @@ export function ValueChart({
   if (data.length === 0) return <ChartPlaceholder loading={loading} height={height ?? "100%"}>No valuation history in this range.</ChartPlaceholder>;
   const gradient = `val-${testId}`;
   const axis = amountAxis(data.flatMap((d) => [d.value, d.cost]));
+  const time = timeAxis(data.map((d) => d.date), narrow ? 6 : 12);
   return (
     <div className="chart-frame" data-testid={testId} style={{ width: "100%", height: height ?? "100%" }}>
       <ResponsiveContainer>
@@ -42,12 +45,13 @@ export function ValueChart({
             </linearGradient>
           </defs>
           <CartesianGrid stroke="var(--border)" vertical={false} />
-          <XAxis dataKey="date" tick={{ fontSize: 12 }} minTickGap={40} stroke="var(--muted)" />
+          <XAxis dataKey="date" stroke="var(--muted)" {...timeAxisProps(time)} />
           <YAxis {...(narrow ? narrowYAxis : { width: 80, tick: { fontSize: 12 } })} stroke="var(--muted)" domain={axis.domain} ticks={axis.ticks} interval={0} allowDataOverflow tickFormatter={(v: number) => (narrow ? fmtCompact(v) : Math.round(v).toLocaleString("pl-PL"))} />
           <Tooltip
             formatter={(v, name) => [fmtPln(Number(v)), name === "value" ? labels.value : labels.cost]}
             contentStyle={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 6 }}
           />
+          {yearLines(time)}
           <Area type="monotone" dataKey="cost" baseValue={axis.domain[0]} stroke="var(--muted)" strokeDasharray="4 3" fill="none" dot={false} isAnimationActive={false} />
           <Area type="monotone" dataKey="value" baseValue={axis.domain[0]} stroke="var(--accent)" fill={`url(#${gradient})`} dot={false} isAnimationActive={false} />
         </AreaChart>
