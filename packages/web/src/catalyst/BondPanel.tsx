@@ -1,9 +1,10 @@
 // A bond's panel in the Catalyst view: price and liquidity, the yield's make-up, the coupons, the issuer's track record.
-import type { ReactNode } from "react";
-import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { fmtInt, fmtNum, today } from "../format.ts";
+import { useState, type ReactNode } from "react";
+import { Area, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { addDays, fmtInt, fmtNum, today } from "../format.ts";
+import { RangePicker } from "../RangePicker.tsx";
 import { useApi } from "../useApi.ts";
-import { chartMargin, useNarrow } from "../useNarrow.ts";
+import { chartMargin, narrowYAxis, useNarrow } from "../useNarrow.ts";
 import type { BondDetail, BondOutcome, BondRow, ReportedEvent } from "./types.ts";
 import { FLAG_TITLE, LEVEL_LABEL, couponLabel, pct, pp, webHref } from "./labels.ts";
 import { LiquidityDots } from "./parts.tsx";
@@ -11,7 +12,9 @@ import { timeAxis } from "../timeAxis.ts";
 import { timeAxisProps, yearLines } from "../TimeTick.tsx";
 
 export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; setTab: (t: string) => void }) {
-  const detail = useApi<BondDetail>(`/catalyst/bonds/${row.isin}`);
+  // The price chart's span: the sessions and quotes are read for it (the other tabs don't depend on it).
+  const [range, setRange] = useState<BondRange>("1Y");
+  const detail = useApi<BondDetail>(`/catalyst/bonds/${row.isin}`, { from: rangeFrom(range) });
   const d = detail.data;
   return (
     <div className="catalyst-panel">
@@ -28,7 +31,7 @@ export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; set
         ))}
       </div>
       {detail.error && <p className="error">{detail.error}</p>}
-      {tab === "price" && <PriceTab row={row} detail={d} loading={detail.loading} />}
+      {tab === "price" && <PriceTab row={row} detail={d} loading={detail.loading} range={range} setRange={setRange} busy={detail.refreshing} />}
       {tab === "yield" && <YieldTab row={row} detail={d} />}
       {tab === "coupons" && <CouponsTab detail={d} loading={detail.loading} />}
       {tab === "track" && <TrackTab detail={d} loading={detail.loading} />}
@@ -36,17 +39,54 @@ export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; set
   );
 }
 
-export function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondDetail | undefined; loading: boolean }) {
+/** The price chart's time spans; "ALL" from the start of the stored history (2020). */
+export type BondRange = "3M" | "6M" | "1Y" | "ALL";
+const RANGES: readonly BondRange[] = ["3M", "6M", "1Y", "ALL"];
+const rangeFrom = (r: BondRange) => (r === "ALL" ? "2020-01-01" : addDays(today(), r === "3M" ? -91 : r === "6M" ? -182 : -365));
+
+/** The price chart's series, each switched on and off by its chip under the chart. */
+const SERIES = [
+  { key: "price", label: "Price", color: "var(--accent)", dashed: false },
+  { key: "bid", label: "Bid", color: "var(--pos)", dashed: true },
+  { key: "ask", label: "Ask", color: "var(--neg)", dashed: true },
+  { key: "turnover", label: "Turnover", color: "var(--muted)", dashed: false },
+] as const;
+type SeriesKey = (typeof SERIES)[number]["key"];
+
+interface PricePoint {
+  date: string;
+  /** The session's close when traded, else null (the dots). */
+  close: number | null;
+  /** The last price known that day (the close carried over a session without trades): the line. */
+  reference: number | null;
+  turnover: number;
+  bid: number | null;
+  ask: number | null;
+}
+
+/**
+ * Price and liquidity: the chart first (the price, its change over the span, the span), then the liquidity figures.
+ * Pointing at the chart shows that day's figures in the header instead of a box over the chart.
+ */
+export function PriceTab({ row, detail, loading, range, setRange, busy }: { row: BondRow; detail: BondDetail | undefined; loading: boolean; range: BondRange; setRange: (r: BondRange) => void; busy: boolean }) {
   const narrow = useNarrow();
+  const [active, setActive] = useState<number | null>(null);
+  const [hidden, setHidden] = useState<ReadonlySet<SeriesKey>>(new Set());
   if (!detail) return <p className="muted">{loading ? "Loading…" : ""}</p>;
   const quotes = new Map(detail.quotes.map((q) => [q.date, q]));
-  const data = detail.sessions.map((s) => ({ date: s.date, close: s.trades > 0 ? s.close : null, reference: s.close, turnover: s.turnover, bid: quotes.get(s.date)?.bid?.price ?? null, ask: quotes.get(s.date)?.ask?.price ?? null }));
+  const data: PricePoint[] = detail.sessions.map((s) => ({ date: s.date, close: s.trades > 0 ? s.close : null, reference: s.close, turnover: s.turnover, bid: quotes.get(s.date)?.bid?.price ?? null, ask: quotes.get(s.date)?.ask?.price ?? null }));
   // Months (or weeks, or years) on their first session, the year's start stronger.
   const axis = timeAxis(data.map((d) => d.date), narrow ? 6 : 12);
   const l = row.liquidity;
   // The latest quoted session: the ask is what a buyer pays, the bid what a seller gets.
   const last = [...detail.quotes].reverse().find((q) => q.bid || q.ask);
   const cur = row.currency === "PLN" ? "zł" : row.currency;
+  const priced = data.filter((d) => d.reference !== null);
+  const first = priced[0];
+  const point = (active !== null ? data[active] : undefined) ?? priced.at(-1);
+  const change = first && point?.reference != null ? point.reference - first.reference! : null;
+  const toggle = (k: SeriesKey) => setHidden((h) => (h.has(k) ? new Set([...h].filter((x) => x !== k)) : new Set([...h, k])));
+  const indexOf = (state: { activeTooltipIndex?: number | string | null }) => (state.activeTooltipIndex == null ? null : Number(state.activeTooltipIndex));
   // Each figure with its label, in the words a buyer or seller uses.
   const facts: [string, ReactNode, string?][] = [
     ["Liquidity", <span key="l" className="cat-liq-level"><LiquidityDots level={l.level} /> {cap(LEVEL_LABEL[l.level])}</span>],
@@ -64,6 +104,73 @@ export function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondD
   ];
   return (
     <div className="cat-price">
+      <div className="cat-price-head">
+        <div className="cat-price-now" data-testid="catalyst-price-now" aria-live="polite">
+          <div>
+            <span className="cat-price-big">{point?.reference != null ? fmtNum(point.reference) : "–"}</span>
+            {change !== null && (
+              <span className={`cat-price-change ${change < 0 ? "neg" : change > 0 ? "pos" : "muted"}`}>
+                {change > 0 ? "+" : change < 0 ? "−" : "±"}
+                {fmtNum(Math.abs(change))} <span className="muted">since {first!.date}</span>
+              </span>
+            )}
+          </div>
+          <div className="muted cat-price-sub">
+            {point ? (active !== null ? point.date : `last ${point.date}`) : ""}
+            {point && (point.close !== null ? ` · traded, ${fmtInt(Math.round(point.turnover))} ${cur}` : " · no trade")}
+            {point?.bid != null && ` · bid ${fmtNum(point.bid)}`}
+            {point?.ask != null && ` · ask ${fmtNum(point.ask)}`}
+          </div>
+        </div>
+        <RangePicker<BondRange> value={range} onChange={setRange} options={RANGES} busy={busy} testId="catalyst-range" />
+      </div>
+      {data.length === 0 ? (
+        <p className="muted cat-chart cat-chart-empty">No sessions in this span.</p>
+      ) : (
+        <div className="cat-chart" data-testid="catalyst-chart">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart
+              data={data}
+              margin={chartMargin(narrow)}
+              onMouseMove={(st) => setActive(indexOf(st))}
+              onTouchMove={(st) => setActive(indexOf(st))}
+              onMouseLeave={() => setActive(null)}
+            >
+              <defs>
+                <linearGradient id="bond-price-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.22} />
+                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke="var(--line)" vertical={false} />
+              <XAxis dataKey="date" stroke="var(--muted)" {...timeAxisProps(axis)} />
+              {/* Whole percents: "auto" picks fractional ticks (101.25) that don't fit the axis once prices pass 100. */}
+              <YAxis yAxisId="p" domain={[(min: number) => Math.floor(min), (max: number) => Math.ceil(max)]} allowDecimals={false} tickFormatter={(v: number) => fmtInt(v)} stroke="var(--muted)" {...(narrow ? narrowYAxis : { width: 44, tick: { fontSize: 12 } })} />
+              {/* Turnover in a band at the bottom: its axis four times its peak, so the bars keep under the price. */}
+              <YAxis yAxisId="t" orientation="right" hide domain={[0, (max: number) => max * 4]} />
+              {/* No box over the chart: the header shows the day pointed at; the cursor marks it. */}
+              <Tooltip content={() => null} cursor={{ stroke: "var(--muted)", strokeDasharray: "3 3" }} isAnimationActive={false} />
+              {yearLines(axis, "p")}
+              <Bar yAxisId="t" dataKey="turnover" name="turnover" fill="var(--line)" hide={hidden.has("turnover")} isAnimationActive={false} />
+              <Area yAxisId="p" dataKey="reference" name="price" stroke="var(--accent)" strokeWidth={1.75} fill="url(#bond-price-fill)" hide={hidden.has("price")} connectNulls isAnimationActive={false} />
+              {/* A dot on each session with trades: the line between them is the last price carried over. */}
+              <Line yAxisId="p" dataKey="close" name="traded" stroke="none" dot={{ r: 2, fill: "var(--accent)", stroke: "none" }} activeDot={false} legendType="none" hide={hidden.has("price")} isAnimationActive={false} />
+              <Line yAxisId="p" dataKey="bid" name="bid" stroke="var(--pos)" dot={false} strokeDasharray="4 3" connectNulls hide={hidden.has("bid")} isAnimationActive={false} />
+              <Line yAxisId="p" dataKey="ask" name="ask" stroke="var(--neg)" dot={false} strokeDasharray="4 3" connectNulls hide={hidden.has("ask")} isAnimationActive={false} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+      <div className="chart-chips" data-testid="catalyst-series">
+        {SERIES.map((x) => (
+          <button key={x.key} type="button" className={`chart-chip${hidden.has(x.key) ? " off" : ""}`} aria-pressed={!hidden.has(x.key)} onClick={() => toggle(x.key)} title={hidden.has(x.key) ? `Show ${x.label.toLowerCase()}` : `Hide ${x.label.toLowerCase()}`}>
+            <span className={`chart-swatch${x.dashed ? " dashed" : ""}${x.key === "turnover" ? " bar" : ""}`} style={{ color: x.color }} aria-hidden />
+            {x.label}
+          </button>
+        ))}
+        <span className="muted chart-chips-note">dots: sessions with trades</span>
+      </div>
+      <h3 className="cat-section-title">Liquidity</h3>
       <dl className="cat-stats" data-testid="catalyst-liquidity">
         {facts.map(([label, value, note]) => (
           <div key={label}>
@@ -75,24 +182,6 @@ export function PriceTab({ row, detail, loading }: { row: BondRow; detail: BondD
           </div>
         ))}
       </dl>
-      <div className="cat-chart">
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={data} margin={chartMargin(narrow)}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
-          <XAxis dataKey="date" {...timeAxisProps(axis)} />
-          {/* Whole percents: "auto" picks fractional ticks (101.25) that don't fit the axis once prices pass 100. */}
-          <YAxis yAxisId="p" domain={[(min: number) => Math.floor(min), (max: number) => Math.ceil(max)]} allowDecimals={false} tickFormatter={(v: number) => fmtInt(v)} width={narrow ? 36 : 44} />
-          <YAxis yAxisId="t" orientation="right" hide />
-          <Tooltip formatter={(v, name) => [name === "turnover" ? fmtInt(Math.round(Number(v))) : fmtNum(Number(v)), String(name)]} />
-          {yearLines(axis, "p")}
-          <Bar yAxisId="t" dataKey="turnover" fill="var(--line)" isAnimationActive={false} />
-          <Line yAxisId="p" dataKey="reference" name="reference" stroke="var(--border)" dot={false} isAnimationActive={false} />
-          <Line yAxisId="p" dataKey="close" name="close (traded)" stroke="var(--accent)" dot={{ r: 2 }} connectNulls={false} isAnimationActive={false} />
-          <Line yAxisId="p" dataKey="bid" name="bid" stroke="var(--pos)" dot={false} strokeDasharray="4 3" connectNulls isAnimationActive={false} />
-          <Line yAxisId="p" dataKey="ask" name="ask" stroke="var(--neg)" dot={false} strokeDasharray="4 3" connectNulls isAnimationActive={false} />
-        </ComposedChart>
-      </ResponsiveContainer>
-      </div>
     </div>
   );
 }

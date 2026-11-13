@@ -1899,7 +1899,7 @@ test.describe("catalyst view", () => {
   test("a bond's drawer is over the sticky filters, except while a filter is being used", async ({ page }) => {
     // A short window with the drawer pulled up high: it reaches up over the filters.
     await page.setViewportSize({ width: 1333, height: 500 });
-    await page.addInitScript(() => window.localStorage.setItem("portfolio-tracker.chartPanel.height", "0.75"));
+    await page.addInitScript(() => window.localStorage.setItem("portfolio-tracker.bondPanel.height", "0.75"));
     await page.goto("/#/catalyst");
     await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).getByTestId("catalyst-bond").click();
     await expect(page.getByTestId("catalyst-panel-title")).toBeVisible();
@@ -1921,6 +1921,8 @@ test.describe("catalyst view", () => {
   });
 
   test("a bond's panel and its issuer's dialog lead to each other", async ({ page }) => {
+    // A low drawer, so the table's row stays clear of it (this test is about the links, not the drawer).
+    await page.addInitScript(() => window.localStorage.setItem("portfolio-tracker.bondPanel.height", "0.3"));
     await page.goto("/#/catalyst");
     const row = page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" });
     const dialog = page.getByTestId("issuer-dialog");
@@ -1943,6 +1945,62 @@ test.describe("catalyst view", () => {
     await expect(title).toHaveCount(0);
     await row.getByTestId("catalyst-bond").click();
     await expect(title).toContainText("KRU0829");
+  });
+
+  test("a bond's price chart: the price and its change on top, a span picker, a chip per series, the day pointed at in the header", async ({ page }) => {
+    await page.goto("/#/catalyst");
+    await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).getByTestId("catalyst-bond").click();
+    const now = page.getByTestId("catalyst-price-now");
+    await expect(now).toContainText("101,00");
+    await expect(now).toContainText("+0,10 since 2026-11-04");
+    await expect(now).toContainText("last 2026-11-05 · traded, 10 000 zł · bid 100,80 · ask 101,20");
+    // The chart has a height of its own, not what the figures leave over.
+    expect((await page.getByTestId("catalyst-chart").boundingBox())!.height).toBeGreaterThanOrEqual(160);
+    // Pointing at a day: its figures in the header, no box over the chart.
+    const chart = (await page.getByTestId("catalyst-chart").boundingBox())!;
+    await page.mouse.move(chart.x + 60, chart.y + chart.height / 2);
+    await expect(now).toContainText("100,90");
+    await expect(now).not.toContainText("last ");
+    await page.mouse.move(chart.x + chart.width / 2, chart.y - 40);
+    await expect(now).toContainText("last 2026-11-05");
+    // A chip hides its series and shows it again.
+    const series = page.getByTestId("catalyst-series");
+    const lines = page.getByTestId("catalyst-chart").locator(".recharts-line");
+    const before = await lines.count();
+    await series.getByRole("button", { name: "Bid" }).click();
+    await expect(series.getByRole("button", { name: "Bid" })).toHaveAttribute("aria-pressed", "false");
+    await expect(lines).toHaveCount(before - 1);
+    await series.getByRole("button", { name: "Bid" }).click();
+    await expect(lines).toHaveCount(before);
+    // The span: the sessions read from 3 months back.
+    const asked = page.waitForRequest((r) => /\/catalyst\/bonds\/PL[^/]*\?.*from=/.test(r.url()) && r.url().includes(`from=${new Date(Date.now() - 91 * 86_400_000).toISOString().slice(0, 7)}`));
+    await page.getByTestId("catalyst-range").getByRole("button", { name: "3M" }).click();
+    await asked;
+    await expect(page.getByTestId("catalyst-range").getByRole("button", { name: "3M" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("on a phone: a bond opens as a page of its own, the chart first; Back goes back to the list", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/#/catalyst");
+    await page.getByTestId("catalyst-row").filter({ hasText: "KRU0829" }).getByRole("button").first().click();
+    const bondPage = page.locator(".panel-page");
+    await expect(bondPage).toBeVisible();
+    // The whole screen, the chart a good part of it.
+    expect((await bondPage.boundingBox())!).toMatchObject({ x: 0, y: 0, width: 390, height: 844 });
+    expect((await page.getByTestId("catalyst-chart").boundingBox())!.height).toBeGreaterThanOrEqual(240);
+    await expect(page).toHaveURL(/bond=/);
+    // The phone's Back closes it, and the list is still there.
+    await page.goBack();
+    await expect(bondPage).toHaveCount(0);
+    await expect(page).not.toHaveURL(/bond=/);
+    await expect(page).toHaveURL(/#\/catalyst/);
+    await expect(page.getByTestId("catalyst-row").first()).toBeVisible();
+    // ‹ does the same.
+    await page.getByTestId("catalyst-row").filter({ hasText: "KRU0829" }).getByRole("button").first().click();
+    await expect(bondPage).toBeVisible();
+    await page.getByTestId("chart-panel-close").click();
+    await expect(bondPage).toHaveCount(0);
+    await expect(page).not.toHaveURL(/bond=/);
   });
 
   test("a row opens its panel: price and liquidity, the yield's make-up, the coupons", async ({ page }) => {

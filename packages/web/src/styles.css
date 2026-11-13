@@ -214,6 +214,12 @@ td.tx-account { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
    the header under the filters: --bar-h, both measured). The table doesn't scroll sideways (a scrolling box would hold
    its header): on narrower screens the least needed columns go instead (asset type, then fee and note: in the form). */
 .tx-toolbar, .sticky-toolbar { position: sticky; top: var(--sticky-top, 0px); z-index: 15; background: var(--bg); padding-top: 10px; margin-top: -10px; }
+/* A low touch screen (a phone turned sideways): the filters and the table's header scroll away with the page; stuck,
+   they'd cover the whole screen. */
+@media (max-height: 500px) and (pointer: coarse) {
+  .tx-toolbar, .sticky-toolbar { position: static; }
+  main .table-wrap.sticky-head { position: static; } /* main: over the sticky rule below */
+}
 /* Under a bond's drawer (.chart-panel, 20), except while it's being used: a control in it focused, the companies'
    pop-up or the phone's filters sheet open (they live in its layer). */
 .tx-toolbar:focus-within, .sticky-toolbar:focus-within, .sticky-toolbar:has(.cat-companies-pop, .sheet-backdrop) { z-index: 25; }
@@ -930,8 +936,44 @@ td.cat-issuer { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
 .cat-tabs { align-self: flex-start; flex: none; }
 /* Above the sticky filter bar, which reaches 10px up (its negative margin): room for the tabs' bottom edge. */
 .cat-issuers-tabs { margin-bottom: 12px; }
-.cat-price { display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
-.cat-price .cat-chart { flex: 1; min-height: 120px; }
+/* A bond's price: the chart first, at a height of its own (the drawer's body scrolls to the figures under it). */
+.cat-price { display: flex; flex-direction: column; gap: 10px; }
+.cat-price .cat-chart { flex: none; height: clamp(220px, 42vh, 400px); min-height: 0; }
+.cat-price .cat-chart-empty { display: grid; place-items: center; margin: 0; border: 1px dashed var(--border); border-radius: var(--radius); }
+.cat-price-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px 16px; flex-wrap: wrap; }
+.cat-price-head .range { margin: 0; }
+.cat-price-now { min-width: 0; }
+.cat-price-big { font-size: var(--fs-26); font-weight: 600; letter-spacing: -0.015em; font-variant-numeric: tabular-nums; margin-right: 10px; }
+.cat-price-change { font-size: var(--fs-15); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cat-price-change .muted { font-weight: 400; font-size: var(--fs-13); }
+.cat-price-sub { font-size: var(--fs-13); font-variant-numeric: tabular-nums; min-height: 1.4em; }
+/* Under a chart: a chip per series, on or off. */
+.chart-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chart-chip { font: inherit; font-size: var(--fs-12); display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--fg); cursor: pointer; }
+.chart-chip:hover { background: var(--row); }
+.chart-chip.off { color: var(--faint); }
+.chart-chip.off .chart-swatch { opacity: 0.3; }
+.chart-swatch { width: 14px; height: 3px; border-radius: 2px; background: currentColor; }
+.chart-swatch.dashed { background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px); }
+.chart-swatch.bar { width: 8px; height: 10px; border-radius: 1px; opacity: 0.45; }
+.chart-chips-note { font-size: var(--fs-12); margin-left: 4px; }
+.cat-section-title { font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); margin: 6px 0 0; }
+
+/* A drawer as a page of its own on a phone (a bond): the whole screen, ‹ back; its body scrolls. */
+.panel-page { position: fixed; inset: 0; z-index: 35; background: var(--panel); display: flex; flex-direction: column; }
+.panel-page-header { display: flex; align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top)) 12px 8px; border-bottom: 1px solid var(--border); flex: none; }
+.panel-page-header .icon-button { flex: none; }
+.panel-page-title { flex: 1; min-width: 0; font-size: var(--fs-14); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.panel-page-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 12px max(16px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+.panel-page .catalyst-panel > :not(.cat-tabs) { overflow: visible; flex: none; }
+.panel-page .cat-tabs { align-self: stretch; overflow-x: auto; scrollbar-width: none; }
+.panel-page .cat-tabs > button { flex: 1 0 auto; white-space: nowrap; padding: 0 12px; }
+.panel-page .cat-price .cat-chart { height: clamp(240px, 46dvh, 440px); }
+/* In the docked drawer the chart fills what the drawer shows (its header, the tabs, the price line and the chips
+   take about 210 px); the figures are a scroll below. */
+.chart-panel .cat-price .cat-chart { height: max(160px, calc(var(--panel-h, 400px) - 210px)); }
+/* A phone turned sideways: the chart takes the screen under the page's header. */
+@media (max-height: 500px) and (pointer: coarse) { .panel-page .cat-price .cat-chart { height: calc(100dvh - 64px); } }
 .cat-facts { margin: 0; font-size: var(--fs-13); }
 .cat-track { display: flex; flex-direction: column; gap: 6px; }
 .cat-flags { margin: 0; padding-left: 1.2rem; font-size: var(--fs-13); }

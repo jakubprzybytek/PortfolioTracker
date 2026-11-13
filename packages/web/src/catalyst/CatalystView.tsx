@@ -302,7 +302,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
       </p>
 
       {selected && (
-        <ChartPanel title={<BondTitle r={selected} onIssuer={() => openIssuer(selected)} />} onClose={closePanel} onHeight={setPanelHeight}>
+        <ChartPanel title={<BondTitle r={selected} onIssuer={() => openIssuer(selected)} />} onClose={closePanel} onHeight={setPanelHeight} id="bondPanel" fraction={0.6} phonePage>
           <BondPanel row={selected} tab={params["tab"] ?? "price"} setTab={(t) => setParams({ ...params, tab: t === "price" ? undefined : t })} />
         </ChartPanel>
       )}
