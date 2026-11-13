@@ -48,10 +48,13 @@ test.describe("cached data", () => {
   });
 
   test("a tablet in landscape: the cards' values fit, the whole menu is in view", async ({ page }) => {
-    // A 10" tablet in Chrome (1333 × 657 CSS px): six cards in a row, a short window.
+    // A 10" tablet in Chrome (1333 × 657 CSS px): the cards in two rows of three, a short window.
     await page.setViewportSize({ width: 1333, height: 657 });
     await page.goto("/");
     await expect(page.getByTestId("total-all")).toBeVisible();
+    // A wide font (DejaVu Sans, as in CI; much wider than Segoe UI or Roboto; Liberation Mono, wider still, where it's
+    // missing), so the test means the same everywhere.
+    await page.addStyleTag({ content: "* { font-family: 'DejaVu Sans', 'Liberation Mono', monospace !important; }" });
     // Values as long as a real portfolio's: none overflows its card.
     const overflowing = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>(".card .value")]

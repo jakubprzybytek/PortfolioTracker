@@ -272,13 +272,16 @@ h2 { font-size: var(--fs-18); font-weight: 600; margin: 28px 0 10px; letter-spac
 .faint { color: var(--faint); }
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
-.cards { display: flex; gap: 12px; flex-wrap: wrap; }
+.cards { display: flex; gap: 12px; flex-wrap: wrap; container: cards / inline-size; }
 .card { padding: 14px 16px; flex: 1 1 150px; min-width: 150px; container-type: inline-size; }
 /* KPI cards and the profit breakdown: a small uppercase label, the figure, a muted note. */
 .card .label, .breakdown-part .label { font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--faint); }
 /* The value fits its card: 24 px where there's room, smaller in a narrow card ("1 562 317,43 zł" in six cards on a
-   tablet), on one line. */
-.card .value { font-size: clamp(var(--fs-15), 12cqi, var(--fs-24)); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+   tablet), on one line. 10% of the card's width a character: room for 15 characters of a wide font (DejaVu Sans). */
+.card .value { font-size: clamp(0.75rem, 10cqi, var(--fs-24)); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+/* Six cards in a row only where their values have room; else two rows of three (a tablet), so the values keep their
+   size. A phone has its own two columns (below). */
+@container cards (min-width: 560px) and (max-width: 1150px) { .card { flex-basis: calc((100% - 24px) / 3); } }
 /* A card that opens a view (the year's return → Performance): looks like the others, a hover hint. */
 a.link-card { color: inherit; text-decoration: none; }
 a.link-card:hover { border-color: var(--accent); }
