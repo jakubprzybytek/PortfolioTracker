@@ -277,7 +277,8 @@ export function growthOf100(
     const bench: Record<string, number | null> = {};
     for (const b of bases) {
       const v = b.base === undefined ? undefined : benchmarkAt(b.points, p.date);
-      bench[b.id] = v === undefined || b.base === undefined ? null : round((100 * v) / b.base, 4);
+      // A benchmark worth 0 (or nothing) on the first day has no line: a division by it is infinite.
+      bench[b.id] = v === undefined || b.base === undefined || !b.base ? null : round((100 * v) / b.base, 4);
     }
     return {
       date: p.date,

@@ -1,4 +1,5 @@
 import { Fragment, useState, type ReactNode } from "react";
+import { finite, stepTicks } from "./ticks.ts";
 import {
   Bar,
   CartesianGrid,
@@ -408,18 +409,7 @@ export function YearsTable({
 
 /** A tick step in % giving 4–6 ticks over [min, max]. */
 function pctTicks(min: number, max: number): number[] {
-  const lo = Math.min(0, min);
-  const hi = Math.max(0, max);
-  const step =
-    [1, 2, 2.5, 5, 10, 20, 25, 50].find((s) => (hi - lo) / s <= 6) ?? 100;
-  const ticks: number[] = [];
-  for (
-    let v = Math.floor(lo / step) * step;
-    v <= Math.ceil(hi / step) * step + 1e-9;
-    v += step
-  )
-    ticks.push(Math.round(v * 100) / 100);
-  return ticks;
+  return stepTicks(Math.min(0, min), Math.max(0, max), [1, 2, 2.5, 5, 10, 20, 25, 50, 100], 6).ticks;
 }
 
 /** The bar chart's tooltip: the year (a part of one: its days) and its three figures, in a fixed order. */
@@ -631,20 +621,10 @@ export function GrowthChart({
   const data = growthOf100(points, cpi ?? [], benchmarks);
   // A benchmark without a value on the first day has no line (it starts later).
   const lines = benchmarks.filter((b) => data[0]!.bench[b.id] !== null);
-  const values = data
-    .flatMap((d) => [d.portfolio, d.cpi, d.cpiPlus, ...lines.map((b) => d.bench[b.id] ?? null)])
-    .filter((v): v is number => v !== null);
+  const values = finite(data.flatMap((d) => [d.portfolio, d.cpi, d.cpiPlus, ...lines.map((b) => d.bench[b.id] ?? null)]));
   const lo = Math.min(...values);
   const hi = Math.max(...values);
-  const step =
-    [0.5, 1, 2, 5, 10, 20, 25, 50].find((s) => (hi - lo) / s <= 5) ?? 100;
-  const ticks: number[] = [];
-  for (
-    let v = Math.floor(lo / step) * step;
-    v <= Math.ceil(hi / step) * step + 1e-9;
-    v += step
-  )
-    ticks.push(Math.round(v * 100) / 100);
+  const { step, ticks } = stepTicks(lo, hi, [0.5, 1, 2, 5, 10, 20, 25, 50, 100], 5);
   const end = data.at(-1)!;
   const zl = (v: number | null | undefined) => (v === null || v === undefined ? "–" : `${fmtNum(v, 2)} zł`);
   const margin = `+${fmtNum(CPI_MARGIN * 100, 0)}%`;

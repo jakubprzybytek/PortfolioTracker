@@ -174,4 +174,16 @@ describe("growthOf100", () => {
       )[0]!.cpi,
     ).toBeNull();
   });
+
+  it("a benchmark worth 0 on the first day has no line (not an infinite one)", () => {
+    const g = growthOf100(
+      [
+        { date: "2025-01-31", total: 1000, netDeposits: 1000 },
+        { date: "2025-02-28", total: 1100, netDeposits: 1000 },
+      ],
+      cpiLevels(ytd2025, []),
+      [{ id: "zero", points: [{ date: "2025-01-31", value: 0 }, { date: "2025-02-28", value: 5 }] }],
+    );
+    expect(g.map((p) => p.bench["zero"])).toEqual([null, null]);
+  });
 });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { stepTicks } from "./ticks.ts";
 
 /** Same breakpoint as the stylesheet's mobile layout (menu on top). */
 const QUERY = "(max-width: 720px)";
@@ -41,10 +42,9 @@ export function amountAxis(values: number[]): { domain: [number, number]; ticks:
   if (high === low) [low, high] = [low - Math.abs(low || 1) * 0.1, high + Math.abs(high || 1) * 0.1];
   const raw = (high - low) / 5;
   const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = ([1, 2, 2.5, 5, 10].find((m) => m * mag >= raw) ?? 10) * mag;
-  const from = Math.floor(low / step) * step;
-  const to = Math.ceil(high / step) * step;
-  const ticks: number[] = [];
-  for (let t = from; t <= to + step / 2; t += step) ticks.push(Math.round(t * 1e6) / 1e6);
-  return { domain: [from, to], ticks };
+  // At least a millionth of the values: two values a hair apart can't make a step too small to move them.
+  const min_ = Math.max(Math.abs(high), Math.abs(low)) * 1e-6;
+  const nice = ([1, 2, 2.5, 5, 10].find((m) => m * mag >= raw) ?? 10) * mag;
+  const { step, ticks } = stepTicks(low, high, [Math.max(nice, min_)], 6);
+  return { domain: [ticks[0] ?? Math.floor(low / step) * step, ticks.at(-1) ?? Math.ceil(high / step) * step], ticks };
 }
