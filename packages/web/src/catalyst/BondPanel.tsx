@@ -8,12 +8,15 @@ import { chartMargin, narrowYAxis, useNarrow } from "../useNarrow.ts";
 import type { BondDetail, BondOutcome, BondRow, ReportedEvent } from "./types.ts";
 import { FLAG_TITLE, LEVEL_LABEL, couponLabel, pct, pp, webHref } from "./labels.ts";
 import { LiquidityDots } from "./parts.tsx";
+import { PremiumChart, YieldChart } from "./PremiumChart.tsx";
 import { timeAxis } from "../timeAxis.ts";
 import { timeAxisProps, yearLines } from "../TimeTick.tsx";
 
 export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; setTab: (t: string) => void }) {
   // The price chart's span: the sessions and quotes are read for it (the other tabs don't depend on it).
   const [range, setRange] = useState<BondRange>("1Y");
+  // The chart's view: price, premium against its peers, or (a fixed coupon) yield against the State's.
+  const [chart, setChart] = useState<ChartView>("price");
   const detail = useApi<BondDetail>(`/catalyst/bonds/${row.isin}`, { from: rangeFrom(range) });
   const d = detail.data;
   return (
@@ -31,7 +34,7 @@ export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; set
         ))}
       </div>
       {detail.error && <p className="error">{detail.error}</p>}
-      {tab === "price" && <PriceTab row={row} detail={d} loading={detail.loading} range={range} setRange={setRange} busy={detail.refreshing} />}
+      {tab === "price" && <PriceTab row={row} detail={d} loading={detail.loading} range={range} setRange={setRange} busy={detail.refreshing} chart={chart} setChart={setChart} />}
       {tab === "yield" && <YieldTab row={row} detail={d} />}
       {tab === "coupons" && <CouponsTab detail={d} loading={detail.loading} />}
       {tab === "track" && <TrackTab detail={d} loading={detail.loading} />}
@@ -41,6 +44,7 @@ export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; set
 
 /** The price chart's time spans; "ALL" from the start of the stored history (2020). */
 export type BondRange = "3M" | "6M" | "1Y" | "ALL";
+export type ChartView = "price" | "premium" | "yield";
 const RANGES: readonly BondRange[] = ["3M", "6M", "1Y", "ALL"];
 const rangeFrom = (r: BondRange) => (r === "ALL" ? "2020-01-01" : addDays(today(), r === "3M" ? -91 : r === "6M" ? -182 : -365));
 
@@ -68,7 +72,7 @@ interface PricePoint {
  * Price and liquidity: the chart first (the price, its change over the span, the span), then the liquidity figures.
  * Pointing at the chart shows that day's figures in the header instead of a box over the chart.
  */
-export function PriceTab({ row, detail, loading, range, setRange, busy }: { row: BondRow; detail: BondDetail | undefined; loading: boolean; range: BondRange; setRange: (r: BondRange) => void; busy: boolean }) {
+export function PriceTab({ row, detail, loading, range, setRange, busy, chart: wanted, setChart }: { row: BondRow; detail: BondDetail | undefined; loading: boolean; range: BondRange; setRange: (r: BondRange) => void; busy: boolean; chart: ChartView; setChart: (v: ChartView) => void }) {
   const narrow = useNarrow();
   const [active, setActive] = useState<number | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<SeriesKey>>(new Set());
@@ -87,6 +91,9 @@ export function PriceTab({ row, detail, loading, range, setRange, busy }: { row:
   const change = first && point?.reference != null ? point.reference - first.reference! : null;
   const toggle = (k: SeriesKey) => setHidden((h) => (h.has(k) ? new Set([...h].filter((x) => x !== k)) : new Set([...h, k])));
   const indexOf = (state: { activeTooltipIndex?: number | string | null }) => (state.activeTooltipIndex == null ? null : Number(state.activeTooltipIndex));
+  // The views this bond has: premium once the index has the span, yield for a fixed coupon with trades in it.
+  const views: [ChartView, string][] = [["price", "Price"], ...(detail.premium ? [["premium", "Premium"] as [ChartView, string]] : []), ...(detail.premium?.yields?.length ? [["yield", "Yield"] as [ChartView, string]] : [])];
+  const chart = views.some(([k]) => k === wanted) ? wanted : "price";
   // Each figure with its label, in the words a buyer or seller uses.
   const facts: [string, ReactNode, string?][] = [
     ["Liquidity", <span key="l" className="cat-liq-level"><LiquidityDots level={l.level} /> {cap(LEVEL_LABEL[l.level])}</span>],
@@ -105,6 +112,23 @@ export function PriceTab({ row, detail, loading, range, setRange, busy }: { row:
   return (
     <div className="cat-price">
       <div className="cat-price-head">
+        {views.length > 1 ? (
+          <div className="segmented cat-chart-views" role="tablist" aria-label="Chart" data-testid="catalyst-chart-view">
+            {views.map(([k, label]) => (
+              <button key={k} type="button" role="tab" aria-selected={chart === k} className={chart === k ? "active" : ""} onClick={() => setChart(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span />
+        )}
+        <RangePicker<BondRange> value={range} onChange={setRange} options={RANGES} busy={busy} testId="catalyst-range" />
+      </div>
+      {chart === "premium" && detail.premium && <PremiumChart row={row} view={detail.premium} since={detail.premium.series[0]?.date} />}
+      {chart === "yield" && detail.premium && <YieldChart view={detail.premium} />}
+      {chart === "price" && (
+      <>
         <div className="cat-price-now" data-testid="catalyst-price-now" aria-live="polite">
           <div>
             <span className="cat-price-big">{point?.reference != null ? fmtNum(point.reference) : "–"}</span>
@@ -122,8 +146,6 @@ export function PriceTab({ row, detail, loading, range, setRange, busy }: { row:
             {point?.ask != null && ` · ask ${fmtNum(point.ask)}`}
           </div>
         </div>
-        <RangePicker<BondRange> value={range} onChange={setRange} options={RANGES} busy={busy} testId="catalyst-range" />
-      </div>
       {data.length === 0 ? (
         <p className="muted cat-chart cat-chart-empty">No sessions in this span.</p>
       ) : (
@@ -170,6 +192,8 @@ export function PriceTab({ row, detail, loading, range, setRange, busy }: { row:
         ))}
         <span className="muted chart-chips-note">dots: sessions with trades</span>
       </div>
+      </>
+      )}
       <h3 className="cat-section-title">Liquidity</h3>
       <dl className="cat-stats" data-testid="catalyst-liquidity">
         {facts.map(([label, value, note]) => (

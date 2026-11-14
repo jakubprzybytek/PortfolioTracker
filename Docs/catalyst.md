@@ -511,7 +511,7 @@ More columns (bid/ask, accrued interest, amount owed, gross yield, yield to call
 
 **Chart** (toggle above the table): net yield against years to maturity for the filtered bonds, with the treasury curve and the alternative as lines; dots coloured by **one chosen dimension** (default: debt service, the one that matters most for a bondholder, §13), faded at low confidence, grey when not scored; a click selects the row. It shows the risk vs premium mismatches at a glance and replaces CV's "2D stats".
 
-**Row panel** (bottom, as Holdings): tabs *Price & liquidity* (close, bid/ask, turnover bars; 1M/6M/1Y/ALL), *Yield* (cash flows, tax, commission, the alternative, as PT's Buy-more breakdown), *Coupons* (periods, rates, record and payment days, call terms).
+**Row panel** (bottom, as Holdings; on a phone a page of its own): tabs *Price & liquidity* (the chart first, 3M/6M/1Y/ALL, three views: **Price**: close, bid/ask, turnover bars; **Premium**: the bond's premium on its traded sessions against its issuer's other bonds' median, its industry's median with its middle half, and the market's median, with a line saying what moved it over the span (`premiumMoves`: about unchanged; mostly the market or the sector; mostly the issuer; mostly this bond); **Yield**, fixed coupons only: its yield before tax against the State's at the same years, the gap shaded; then the liquidity figures), *Yield* (cash flows, tax, commission, the alternative, as PT's Buy-more breakdown), *Coupons* (periods, rates, record and payment days, call terms).
 
 **Phone:** three-line rows (code, issuer, six dots / coupon, maturity, liquidity / net yield, vs alternative, premium); filters folded into the search and a Filters button; the chart full width above the list.
 

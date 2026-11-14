@@ -102,6 +102,28 @@ export interface BondDetail {
   events: BondEvent[];
   /** The issuer's repayment track record: until companies are linked, the bonds sharing the code's prefix. */
   track: TrackRecord;
+  /** Its premium over the span against its issuer's, sector's and market's (null: no index in the span). */
+  premium: PremiumView | null;
+}
+
+/** Bands: median with the middle half (q1–q3) of the group's bonds. */
+export interface PremiumBand {
+  median: number;
+  q1: number;
+  q3: number;
+}
+
+/** A bond's premium chart (fractions): its own on traded sessions, and what it's compared with. */
+export interface PremiumView {
+  /** How the premium is measured; null: the bond has none (no terms, another currency, no trade). */
+  basis: "wz" | "fixed-curve" | null;
+  industry: string | null;
+  /** The issuer's other bonds with a premium history. */
+  issuerBonds: number;
+  series: { date: string; bond: number | null; issuer?: number; sector?: PremiumBand; market?: PremiumBand }[];
+  moves: { from: string | null; to: string | null; bond: number | null; issuer: number | null; sector: number | null; market: number | null; verdict: "unchanged" | "market" | "sector" | "issuer" | "bond" | null };
+  /** A fixed coupon: its yield and the State's at the same years, on its traded sessions. */
+  yields?: { date: string; yield: number; gov: number }[];
 }
 
 export interface BondEvent {

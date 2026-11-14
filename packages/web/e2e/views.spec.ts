@@ -1979,6 +1979,51 @@ test.describe("catalyst view", () => {
     await expect(page.getByTestId("catalyst-range").getByRole("button", { name: "3M" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  test("a bond's premium against its issuer, sector and market: what moved it, in a line; a fixed coupon's yield against the State's", async ({ page }) => {
+    const dates = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05"];
+    const band = (m: number) => ({ median: m, q1: m - 0.01, q3: m + 0.01 });
+    const premium = (basis: "wz" | "fixed-curve") => ({
+      basis,
+      industry: "Finance",
+      issuerBonds: 2,
+      // The bond and its issuer's other bonds widen by 2 pp; Finance and the market stay.
+      series: dates.map((date, i) => ({ date, bond: i === 1 ? null : 0.03 + (i * 0.02) / 3, issuer: 0.025 + (i * 0.015) / 3, sector: band(0.028), market: band(0.03) })),
+      moves: { from: "2026-11-02", to: "2026-11-05", bond: 0.02, issuer: 0.015, sector: 0, market: 0, verdict: "issuer" },
+      ...(basis === "fixed-curve" ? { yields: [{ date: "2026-11-02", yield: 0.08, gov: 0.05 }, { date: "2026-11-05", yield: 0.1, gov: 0.05 }] } : {}),
+    });
+    let basis: "wz" | "fixed-curve" = "wz";
+    await page.route("**/catalyst/bonds/PL*", (r) =>
+      r.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: null, coupons: [], market: "GPW ASO", sessions: dates.map((date) => ({ date, close: 101, trades: 1, turnover: 10000, nominal: 1000 })), quotes: [], events: [], track: { company: null, prefix: "KRU", since: "2020-01-02", counts: { repaid: 0, early: 0, "below-par": 0, "past-maturity": 0, listed: 1, unknown: 0 }, bonds: [], flags: [], attention: [], reported: [] }, company: null, premium: premium(basis) }),
+      }),
+    );
+    await page.goto("/#/catalyst");
+    await page.getByTestId("catalyst-table").locator("tbody tr").filter({ hasText: "KRU0829" }).getByTestId("catalyst-bond").click();
+    const views = page.getByTestId("catalyst-chart-view");
+    // A floating bond: price and premium, no yield.
+    await expect(views.getByRole("tab")).toHaveText(["Price", "Premium"]);
+    await views.getByRole("tab", { name: "Premium" }).click();
+    const now = page.getByTestId("catalyst-premium-now");
+    await expect(now).toContainText("5,00 pp");
+    await expect(now).toContainText("+2,00 pp since 2026-11-02");
+    await expect(now).toContainText("last trade 2026-11-05 · issuer 4,00 pp · Finance 2,80 pp · market 3,00 pp");
+    await expect(page.getByTestId("catalyst-premium-verdict")).toContainText("Mostly the issuer (its other bonds moved too, the sector didn't). This bond +2,00 pp · issuer +1,50 pp · Finance 0,00 pp · market 0,00 pp");
+    await expect(page.getByTestId("catalyst-premium-series").getByRole("button")).toHaveText(["KRU0829", "Issuer's other bonds", "Finance median", "Market median"]);
+    // Pointing at a day: its figures in the header.
+    const chart = (await page.getByTestId("catalyst-premium-chart").boundingBox())!;
+    await page.mouse.move(chart.x + 60, chart.y + chart.height / 2);
+    await expect(now).toContainText("2026-11-02 · issuer 2,50 pp");
+    await expect(now).toContainText("3,00 pp");
+    // A fixed coupon: the yield view too, the State's under it.
+    basis = "fixed-curve";
+    await page.getByTestId("catalyst-range").getByRole("button", { name: "6M" }).click();
+    await expect(views.getByRole("tab")).toHaveText(["Price", "Premium", "Yield"]);
+    await views.getByRole("tab", { name: "Yield" }).click();
+    await expect(page.getByTestId("catalyst-yield-now")).toContainText("10,00%");
+    await expect(page.getByTestId("catalyst-yield-now")).toContainText("State 5,00% · premium 5,00 pp");
+  });
+
   test("on a phone: a bond opens as a page of its own, the chart first; Back goes back to the list", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/#/catalyst");

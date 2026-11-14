@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { InterestPeriod } from "../src/bonds/couponPeriods.ts";
 import { catalystKeys, type CatalystBondItem, type CatalystSessionItem, type CatalystTermsItem } from "../src/catalyst/items.ts";
-import { CARRY_SESSIONS, MIN_GROUP, premiumIndex, type BondPremiums } from "../src/catalyst/premiums.ts";
+import { CARRY_SESSIONS, MIN_GROUP, premiumIndex, premiumMoves, premiumSeries, type BondPremiums } from "../src/catalyst/premiums.ts";
 import { DEFAULT_CATALYST_ASSUMPTIONS, screenRow, sessionPremium } from "../src/catalyst/screen.ts";
 
 const DATE = "2026-11-05";
@@ -109,5 +109,60 @@ describe("premiumIndex", () => {
     expect(Object.keys(day.industry).sort()).toEqual(["Developer", "Finance"]);
     expect(day.industry["Developer"]!.median).toBe(0.05);
     expect(index[0]!.all).toBeUndefined();
+  });
+});
+
+describe("premiumSeries and premiumMoves", () => {
+  const sessions = Array.from({ length: 20 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`);
+  const h = (isin: string, points: Record<string, number>): BondPremiums => ({ isin, basis: "wz", points });
+  /** An index whose sector and market medians go from `from` to `to` over the sessions. */
+  const index = (sector: [number, number], market: [number, number]) =>
+    sessions.map((date, i) => {
+      const r = (x: number) => Math.round(x * 1e6) / 1e6;
+      const at = ([a, b]: [number, number]) => r(a + ((b - a) * i) / (sessions.length - 1));
+      return { date, all: { median: at(market), q1: r(at(market) - 0.01), q3: r(at(market) + 0.01), n: 100 }, industry: { Developer: { median: at(sector), q1: r(at(sector) - 0.01), q3: r(at(sector) + 0.01), n: 20 } } };
+    });
+  const moves = (bond: BondPremiums, others: BondPremiums[], idx: ReturnType<typeof index>) => premiumMoves(premiumSeries(sessions, bond, others, idx, "Developer"));
+
+  it("the series: the bond's own premium on its traded sessions; the issuer's other bonds' median; the sector's and market's bands", () => {
+    const s = premiumSeries(sessions, h("A", { "2026-10-01": 0.05 }), [h("B", { "2026-10-01": 0.06 }), h("C", { "2026-10-01": 0.08 })], index([0.04, 0.04], [0.03, 0.03]), "Developer");
+    expect(s[0]).toEqual({ date: "2026-10-01", bond: 0.05, issuer: 0.07, sector: { median: 0.04, q1: 0.03, q3: 0.05 }, market: { median: 0.03, q1: 0.02, q3: 0.04 } });
+    expect(s[1]!.bond).toBeNull();
+    // The other bonds' trades count for ten sessions, then the issuer's line stops.
+    expect(s[CARRY_SESSIONS - 1]!.issuer).toBe(0.07);
+    expect(s[CARRY_SESSIONS]!.issuer).toBeUndefined();
+    // Without an industry: no sector band.
+    expect(premiumSeries(sessions, undefined, [], index([0.04, 0.04], [0.03, 0.03]), undefined)[0]!.sector).toBeUndefined();
+  });
+
+  it("the market's move: the sector widened about as much as the bond", () => {
+    const m = moves(h("A", { "2026-10-01": 0.04, "2026-10-20": 0.06 }), [], index([0.04, 0.055], [0.03, 0.04]));
+    expect(m).toMatchObject({ bond: 0.02, sector: 0.015, market: 0.01, verdict: "sector" });
+  });
+
+  it("the issuer's: its other bonds widened with it, the sector didn't", () => {
+    const others = [h("B", { "2026-10-01": 0.05, "2026-10-20": 0.09 })];
+    // A third of the bond's move will do (a bond near maturity moves several times as much): GHE0327, 2026.
+    expect(moves(h("A", { "2026-10-01": 0.2, "2026-10-20": 0.63 }), [h("B", { "2026-10-01": 0.15, "2026-10-20": 0.36 })], index([0.04, 0.037], [0.03, 0.03])).verdict).toBe("issuer");
+    expect(moves(h("A", { "2026-10-01": 0.05, "2026-10-20": 0.1 }), others, index([0.04, 0.04], [0.03, 0.03])).verdict).toBe("issuer");
+    // No other bonds: the issuer's all the same.
+    expect(moves(h("A", { "2026-10-01": 0.05, "2026-10-20": 0.1 }), [], index([0.04, 0.04], [0.03, 0.03])).verdict).toBe("issuer");
+  });
+
+  it("this bond's alone: its issuer's other bonds stayed", () => {
+    const others = [h("B", { "2026-10-01": 0.05, "2026-10-12": 0.05, "2026-10-20": 0.051 })];
+    expect(moves(h("A", { "2026-10-01": 0.05, "2026-10-20": 0.1 }), others, index([0.04, 0.04], [0.03, 0.03])).verdict).toBe("bond");
+  });
+
+  it("every change over the bond's own trades: a bond first traded halfway isn't compared with the sector before", () => {
+    // The sector widens in the first half only; the bond trades in the second half, flat.
+    const idx = sessions.map((date, i) => ({ date, all: { median: 0.03, q1: 0.02, q3: 0.04, n: 100 }, industry: { Developer: { median: i < 10 ? 0.03 + i * 0.002 : 0.05, q1: 0.02, q3: 0.06, n: 20 } } }));
+    const m = moves(h("A", { "2026-10-11": 0.05, "2026-10-20": 0.051 }), [], idx);
+    expect(m).toMatchObject({ from: "2026-10-11", to: "2026-10-20", sector: 0, verdict: "unchanged" });
+  });
+
+  it("unchanged under a quarter point; nothing to say with fewer than two trades", () => {
+    expect(moves(h("A", { "2026-10-01": 0.05, "2026-10-20": 0.052 }), [], index([0.04, 0.06], [0.03, 0.03])).verdict).toBe("unchanged");
+    expect(moves(h("A", { "2026-10-01": 0.05 }), [], index([0.04, 0.06], [0.03, 0.03]))).toMatchObject({ bond: null, verdict: null });
   });
 });

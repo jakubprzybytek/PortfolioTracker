@@ -27,6 +27,8 @@ import { addDays, today } from "@portfolio/core";
 import { DocumentInput, judgementGaps, MAX_UPLOAD_BYTES, PaymentEventInput, RetractInput, ScheduleInput, UploadUrlInput, type PaymentEvent } from "@portfolio/core/catalyst/index";
 import { storeDocument } from "../documents.ts";
 import { AgentEntityInput, AnalysisInput, ChecklistInput, CollectedFiguresInput, KnownInput, NameLinkInput, agentMayCall, entityIdOf, latestPeriod, KRS_REGISTER, krsExtract, leiRecords, sameName, shortName, workItems, type Fetcher } from "@portfolio/core/catalyst/index";
+import { curveAt, premiumMoves, premiumSeries } from "@portfolio/core/catalyst/index";
+import { settlementDate, yearsBetween } from "@portfolio/core";
 import { CatalystAssumptionsInput, catalystAssumptions, CatalystViewsInput, codePrefix, issuerKey, reviewedTo, trackRecord, type AiSwitch, type CatalystAssumptions, type CatalystBondItem, type CatalystEntityItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystPaymentEventItem, type CatalystScheduleItem, type CatalystViews, type TrackBond } from "@portfolio/core/catalyst/index";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
@@ -142,7 +144,7 @@ const ROUTES: Record<string, Handler> = {
     const market = bond.markets.find((m) => m.startsWith("GPW")) ?? bond.markets[0] ?? "";
     const termsRead = catalystRepo.getTerms(isin).then((t) => t ?? null);
     const entityRead = link?.entityId ? catalystRepo.getEntity(link.entityId) : Promise.resolve(undefined);
-    const [terms, coupons, sessions, quotes, events, entity, track] = await Promise.all([
+    const [terms, coupons, sessions, quotes, events, entity, track, premium] = await Promise.all([
       termsRead,
       catalystRepo.listCoupons(isin),
       catalystRepo.listSessions(isin, from, to),
@@ -150,6 +152,7 @@ const ROUTES: Record<string, Handler> = {
       catalystRepo.listEvents(isin),
       entityRead,
       Promise.all([termsRead, entityRead]).then(([t, e]) => issuerTrack(bond, t?.issuer, { link, entity: e })),
+      entityRead.then((e) => premiumView(bond, link?.entityId ?? undefined, e?.industry, from, to)),
     ]);
     const strip = <T extends { PK: string; SK: string }>({ PK: _p, SK: _s, ...rest }: T) => rest;
     return json(200, {
@@ -162,6 +165,7 @@ const ROUTES: Record<string, Handler> = {
       events: events.map(({ PK: _p, SK: _s, isin: _i, source: _src, fetchedAt: _f, ...e }) => e),
       track,
       company: entity ? entityView(entity) : null,
+      premium,
     });
   },
 
@@ -879,6 +883,41 @@ async function trackOf(group: CatalystBondItem[], issuer: string | undefined, en
   );
   const markings = issuer ? (exitsNow?.marked ?? []).filter((m) => issuerKey(m.issuer) === issuerKey(issuer)).map((m) => m.marking) : [];
   return trackRecord(bonds, today(), markings, reported.map(paymentEventView));
+}
+
+/**
+ * A bond's premium over the span (Docs/catalyst-premium-history-plan.md): its own on each traded session, its
+ * issuer's other bonds' median, its industry's and the market's index; what moved it; for a fixed coupon, its yield
+ * and the State's at the same years. Null when the market index has nothing in the span.
+ */
+async function premiumView(bond: CatalystBondItem, entityId: string | undefined, industry: string | undefined, from: string, to: string) {
+  const [own, index, links, curves] = await Promise.all([
+    catalystRepo.getPremiums(bond.isin),
+    catalystRepo.listPremiumIndex(from, to),
+    entityId ? catalystRepo.listLinks() : Promise.resolve([]),
+    catalystRepo.listCurves(from, to),
+  ]);
+  if (index.length === 0) return null;
+  const others = await Promise.all(links.filter((l) => l.entityId === entityId && l.isin !== bond.isin).map((l) => catalystRepo.getPremiums(l.isin)));
+  const sessions = index.map((x) => x.date);
+  const series = premiumSeries(sessions, own, others.filter((o): o is NonNullable<typeof o> => !!o), index, industry);
+  // A fixed coupon: its yield = premium + the State's curve at its years that session.
+  const curveBy = new Map(curves.map((c) => [c.date, c.fixed]));
+  const yields =
+    own?.basis === "fixed-curve" && bond.maturity
+      ? series.flatMap((p) => {
+          const gov = p.bond !== null ? curveAt(curveBy.get(p.date) ?? [], yearsBetween(settlementDate(p.date), bond.maturity!)) : null;
+          return p.bond !== null && gov !== null ? [{ date: p.date, yield: Math.round((p.bond + gov) * 1e6) / 1e6, gov }] : [];
+        })
+      : undefined;
+  return {
+    basis: own?.basis ?? null,
+    industry: industry ?? null,
+    issuerBonds: others.filter(Boolean).length,
+    series,
+    moves: premiumMoves(series),
+    ...(yields ? { yields } : {}),
+  };
 }
 
 /** A stored payment event without its keys. */
