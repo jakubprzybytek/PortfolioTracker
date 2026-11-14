@@ -12,7 +12,7 @@ analysis, end to end".
 
 ## Before anything
 
-- Run commands as `npx catalyst <command> --stage <stage> --by <your model id>` (dev unless the owner says prod).
+- Run commands as `npx catalyst <command> --stage <stage> --by <your model id>` (prod unless the owner says otherwise; the CLI itself defaults to dev, so always pass `--stage prod`).
   Output is JSON; add `--table` to show the owner.
 - **No token?** The CLI says so. Ask the owner to make one in the app (Catalyst → the cog → "AI agent's token") and
   to run `! npx catalyst login --stage <stage>` themselves. Never ask for the token, never read the CLI's settings
