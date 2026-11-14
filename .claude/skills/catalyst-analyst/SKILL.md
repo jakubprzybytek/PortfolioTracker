@@ -46,6 +46,11 @@ analysis, end to end".
    person would (the site's reports page, a search); don't guess URLs. An unlisted company filing under the
    accounting act: `catalyst checklist --add <id> <year> group --where "KRS repository, KRS <number>"`, and tell
    the owner it's waiting for them.
+   - **A reports list you can't read** (it pages by script, or loads from a path robots.txt disallows): read the
+     site's sitemap (named in robots.txt, usually `/sitemap.xml`). It often lists every report page, and those
+     pages may be allowed when the list isn't. Filter by keywords in the URL (`obligacj`, `wykup`, `odsetk`,
+     `zgromadzen`) rather than fetching everything. It gives pages, not their attachments: a PDF under a
+     disallowed path is still the owner's to download.
    - **Half-year reports** (`kind: "interim"` in `catalyst work`): only for the companies it lists (bonds due within
      24 months, or debt service, liquidity or refinancing yellow or red), or when the owner asks. The same accounts
      (group or single) as the year, under the same standard. Quarterly reports only when asked.
