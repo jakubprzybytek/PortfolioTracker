@@ -6,9 +6,10 @@ import { BatchWriteCommand, DynamoDBDocumentClient, GetCommand, PutCommand, Quer
 import type { IsoDate } from "../dates.ts";
 import { JobRunStore } from "../db/jobRuns.ts";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
-import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystChecklistItem, type CatalystDocumentItem, type CatalystPaymentEventItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem, type CatalystScheduleItem } from "./items.ts";
+import { catalystKeys, type CatalystBondItem, type CatalystCouponItem, type CatalystAnalysisItem, type CatalystCollectedFiguresItem, type CatalystChecklistItem, type CatalystDocumentItem, type CatalystPaymentEventItem, type CatalystEntityItem, type CatalystEventItem, type CatalystFilingItem, type CatalystKnownItem, type CatalystYearItem, type CatalystExitsNowItem, type CatalystLinkItem, type CatalystMarkingItem, type CatalystNameItem, type CatalystCurveItem, type CatalystPremiumsItem, type CatalystPremiumIndexItem, type CatalystDayItem, type CatalystQuoteDayItem, type CatalystQuoteItem, type CatalystScreenItem, type CatalystSessionItem, type CatalystTermsItem, type CatalystScheduleItem } from "./items.ts";
 import type { ScreenRow } from "./screen.ts";
 import type { FinancialYear } from "./financials.ts";
+import type { BondPremiums, PremiumIndex } from "./premiums.ts";
 
 /** Reads only these attributes (names escaped: some, like `scope`, are reserved words). */
 function projection(fields: string[]): Pick<QueryCommandInput, "ProjectionExpression" | "ExpressionAttributeNames"> {
@@ -281,6 +282,65 @@ export class CatalystRepository {
 
   async putCurve(item: Omit<CatalystCurveItem, "PK" | "SK">): Promise<void> {
     await this.doc.send(new PutCommand({ TableName: this.table(), Item: { ...catalystKeys.curve(item.date), ...item } }));
+  }
+
+  /** Curves of many sessions at once (the premium history's backfill). */
+  putCurves(items: Omit<CatalystCurveItem, "PK" | "SK">[]): Promise<number> {
+    return this.batchPut(items.map((c) => ({ ...catalystKeys.curve(c.date), ...c })));
+  }
+
+  /** The curves of the sessions from `from` to `to`, oldest first. */
+  listCurves(from: IsoDate, to: IsoDate): Promise<CatalystCurveItem[]> {
+    return this.queryAll<CatalystCurveItem>({ KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to", ExpressionAttributeValues: { ":pk": "CURVE#PLGOV", ":from": from, ":to": to } });
+  }
+
+  /** Bonds' premium histories (replaces them whole). */
+  putPremiums(items: BondPremiums[]): Promise<number> {
+    const computedAt = new Date().toISOString();
+    return this.batchPut(items.map((p) => ({ ...catalystKeys.premiums(p.isin), GSI1PK: "PREMIUMS", GSI1SK: p.isin, ...p, computedAt })));
+  }
+
+  getPremiums(isin: string): Promise<CatalystPremiumsItem | undefined> {
+    return this.doc.send(new GetCommand({ TableName: this.table(), Key: catalystKeys.premiums(isin) })).then((r) => r.Item as CatalystPremiumsItem | undefined);
+  }
+
+  /** Every bond's premium history (one query on the index). */
+  listPremiums(): Promise<CatalystPremiumsItem[]> {
+    return this.queryAll<CatalystPremiumsItem>({ IndexName: "GSI1", KeyConditionExpression: "GSI1PK = :t", ExpressionAttributeValues: { ":t": "PREMIUMS" } });
+  }
+
+  /**
+   * A session's premium added to a bond's history (the daily metrics): one entry of its map, or the item when the bond
+   * has none yet.
+   */
+  async addPremium(isin: string, basis: BondPremiums["basis"], date: IsoDate, premium: number): Promise<void> {
+    const computedAt = new Date().toISOString();
+    try {
+      await this.doc.send(
+        new UpdateCommand({
+          TableName: this.table(),
+          Key: catalystKeys.premiums(isin),
+          UpdateExpression: "SET #points.#d = :p, #basis = :b, computedAt = :at",
+          ConditionExpression: "attribute_exists(#points)",
+          ExpressionAttributeNames: { "#points": "points", "#d": date, "#basis": "basis" },
+          ExpressionAttributeValues: { ":p": premium, ":b": basis, ":at": computedAt },
+        }),
+      );
+    } catch (err) {
+      if ((err as { name?: string }).name !== "ConditionalCheckFailedException") throw err;
+      await this.putPremiums([{ isin, basis, points: { [date]: premium } }]);
+    }
+  }
+
+  /** Market index items (replaces them whole). */
+  putPremiumIndex(items: PremiumIndex[]): Promise<number> {
+    const computedAt = new Date().toISOString();
+    return this.batchPut(items.map((x) => ({ ...catalystKeys.premiumIndex(x.date), ...x, computedAt })));
+  }
+
+  /** The market index from `from` to `to`, oldest first. */
+  listPremiumIndex(from: IsoDate, to: IsoDate): Promise<CatalystPremiumIndexItem[]> {
+    return this.queryAll<CatalystPremiumIndexItem>({ KeyConditionExpression: "PK = :pk AND SK BETWEEN :from AND :to", ExpressionAttributeValues: { ":pk": "PREMIUM_INDEX", ":from": from, ":to": to } });
   }
 
   /** The latest curve, if any. */

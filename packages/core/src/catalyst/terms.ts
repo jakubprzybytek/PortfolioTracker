@@ -47,7 +47,8 @@ export const NEW_PERIOD_LAG_DAYS = 7;
 /**
  * The listed bonds to read, at most `limit`: first those without terms (corporate first, municipal last), then
  * floating ones whose current interest period started at least a week ago and were read before that, then codes the
- * site didn't have, or pages whose dates didn't add up, a month ago.
+ * site didn't have, or pages whose dates didn't add up, a month ago. Last, ended corporate PLN bonds without terms,
+ * once (their margins for the premium history: Docs/catalyst-premium-history-plan.md, step A; not tried again).
  */
 export function termsWork(bonds: CatalystBondItem[], terms: Map<string, CatalystTermsItem>, today: IsoDate, limit: number): CatalystBondItem[] {
   const wanted = bonds.filter((b) => b.status === "listed" && (READ_SEGMENTS.has(b.segment) || (b.segment === "treasury" && /^(WZ|NZ)\d/.test(b.code))));
@@ -63,7 +64,8 @@ export function termsWork(bonds: CatalystBondItem[], terms: Map<string, Catalyst
     const t = terms.get(b.isin);
     return !!(t?.notFound || t?.periodsProblem) && addDays(t.fetchedAt.slice(0, 10), NOT_FOUND_RETRY_DAYS) <= today;
   });
-  return [...missing, ...refresh, ...retry].slice(0, limit);
+  const ended = bonds.filter((b) => b.status === "ended" && b.segment === "corporate" && b.currency === "PLN" && !terms.has(b.isin)).sort((a, b) => a.code.localeCompare(b.code));
+  return [...missing, ...refresh, ...retry, ...ended].slice(0, limit);
 }
 
 /** The interest period running on `day` among `starts` (ascending): its first day, if any. */

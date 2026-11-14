@@ -13,9 +13,10 @@ import {
   type CatalystSessionItem,
   type TreasuryQuote,
 } from "@portfolio/core/catalyst/index";
-import { Repository, retailOffers, type RetailTerms } from "@portfolio/core";
+import { Repository, addDays, retailOffers, type RetailTerms } from "@portfolio/core";
 import { catalystRepo } from "./context.ts";
 import { analysisInputs, analysisOf } from "./analysis.ts";
+import { buildIndex } from "./premiums.ts";
 import type { IssuerSignals } from "@portfolio/core/catalyst/index";
 
 /** Bonds read at once (each two or three queries). */
@@ -112,8 +113,17 @@ export async function computeMetrics(): Promise<{ itemsWritten: number; note: st
   const written = await catalystRepo.putScreen(rows);
   const withYield = rows.filter((r) => r.yieldNet !== null).length;
   const withPremium = rows.filter((r) => r.premium !== null).length;
+
+  // The premium history (Docs/catalyst-premium-history-plan.md, step D): the day's premium of each bond traded that
+  // day (the screen's is the history's own), then the day's market index. Not for the State's bonds (their premium is
+  // the curve).
+  const bondBy = new Map(listed.map((b) => [b.isin, b]));
+  const traded = rows.filter((r) => r.premium !== null && r.premiumBasis !== null && r.lastTraded === date && bondBy.get(r.isin)?.segment !== "treasury");
+  for (let i = 0; i < traded.length; i += AT_ONCE)
+    await Promise.all(traded.slice(i, i + AT_ONCE).map((r) => catalystRepo.addPremium(r.isin, r.premiumBasis!, date, r.premium!)));
+  const index = await buildIndex(bonds, (await catalystRepo.listDays(addDays(date, -30), date)).map((d) => d.date));
   return {
-    itemsWritten: written + 1,
-    note: `${date}: ${rows.length} bonds, ${withYield} with a yield, ${withPremium} with a premium; curve of ${fixed.length} fixed and ${wz.length} WZ series; ${offers.length} retail offers`,
+    itemsWritten: written + 1 + traded.length + index.written,
+    note: `${date}: ${rows.length} bonds, ${withYield} with a yield, ${withPremium} with a premium (${traded.length} traded today, added to their histories); curve of ${fixed.length} fixed and ${wz.length} WZ series; ${offers.length} retail offers; ${index.note}`,
   };
 }

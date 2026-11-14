@@ -85,7 +85,12 @@ async function readTerms(): Promise<{ itemsWritten: number; note: string; idle?:
       read++;
       if (page.periodsProblem) noPeriods.push(`${bond.code} (${page.periodsProblem})`);
     } catch (err) {
-      failed.push(`${bond.code} (${String((err as Error).message ?? err).slice(0, 120)})`);
+      const message = String((err as Error).message ?? err).slice(0, 120);
+      failed.push(`${bond.code} (${message})`);
+      // An ended bond is read once (its margin for the premium history): a page that fails is recorded as not found,
+      // or it would be tried again every run (12 pages without an ISIN, 2026-11-14). A listed one is tried again.
+      if (bond.status === "ended")
+        await catalystRepo.putTerms({ isin: bond.isin, code: bond.code, notFound: true, periodsProblem: `read failed: ${message}`, coupon: { kind: "OTHER" }, source: SOURCE, fetchedAt: new Date().toISOString() }).catch(() => undefined);
     }
   }
   if (read === 0 && failed.length > 0) throw new Error(`no page read: ${failed.slice(0, 5).join("; ")}`);

@@ -10,6 +10,7 @@ import type { CurvePoint } from "./curve.ts";
 import type { ScreenRow } from "./screen.ts";
 import type { ExitAction, ExitSignal } from "./exits.ts";
 import type { FinancialYear } from "./financials.ts";
+import type { BondPremiums, PremiumIndex } from "./premiums.ts";
 
 export type CatalystBondStatus = "listed" | "suspended" | "ended";
 
@@ -71,6 +72,8 @@ export const catalystKeys = {
   quoteDay: (date: IsoDate) => ({ PK: "QUOTEDAYS" as const, SK: date }),
   screen: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "SCREEN" as const }),
   curve: (date: IsoDate) => ({ PK: "CURVE#PLGOV" as const, SK: date }),
+  premiums: (isin: string) => ({ PK: `BOND#${isin}` as const, SK: "PREMIUMS" as const }),
+  premiumIndex: (date: IsoDate) => ({ PK: "PREMIUM_INDEX" as const, SK: date }),
   setting: (name: string) => ({ PK: `SETTING#${name}` as const, SK: "META" as const }),
   quote: (isin: string, date: IsoDate, market: string) => ({ PK: `BOND#${isin}` as const, SK: `Q#${date}#${market}` as const }),
   event: (isin: string, published: string, action: ExitAction) => ({ PK: `BOND#${isin}` as const, SK: `EVENT#${published}#${action}` as const }),
@@ -451,6 +454,12 @@ export type CatalystCouponItem = InterestPeriod & { PK: `BOND#${string}`; SK: `C
 
 /** A listed bond's screen row (core/catalyst/screen.ts), recomputed by the metrics; listed on the index as `SCREEN`. */
 export type CatalystScreenItem = ScreenRow & { PK: `BOND#${string}`; SK: "SCREEN"; GSI1PK: "SCREEN"; GSI1SK: string; computedAt: string };
+
+/** A bond's premium history (core/catalyst/premiums.ts): a premium per traded session; listed on the index as `PREMIUMS`. */
+export type CatalystPremiumsItem = BondPremiums & { PK: `BOND#${string}`; SK: "PREMIUMS"; GSI1PK: "PREMIUMS"; GSI1SK: string; computedAt: string };
+
+/** The market index of a session (core/catalyst/premiums.ts): the median premium of the corporate bonds, by group. */
+export type CatalystPremiumIndexItem = PremiumIndex & { PK: "PREMIUM_INDEX"; SK: IsoDate; computedAt: string };
 
 /** The State's curves of a session (core/catalyst/curve.ts): fixed-rate yields and WZ price-adjusted margins. */
 export interface CatalystCurveItem {

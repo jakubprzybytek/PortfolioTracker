@@ -33,6 +33,7 @@ export const JOBS = {
   "catalyst-export": { maxAgeHours: 32 * 24, table: "catalyst" },
   "catalyst-metrics": { table: "catalyst" },
   "catalyst-backfill": { table: "catalyst" },
+  "catalyst-premiums": { table: "catalyst" },
 } satisfies Record<string, { maxAgeHours?: number; prices?: boolean; optional?: boolean; table?: JobTable }>;
 
 export type JobName = keyof typeof JOBS;

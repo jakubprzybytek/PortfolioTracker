@@ -163,7 +163,7 @@ export function periodsToMaturity(periods: InterestPeriod[], maturity: IsoDate):
 }
 
 /** The bond's flows from settlement: from its interest periods (terms), or for treasury fixed and zero series yearly. */
-function flowsOf(input: ScreenInput, nominal: number, settle: IsoDate, fileRate: number | null): { flows: BondFlow[]; floating: boolean; extended?: boolean } | ScreenFlag {
+function flowsOf(input: Pick<ScreenInput, "bond" | "terms" | "coupons" | "assumptions">, nominal: number, settle: IsoDate, fileRate: number | null): { flows: BondFlow[]; floating: boolean; extended?: boolean } | ScreenFlag {
   const { bond, terms, assumptions: a } = input;
   if (/^IZ\d{4}$/.test(bond.code)) return "indexed";
   if (bond.segment === "treasury" && /^(DS|PS|WS|OK)\d{4}$/.test(bond.code) && bond.maturity) return { flows: yearlyCouponFlows(nominal, fileRate ?? 0, bond.maturity, settle), floating: false };
@@ -231,13 +231,12 @@ export function screenRow(input: ScreenInput): ScreenRow {
 
   const nominal = base.nominal;
   const got = flowsOf(input, nominal, settle, last.rate);
-  // The premium of a floating bond needs only its margin, not its flows.
-  const coupon = terms?.coupon;
-  if (bond.currency === "PLN" && !stale) {
-    if (coupon?.kind === "FLOATING" && coupon.margin !== undefined) {
-      const wz = curveAt(input.wzCurve, years);
-      base.premium = round(priceAdjustedMargin(coupon.margin, last.close, years) - (wz ?? 0));
-      base.premiumBasis = "wz";
+  // The premium: the same as the history's (sessionPremium), not on a stale price.
+  if (!stale) {
+    const p = sessionPremium({ bond, terms, coupons: input.coupons, session: { date: last.date, close: last.close, accruedInterest: last.accruedInterest, nominal, rate: last.rate }, fixedCurve: input.fixedCurve, wzCurve: input.wzCurve });
+    if (p) {
+      base.premium = p.premium;
+      base.premiumBasis = p.basis;
     }
   }
   if (typeof got === "string") {
@@ -279,14 +278,45 @@ export function screenRow(input: ScreenInput): ScreenRow {
       if (offer) base.alternative = { label: `${offer.series} (retail, ${offer.termMonths >= 12 ? `${offer.termMonths / 12} y` : `${offer.termMonths} m`})`, yieldNet: retailOfferYield(offer, settle, bond.maturity, false, a) };
     }
     if (base.alternative) base.vsAlternative = round(base.yieldNet - base.alternative.yieldNet);
-    // Fixed coupons: the yield before tax and commission against the State's at the same maturity.
-    if (!got.floating && !stale) {
-      const curve = curveAt(input.fixedCurve, years);
-      if (curve !== null) {
-        base.premium = round(irr(price, flows.map((f) => ({ t: f.t, amount: f.gross }))) - curve);
-        base.premiumBasis = "fixed-curve";
-      }
-    }
   }
   return base;
+}
+
+/** A session of a bond as its premium needs it. */
+export interface PremiumSession {
+  date: IsoDate;
+  /** Clean price, % of nominal. */
+  close: number | null;
+  accruedInterest: number | null;
+  nominal: number | null;
+  /** The current period's rate in the daily file (fixed treasury series' coupon). */
+  rate: number | null;
+}
+
+/**
+ * A bond's premium over the State on a session (Docs/catalyst.md, "Market metrics"; the premium history and today's
+ * screen alike): a floating coupon, its margin adjusted for the price less the WZ curve's at the same years; a fixed
+ * one, its yield before tax and commission less the fixed curve's. PLN only; none within 90 days of maturity, for an
+ * indexed bond, or without terms or periods.
+ */
+export function sessionPremium(input: { bond: CatalystBondItem; terms?: CatalystTermsItem; coupons: InterestPeriod[]; session: PremiumSession; fixedCurve: CurvePoint[]; wzCurve: CurvePoint[] }): { premium: number; basis: "wz" | "fixed-curve" } | null {
+  const { bond, terms, session: s } = input;
+  const nominal = s.nominal ?? bond.nominal;
+  if (bond.currency !== "PLN" || s.close === null || !bond.maturity || !nominal) return null;
+  const settle = settlementDate(s.date);
+  if (bond.maturity <= addDays(settle, MATURES_SOON_DAYS)) return null;
+  const years = yearsBetween(settle, bond.maturity);
+  // A floating coupon needs only its margin, not its flows.
+  const coupon = terms?.coupon;
+  if (coupon?.kind === "FLOATING" && coupon.margin !== undefined) {
+    const wz = curveAt(input.wzCurve, years);
+    return { premium: round(priceAdjustedMargin(coupon.margin, s.close, years) - (wz ?? 0)), basis: "wz" };
+  }
+  const got = flowsOf({ bond, terms, coupons: input.coupons, assumptions: DEFAULT_CATALYST_ASSUMPTIONS }, nominal, settle, s.rate);
+  if (typeof got === "string" || got.floating || !got.flows.some((f) => f.date > settle && f.kind === "redemption")) return null;
+  const curve = curveAt(input.fixedCurve, years);
+  if (curve === null) return null;
+  const price = (nominal * s.close) / 100 + (s.accruedInterest ?? 0);
+  const flows = got.flows.filter((f) => f.date > settle).map((f) => ({ t: yearsBetween(settle, f.date), amount: f.perBond }));
+  return { premium: round(irr(price, flows) - curve), basis: "fixed-curve" };
 }

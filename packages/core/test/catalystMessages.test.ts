@@ -9,7 +9,13 @@ describe("planBatch", () => {
       JSON.stringify({ kind: "metrics" }),
       JSON.stringify({ kind: "backfill", from: "2026-09-01", to: "2026-09-30" }),
     ]);
-    expect(plan).toEqual({ backfills: [{ from: "2026-10-01", to: "2026-10-31" }, { from: "2026-09-01", to: "2026-09-30" }], metrics: true, invalid: [] });
+    expect(plan).toEqual({ backfills: [{ from: "2026-10-01", to: "2026-10-31" }, { from: "2026-09-01", to: "2026-09-30" }], premiums: [], metrics: true, invalid: [] });
+  });
+
+  it("the premium history: from the start, or on from a bond", () => {
+    const plan = planBatch([JSON.stringify({ kind: "premiums" }), JSON.stringify({ kind: "premiums", after: "PLKRUK000123" })]);
+    expect(plan.premiums).toEqual([{}, { after: "PLKRUK000123" }]);
+    expect(plan.metrics).toBe(false);
   });
 
   it("sets malformed requests apart", () => {

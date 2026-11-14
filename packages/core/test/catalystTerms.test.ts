@@ -42,9 +42,15 @@ describe("termsWork", () => {
   const wz = bond("WZ0330", "treasury");
   const ended = bond("ABC0124", "corporate", "ended");
 
-  it("listed bonds without terms, corporate first, municipal last; treasury only its floating series; never ended ones", () => {
-    expect(termsWork([muni, ds, ended, wz, corp], new Map(), "2026-11-06", 10).map((b) => b.code)).toEqual(["KRU0829", "WZ0330", "WAW0130"]);
+  it("listed bonds without terms, corporate first, municipal last; treasury only its floating series; ended corporate ones last", () => {
+    expect(termsWork([muni, ds, ended, wz, corp], new Map(), "2026-11-06", 10).map((b) => b.code)).toEqual(["KRU0829", "WZ0330", "WAW0130", "ABC0124"]);
     expect(termsWork([muni, corp], new Map(), "2026-11-06", 1).map((b) => b.code)).toEqual(["KRU0829"]);
+  });
+
+  it("an ended bond once: not when it has terms, not again when the site didn't have it; only corporate PLN", () => {
+    expect(termsWork([ended], new Map([[ended.isin, terms(ended, {})]]), "2026-11-06", 10)).toEqual([]);
+    expect(termsWork([ended], new Map([[ended.isin, terms(ended, { notFound: true, fetchedAt: "2026-01-01T09:30:00Z" })]]), "2026-11-06", 10)).toEqual([]);
+    expect(termsWork([bond("WAW0124", "municipal", "ended"), { ...bond("ABC0125", "corporate", "ended"), currency: "EUR" }], new Map(), "2026-11-06", 10)).toEqual([]);
   });
 
   it("then floating bonds a week into a new period, read before it; and codes the site didn't have a month ago", () => {
