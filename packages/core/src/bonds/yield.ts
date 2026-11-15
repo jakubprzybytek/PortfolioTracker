@@ -18,6 +18,17 @@ export interface BondFlow {
   projected?: boolean;
 }
 
+/**
+ * One flow of a bond bought for `cost` (price + accrued interest + commission) after `tax`, as a Polish broker
+ * withholds it: coupons and interest taxed in full, the first one too (the accrued interest paid with the purchase
+ * isn't taken off it: Bossa's notes on prod, CPS0130's coupon of 2026-01-12), and at redemption the gain over `cost`,
+ * so the accrued interest paid counts once, as cost. A loss at redemption isn't credited.
+ */
+export function netOfTax(f: Pick<BondFlow, "kind" | "perBond" | "taxBase">, cost: number, tax: number): number {
+  const base = f.kind === "redemption" ? f.perBond - cost : f.taxBase;
+  return f.perBond - Math.max(0, base) * tax;
+}
+
 /** The annual rate at which `flows` (t in years) are worth `price` today; bisection, as flows are all positive. */
 export function irr(price: number, flows: { t: number; amount: number }[]): number {
   if (price <= 0 || flows.length === 0) return 0;

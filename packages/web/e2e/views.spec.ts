@@ -1684,8 +1684,9 @@ test.describe("catalyst view", () => {
     curve: { fixed: [{ years: 1, value: 0.04, code: "PS1127" }, { years: 5, value: 0.055, code: "DS1031" }], wz: [] },
     rows: [
       // Kruk: linked, AI analysis on, scored (red only in asset coverage). Abc: linked, AI analysis off.
-      row("KRU0829", { entityId: "0000533217", issuerShort: "Kruk", issuerLegal: "Kruk S.A.", aiAnalysis: true, industry: "Finance", scorecard: signals }),
-      row("ABC1227", { entityId: "0000000001", issuerShort: "Abc", issuerLegal: "Abc S.A.", aiAnalysis: false, issuer: "Abc S.A.", coupon: { kind: "FIXED", rate: 0.09 }, couponText: "stałe 9%", years: 1.1, yieldNet: 0.074, vsAlternative: 0.035, premium: 0.045, premiumBasis: "fixed-curve", projected: false, liquidity: liq("low", 0.1), nominal: 100 }),
+      // Kruk past its record day, Abc before it (it pays accrued interest).
+      row("KRU0829", { entityId: "0000533217", issuerShort: "Kruk", issuerLegal: "Kruk S.A.", aiAnalysis: true, industry: "Finance", scorecard: signals, period: { start: "2026-08-12", end: "2026-11-12", recordDate: "2026-11-04", paymentDate: "2026-11-12", settle: "2026-11-09" } }),
+      row("ABC1227", { entityId: "0000000001", issuerShort: "Abc", issuerLegal: "Abc S.A.", aiAnalysis: false, issuer: "Abc S.A.", coupon: { kind: "FIXED", rate: 0.09 }, couponText: "stałe 9%", years: 1.1, yieldNet: 0.074, vsAlternative: 0.035, premium: 0.045, premiumBasis: "fixed-curve", projected: false, liquidity: liq("low", 0.1), nominal: 100, period: { start: "2026-06-30", end: "2026-12-30", recordDate: "2026-12-22", paymentDate: "2026-12-30", settle: "2026-11-09" } }),
       row("WAW0130", { segment: "municipal", issuer: null, coupon: undefined, couponText: null, yieldNet: null, yieldGross: null, vsAlternative: null, premium: null, liquidity: liq("medium", 0.5), flags: ["no-terms"] }),
       row("OLD0828", { issuer: "Old S.A.", yieldNet: 0.2, liquidity: liq("none", 0), flags: ["stale"] }),
     ],
@@ -1819,6 +1820,11 @@ test.describe("catalyst view", () => {
     await expect(kru).toContainText("+2,2%");
     await expect(kru).toContainText("WIBOR 3M".replace("WIBOR ", "W"));
     await expect(rows.filter({ hasText: "WAW0130" })).toContainText("no terms yet");
+    // The interest period: past the record day (green), before it (amber, accrued interest paid), none without periods.
+    await expect(kru.getByTestId("catalyst-period")).toHaveAttribute("data-after-record", "true");
+    await expect(rows.filter({ hasText: "ABC1227" }).getByTestId("catalyst-period")).toHaveAttribute("data-after-record", "false");
+    await expect(rows.filter({ hasText: "ABC1227" }).getByTestId("catalyst-period")).toHaveAttribute("title", /day 132 of 183 .*record day 2026-12-22.*taxes the coupon in full/);
+    await expect(rows.filter({ hasText: "WAW0130" }).getByTestId("catalyst-period")).toHaveCount(0);
 
     await page.getByTestId("catalyst-stale").click();
     await expect(rows).toHaveCount(4);
@@ -2058,6 +2064,7 @@ test.describe("catalyst view", () => {
     await page.getByTestId("catalyst-tab-yield").click();
     await expect(page.getByTestId("catalyst-yield-facts")).toContainText("TOS1129 (retail, 3 y)");
     await page.getByTestId("catalyst-tab-coupons").click();
+    await expect(page.locator(".cat-period-now")).toContainText("Past the record day (2026-11-04): this coupon (paid 2026-11-12) goes to the seller");
     const periods = page.getByTestId("catalyst-coupons").locator("tbody tr");
     await expect(periods).toHaveCount(2);
     // The latest period first, and it's the current one.

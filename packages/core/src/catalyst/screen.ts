@@ -6,7 +6,7 @@
 import { z } from "zod";
 import type { InterestPeriod } from "../bonds/couponPeriods.ts";
 import { INTEREST_TAX } from "../bonds/couponPeriods.ts";
-import { irr, periodFlows, yearlyCouponFlows, yearsBetween, type BondFlow } from "../bonds/yield.ts";
+import { irr, netOfTax, periodFlows, yearlyCouponFlows, yearsBetween, type BondFlow } from "../bonds/yield.ts";
 import { addDays, type IsoDate } from "../dates.ts";
 import { DEFAULT_ASSUMPTIONS, DEFAULT_COMMISSION, nbpRateFromOffers, nearestOffer, retailOfferYield, type HoldSellAssumptions } from "../holdsell/holdSell.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
@@ -99,6 +99,12 @@ export interface ScreenRow {
   /** Over the State's curve: fixed coupons, yield − the curve at the same maturity; floating, price-adjusted margin − WZ's. */
   premium: number | null;
   premiumBasis: "fixed-curve" | "wz" | null;
+  /**
+   * Where a purchase on the session settles in the interest period whose coupon is still to be paid: its dates and the
+   * settlement day. Up to the record day the buyer pays accrued interest and gets the coupon (taxed in full); after it
+   * neither. Null without periods.
+   */
+  period: CurrentPeriod | null;
   liquidity: Liquidity;
   flags: ScreenFlag[];
   /** The issuer's signals (phase 2), copied by the metrics from its company's analysis for the table's filters. */
@@ -184,6 +190,20 @@ function flowsOf(input: Pick<ScreenInput, "bond" | "terms" | "coupons" | "assump
   return "no-terms";
 }
 
+export interface CurrentPeriod {
+  start: IsoDate;
+  end: IsoDate;
+  recordDate?: IsoDate;
+  paymentDate: IsoDate;
+  settle: IsoDate;
+}
+
+/** The period whose coupon is still to be paid when a purchase settles on `settle` (see `ScreenRow.period`). */
+export function currentPeriod(periods: InterestPeriod[], settle: IsoDate): CurrentPeriod | null {
+  const p = [...periods].sort((x, y) => x.start.localeCompare(y.start)).find((x) => x.paymentDate > settle && x.start <= settle);
+  return p ? { start: p.start, end: p.end, ...(p.recordDate ? { recordDate: p.recordDate } : {}), paymentDate: p.paymentDate, settle } : null;
+}
+
 export function screenRow(input: ScreenInput): ScreenRow {
   const { bond, terms, assumptions: a } = input;
   const market = bond.markets.find((m) => m.startsWith("GPW")) ?? bond.markets[0] ?? "";
@@ -216,6 +236,7 @@ export function screenRow(input: ScreenInput): ScreenRow {
     vsAlternative: null,
     premium: null,
     premiumBasis: null,
+    period: currentPeriod(input.coupons, settlementDate(last?.date ?? bond.lastSeen)),
     liquidity: liq,
     flags,
   };
@@ -254,19 +275,7 @@ export function screenRow(input: ScreenInput): ScreenRow {
   const price = (nominal * last.close) / 100 + accrued;
   const commission = a.commission ?? DEFAULT_COMMISSION;
   const cost = price * (1 + commission);
-  // Tax: coupons less the accrued interest paid with the bond (deductible from the first), and the gain over the
-  // price paid at redemption.
-  let accruedLeft = accrued;
-  const flows = got.flows.filter((f) => f.date > settle).map((f) => {
-    let taxBase = f.taxBase;
-    if (f.kind !== "redemption" && accruedLeft > 0) {
-      const used = Math.min(accruedLeft, taxBase);
-      taxBase -= used;
-      accruedLeft -= used;
-    }
-    if (f.kind === "redemption") taxBase = Math.max(0, f.perBond - cost);
-    return { t: yearsBetween(settle, f.date), gross: f.perBond, net: f.perBond - Math.max(0, taxBase) * INTEREST_TAX };
-  });
+  const flows = got.flows.filter((f) => f.date > settle).map((f) => ({ t: yearsBetween(settle, f.date), gross: f.perBond, net: netOfTax(f, cost, INTEREST_TAX) }));
   base.yieldGross = irr(cost, flows.map((f) => ({ t: f.t, amount: f.gross })));
   base.yieldNet = irr(cost, flows.map((f) => ({ t: f.t, amount: f.net })));
   base.projected = got.floating || !!got.extended;

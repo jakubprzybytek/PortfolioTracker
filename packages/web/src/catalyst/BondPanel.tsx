@@ -7,7 +7,7 @@ import { useApi } from "../useApi.ts";
 import { chartMargin, narrowYAxis, useNarrow } from "../useNarrow.ts";
 import type { BondDetail, BondOutcome, BondRow, ReportedEvent } from "./types.ts";
 import { FLAG_TITLE, LEVEL_LABEL, couponLabel, pct, pp, webHref } from "./labels.ts";
-import { LiquidityDots } from "./parts.tsx";
+import { LiquidityDots, PeriodBar, periodTitle } from "./parts.tsx";
 import { PremiumChart, YieldChart } from "./PremiumChart.tsx";
 import { timeAxis } from "../timeAxis.ts";
 import { timeAxisProps, yearLines } from "../TimeTick.tsx";
@@ -36,7 +36,7 @@ export function BondPanel({ row, tab, setTab }: { row: BondRow; tab: string; set
       {detail.error && <p className="error">{detail.error}</p>}
       {tab === "price" && <PriceTab row={row} detail={d} loading={detail.loading} range={range} setRange={setRange} busy={detail.refreshing} chart={chart} setChart={setChart} />}
       {tab === "yield" && <YieldTab row={row} detail={d} />}
-      {tab === "coupons" && <CouponsTab detail={d} loading={detail.loading} />}
+      {tab === "coupons" && <CouponsTab row={row} detail={d} loading={detail.loading} />}
       {tab === "track" && <TrackTab detail={d} loading={detail.loading} />}
     </div>
   );
@@ -234,17 +234,23 @@ export function YieldTab({ row, detail }: { row: BondRow; detail: BondDetail | u
           <dd>{v}</dd>
         </div>
       ))}
-      <p className="muted">Bought at the session's price + accrued interest + commission, held to maturity, coupons reinvested at the same yield; tax 19% on coupons (less the accrued interest paid) and on the gain at maturity. A corporate bond's yield is what's promised; the premium is the pay for the issuer's risk.</p>
+      <p className="muted">Bought at the session's price + accrued interest + commission, held to maturity, coupons reinvested at the same yield; tax 19% on every coupon (the first in full, as the broker withholds it; the accrued interest paid counts only as cost) and on the gain at maturity. A corporate bond's yield is what's promised; the premium is the pay for the issuer's risk.</p>
     </dl>
   );
 }
 
-export function CouponsTab({ detail, loading }: { detail: BondDetail | undefined; loading: boolean }) {
+export function CouponsTab({ row, detail, loading }: { row?: BondRow; detail: BondDetail | undefined; loading: boolean }) {
   if (!detail) return <p className="muted">{loading ? "Loading…" : ""}</p>;
   const now = today();
   if (detail.coupons.length === 0) return <p className="muted">{detail.terms?.periodsProblem ? `obligacje.pl's periods don't add up: ${detail.terms.periodsProblem}.` : "No interest periods (terms not read yet, or a treasury series: yearly coupons)."}</p>;
   return (
     <div className="table-wrap">
+      {row?.period && (
+        <div className="cat-period-now">
+          <PeriodBar period={row.period} accrued={row.accruedInterest} currency={row.currency} wide />
+          <p className="muted">{periodTitle(row.period, row.accruedInterest, row.currency)}</p>
+        </div>
+      )}
       <table className="static cat-coupons" data-testid="catalyst-coupons">
         <thead>
           <tr>

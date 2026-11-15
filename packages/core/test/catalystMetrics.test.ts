@@ -3,9 +3,10 @@ import type { InterestPeriod } from "../src/bonds/couponPeriods.ts";
 import { curveAt, fixedCurve, fixedYield, priceAdjustedMargin, wzCurve, type CurvePoint } from "../src/catalyst/curve.ts";
 import { catalystKeys, type CatalystBondItem, type CatalystSessionItem, type CatalystTermsItem } from "../src/catalyst/items.ts";
 import { liquidity } from "../src/catalyst/liquidity.ts";
-import { DEFAULT_CATALYST_ASSUMPTIONS, screenRow, type ScreenInput } from "../src/catalyst/screen.ts";
-import { addDays } from "../src/dates.ts";
-import { isSettlementDay } from "../src/settlement.ts";
+import { DEFAULT_CATALYST_ASSUMPTIONS, currentPeriod, screenRow, type ScreenInput } from "../src/catalyst/screen.ts";
+import { addDays, daysBetween } from "../src/dates.ts";
+import { irr, yearsBetween } from "../src/bonds/yield.ts";
+import { isSettlementDay, settlementDate } from "../src/settlement.ts";
 
 describe("curves", () => {
   it("a fixed bond at par yields its coupon (before tax and commission)", () => {
@@ -109,6 +110,34 @@ describe("screenRow", () => {
     expect(r.premiumBasis).toBe("fixed-curve");
     expect(r).toMatchObject({ price: 100, market: "GPW ASO", projected: false, flags: [] });
     expect(r.liquidity.level).toBe("medium");
+  });
+
+  it("the current period: the one whose coupon is still to be paid at settlement, past its record day too", () => {
+    const ps = yearly("PLX").map((p) => ({ ...p, recordDate: addDays(p.end, -7) }));
+    expect(currentPeriod(ps, "2026-06-01")).toEqual({ start: "2025-11-09", end: "2026-11-09", recordDate: "2026-11-02", paymentDate: "2026-11-09", settle: "2026-06-01" });
+    // Past the record day the period stays current (its coupon goes to the seller) until it's paid.
+    expect(currentPeriod(ps, "2026-11-05")?.start).toBe("2025-11-09");
+    expect(currentPeriod(ps, "2026-11-09")?.start).toBe("2026-11-09");
+    expect(currentPeriod(ps, "2025-01-01")).toBeNull();
+    expect(currentPeriod(ps, "2030-01-01")).toBeNull();
+    const b = bond({ code: "FIX1129" });
+    expect(screenRow(input({ bond: b, terms: terms(b, { kind: "FIXED", rate: 0.06 }), coupons: ps, sessions: sessions(b, 100) })).period?.start).toBe("2026-11-09");
+  });
+
+  it("below par with accrued interest: every coupon taxed in full, the gain at maturity over price + accrued interest", () => {
+    const b = bond({ code: "LOW1129" });
+    const ss = sessions(b, 95).map((s) => ({ ...s, accruedInterest: 30 }));
+    const r = screenRow(input({ bond: b, terms: terms(b, { kind: "FIXED", rate: 0.06 }), coupons: yearly(b.isin, 0.06), sessions: ss }));
+    // Paid 950 + 30: coupons (6%, ACT/365: 2028's has 366 days) taxed in full; the gain 1000 − 980 = 20 taxed 3,80
+    // (the 30 isn't also taken off a coupon).
+    const t = (d: string) => yearsBetween(settlementDate(r.lastTraded!), d);
+    const net = (start: string, end: string) => Math.round(60 * (daysBetween(start, end) / 365) * 100) / 100 * 0.81;
+    const expected = irr(980, [
+      { t: t("2027-11-09"), amount: net("2026-11-09", "2027-11-09") },
+      { t: t("2028-11-09"), amount: net("2027-11-09", "2028-11-09") },
+      { t: t("2029-11-09"), amount: net("2028-11-09", "2029-11-09") + 1000 - 3.8 },
+    ]);
+    expect(r.yieldNet).toBeCloseTo(expected, 6);
   });
 
   it("a floating bond: coupons at the assumed WIBOR + margin; premium = margin adjusted for price − WZ's", () => {

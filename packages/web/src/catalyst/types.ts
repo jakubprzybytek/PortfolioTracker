@@ -57,6 +57,8 @@ export interface BondRow {
   vsAlternative: number | null;
   premium: number | null;
   premiumBasis: "fixed-curve" | "wz" | null;
+  /** The interest period a purchase on the session settles in (rows from before 2026-11-16 don't have it). */
+  period?: CurrentPeriod | null;
   liquidity: Liquidity;
   flags: string[];
 }
@@ -342,4 +344,13 @@ export interface YearLines {
   presentedUnit?: number;
   lines: StatementLineView[];
   figures: Record<string, Figure | undefined>;
+}
+
+/** An interest period and where a purchase settles in it (the screen's `period`). */
+export interface CurrentPeriod {
+  start: string;
+  end: string;
+  recordDate?: string;
+  paymentDate: string;
+  settle: string;
 }

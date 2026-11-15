@@ -218,22 +218,34 @@ describe("buyMore", () => {
     expect(r!.weight).toBeCloseTo(0.1049, 3);
   });
 
-  it("outside IKE: 19% tax, but not on the accrued interest paid with the bond; cheaper means a higher yield", () => {
+  it("outside IKE: 19% tax on every coupon, the first in full; the accrued interest paid counts once, as cost", () => {
     const r = buyMore(listed(100, "Broker"))[0]!;
     expect(r.taxFree).toBe(false);
-    // About 5% × 0,81: the first coupon (50) mostly gives back the accrued interest paid (49,32), which isn't taxed.
-    expect(r.netYield).toBeGreaterThan(0.039);
-    expect(r.netYield).toBeLessThan(0.0415);
+    // Under 5% × 0,81: the first coupon (50) is taxed in full though it mostly gives back the accrued interest paid
+    // (49,32), as a broker withholds it; that interest comes back only as cost, and at par there's no gain to set it off.
+    expect(r.netYield).toBeGreaterThan(0.034);
+    expect(r.netYield).toBeLessThan(0.037);
     expect(r.netYield).toBeLessThan(r.grossYield!);
-    // Per bond: the first coupon taxed only on what exceeds the accrued interest paid (50 − 49,32), later ones in full
+    // Per bond: every coupon taxed in full; no gain at redemption (paid 1000 + 49,32 accrued + commission)
     expect(r.flows.map((f) => [f.date, f.kind, f.amount, f.tax])).toEqual([
-      ["2026-10-25", "coupon", 50, 0.13],
+      ["2026-10-25", "coupon", 50, 9.5],
       ["2027-10-25", "coupon", 50, 9.5],
       ["2028-10-25", "coupon", 50, 9.5],
       ["2028-10-25", "redemption", 1000, 0],
     ]);
     expect(r.price.accrued).toBe(accrued);
     expect(buyMore(listed(90))[0]!.grossYield!).toBeGreaterThan(0.1);
+  });
+
+  it("below par outside IKE: the gain at redemption is over price + accrued interest, the accrued interest not also taken off a coupon", () => {
+    const r = buyMore(listed(90, "Broker"))[0]!;
+    // Paid 900 + 49,32 accrued (no commission): the gain is 50,68, taxed 9,63; every coupon taxed in full.
+    expect(r.flows.map((f) => [f.kind, f.tax])).toEqual([
+      ["coupon", 9.5],
+      ["coupon", 9.5],
+      ["coupon", 9.5],
+      ["redemption", 9.63],
+    ]);
   });
 
   it("retail: one row per account and kind, the series on offer now, weighed with every series of that kind held", () => {

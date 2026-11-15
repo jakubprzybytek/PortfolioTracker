@@ -13,7 +13,7 @@ import { INTEREST_TAX, isTaxFreeAccount, type InterestPeriod } from "../bonds/co
 import { indexRatioAt, type ReferenceIndex } from "../bonds/izIndex.ts";
 import { grosz, lotSeries, publishedRatePeriods, valueRetailBond, type RetailRatePeriod } from "../bonds/retail.ts";
 import type { BondTerms } from "../bonds/terms.ts";
-import { irr, periodFlows, yearlyCouponFlows, yearsBetween, type BondFlow } from "../bonds/yield.ts";
+import { irr, netOfTax, periodFlows, yearlyCouponFlows, yearsBetween, type BondFlow } from "../bonds/yield.ts";
 import { daysBetween, shiftMonth, type IsoDate } from "../dates.ts";
 import type { HoldingSnapshot, InstrumentItem, TransactionItem } from "../db/items.ts";
 import type { RetailKind, RetailTerms } from "../mf/retailRates.ts";
@@ -599,19 +599,7 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
     const accrued = (h.accruedInterest ?? 0) / (h.type === "BOND_IBKR" ? fx : 1);
     const c = perBond * commission;
     const cost = perBond + c;
-    // Tax: coupons less the accrued interest paid with the bond (deductible from the first one), and the gain over
-    // the price paid at redemption.
-    let accruedLeft = accrued;
-    const flows = per.flows.map((f) => {
-      let taxBase = f.taxBase;
-      if (f.kind !== "redemption" && accruedLeft > 0) {
-        const used = Math.min(accruedLeft, taxBase);
-        taxBase -= used;
-        accruedLeft -= used;
-      }
-      if (f.kind === "redemption") taxBase = Math.max(0, f.perBond - cost);
-      return { t: yearsBetween(today, f.date), date: f.date, kind: f.kind, projected: !!f.projected, gross: f.perBond, net: f.perBond - Math.max(0, taxBase) * tax };
-    });
+    const flows = per.flows.map((f) => ({ t: yearsBetween(today, f.date), date: f.date, kind: f.kind, projected: !!f.projected, gross: f.perBond, net: netOfTax(f, cost, tax) }));
     const grossYield = irr(cost, flows.map((f) => ({ t: f.t, amount: f.gross })));
     const netYield = irr(cost, flows.map((f) => ({ t: f.t, amount: f.net })));
     const years = yearsBetween(today, per.maturity);
@@ -623,7 +611,7 @@ export function buyMore(input: HoldSellInput & { portfolioValue?: number }): Buy
     const fixed = (h.type === "BOND_LISTED" && inst.terms?.couponType === "FIXED") || (h.type === "BOND_CORPORATE" && !floating) || h.type === "BOND_IBKR";
     notes.push(`at the last price${h.priceDate ? ` (${h.priceDate})` : ""} + accrued interest; the ask can be higher, above all on Catalyst`);
     notes.push(`purchase: ${pct(commission)} commission${a.commission === undefined ? " (the account's, from its trades)" : ""}`);
-    notes.push(taxFree ? "no tax (IKE/IKZE)" : "tax 19% on coupons (less the accrued interest paid) and on the gain over the price paid");
+    notes.push(taxFree ? "no tax (IKE/IKZE)" : "tax 19% on coupons (the first in full: the accrued interest paid counts only as cost) and on the gain over the price paid");
     if (h.type === "BOND_LISTED" && inst.terms?.couponType === "INDEXED") notes.push(`IZ indexation at CPI ${pct(a.cpi)}: the real yield is the steadier figure`);
     if (floating) notes.push(`coupons not set yet: WIBOR ${pct(a.wibor)} + margin; the margin over WIBOR is the steadier figure`);
     if (h.type === "BOND_CORPORATE") notes.push("a corporate bond's yield is what's promised; the spread is the pay for the issuer's risk");

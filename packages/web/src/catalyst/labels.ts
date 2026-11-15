@@ -2,7 +2,7 @@
 import { fmtMoney, fmtNum, fmtPct } from "../format.ts";
 import { signalsScore } from "./issuer.tsx";
 import type { SortValue } from "../sort.ts";
-import type { BondRow, Level, Liquidity } from "./types.ts";
+import type { BondRow, CurrentPeriod, Level, Liquidity } from "./types.ts";
 
 export const SEGMENTS: Record<string, string> = {
   corporate: "Corporate",
@@ -54,7 +54,16 @@ export const couponLabel = (r: BondRow) => {
 };
 export const baseOf = (r: BondRow) => (r.coupon?.kind === "FLOATING" ? (r.coupon.base ?? "other") : r.coupon?.kind === "FIXED" || /^(DS|PS|WS)\d/.test(r.code) ? "fixed" : r.coupon?.kind === "ZERO" || /^OK\d/.test(r.code) ? "zero" : "");
 
-export const SORT_KEYS = ["bond", "issuer", "type", "coupon", "maturity", "price", "yield", "vsalt", "premium", "liquidity", "scorecard"] as const;
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+
+/** Where a purchase settles in its interest period: the share of it gone, and whether it's past the record day. */
+export function periodPosition(p: CurrentPeriod): { share: number; record: number | null; afterRecord: boolean; day: number; days: number } {
+  const days = Math.max(1, dayDiff(p.start, p.end));
+  const day = Math.min(days, Math.max(0, dayDiff(p.start, p.settle)));
+  return { share: day / days, record: p.recordDate ? Math.min(1, Math.max(0, dayDiff(p.start, p.recordDate) / days)) : null, afterRecord: !!p.recordDate && p.settle > p.recordDate, day, days };
+}
+
+export const SORT_KEYS = ["bond", "issuer", "type", "coupon", "maturity", "price", "period", "yield", "vsalt", "premium", "liquidity", "scorecard"] as const;
 export function sortValue(r: BondRow, key: string): SortValue {
   switch (key) {
     case "bond":
@@ -69,6 +78,9 @@ export function sortValue(r: BondRow, key: string): SortValue {
       return r.years;
     case "price":
       return r.price;
+    // The share of the coupon a purchase pays as accrued interest: none past the record day.
+    case "period":
+      return r.period ? (periodPosition(r.period).afterRecord ? 0 : periodPosition(r.period).share) : null;
     case "yield":
       return r.yieldNet;
     case "vsalt":

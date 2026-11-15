@@ -280,6 +280,7 @@ h2 { font-size: var(--fs-18); font-weight: 600; margin: 28px 0 10px; letter-spac
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }
 .pos { color: var(--pos); }
+.warn-text { color: var(--warn); }
 .neg { color: var(--neg); }
 .cards { display: flex; gap: 12px; flex-wrap: wrap; container: cards / inline-size; }
 .card { padding: 14px 16px; flex: 1 1 150px; min-width: 150px; container-type: inline-size; }
@@ -926,6 +927,12 @@ tr.sale-pair td:first-child { padding-left: 1.6rem; }
 .cat-liq > span { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--muted); }
 .cat-liq > span.on { background: var(--pos); border-color: var(--pos); }
 .cat-liq[data-level="low"] > span.on { background: var(--muted); border-color: var(--muted); }
+/* The interest period: filled to settlement, the record day as a tick; amber before it (accrued interest paid), green after. */
+.cat-period { position: relative; display: inline-block; width: 64px; height: 8px; border-radius: 4px; background: var(--line); box-shadow: inset 0 0 0 1px var(--border); vertical-align: middle; overflow: hidden; }
+.cat-period.wide { width: 100%; max-width: 420px; height: 10px; border-radius: 5px; }
+.cat-period > .fill { position: absolute; inset: 0 auto 0 0; background: var(--warn); }
+.cat-period[data-after-record="true"] > .fill { background: var(--pos); }
+.cat-period > .record { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--fg); opacity: .7; }
 td.cat-issuer { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
 .catalyst-chart { margin-bottom: 12px; }
 .catalyst-chart .chart-legend { margin: 0 0 6px; }
@@ -1234,3 +1241,5 @@ tr.outside:hover td { opacity: 0.85; }
 .cat-toggle-dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; box-sizing: border-box; flex: none; }
 .cat-toggle.on .cat-toggle-dot { background: currentColor; }
 .filters .cat-companies-found .muted { margin-left: auto; white-space: nowrap; }
+.cat-period-now { margin: 4px 0 12px; }
+.cat-period-now > p { margin: 6px 0 0; }

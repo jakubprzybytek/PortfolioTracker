@@ -15,7 +15,7 @@ import type { BondRow, Screen } from "./types.ts";
 import { FLAG_LABEL, FLAG_TITLE, SEGMENTS, SORT_KEYS, baseOf, couponLabel, liquidityTitle, pct, pp, sortValue } from "./labels.ts";
 import { FILTER_KEYS, LIQUIDITY, MATURITIES, MIN_PREMIUM, MIN_YIELD, NOMINALS, companyList, companyName, companyParam, inList, matches, opt, toggleCompany } from "./filters.ts";
 import { CompaniesFilter, companiesOf } from "./CompaniesFilter.tsx";
-import { BondTitle, LiquidityDots } from "./parts.tsx";
+import { BondTitle, LiquidityDots, PeriodBar } from "./parts.tsx";
 import { YieldChart } from "./YieldChart.tsx";
 import { BondPanel } from "./BondPanel.tsx";
 import { ViewsMenu } from "./ViewsMenu.tsx";
@@ -161,6 +161,12 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
               </div>
               <div className="cat-line muted">
                 {couponLabel(r)} · {r.years === null ? "–" : `${fmtNum(r.years, 1)} y`} · {r.price === null ? "–" : fmtNum(r.price)}
+                {r.period && (
+                  <>
+                    {" "}
+                    <PeriodBar period={r.period} accrued={r.accruedInterest} currency={r.currency} />
+                  </>
+                )}
               </div>
               {r.entityId && (
                 <div className="cat-line">
@@ -185,6 +191,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
               <SortTh label="Coupon" sortKey="coupon" sort={sort} onSort={(s) => set("sort", sortParam(s))} className="left" firstDesc />
               <SortTh label="Maturity" sortKey="maturity" sort={sort} onSort={(s) => set("sort", sortParam(s))} />
               <SortTh label="Price" sortKey="price" sort={sort} onSort={(s) => set("sort", sortParam(s))} />
+              <SortTh label="Period" sortKey="period" sort={sort} onSort={(s) => set("sort", sortParam(s))} info={<InfoTip label="interest period" testId="info-period">{INFO.period}</InfoTip>} />
               <SortTh label="Yield net" sortKey="yield" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="yield net" testId="info-yield">{INFO.yield}</InfoTip>} />
               <SortTh label="Vs alt." sortKey="vsalt" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="vs alt." testId="info-vsalt">{INFO.vsalt}</InfoTip>} />
               <SortTh label="Premium" sortKey="premium" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="premium" testId="info-premium">{INFO.premium}</InfoTip>} />
@@ -193,7 +200,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
           }
         >
           <tbody>
-            {!screen.data && screen.loading && <SkeletonRows rows={12} cols={10} />}
+            {!screen.data && screen.loading && <SkeletonRows rows={12} cols={11} />}
             {shown.map((r) => (
               <tr key={r.isin} className={`clickable${r.isin === params["bond"] ? " selected" : ""}${r.flags.includes("stale") ? " closed" : ""}${peek && others.includes(r) ? " outside" : ""}`} onClick={() => toggleRow(r)} data-testid="catalyst-row" data-code={r.code}>
                 <td className="left cat-bond" title={`${r.isin} · ${SEGMENTS[r.segment] ?? r.segment} · ${r.markets.join(", ")}`}>
@@ -274,6 +281,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
                 </td>
                 <td title={r.maturity ?? ""}>{r.years === null ? "–" : `${fmtNum(r.years, 1)} y`}</td>
                 <td title={r.lastTraded ? `Last trade ${r.lastTraded}; accrued interest ${fmtNum(r.accruedInterest)}` : "No trade in the last 90 sessions"}>{r.price === null ? "–" : fmtNum(r.price)}</td>
+                <td>{r.period ? <PeriodBar period={r.period} accrued={r.accruedInterest} currency={r.currency} /> : <span className="muted">–</span>}</td>
                 <td title={r.yieldGross !== null ? `Before tax ${pct(r.yieldGross)}${r.projected ? "; future coupons at the assumed base rate" : ""}` : ""}>
                   {pct(r.yieldNet)}
                   {r.projected && r.yieldNet !== null && <span className="muted">*</span>}
@@ -289,7 +297,7 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
             ))}
             {screen.data && shown.length === 0 && (
               <tr>
-                <td className="left muted" colSpan={10}>
+                <td className="left muted" colSpan={11}>
                   {all.length === 0 ? "No data yet." : "No bonds match the filters."}
                 </td>
               </tr>
@@ -331,6 +339,11 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
 const DEFAULT_SORT: Sort = { key: "yield", desc: true };
 
 const INFO = {
+  period: (
+    <>
+      <strong>Period</strong>: where a purchase today settles in the current interest period, the record day as a tick. <span className="warn-text">Amber</span>, before the record day: you pay the accrued interest so far and get the coupon, but the broker taxes the coupon in full, so 19% of the accrued interest is paid early and comes back only as cost at maturity (if there's a gain to set it off). <span className="pos">Green</span>, after the record day: no accrued interest, the coupon goes to the seller. A short amber bar costs little; sorting puts the least accrued interest first.
+    </>
+  ),
   yield: (
     <>
       <strong>Yield net</strong>: what the bond earns a year if bought today at its last price (plus the accrued interest and the commission) and held to maturity, after the 19% tax on coupons and on the gain. Coupons are assumed reinvested at the same yield. <em>*</em>: a floating coupon, its future rates at the base rate assumed in the settings (the cog).
