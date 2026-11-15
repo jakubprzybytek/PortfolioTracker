@@ -1071,6 +1071,19 @@ In the order the roadmap would take them:
     ranking.
 11. **Monitoring:** re-runs on new reports; alerts (late report, auditor change, covenant breach, a
     dimension changing colour); a watchlist from holdings.
+12. **Covenants per bond** (added 2026-11-15; brings together the covenant parts of 2, 3 and 11). What each
+    issue promises in its terms of issue (*warunki emisji*), read by the agent with quotes checked in code:
+    - financial ratios with their thresholds and test dates (net debt / equity, net debt / EBITDA, often
+      defined differently from the scorecard's), and the **headroom** against the latest report, computed
+      with the issue's own definition;
+    - limits on dividends and buy-backs, on new debt and collateral (negative pledge), change of control,
+      reporting and listing duties, cross-default;
+    - what a breach gives bondholders: early redemption on demand, after a cure period or not.
+
+    Breaches and waivers (a bondholders' meeting relaxing a covenant) recorded as events, as `terms-changed`
+    and `covenant-breach` already are (they weigh heavily in the judgement: catalyst-default-calibration.md).
+    Shown in the bond's panel (each covenant, its threshold, the latest value, the headroom), a flag on the
+    bonds table when the headroom is thin or a covenant was breached or waived, and an alert from 11.
 
 ## 19. Where things are, and how to run them
 
