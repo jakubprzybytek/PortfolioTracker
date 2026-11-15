@@ -6,6 +6,8 @@ import { nextSort, type Sort } from "./sort.ts";
  * header under it is what keyboards and screen readers use, so the copy's buttons stay out of the tab order.
  */
 export const HeaderCopy = createContext(false);
+/** Inside a sortable heading (its `info`): an InfoTip there takes its test id only in the sticky copy, as SortTh's buttons. */
+export const InSortTh = createContext(false);
 
 /**
  * A header cell that sorts its table (sort.ts): a click cycles ascending → descending → the view's order; the
@@ -42,7 +44,7 @@ export function SortTh({
           {active ? (sort.desc ? "▼" : "▲") : ""}
         </span>
       </button>
-      {info}
+      {info && <InSortTh.Provider value={true}>{info}</InSortTh.Provider>}
     </th>
   );
 }

@@ -191,8 +191,8 @@ export function CatalystView({ params, setParams }: { params: Record<string, str
               <SortTh label="Coupon" sortKey="coupon" sort={sort} onSort={(s) => set("sort", sortParam(s))} className="left" firstDesc />
               <SortTh label="Maturity" sortKey="maturity" sort={sort} onSort={(s) => set("sort", sortParam(s))} />
               <SortTh label="Price" sortKey="price" sort={sort} onSort={(s) => set("sort", sortParam(s))} />
-              <SortTh label="Period" sortKey="period" sort={sort} onSort={(s) => set("sort", sortParam(s))} info={<InfoTip label="interest period" testId="info-period">{INFO.period}</InfoTip>} />
-              <SortTh label="Yield net" sortKey="yield" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="yield net" testId="info-yield">{INFO.yield}</InfoTip>} />
+              <SortTh label="Period" sortKey="period" sort={sort} onSort={(s) => set("sort", sortParam(s))} info={<InfoTip label="interest period" testId="info-period" more="interest-period">{INFO.period}</InfoTip>} />
+              <SortTh label="Yield net" sortKey="yield" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="yield net" testId="info-yield" more="coupon-tax">{INFO.yield}</InfoTip>} />
               <SortTh label="Vs alt." sortKey="vsalt" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="vs alt." testId="info-vsalt">{INFO.vsalt}</InfoTip>} />
               <SortTh label="Premium" sortKey="premium" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc info={<InfoTip label="premium" testId="info-premium">{INFO.premium}</InfoTip>} />
               <SortTh label="Liquidity" sortKey="liquidity" sort={sort} onSort={(s) => set("sort", sortParam(s))} firstDesc />

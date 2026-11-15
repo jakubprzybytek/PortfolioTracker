@@ -1347,6 +1347,40 @@ test.describe("indicators view", () => {
   });
 });
 
+test.describe("wiki", () => {
+  test("opens the first article, follows a link to another, and on a phone shows the list first", async ({ page }) => {
+    await page.goto("/#/wiki");
+    await expect(page).toHaveURL(/#\/wiki\?page=xirr$/);
+    await expect(page.getByTestId("wiki-title")).toHaveText("XIRR and time-weighted return");
+    await expect(page.getByTestId("wiki-article").locator("table").first()).toBeVisible();
+    await page.getByTestId("wiki-item").filter({ hasText: "Tax on coupons" }).click();
+    await expect(page.getByTestId("wiki-title")).toHaveText("Tax on coupons");
+    await page.getByTestId("wiki-article").getByRole("link", { name: "accrued interest" }).first().click();
+    await expect(page).toHaveURL(/page=accrued-interest$/);
+    await expect(page.getByTestId("wiki-item").filter({ hasText: "Accrued interest" })).toHaveAttribute("aria-current", "page");
+    await page.goBack();
+    await expect(page.getByTestId("wiki-title")).toHaveText("Tax on coupons");
+
+    await page.setViewportSize({ width: 390, height: 800 });
+    await page.goto("/#/");
+    await page.goto("/#/wiki");
+    await expect(page.getByTestId("wiki-item").first()).toBeVisible();
+    await expect(page.getByTestId("wiki-article")).toBeHidden();
+    await page.getByTestId("wiki-item").filter({ hasText: "Interest period" }).click();
+    await expect(page.getByTestId("wiki-title")).toBeVisible();
+    await expect(page.getByTestId("wiki-item").first()).toBeHidden();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+  });
+
+  test("the Dashboard's XIRR explains itself and links to its article", async ({ page }) => {
+    await page.goto("/#/");
+    await page.getByTestId("info-xirr").click();
+    await expect(page.getByTestId("info-xirr-text")).toContainText("money-weighted");
+    await page.getByTestId("info-xirr-more").click();
+    await expect(page).toHaveURL(/#\/wiki\?page=xirr$/);
+  });
+});
+
 test.describe("notes view", () => {
   test("opens the first note when you come to Notes, and the one open last time when you come back", async ({ page }) => {
     const stamp = Date.now();
@@ -2221,6 +2255,13 @@ test.describe("catalyst view", () => {
     await expect(page.getByTestId("info-premium-text")).toHaveCount(0);
     await page.getByTestId("info-vsalt").click();
     await expect(page.getByTestId("info-vsalt-text")).toContainText("safe alternative");
+    await page.keyboard.press("Escape");
+    // "More →": the pointer crosses onto the explanation and follows its link to the Wiki, without sorting.
+    await page.getByTestId("info-period").hover();
+    await page.getByTestId("info-period-more").hover();
+    await page.getByTestId("info-period-more").click();
+    await expect(page).toHaveURL(/#\/wiki\?page=interest-period$/);
+    await expect(page.getByTestId("wiki-title")).toHaveText("Interest period and record day");
   });
 
   test("the agent's tokens: a named one made beside the others, shown once, with the login command; one revoked after a confirmation", async ({ page }) => {

@@ -1,3 +1,4 @@
+import { InfoTip } from "./InfoTip.tsx";
 import { CLASS_LABELS } from "./Allocation.tsx";
 import { RANGES, rangeFrom, today, type RangeKey } from "./format.ts";
 import { AllocationChart, DrawdownChart } from "./HistoryCharts.tsx";
@@ -29,7 +30,11 @@ export function PerformanceView({ params, setParams }: { params: Record<string, 
           <span className="muted part-note">the whole history, per calendar year</span>
         </header>
         <h2>
-          Returns by year <span className="muted chart-legend">time-weighted (deposits don't count), against the benchmarks over the same days and inflation (CPI December on December)</span>
+          Returns by year{" "}
+          <InfoTip label="time-weighted return" testId="info-twr" more="xirr">
+            <strong>Time-weighted return</strong>: what 100 zł invested at the start became, whatever you added or took out later: each day's growth leaves out that day's deposits. It grades the investments, not your timing; the Dashboard's XIRR includes it.
+          </InfoTip>{" "}
+          <span className="muted chart-legend">time-weighted (deposits don't count), against the benchmarks over the same days and inflation (CPI December on December)</span>
         </h2>
         {years.error ? <p className="error">{years.error}</p> : <YearsTable data={years.data} loading={years.loading} />}
         <div className="chart-pair" data-testid="years-pair">

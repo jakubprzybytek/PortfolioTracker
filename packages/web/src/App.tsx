@@ -18,6 +18,7 @@ const HoldSellView = lazy(() => import("./HoldSellView.tsx").then((m) => ({ defa
 const IndicatorsView = lazy(() => import("./IndicatorsView.tsx").then((m) => ({ default: m.IndicatorsView })));
 const InstrumentView = lazy(() => import("./InstrumentView.tsx").then((m) => ({ default: m.InstrumentView })));
 const NotesView = lazy(() => import("./NotesView.tsx").then((m) => ({ default: m.NotesView })));
+const WikiView = lazy(() => import("./WikiView.tsx").then((m) => ({ default: m.WikiView })));
 const PerformanceView = lazy(() => import("./PerformanceView.tsx").then((m) => ({ default: m.PerformanceView })));
 const PricesView = lazy(() => import("./PricesView.tsx").then((m) => ({ default: m.PricesView })));
 const SalesView = lazy(() => import("./SalesView.tsx").then((m) => ({ default: m.SalesView })));
@@ -210,6 +211,7 @@ function Shell({ email }: { email: string }) {
         {route.view === "indicators" && <IndicatorsView key="indicators" params={route.params} setParams={setParams} />}
         {route.view === "transactions" && <TransactionsView key="transactions" params={route.params} setParams={setParams} />}
         {route.view === "notes" && <NotesView key="notes" params={route.params} setParams={setParams} />}
+        {route.view === "wiki" && <WikiView key="wiki" params={route.params} setParams={setParams} />}
         {route.view === "catalyst" && <CatalystView key="catalyst" params={route.params} setParams={setParams} />}
         {route.view === "catalystIssuers" && <IssuersView key="catalystIssuers" params={route.params} setParams={setParams} />}
         {route.view === "instrument" && <InstrumentView key="instrument" params={route.params} />}

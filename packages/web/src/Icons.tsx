@@ -17,6 +17,7 @@ const paths: Record<View | "menu" | "close" | "logout" | "filter" | "clear-filte
   cashflows: "M4 14v6h16v-6M12 3v11M8 10l4 4 4-4",
   transactions: "M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3",
   notes: "M6 3h9l4 4v14H6zM14 3v5h5M9 12h7M9 16h7",
+  wiki: "M4 5.5C6.5 4 9.5 4 12 6c2.5-2 5.5-2 8-.5V19c-2.5-1.5-5.5-1.5-8 .5-2.5-2-5.5-2-8-.5zM12 6v13.5",
   // a scatter of bonds over axes: the Catalyst market (yield against maturity)
   catalyst: "M4 4v16h16M8 15h.01M11 11h.01M14 13h.01M17 8h.01M19 11h.01",
   catalystIssuers: "M4 4v16h16M8 15h.01M11 11h.01M14 13h.01M17 8h.01M19 11h.01",

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { InfoTip } from "./InfoTip.tsx";
 import { fmtPct, fmtPln, fmtTime, rangeFrom, signClass, today, type RangeKey } from "./format.ts";
 import { AccountsTable, type AccountsResponse } from "./AccountsTable.tsx";
 import { Allocation } from "./Allocation.tsx";
@@ -11,10 +12,13 @@ import { RefreshPrices } from "./RefreshPrices.tsx";
 import { AssetMixPanel } from "./Targets.tsx";
 import type { YearsResponse } from "./Returns.tsx";
 
-function Card({ label, value, className, testId, note, loading, href }: { label: string; value: string; className?: string; testId: string; note?: string; loading: boolean; href?: string }) {
+function Card({ label, info, value, className, testId, note, loading, href }: { label: string; info?: ReactNode; value: string; className?: string; testId: string; note?: string; loading: boolean; href?: string }) {
   const body = (
     <>
-      <div className="label">{label}</div>
+      <div className="label">
+        {label}
+        {info}
+      </div>
       <div className={`value ${className ?? ""}`}>{loading ? <span className="skeleton-bar" /> : value}</div>
       {note && <div className="note muted">{note}</div>}
     </>
@@ -117,6 +121,11 @@ export function DashboardView() {
         <Card
           loading={sumLoading}
           label="XIRR"
+          info={
+            <InfoTip label="XIRR" testId="info-xirr" more="xirr">
+              <strong>XIRR</strong>: the annual return of your money, deposits and withdrawals on their days included (money-weighted). The Performance view's returns leave deposits out (time-weighted), to compare with the benchmarks.
+            </InfoTip>
+          }
           value={sum?.xirr != null ? fmtPct(sum.xirr * 100) : "–"}
           className={signClass(sum?.xirr)}
           testId="total-xirr"
