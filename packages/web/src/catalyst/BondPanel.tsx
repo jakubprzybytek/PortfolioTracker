@@ -243,6 +243,8 @@ export function CouponsTab({ row, detail, loading }: { row?: BondRow; detail: Bo
   if (!detail) return <p className="muted">{loading ? "Loading…" : ""}</p>;
   const now = today();
   if (detail.coupons.length === 0) return <p className="muted">{detail.terms?.periodsProblem ? `obligacje.pl's periods don't add up: ${detail.terms.periodsProblem}.` : "No interest periods (terms not read yet, or a treasury series: yearly coupons)."}</p>;
+  // "To" only when a period ends on another day than its coupon is paid (it rarely does): five date columns don't fit a phone.
+  const showEnd = detail.coupons.some((c) => c.end !== c.paymentDate);
   return (
     <div className="table-wrap">
       {row?.period && (
@@ -255,7 +257,7 @@ export function CouponsTab({ row, detail, loading }: { row?: BondRow; detail: Bo
         <thead>
           <tr>
             <th className="left">From</th>
-            <th className="left">To</th>
+            {showEnd && <th className="left">To</th>}
             <th className="left">Record day</th>
             <th className="left">Paid</th>
             <th>Rate</th>
@@ -266,7 +268,7 @@ export function CouponsTab({ row, detail, loading }: { row?: BondRow; detail: Bo
           {[...detail.coupons].sort((a, b) => b.start.localeCompare(a.start)).map((c) => (
             <tr key={c.start} className={c.start <= now && now < c.end ? "current" : undefined} title={c.start <= now && now < c.end ? "The current period" : undefined}>
               <td className="left">{c.start}</td>
-              <td className="left">{c.end}</td>
+              {showEnd && <td className="left">{c.end}</td>}
               <td className="left">{c.recordDate ?? "–"}</td>
               <td className="left">{c.paymentDate}</td>
               <td>{c.rate === undefined ? <span className="muted">–</span> : pct(c.rate)}</td>

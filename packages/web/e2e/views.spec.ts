@@ -1696,7 +1696,7 @@ test.describe("catalyst view", () => {
     views = [];
     await page.route("**/catalyst/bonds", (r) => r.fulfill({ contentType: "application/json", body: JSON.stringify(screen) }));
     await page.route("**/catalyst/bonds/PL*", (r) =>
-      r.fulfill({ contentType: "application/json", body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: { issuer: "Kruk S.A.", secured: false }, coupons: [{ start: "2020-08-12", end: "2020-11-12", paymentDate: "2020-11-12", rate: 0.07 }, { start: "2020-11-12", end: "2099-11-12", paymentDate: "2099-11-12", rate: 0.0713 }], market: "GPW ASO", sessions: [{ date: "2026-11-04", close: 100.9, trades: 2, turnover: 20000, nominal: 1000 }, { date: "2026-11-05", close: 101, trades: 1, turnover: 10000, nominal: 1000 }], quotes: [{ date: "2026-11-05", bid: { price: 100.8, volume: 50 }, ask: { price: 101.2, volume: 12 } }],
+      r.fulfill({ contentType: "application/json", body: JSON.stringify({ bond: { isin: "x", code: "KRU0829", maturity: "2029-08-12", firstSeen: "2024-01-02", markets: ["GPW ASO"] }, terms: { issuer: "Kruk S.A.", secured: false }, coupons: [{ start: "2020-08-12", end: "2020-11-12", recordDate: "2020-11-04", paymentDate: "2020-11-16", rate: 0.07 }, { start: "2020-11-12", end: "2099-11-12", paymentDate: "2099-11-12", rate: 0.0713 }], market: "GPW ASO", sessions: [{ date: "2026-11-04", close: 100.9, trades: 2, turnover: 20000, nominal: 1000 }, { date: "2026-11-05", close: 101, trades: 1, turnover: 10000, nominal: 1000 }], quotes: [{ date: "2026-11-05", bid: { price: 100.8, volume: 50 }, ask: { price: 101.2, volume: 12 } }],
             events: [{ published: "2026-05-04T08:30:00", action: "suspension", reason: "na wniosek emitenta", signal: "routine", from: "2026-05-05T00:00:00", to: null, inForce: false }],
             track: {
               company: null,
@@ -2049,6 +2049,11 @@ test.describe("catalyst view", () => {
     // ‹ does the same.
     await page.getByTestId("catalyst-row").filter({ hasText: "KRU0829" }).getByRole("button").first().click();
     await expect(bondPage).toBeVisible();
+    // The coupons (one paid after its period ends, so a "To" column too): the table scrolls, not the page and its tabs.
+    await page.getByTestId("catalyst-tab-coupons").click();
+    await expect(page.getByTestId("catalyst-coupons")).toContainText("To");
+    expect(await page.locator(".panel-page-body").evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
+    await page.getByTestId("catalyst-tab-price").click();
     await page.getByTestId("chart-panel-close").click();
     await expect(bondPage).toHaveCount(0);
     await expect(page).not.toHaveURL(/bond=/);

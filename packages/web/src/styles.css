@@ -981,6 +981,8 @@ td.cat-issuer { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; }
 .panel-page-title { flex: 1; min-width: 0; font-size: var(--fs-14); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .panel-page-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 12px max(16px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
 .panel-page .catalyst-panel > :not(.cat-tabs) { overflow: visible; flex: none; }
+/* …but a wide table scrolls on its own, not the page with the tabs. */
+.panel-page .catalyst-panel > .table-wrap { overflow-x: auto; }
 .panel-page .cat-tabs { align-self: stretch; overflow-x: auto; scrollbar-width: none; }
 .panel-page .cat-tabs > button { flex: 1 0 auto; white-space: nowrap; padding: 0 12px; }
 .panel-page .cat-price .cat-chart { height: clamp(240px, 46dvh, 440px); }
@@ -1241,5 +1243,5 @@ tr.outside:hover td { opacity: 0.85; }
 .cat-toggle-dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; box-sizing: border-box; flex: none; }
 .cat-toggle.on .cat-toggle-dot { background: currentColor; }
 .filters .cat-companies-found .muted { margin-left: auto; white-space: nowrap; }
-.cat-period-now { margin: 4px 0 12px; }
+.cat-period-now { margin: 0 0 8px; padding: 10px 12px 0; }
 .cat-period-now > p { margin: 6px 0 0; }
