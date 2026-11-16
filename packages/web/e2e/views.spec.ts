@@ -317,6 +317,24 @@ test.describe("adding transactions", () => {
     await page.keyboard.press("Escape");
   });
 
+  test("a listed bond's buy suggests the clean value plus accrued interest to settlement, and checks a typed amount", async ({ page }) => {
+    await page.goto("/#/transactions");
+    await expect(page.getByTestId("transaction-row").first()).toBeVisible();
+    await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-date").fill("2026-11-16");
+    await page.getByTestId("tx-account").selectOption("broker");
+    await page.getByTestId("tx-instrument").selectOption("PL0000113783");
+    await page.getByTestId("tx-quantity").fill("18");
+    await page.getByTestId("tx-price").fill("81,47");
+    // A broker's note: 18 × (814,70 + 9,92 accrued to the settlement on 18 Nov) = 14 843,16.
+    await expect(page.getByTestId("tx-amount")).toHaveValue("14843,16");
+    const hint = page.getByTestId("tx-accrued-hint");
+    await expect(hint).toContainText("accrued interest 9,92 a bond to the settlement on 2026-11-18");
+    await page.getByTestId("tx-amount").fill("14664,60"); // the clean value only
+    await expect(hint).toContainText("Implies 0,00 accrued interest a bond; the app calculates 9,92");
+    await page.keyboard.press("Escape");
+  });
+
   test("the instrument list waits for the account's transactions instead of showing every instrument first", async ({ page }) => {
     // Hold back the transactions (which instruments the account has had) until released.
     let release!: () => void;
@@ -553,14 +571,15 @@ test.describe("adding transactions", () => {
   test("suggests a bond buy's amount and finds a new treasury series by code; the server's objections show", async ({ page }) => {
     await page.goto("/#/transactions");
     await page.getByTestId("tx-add").click();
+    await page.getByTestId("tx-date").fill("2026-11-16"); // accrued interest to the settlement on 18 Nov: 9,92 a bond
     await page.getByTestId("tx-type").selectOption("BUY");
     await page.getByTestId("tx-account").selectOption("ike"); // has had DS0432 and EDO0935 (the list shows the account's own)
     await page.getByTestId("tx-instrument").selectOption({ label: "DS0432 · Obligacje skarbowe DS0432 (stałe 1,75 %)" });
     await page.getByTestId("tx-quantity").fill("10");
     await page.getByTestId("tx-price").fill("80,5");
-    await expect(page.getByTestId("tx-amount")).toHaveValue("8050"); // 10 × 80.5% × 1000
+    await expect(page.getByTestId("tx-amount")).toHaveValue("8149,2"); // 10 × (80.5% × 1000 + 9.92)
     await page.getByTestId("tx-fee").fill("16,10");
-    await expect(page.getByTestId("tx-summary")).toContainText("8 066,10 zł");
+    await expect(page.getByTestId("tx-summary")).toContainText("8 165,30 zł");
 
     await page.getByTestId("tx-instrument").selectOption("__new__");
     await page.getByTestId("tx-new-code").fill("EDO1036");

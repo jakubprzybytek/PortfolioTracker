@@ -1,3 +1,4 @@
+import { valueBondAtSettlement } from "@portfolio/core/bonds/accrued";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, apiSend } from "./api.ts";
 import { InstrumentPicker } from "./InstrumentPicker.tsx";
@@ -51,8 +52,20 @@ function unitValue(i: Instrument, price: number, paidIn: string, fx: number | un
   return price * rate;
 }
 
+/**
+ * A listed bond's accrued interest per bond for a trade on `date`: to its settlement day (T+2), as the broker's note
+ * charges it. Undefined when the app can't compute it: no terms (most corporate bonds), an indexed bond (needs the
+ * reference index), a period without a rate, or paid in another currency.
+ */
+function accruedAtSettlement(i: Instrument, date: string, paidIn: string): { perBond: number; settlementDate: string } | undefined {
+  if ((i.type !== "BOND_LISTED" && i.type !== "BOND_CORPORATE") || !i.terms || i.terms.couponType === "INDEXED" || paidIn !== i.currency) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
+  const v = valueBondAtSettlement(i.terms, date);
+  return v.problem ? undefined : { perBond: v.accruedInterest, settlementDate: v.settlementDate };
+}
+
 const priceLabel = (i: Instrument | undefined): string =>
-  !i ? "Price" : isBond(i) ? "Price, % of nominal" : i.type === "BOND_RETAIL" ? "Price per bond, PLN" : `Price, ${i.currency}`;
+  !i ? "Price" : isBond(i) ? "Clean price, % of nominal" : i.type === "BOND_RETAIL" ? "Price per bond, PLN" : `Price, ${i.currency}`;
 
 function Field({ label, children, hint, wide }: { label: string; children: ReactNode; hint?: ReactNode; wide?: boolean }) {
   return (
@@ -167,13 +180,15 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const p = parseNum(price);
   const fx = parseNum(fxRate);
   const f = parseNum(fee) ?? 0;
+  // Listed bonds: the accrued interest the buyer pays the seller on top of the clean price.
+  const accrued = inst && (type === "BUY" || type === "SELL") ? accruedAtSettlement(inst, date, cur) : undefined;
   // Suggested size of the amount: the trade value (buy: without the fee, which comes on top; sell: net of it).
   const suggested = useMemo(() => {
     if (!inst || !HAS_QUANTITY.has(type) || q === undefined || p === undefined) return undefined;
-    const value = q * unitValue(inst, p, cur, fx);
+    const value = q * (unitValue(inst, p, cur, fx) + (accrued?.perBond ?? 0));
     if (!Number.isFinite(value)) return undefined;
     return Math.round((type === "SELL" ? value - f : value) * 100) / 100;
-  }, [inst, type, q, p, fx, f, cur]);
+  }, [inst, type, q, p, fx, f, cur, accrued]);
   const amountShown = amountTouched ? amount : str(suggested);
   const size = parseNum(amountShown);
   // With tax paid, the amount typed is the gross and the net is stored.
@@ -188,6 +203,20 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
         ? -Math.abs(size)
         : Math.round((Math.abs(size) - t) * 100) / 100;
   const cashEffect = signed === undefined ? undefined : type === "BUY" ? signed - f : signed;
+  // The accrued interest per bond the amount implies (amount less the clean value), to check against the calculation.
+  const impliedAccrued =
+    accrued && size !== undefined && q && p !== undefined && inst
+      ? Math.round(((Math.abs(size) + (type === "SELL" ? f : 0)) / q - unitValue(inst, p, cur, fx)) * 100) / 100
+      : undefined;
+  const bondHint = !inst || !isBond(inst) || (type !== "BUY" && type !== "SELL")
+    ? undefined
+    : !accrued
+      ? type === "BUY"
+        ? "Suggested: price × nominal. Add accrued interest, as on your broker's note."
+        : undefined
+      : impliedAccrued === undefined || Math.abs(impliedAccrued - accrued.perBond) < 0.015
+        ? `Clean price + accrued interest ${fmtNum(accrued.perBond)} a bond to the settlement on ${accrued.settlementDate}${type === "SELL" ? ", less the fee" : ""}: as on your broker's note.`
+        : `Implies ${fmtNum(impliedAccrued)} accrued interest a bond; the app calculates ${fmtNum(accrued.perBond)} to the settlement on ${accrued.settlementDate}. Check it against your broker's note.`;
 
   async function lookup() {
     setFound(null);
@@ -460,7 +489,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                           ? "Gross amount (before tax)"
                           : "Amount"
                 }
-                hint={inst && isBond(inst) && type === "BUY" ? "Suggested: price × nominal. Add accrued interest, as on your broker's note." : undefined}
+                hint={bondHint && <span data-testid="tx-accrued-hint">{bondHint}</span>}
               >
                 <div className="with-currency">
                   <input
