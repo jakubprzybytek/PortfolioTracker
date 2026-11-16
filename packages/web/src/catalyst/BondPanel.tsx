@@ -1,6 +1,6 @@
 // A bond's panel in the Catalyst view: price and liquidity, the yield's make-up, the coupons, the issuer's track record.
 import { useState, type ReactNode } from "react";
-import { Area, Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { addDays, fmtInt, fmtNum, today } from "../format.ts";
 import { RangePicker } from "../RangePicker.tsx";
 import { useApi } from "../useApi.ts";
@@ -158,12 +158,6 @@ export function PriceTab({ row, detail, loading, range, setRange, busy, chart: w
               onTouchMove={(st) => setActive(indexOf(st))}
               onMouseLeave={() => setActive(null)}
             >
-              <defs>
-                <linearGradient id="bond-price-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.22} />
-                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <CartesianGrid stroke="var(--line)" vertical={false} />
               <XAxis dataKey="date" stroke="var(--muted)" {...timeAxisProps(axis)} />
               {/* Whole percents: "auto" picks fractional ticks (101.25) that don't fit the axis once prices pass 100. */}
@@ -173,8 +167,9 @@ export function PriceTab({ row, detail, loading, range, setRange, busy, chart: w
               {/* No box over the chart: the header shows the day pointed at; the cursor marks it. */}
               <Tooltip content={() => null} cursor={{ stroke: "var(--muted)", strokeDasharray: "3 3" }} isAnimationActive={false} />
               {yearLines(axis, "p")}
-              <Bar yAxisId="t" dataKey="turnover" name="turnover" fill="var(--line)" hide={hidden.has("turnover")} isAnimationActive={false} />
-              <Area yAxisId="p" dataKey="reference" name="price" stroke="var(--accent)" strokeWidth={1.75} fill="url(#bond-price-fill)" hide={hidden.has("price")} connectNulls isAnimationActive={false} />
+              <Line yAxisId="p" dataKey="reference" name="price" stroke="var(--accent)" strokeWidth={1.75} dot={false} activeDot={false} hide={hidden.has("price")} connectNulls isAnimationActive={false} />
+              {/* In the legend chip's grey (the grid's colour, --line, all but vanished); the price is a line, no fill to hide them. */}
+              <Bar yAxisId="t" dataKey="turnover" name="turnover" fill="var(--muted)" fillOpacity={0.45} maxBarSize={6} minPointSize={(v) => ((v ?? 0) > 0 ? 2 : 0)} hide={hidden.has("turnover")} isAnimationActive={false} />
               {/* A dot on each session with trades: the line between them is the last price carried over. */}
               <Line yAxisId="p" dataKey="close" name="traded" stroke="none" dot={{ r: 2, fill: "var(--accent)", stroke: "none" }} activeDot={false} legendType="none" hide={hidden.has("price")} isAnimationActive={false} />
               <Line yAxisId="p" dataKey="bid" name="bid" stroke="var(--pos)" dot={false} strokeDasharray="4 3" connectNulls hide={hidden.has("bid")} isAnimationActive={false} />

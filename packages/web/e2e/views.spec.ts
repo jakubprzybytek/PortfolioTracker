@@ -2007,6 +2007,8 @@ test.describe("catalyst view", () => {
     const series = page.getByTestId("catalyst-series");
     const lines = page.getByTestId("catalyst-chart").locator(".recharts-line");
     const before = await lines.count();
+    // The price is a line: no filled area over the bid, ask and turnover.
+    await expect(page.getByTestId("catalyst-chart").locator(".recharts-area")).toHaveCount(0);
     await series.getByRole("button", { name: "Bid" }).click();
     await expect(series.getByRole("button", { name: "Bid" })).toHaveAttribute("aria-pressed", "false");
     await expect(lines).toHaveCount(before - 1);
