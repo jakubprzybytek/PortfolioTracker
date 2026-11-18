@@ -48,6 +48,11 @@ import {
   type HoldSellAssumptions,
   type RetailTerms,
   TargetsInput,
+  RegionTargetsInput,
+  RegionWeightsInput,
+  compactWeights,
+  type FundRegions,
+  type RegionTargets,
   type Targets,
   ASSET_CLASSES,
   defaultAssetClass,
@@ -226,6 +231,8 @@ async function treasurySeries(code: string): Promise<InstrumentInput | undefined
 const HOLD_SELL_SETTING = "holdSell";
 /** Where the target allocation is kept (settings). */
 const TARGETS_SETTING = "targets";
+/** Where the target share per region is kept (settings). */
+const REGION_TARGETS_SETTING = "regionTargets";
 
 /** The retail series on sale on `day` (core/holdsell, retailOffers), from the Ministry file's series in `market`. */
 const retailOffersOn = (day: string): Promise<RetailTerms[]> =>
@@ -458,6 +465,24 @@ const ROUTES: Record<string, Route> = {
     await repo.putInstrument({ ...rest, ...(assetClass ? { assetClass } : {}) });
     await queueValuation({ reason: "asset class changed", isins: [isin] });
     return json(200, { isin, assetClass: assetClass ?? rule, set: !!assetClass });
+  },
+  "PUT /instruments/{isin}/regions": async ({ event, isin }) => {
+    // { regions }: the fund's split across world regions (% adding up to 100), typed from its factsheet, kept with
+    // today's date; null removes it. Read at request time (GET /regions), so nothing is revalued.
+    if (!isin || !ISIN.test(isin)) return json(400, { error: "Invalid ISIN" });
+    const inst = await repo.getInstrument(isin);
+    if (!inst) return json(404, { error: "Unknown instrument" });
+    const body = bodyOf(event) as { regions?: unknown } | undefined;
+    const { PK: _p, SK: _s, GSI1PK: _g, GSI1SK: _gs, updatedAt: _u, regions: _r, regionsAsOf: _ra, ...rest } = inst;
+    if (body?.regions === null) {
+      await repo.putInstrument(rest);
+      return json(200, { isin, regions: null });
+    }
+    const parsed = RegionWeightsInput.safeParse(body?.regions);
+    if (!parsed.success) return json(400, { error: `regions: ${parsed.error.issues.map((i) => `${i.path.join(".") || ""}${i.path.length ? ": " : ""}${i.message}`).join("; ")}` });
+    const kept: FundRegions = { regions: compactWeights(parsed.data), regionsAsOf: today() };
+    await repo.putInstrument({ ...rest, ...kept });
+    return json(200, { isin, ...kept });
   },
   "GET /instruments/{isin}/coupons": async ({ isin }) => {
     // The bond's periods (oldest first), with the coupons you received matched to them: the rate each implies and
@@ -728,6 +753,25 @@ const ROUTES: Record<string, Route> = {
     const parsed = TargetsInput.safeParse(body);
     if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
     await repo.putSetting(TARGETS_SETTING, parsed.data);
+    return json(200, { targets: parsed.data });
+  },
+  "GET /regions": async () => {
+    // The equity funds' regions (by ISIN, from the instruments) and the target per region (null until set); the app
+    // sums them over the latest snapshot's holdings (core/regions).
+    const funds: Record<string, FundRegions> = {};
+    for (const i of await repo.listInstruments()) if (i.regions) funds[i.isin] = { regions: i.regions, regionsAsOf: i.regionsAsOf ?? "" };
+    return json(200, { funds, targets: (await repo.getSetting<RegionTargets>(REGION_TARGETS_SETTING)) ?? null });
+  },
+  "PUT /regions/targets": async ({ event }) => {
+    // The targets per region to keep; { reset: true } removes them.
+    const body = bodyOf(event) as Record<string, unknown> | undefined;
+    if (body?.["reset"] === true) {
+      await repo.deleteSetting(REGION_TARGETS_SETTING);
+      return json(200, { targets: null });
+    }
+    const parsed = RegionTargetsInput.safeParse(body);
+    if (!parsed.success) return json(400, { error: parsed.error.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ") });
+    await repo.putSetting(REGION_TARGETS_SETTING, parsed.data);
     return json(200, { targets: parsed.data });
   },
   "GET /quality": async () => {

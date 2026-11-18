@@ -69,6 +69,7 @@ GSI1PK = INSTRUMENT         GSI1SK = <ISIN>
 | `pricePath` | Foreign bonds at IBKR (`BOND_IBKR`, `nominal` 1000) without a quote (`venue = CALC`: US T-bills, matured bonds): known prices `[{ date, price }]` (% of nominal: your trades, redemption at maturity); the backfill writes a price per weekday in between at a constant yield. Quoted ones have `venue = XSTU`, `sourceIds.onvista = "STU"` |
 | `splits` | ETFs: `[{ "date": "2025-12-15", "ratio": 100 }]`: from `date` on one unit became `ratio` units. Prices are stored as traded; charts and the 1-year change divide earlier prices by later splits (`core/prices/splits.ts`) |
 | `assetClass` | `SHARES` / `BONDS` / `CASH` / `OTHER`, only when set by hand and different from the rule (by type; an ETF with "bond" in its name = bonds; `assetClassOf` in `core/valuation/history.ts`). The valuation copies it into the day's holdings (`assetClass` there too), so the allocation charts (`byClass`) follow it; changing it revalues the instrument from its first transaction |
+| `regions`, `regionsAsOf` | Equity funds: the split across world regions in % (`US`, `EUROPE`, `JAPAN`, `EM`, `OTHER`, adding up to 100; regions at 0 left out), typed in the app (Dashboard, Regions, "Funds") from the factsheet, and the day it was typed. Read at request time by `GET /regions` (not copied into holdings, nothing revalued). Exists nowhere else: in the monthly backup (`instruments.json`), and an instrument import without them keeps the stored ones |
 | `active` | `false` once sold/matured (jobs skip inactive instruments) |
 | bonds only | `nominal` (face value), `coupon_type` (`FIXED` / `FLOATING` / `INDEXED`), `coupon_rate` or `margin` + `reference_rate`, `maturity`, `coupon_schedule` (period start/end, payment date); IZ bonds also `base_ref` (e.g. IZ0836: 194.28509) and `issue_date` |
 | retail bonds only | `series` (e.g. `EDO0936`), `first_rate`, `margin`, `redemption_fee` |
@@ -215,7 +216,7 @@ GSI1PK = NOTE               GSI1SK = <note_id>
 PK = SETTING#<name>         SK = META
 ```
 
-`value`, `updatedAt`: choices made in the app that aren't data, e.g. `holdSell` (the Buy, hold or sell assumptions: `cpi`, `wibor`, `nbpRate`, `alternative`, `altRate`, `commission`; deleted to go back to the defaults) and `targets` (the target allocation: `targets` and `bands` per asset class, in %; deleted by "Remove targets") and `feedToken` (the spreadsheet link: `hash` (SHA-256 of the token, never the token), `createdAt`, `lastUsedAt`; replaced by "Create new link", deleted by "Revoke"; ui.md, "Access"). Not in the monthly backup (set again in a minute).
+`value`, `updatedAt`: choices made in the app that aren't data, e.g. `holdSell` (the Buy, hold or sell assumptions: `cpi`, `wibor`, `nbpRate`, `alternative`, `altRate`, `commission`; deleted to go back to the defaults) and `targets` (the target allocation: `targets` and `bands` per asset class, in %; deleted by "Remove targets"), `regionTargets` (the same per region: `US`, `EUROPE`, `JAPAN`, `EM`, `OTHER`) and `feedToken` (the spreadsheet link: `hash` (SHA-256 of the token, never the token), `createdAt`, `lastUsedAt`; replaced by "Create new link", deleted by "Revoke"; ui.md, "Access"). Not in the monthly backup (set again in a minute).
 
 ### Planned (not built): settings you enter
 

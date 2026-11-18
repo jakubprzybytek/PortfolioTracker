@@ -19,6 +19,7 @@ describe("exportFiles", () => {
       inst({ isin: "PL0000116798", type: "BOND_RETAIL", code: "EDO0332", retail: {} as never }),
       inst({ isin: "PL0000115865", type: "BOND_LISTED", code: "DS0432", terms: {} as never }),
       inst({ isin: "ZZRZESZOW000", type: "FUND_MANUAL", venue: "MANUAL" }),
+      inst({ isin: "IE00B3RBWM25", type: "ETF", code: "VWRL", venue: "XAMS", regions: { US: 64.6, EUROPE: 15.2, JAPAN: 5, EM: 10.2, OTHER: 5 }, regionsAsOf: "2026-11-18" }),
       inst({ isin: "MF-TERMS", type: "FUND_MANUAL" }),
     ],
     manualPrices: [{ isin: "ZZRZESZOW000", venue: "MANUAL", date: "2026-10-01", close: 1050, currency: "PLN" } as PriceItem],
@@ -39,10 +40,13 @@ describe("exportFiles", () => {
     expect(files.accounts).toEqual([{ account: "eur", baseCurrency: "EUR" }]);
     const instruments = parseInstrumentFile(JSON.stringify(files.instruments));
     expect(instruments.map((i) => [i.code, i.terms ?? null])).toEqual([
+      ["VWRL", null],
       ["DS0432", "mf"],
       ["EDO0332", "mf-retail"],
       ["ZZRZESZOW000", null],
     ]);
+    // regions typed by hand exist nowhere else: kept in the backup
+    expect(instruments[0]).toMatchObject({ regions: { US: 64.6, EUROPE: 15.2, JAPAN: 5, EM: 10.2, OTHER: 5 }, regionsAsOf: "2026-11-18" });
     expect(parseManualPrices(JSON.stringify(files.prices), "restore").map((p) => [p.SK, p.close])).toEqual([["PX#MANUAL#2026-10-01", 1050]]);
     expect(parseCouponPeriods(JSON.stringify(files.coupons))).toEqual([
       { isin: "PLKRK0000713", start: "2026-08-12", end: "2026-11-12", recordDate: "2026-11-03", paymentDate: "2026-11-12", datesSource: "obligacje.pl", rate: 0.0713, rateSource: "manual" },

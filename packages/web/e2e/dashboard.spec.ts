@@ -139,6 +139,70 @@ test.describe("dashboard", () => {
     expect((await page.getByTestId("portfolio-chart").boundingBox())!.height).toBe(260);
   });
 
+  test("regions: set a fund's regions under Funds, the bar and legend follow; targets per region and the calculator; then remove them", async ({ page }) => {
+    const panel = page.getByTestId("region-mix");
+    await expect(panel).toBeVisible();
+    const fundsToggle = page.getByTestId("region-funds-toggle");
+    if ((await fundsToggle.getAttribute("aria-expanded")) !== "true") await fundsToggle.click();
+    const spxs = page.getByTestId("region-fund-SPXS");
+    await expect(spxs).toBeVisible();
+    // Start without regions or targets (a run before may have left them)
+    if ((await page.getByTestId("region-fund-SPXS-edit").textContent()) === "Edit") {
+      await page.getByTestId("region-fund-SPXS-edit").click();
+      await page.getByTestId("region-remove").click();
+    }
+    await expect(page.getByTestId("region-fund-SPXS-edit")).toHaveText("Set");
+    await expect(spxs).toContainText("not set");
+    await expect(page.getByTestId("region-missing")).toContainText("SPXS");
+    const edit = page.getByTestId("region-targets-edit");
+    if ((await edit.textContent()) === "Edit targets") {
+      await edit.click();
+      await page.getByTestId("region-targets-remove").click();
+    }
+    await expect(edit).toHaveText("Set targets");
+
+    // A fund's regions must add up to 100%
+    await page.getByTestId("region-fund-SPXS-edit").click();
+    await page.getByTestId("region-input-US").fill("90");
+    await expect(page.getByTestId("region-save")).toBeDisabled();
+    await expect(page.getByTestId("region-sum")).toContainText("must be 100%");
+    await page.getByTestId("region-input-US").fill("100");
+    await expect(page.getByTestId("region-sum")).toContainText("100% ✓");
+    await page.getByTestId("region-save").click();
+    await expect(page.getByTestId("region-fund-SPXS-regions")).toHaveText("US 100%");
+    await expect(page.getByTestId("region-missing")).toHaveCount(0);
+    await expect(page.getByTestId("region-mix-US")).toContainText("100,0%");
+
+    // Targets per region: the legend compares, the calculator sends new money to the regions below target
+    await edit.click();
+    for (const [k, v] of [["US", "60"], ["EUROPE", "20"], ["JAPAN", "5"], ["EM", "10"], ["OTHER", "5"]] as const) await page.getByTestId(`region-targets-${k}-target`).fill(v);
+    await expect(page.getByTestId("region-targets-sum")).toHaveText("100% ✓");
+    await page.getByTestId("region-targets-save").click();
+    await expect(page.getByTestId("region-mix-US-target")).toHaveText("of 60%");
+    await expect(page.getByTestId("region-mix-US-diff")).toHaveText("+40,0 pp");
+    await expect(page.getByTestId("region-mix-US-diff")).toHaveClass(/neg/);
+    await expect(panel.locator(".mix-target")).toHaveCount(4);
+    const toggle = page.getByTestId("region-targets-rebalance");
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+    await page.getByTestId("region-targets-amount").fill("1000");
+    await expect(page.getByTestId("region-targets-US-trade")).toHaveText("–");
+    await expect(page.getByTestId("region-targets-EUROPE-trade")).toHaveText(/^buy/);
+
+    // On a phone the panel and the funds fit the screen
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(await panel.evaluate((p) => p.scrollWidth <= p.clientWidth + 1)).toBe(true);
+    const box = (await panel.boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+
+    // Clean up: no targets, no regions
+    await edit.click();
+    await page.getByTestId("region-targets-remove").click();
+    await expect(edit).toHaveText("Set targets");
+    await page.getByTestId("region-fund-SPXS-edit").click();
+    await page.getByTestId("region-remove").click();
+    await expect(page.getByTestId("region-fund-SPXS-edit")).toHaveText("Set");
+  });
+
   test("shows the allocation by asset type and by currency", async ({ page }) => {
     await expect(page.getByTestId("alloc-type-CASH")).toContainText("Cash");
     await expect(page.getByTestId("alloc-type-ETF")).toBeVisible();
@@ -172,7 +236,7 @@ test.describe("dashboard", () => {
       await page.getByTestId("targets-remove").click();
     }
     await expect(edit).toHaveText("Set targets");
-    await expect(page.locator(".mix-target")).toHaveCount(0);
+    await expect(page.getByTestId("asset-mix").locator(".mix-target")).toHaveCount(0);
     await expect(page.getByTestId("targets-rebalance")).toHaveCount(0);
 
     // The form, in the panel: the targets must add up to 100%
@@ -189,7 +253,7 @@ test.describe("dashboard", () => {
     // The legend: each class's share, its target and the difference; ticks on the bar where shares' and bonds' targets end
     await expect(page.getByTestId("asset-mix-SHARES-target")).toHaveText("of 60%");
     await expect(page.getByTestId("asset-mix-SHARES-diff")).toHaveText(/^[+−]\d+,\d\spp$/);
-    await expect(page.locator(".mix-target")).toHaveCount(2);
+    await expect(page.getByTestId("asset-mix").locator(".mix-target")).toHaveCount(2);
     const shares = await page.getByTestId("asset-mix").locator("li strong").allTextContents();
     expect(Math.abs(shares.reduce((s, t) => s + num(t), 0) - 100)).toBeLessThan(0.5);
 

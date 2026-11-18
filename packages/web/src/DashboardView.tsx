@@ -9,6 +9,7 @@ import { RangePicker } from "./RangePicker.tsx";
 import type { AccountSummary, HistoryPoint, Snapshot, Status } from "./types.ts";
 import { useApi } from "./useApi.ts";
 import { RefreshPrices } from "./RefreshPrices.tsx";
+import { RegionsPanel } from "./Regions.tsx";
 import { AssetMixPanel } from "./Targets.tsx";
 import type { YearsResponse } from "./Returns.tsx";
 
@@ -155,6 +156,11 @@ export function DashboardView() {
 
       <h2>Accounts</h2>
       <AccountsTable data={summaries} />
+
+      <h2>
+        Regions <span className="muted chart-legend">shares by where the companies are; bond ETFs left out</span>
+      </h2>
+      {snap ? <RegionsPanel snapshot={snap} /> : holdings.loading && <div className="asset-mix"><Skeleton height={14} testId="region-mix-skeleton" /></div>}
 
       <h2>Allocation</h2>
       {snap ? <Allocation snapshot={snap} /> : holdings.loading && <Skeleton height={230} testId="allocation-skeleton" />}

@@ -33,6 +33,7 @@ export function instrumentInput(i: InstrumentItem): InstrumentInput {
     ...(i.pricePath?.length ? { pricePath: i.pricePath } : {}),
     ...(i.splits?.length ? { splits: i.splits } : {}),
     ...(i.assetClass ? { assetClass: i.assetClass } : {}),
+    ...(i.regions ? { regions: i.regions, ...(i.regionsAsOf ? { regionsAsOf: i.regionsAsOf } : {}) } : {}),
   };
 }
 

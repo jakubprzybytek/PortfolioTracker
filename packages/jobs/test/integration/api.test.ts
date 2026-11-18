@@ -700,6 +700,39 @@ describe(`API ${API}`, () => {
     expect((await get<Body>("/targets")).body.targets).toBeNull();
   });
 
+  it("PUT /instruments/{isin}/regions keeps a fund's regions with today's date, GET /regions returns them; null removes them", async () => {
+    type Body = { funds: Record<string, { regions: Record<string, number>; regionsAsOf: string }>; targets: unknown };
+    await send("PUT", `/instruments/${SPXS}/regions`, { regions: null });
+    expect((await get<Body>("/regions")).body.funds[SPXS]).toBeUndefined();
+    expect((await send("PUT", `/instruments/${SPXS}/regions`, { regions: { US: 90 } })).status).toBe(400); // not 100%
+    expect((await send("PUT", `/instruments/${SPXS}/regions`, { regions: { US: 90, MARS: 10 } })).status).toBe(400);
+    expect((await send("PUT", `/instruments/ZZNOSUCHONE0/regions`, { regions: { US: 100 } })).status).toBe(404);
+    const put = await send<{ regions: Record<string, number>; regionsAsOf: string }>("PUT", `/instruments/${SPXS}/regions`, { regions: { US: 99.5, EUROPE: 0.5, EM: 0 } });
+    expect(put.status).toBe(200);
+    expect(put.body.regions).toEqual({ US: 99.5, EUROPE: 0.5 }); // zeros left out
+    expect(put.body.regionsAsOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const { status, body } = await get<Body>("/regions");
+    expect(status).toBe(200);
+    expect(body.funds[SPXS]).toEqual({ regions: put.body.regions, regionsAsOf: put.body.regionsAsOf });
+    // the instrument keeps its other fields
+    expect((await get<{ isin: string; sourceIds: Record<string, string> }[]>("/instruments")).body.find((i) => i.isin === SPXS)?.sourceIds).toMatchObject({ yahoo: expect.any(String) });
+    await send("PUT", `/instruments/${SPXS}/regions`, { regions: null });
+    expect((await get<Body>("/regions")).body.funds[SPXS]).toBeUndefined();
+  });
+
+  it("PUT /regions/targets keeps the targets per region (adding up to 100%), GET /regions returns them, reset removes them", async () => {
+    type Body = { targets: { targets: Record<string, number>; bands: Record<string, number> } | null };
+    await send("PUT", "/regions/targets", { reset: true });
+    expect((await get<Body>("/regions")).body.targets).toBeNull();
+    const bands = { US: 3, EUROPE: 3, JAPAN: 2, EM: 2, OTHER: 2 };
+    expect((await send("PUT", "/regions/targets", { targets: { US: 60, EUROPE: 20, JAPAN: 5, EM: 10, OTHER: 10 }, bands })).status).toBe(400);
+    const targets = { US: 60, EUROPE: 20, JAPAN: 5, EM: 10, OTHER: 5 };
+    expect((await send("PUT", "/regions/targets", { targets, bands })).status).toBe(200);
+    expect((await get<Body>("/regions")).body.targets).toEqual({ targets, bands });
+    await send("PUT", "/regions/targets", { reset: true });
+    expect((await get<Body>("/regions")).body.targets).toBeNull();
+  });
+
   it("rejects bad input", async () => {
     expect((await get("/instruments/not-an-isin/prices")).status).toBe(400);
     expect((await get("/nope")).status).toBe(404);

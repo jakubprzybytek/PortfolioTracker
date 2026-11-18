@@ -2,6 +2,7 @@
 // or, for Polish treasury series, resolved from the imported Ministry of Finance calculator by code.
 
 import { z } from "zod";
+import { RegionWeightsInput } from "../regions/regions.ts";
 import { ASSET_CLASSES } from "../valuation/history.ts";
 
 const CouponPeriod = z.object({
@@ -47,6 +48,9 @@ export const InstrumentInput = z.object({
   splits: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), ratio: z.number().positive() })).optional(),
   /** Asset class, when it differs from the rule (by type; an ETF with "bond" in its name = bonds). */
   assetClass: z.enum(ASSET_CLASSES).optional(),
+  /** Equity funds: the split across world regions (% adding up to 100) and the day it was typed. */
+  regions: RegionWeightsInput.optional(),
+  regionsAsOf: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 export type InstrumentInput = z.output<typeof InstrumentInput>;
 

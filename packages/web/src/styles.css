@@ -538,6 +538,14 @@ td .ccy { color: var(--muted); font-weight: 400; }
 .mix-BONDS { background: var(--mix-bonds); }
 .mix-CASH { background: var(--mix-cash); }
 .mix-OTHER { background: var(--mix-other); }
+/* Regions: categorical slots 1–5 (validated for both themes: dataviz validate_palette.js) */
+:root { --region-us: #2a78d6; --region-europe: #eb6834; --region-japan: #1baf7a; --region-em: #eda100; --region-other: #e87ba4; }
+@media (prefers-color-scheme: dark) { :root { --region-us: #3987e5; --region-europe: #d95926; --region-japan: #199e70; --region-em: #c98500; --region-other: #d55181; } }
+.region-US { background: var(--region-us); }
+.region-EUROPE { background: var(--region-europe); }
+.region-JAPAN { background: var(--region-japan); }
+.region-EM { background: var(--region-em); }
+.region-OTHER { background: var(--region-other); }
 @media (max-width: 720px) {
   td.instrument { min-width: 12rem; }
   /* Cards two per row: smaller figures so 1 577 174,28 zł fits. */
@@ -1249,3 +1257,23 @@ tr.outside:hover td { opacity: 0.85; }
 .filters .cat-companies-found .muted { margin-left: auto; white-space: nowrap; }
 .cat-period-now { margin: 0 0 8px; padding: 10px 12px 0; }
 .cat-period-now > p { margin: 6px 0 0; }
+
+/* Regions: notes, the funds and a fund's regions */
+.asset-mix .region-note { margin: 8px 0 0; font-size: var(--fs-13); }
+.region-funds table { width: 100%; }
+.region-funds td { vertical-align: top; }
+.region-funds .sub { display: block; font-size: 0.85em; }
+.region-fund .sub { max-width: 22rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.region-funds th:nth-child(2), .region-funds td:nth-child(2), .region-funds td:nth-child(2) .sub { text-align: left; }
+.mix-actions-left { display: inline-flex; gap: 20px; }
+.region-funds td.region-edit { text-align: right; width: 1%; }
+.region-form { margin-top: 8px; }
+.region-inputs { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.region-inputs label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-14); }
+.region-inputs .with-unit { display: inline-flex; align-items: center; gap: 4px; }
+.region-inputs input { font: inherit; width: 4.5rem; height: var(--ctl); box-sizing: border-box; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--fg); text-align: right; }
+.region-form .hint { margin: 8px 0; }
+@media (max-width: 720px) {
+  .region-fund .sub { max-width: 12rem; }
+  .region-funds td, .region-funds th { white-space: normal; }
+}

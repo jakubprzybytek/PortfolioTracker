@@ -405,11 +405,14 @@ export default $config({
     api.route("POST /feed-token", apiHandler, auth);
     api.route("DELETE /feed-token", apiHandler, auth);
     api.route("PUT /targets", apiHandler, auth);
+    api.route("GET /regions", apiHandler, auth);
+    api.route("PUT /regions/targets", apiHandler, auth);
     api.route("GET /instruments/{isin}/prices", apiHandler, auth);
     api.route("GET /instruments/{isin}/transactions", apiHandler, auth);
     api.route("POST /instruments/{isin}/prices", apiHandler, auth);
     api.route("DELETE /instruments/{isin}/prices/{date}", apiHandler, auth);
     api.route("PUT /instruments/{isin}/asset-class", apiHandler, auth);
+    api.route("PUT /instruments/{isin}/regions", apiHandler, auth);
     api.route("GET /instruments/{isin}/coupons", apiHandler, auth);
     api.route("POST /instruments/{isin}/coupons", apiHandler, auth);
     api.route("PUT /instruments/{isin}/coupons/{start}", apiHandler, auth);

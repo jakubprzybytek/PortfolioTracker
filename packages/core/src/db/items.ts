@@ -3,6 +3,7 @@
 import type { IsoDate } from "../dates.ts";
 import type { BondTerms } from "../bonds/terms.ts";
 import type { RetailTerms } from "../mf/retailRates.ts";
+import type { RegionWeights } from "../regions/regions.ts";
 import type { AssetClass } from "../valuation/history.ts";
 
 export type InstrumentType = "BOND_LISTED" | "BOND_CORPORATE" | "BOND_RETAIL" | "ETF" | "BOND_IBKR" | "FUND_MANUAL" | "CURRENCY" | "CASH";
@@ -34,6 +35,9 @@ export interface InstrumentItem {
   splits?: Split[];
   /** Asset class set by hand, when it differs from the rule (`assetClassOf`: by type, an ETF with "bond" in its name = bonds). */
   assetClass?: AssetClass;
+  /** Equity funds: the split across world regions in % (typed by hand from the factsheet; core/regions), and the day it was typed. */
+  regions?: RegionWeights;
+  regionsAsOf?: IsoDate;
   updatedAt: string;
 }
 

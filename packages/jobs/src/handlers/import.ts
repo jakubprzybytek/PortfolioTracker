@@ -118,7 +118,9 @@ export async function importInstruments(json: string) {
       ...(i.assetClass && i.assetClass !== defaultAssetClass(i) ? { assetClass: i.assetClass } : {}),
     };
     const before = await repo.getInstrument(i.isin);
-    await repo.putInstrument(item);
+    // Regions are typed in the app and exist nowhere else: from the file (a backup) when it has them, else the stored ones.
+    const regions = i.regions ? { regions: i.regions, ...(i.regionsAsOf ? { regionsAsOf: i.regionsAsOf } : {}) } : before?.regions ? { regions: before.regions, ...(before.regionsAsOf ? { regionsAsOf: before.regionsAsOf } : {}) } : {};
+    await repo.putInstrument({ ...item, ...regions });
     written++;
     // Start the history backfill for an instrument that never had one (new, or missed before). Instruments
     // without a price source (retail bonds: values are calculated) have no history to load.
