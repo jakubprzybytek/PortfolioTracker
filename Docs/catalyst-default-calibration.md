@@ -34,7 +34,7 @@ Other things changed on dev on the way:
 - **Granbero Holdings Limited** was made a company through a name of that name (not a listed name), the only way the
   agent can create a company from an LEI. It has no industry: scored on its own it uses the general rules.
 - The names "Ghelamco Invest Sp. z o.o." and "Kemberton Sp. z o.o." now point at Granbero for their financials; their
-  status went from `confirmed` to `resolved` (the agent's link). The owner may confirm them again.
+  status went from `confirmed` to `resolved` (the agent's link). The same happened on prod (finding 11).
 
 ## What the rules said before each default
 
@@ -83,7 +83,8 @@ are stored on dev: `catalyst entity <id>` lists them.
 ## On prod (2026-11-21)
 
 The owner moved the study to prod (no dev agent token on the machine). Everything below was written by the agent
-through the CLI (`--stage prod`, dry run first), from documents stored with `catalyst documents put`.
+through the CLI (`--stage prod`, dry run first, except one: the GetBack auditor's report went up through
+`documents put` without a dry run), from documents stored with `catalyst documents put`.
 
 | Issuer | Company id | Stored on prod | Not done |
 |---|---|---|---|
@@ -137,12 +138,20 @@ more reds: 4 of 41 (10%): BBI Development, Cavatina Holding, Cognor, Vehis.
 10. **Recording events:** the app treats a second event of the same kind on the same date (and bonds) as a duplicate,
     so two missed payments on one day need distinct bonds (`isins`) or one event. The art. 233 KSH vote (Ghelamco ESPI
     34/2026) still has no kind: stored as a document and named in the `reviewed` text.
+11. **Linking a financing vehicle resets the owner's confirmation.** The API works a name's status out again on every
+    save from who saves it (`api.ts`, `PUT /catalyst/names/{name}`): the owner's save gives `confirmed`, the agent's
+    `resolved` (names agree) or `review`. Adding `--financials` to Ghelamco Invest and Kemberton turned `confirmed` into
+    `resolved`; the links are right and the scores don't depend on the label. **The app has no way to confirm a
+    name** (Docs/catalyst.md says the owner confirms `review` names, but no screen calls the endpoint), and the agent
+    can't (its token only gives `resolved` or `review`). Candidates: a Confirm button for names in the Issuers view;
+    keep `confirmed` when the agent only adds a financing link to a confirmed name.
 
 ## To resume
 
 1. **Owner (prod):** set Capitea's and Kancelaria Medius's kind to *debt collector*; download from the KRS repository
-   Kania's FY2018 single report and Medius's FY2018 and FY2017 group reports (all on the checklist). Optionally
-   confirm the Ghelamco Invest and Kemberton names again (now linked to Granbero).
+   (https://rdf-przegladarka.ms.gov.pl, search by KRS number) Kania's FY2018 single report (KRS 0000053415) and
+   Medius's FY2018 and FY2017 group reports (KRS 0000397680), all on the checklist. The repository was down on
+   2026-11-21. Put the files in one folder; the agent runs `catalyst filings sort` on it and imports them.
 2. GetBack: read the scorecard on collector rules once the kind is set; import FY2017 only as a late, after-default
    comparison.
 3. Kania: import FY2018 from the checklist (and FY2017); find the June 2019 ESPI on series F (Bankier lists can't be
@@ -151,6 +160,7 @@ more reds: 4 of 41 (10%): BBI Development, Cavatina Holding, Cognor, Vehis.
 5. Ghelamco and Kemberton: read the bond terms and store the schedules before any judgement.
 6. Gant: make it a company (LEI or KRS), import FY2012 and FY2011 from the reports as published.
 7. **The table** once the reports are in: each defaulter's colours one and two years before, against the survivors
-   above; then decide on thresholds and the candidate rule changes (findings 2, 4 and 6).
+   above; then decide on thresholds and the candidate rule changes (findings 2, 4 and 6), and on the name
+   confirmation (finding 11).
 8. More defaulters for the sample, from the press lists (PBG, Vivid Games, Braster, Uboat-Line, Religa Development,
    GC Investment, Europejskie Centrum Odszkodowań, Fast Finance).
