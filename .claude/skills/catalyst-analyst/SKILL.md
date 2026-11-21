@@ -14,8 +14,10 @@ analysis, end to end".
 
 - Run commands as `npx catalyst <command> --stage <stage> --by <your model id>` (prod unless the owner says otherwise; the CLI itself defaults to dev, so always pass `--stage prod`).
   Output is JSON; add `--table` to show the owner.
-- **No token?** The CLI says so. Ask the owner to make one in the app (Catalyst → the cog → "AI agent's token") and
-  to run `! npx catalyst login --stage <stage>` themselves. Never ask for the token, never read the CLI's settings
+- **No token?** The CLI says so. Ask the owner to make one in the app (Catalyst → the cog → the agent's tokens),
+  named after this machine or routine (each machine has its own; making one doesn't revoke the others), and to run
+  `! npx catalyst login --stage <stage> --from-clipboard` themselves after "Copy" (or without the flag, at a hidden
+  prompt in a terminal). Never ask for the token, never read the CLI's settings
   folder, never put a token in a file, a command or the chat.
 - **Limits:** at most **5 companies per session** unless the owner says otherwise. Never touch bonds, prices or
   any market data. Never `--force` an import without asking. Every write goes `--dry-run` first.
@@ -30,7 +32,7 @@ analysis, end to end".
    it on in the app. Items marked `who: "you"` are the owner's (a lender's kind, a download, a link to confirm):
    tell them, don't do them. Take one company and do its items in this order.
 
-2. **Identity (§5):** `catalyst identity resolve "<listed name>"` prints GLEIF and KRS candidates with evidence
+2. **Identity (§5):** `catalyst identity resolve "<listed name>"` (or `--lei <lei>` / `--krs <krs>`) prints GLEIF and KRS candidates with evidence
    (the name's bonds' ISIN mapping, a full-text search). Weigh renames, mergers and financing vehicles (a guarantee
    in the bond terms: the group's reports are the ones that count). Then
    `catalyst identity set "<listed name>" --entity <id> | --lei <lei> --evidence "<what shows it>" [--financials <group id>]`.
@@ -50,7 +52,12 @@ analysis, end to end".
      site's sitemap (named in robots.txt, usually `/sitemap.xml`). It often lists every report page, and those
      pages may be allowed when the list isn't. Filter by keywords in the URL (`obligacj`, `wykup`, `odsetk`,
      `zgromadzen`) rather than fetching everything. It gives pages, not their attachments: a PDF under a
-     disallowed path is still the owner's to download.
+     disallowed path is still the owner's to download. WordPress sites split it: `/wp-sitemap.xml` names e.g.
+     `/wp-sitemap-posts-raporty-1.xml` (Kancelaria Medius's reports, whose year filter is script-driven).
+   - **The checklist:** once the owner has downloaded a report on it and you've imported it, close it:
+     `catalyst checklist --set <id> <year> <scope> imported` (or `not-available` when the repository has none).
+   - **Fair figures:** use a year as it was first published. Preliminary or unaudited figures, and a column
+     restated in a later report, are a fallback: say so in the judgement.
    - **Half-year reports** (`kind: "interim"` in `catalyst work`): only for the companies it lists (bonds due within
      24 months, or debt service, liquidity or refinancing yellow or red), or when the owner asks. The same accounts
      (group or single) as the year, under the same standard. Quarterly reports only when asked.
@@ -67,6 +74,8 @@ analysis, end to end".
      a year.
    - **Refused:** read the checks, fix the transcript (a misread amount, a wrong column, a missing line), try
      again. Never `--force` without asking the owner.
+   - **After storing:** `catalyst entity <id> --lines` shows each year's lines as stored; check a few totals
+     against the report.
 
 6. **No report at all**, and an operating company: `catalyst figures put <id> --file fig.json` (`schema figures`),
    avoiding §9's failure modes: part years as years, today's date as the year end, the wrong unit, the wrong
@@ -91,11 +100,30 @@ analysis, end to end".
      `catalyst bonds schedule <code> --file schedule.json --document <terms file>` (`catalyst schema schedule`:
      `issuedNominal`, `instalments` as `{ date, nominalAfter }` oldest first, `[]` when it's repaid at maturity in
      one go, `source`, `quote`). Refinancing then counts the instalments on their dates.
+   - **Covenants:** for each issue, from its terms: each financial ratio with its threshold and test dates, and
+     the **headroom** against the latest report computed with the issue's own definition (net debt / equity or
+     net debt / EBITDA there is often defined differently from the scorecard's: say which you used); limits on
+     dividends, buy-backs and new debt, negative pledge, change of control, reporting and listing duties
+     (a late report can itself be a breach), cross-default; and what a breach gives bondholders (early
+     redemption on demand, after a cure period or not). Write them in the judgement until the app stores
+     covenants (§18 item 12). A thin headroom goes under **Watch**.
    - **Question the greens.** All green is a reason to look harder, not to stop. For lenders: is profit
      revaluation rather than cash (net profit above revenue; operating cash flow near zero)? Are dividends paid
      from new debt (dividends paid vs operating cash flow and borrowings raised)? Is the collateral the group's own
      assets (its own funds' certificates), and how close is its cover to the covenant floor? Is the item you'd
-     "watch" already settled in a current report?
+     "watch" already settled in a current report? What the defaults so far taught
+     (`Docs/catalyst-default-calibration.md`):
+     - profit-based metrics (debt service, profitability) stayed green a year before GetBack defaulted; liquidity
+       and equity were the reds, with bonds raised far above bonds redeemed and operating cash flow negative
+       against a profit. Weigh a lender's liquidity and equity reds above its green ICR;
+     - a developer's debt burden leaves out property **held for sale** (Ghelamco: 294m EUR), so that red can be
+       overstated: check the balance sheet and say so;
+     - changed terms, a meeting to move a maturity and a late report counted as a breach came months before each
+       default: they outweigh good ratios.
+   - **The market's view:** `catalyst bonds --entity <id> --table` shows each bond's premium over treasuries
+     (floating: over WZ). Reading it is fine (you never write market data). A high premium with greens, or a low
+     one with reds, is a mismatch the judgement should explain in a sentence (§11, "Risk vs premium"); a premium
+     widening or a bond that stopped trading is a reason to look (§13, "Market signals").
 
    - **Payments (§11, "Repayment track record"):** when `catalyst work` lists `kind: "payments"`, or before any
      judgement: read the company's current reports (ESPI for listed shares or bonds on the regulated market, EBI for
@@ -103,7 +131,26 @@ analysis, end to end".
      `track.reviewedTo` gives (never read: the last three years, and further for a bond that ended oddly). Look for
      *niewykupienie*, *niedokonanie wykupu*, *nieterminowa wypłata odsetek*, *zgromadzenie obligatariuszy*, *zmiana
      warunków emisji*, *naruszenie kowenantów*, *wniosek o otwarcie postępowania restrukturyzacyjnego / o ogłoszenie
-     upadłości*, and for *wykup obligacji* / *terminowy wykup* confirming a payment. For each one found:
+     upadłości*, and for *wykup obligacji* / *terminowy wykup* confirming a payment. Each becomes one of the kinds
+     (`catalyst schema event`); the track record shows the first six as red flags:
+
+     | Kind | When |
+     |---|---|
+     | `missed-payment` | interest or principal not paid on its date (`resolvedOn` when paid later) |
+     | `late-payment` | paid, but after its date |
+     | `terms-changed` | maturity extended, coupon or schedule changed, collateral released |
+     | `covenant-breach` | a covenant breached, including a late periodic report when the terms make it one |
+     | `insolvency` | restructuring or bankruptcy filed or opened (arrangement, sanation, bankruptcy) |
+     | `buyback-below-par` | the issuer bought its bonds back below par |
+     | `bondholders-meeting` | a meeting called (say what for in `text`); its outcome is its own event |
+     | `waiver` | bondholders agreed not to treat something as a breach |
+     | `paid` | a maturity or call redeemed on time |
+     | `reviewed` | the closing note (below) |
+
+     A shareholders' resolution on continued existence (art. 233 KSH, losses above half the capital) has no kind
+     yet: store the report, name it as a red flag in the judgement and in the `reviewed` event's text, and tell the
+     owner. Before recording, `catalyst events list <id>` shows what's already there (never record one twice).
+     For each one found:
      1. save the report (the page as `.html`, or its PDF) and store it: `catalyst documents put <id> <file> --kind
         current-report --date <its date> --title "ESPI 14/2019: …" --source <url>`;
      2. write `event.json` (`catalyst schema event`): `kind`, `date` (the payment's due date or the meeting's, not
