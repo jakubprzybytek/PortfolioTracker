@@ -1,8 +1,9 @@
-# Catalyst: testing the rules on past defaults (on hold)
+# Catalyst: testing the rules on past defaults
 
-**Status: on hold since 2026-11-10.** Started 2026-11-09 to answer: *do the scorecard's rules flag issuers that later
-failed to pay, and can those cases calibrate the thresholds?* (methodology §18 item 8). Everything below is on the
-**dev** stage only. Prod holds none of it.
+**Status: resumed on prod on 2026-11-21** (section "On prod", below). Started 2026-11-09 on dev to answer: *do the
+scorecard's rules flag issuers that later failed to pay, and can those cases calibrate the thresholds?* (methodology
+§18 item 8), on hold from 2026-11-10. The sections up to "Sources used" describe the dev run; prod was redone from the
+issuers' own documents and now holds more than dev.
 
 ## The question and the method
 
@@ -79,17 +80,77 @@ Other things changed on dev on the way:
 The downloads and transcripts were in the session's scratchpad and are gone. The imported originals and their lines
 are stored on dev: `catalyst entity <id>` lists them.
 
+## On prod (2026-11-21)
+
+The owner moved the study to prod (no dev agent token on the machine). Everything below was written by the agent
+through the CLI (`--stage prod`, dry run first), from documents stored with `catalyst documents put`.
+
+| Issuer | Company id | Stored on prod | Not done |
+|---|---|---|---|
+| Granbero Holdings Limited | `LEI:259400N6KJN8H4A5L316` | Made a company through the name "Granbero Holdings Limited"; industry Developer. Consolidated FY2025 (+FY2024) and H1 2026 (+H1 2025), PDF transcripts, all checks passed | – |
+| Ghelamco Invest | `0000185773` | Name linked to Granbero for its financials (evidence: FY2025 statements p.63, "The bonds are secured by a redemption surety granted by Granbero Holdings Ltd."): the owner's `confirmed` became the agent's `resolved`. Events: ESPI 6/2026 *paid* (PZ1–PZ3), ESPI 30/2026 two *covenant breaches* (H1 report late; Groen Lawendowa proceeds used against the terms, not disclosed promptly), *reviewed* to 2026-11-21. Documents: ESPI 6, 30, 31, 32, 34/2026 | Bond terms of the 7 listed issues (judgement gap); no judgement |
+| Kemberton | `0000690847` | Name linked to Granbero, as Ghelamco. Events: ESPI 26/2026 *covenant breach* (5m EUR from outside the group not paid by 2026-09-30), 29/2026 *waiver* (on Ghelamco Group NV's 50m EUR support), 32/2026 *waiver* (consent to sell Vibe II, proceeds to redeem K1 first), 33/2026 *terms changed* (early-redemption notice cut to 1 day), *reviewed*. Documents: those four | Terms of K1; no judgement |
+| Capitea (GetBack) | `0000413997` | Industry Finance (the kind is the owner's). **Consolidated FY2016 (+FY2015) as published 2017-03-30** (capitea.pl archive): the fair test. Auditor's report stored (scanned, not read: no page rendering on the machine). Events: ESPI 51/2018 *missed payment* (88.26m zł nominal and 3.32m zł interest unpaid at 2018-04-25), 60/2018 and 64/2018 *insolvency* (accelerated arrangement filed 2 May, opened 9 May 2018), 51/2019 *terms changed* (arrangement approved), *reviewed* | **Kind "debt collector" (owner)**: until then it is out of scope and unscored |
+| ZM Henryk Kania | `0000053415` | Industry Manufacturing. FY2018 and FY2017 **collected figures** (the report's selected data only, from its Bankier page): they don't feed the scorecard. FY2018 single on the **owner's checklist** (Bankier's attachments answer 404). Events: ESPI 7/2019 *bondholders' meeting* (series F, to move the maturity), ESPI 24/2020 *insolvency* (bankruptcy 2020-06-18), *reviewed* | The June 2019 ESPI on series F not redeemed and F/H interest unpaid: only press copies found, so not recorded |
+| Kancelaria Medius | `0000397680` | Industry Finance. Events: EBI 18/2020 *missed payment* (series L interest, 2020-04-06), EBI 20, 25, 26/2020 *missed payments* (M, P, O instalments), EBI 23/2020 *bondholders' meeting* (series N, event of default), ESPI 14 and 15/2020 *insolvency* (arrangement filed 11 May, opened 29 May 2020), *reviewed*. One event retracted (ESPI 7/2020 recorded as a missed payment; it is the decision to stop paying). FY2018 and FY2017 group on the **owner's checklist** | Kind (owner); EBI 24/2019 (M and O maturities +12 months: no date on the page); EBI 23/2020 and ESPI 15/2020 dated from their neighbours (the pages show no date) |
+| Gant Development | – | Nothing: not a company in the app | As on dev |
+
+### What the rules say (prod)
+
+| Issuer | Figures | Debt burden | Debt service | Liquidity | Profitability | Asset coverage | Refinancing |
+|---|---|---|---|---|---|---|---|
+| Ghelamco Invest | Granbero FY2025 + H1 2026, developer | red (ND/(inv.+IP) 2.35×) | red (ICR −10.1×) | red (CR 0.90×) | red | yellow (equity ratio 34.9%) | red (cash covers 0.12× of 124m EUR due in 12 months) |
+| Kemberton | the same | red | red | red | red | yellow | **green** (its own K1 is due 2031) |
+| GetBack | FY2016, **general** rules (dry run; the kind isn't set) | red (D/E 2.35×, ND/EBITDA 3.47×) | green (ICR 5.26×) | **green** (current ratio 2.13×) | green (EBIT margin 55.5%) | yellow (equity ratio 23.7%) | green (no listed bond then) |
+| Kania | FY2018 selected data (not scored) | – | – | – | EBIT margin 10.3%, net profit 64.4m zł | equity ratio 30.1% | – |
+| Medius | none yet | | | | | | |
+
+**The survivors on prod** (41 scored issuers other than these, 2026-11-21; rule sets: 13 developer, 10 general,
+6 consumer, 5 collector, 4 leasing, 3 contractor), how often each colour appears:
+
+| Dimension | red | yellow | green |
+|---|---|---|---|
+| Debt burden | 6 | 8 | 27 |
+| Debt service | 8 | 12 | 21 |
+| Liquidity | 8 | 13 | 18 (2 n/a) |
+| Profitability | 11 | 10 | 20 |
+| Asset coverage | 4 | 9 | 28 |
+| Refinancing | 13 | 3 | 25 |
+
+Reds per survivor: none 18, one 11, two 4, three 4, four 2, five 1 (BBI Development), six 1 (Vehis Finanse). Four or
+more reds: 4 of 41 (10%): BBI Development, Cavatina Holding, Cognor, Vehis.
+
+### Findings from the prod run
+
+6. **A financing vehicle's refinancing counts only its own bonds.** Kemberton is red on everything Granbero is, but
+   green on refinancing because K1 is due in 2031, while the same guarantor has 124m EUR of Ghelamco bonds due within
+   12 months at 0.12× cash cover. A candidate rule: a vehicle's refinancing counts every listed bond its guarantor's
+   group owes.
+7. **The rule set decides GetBack.** On general rules FY2016 shows one red (debt burden); liquidity is green because
+   debt portfolios are current assets. On collector rules, applied by hand on dev, liquidity is red (cash / debt due
+   in 12 months 0.17). The owner setting the kind is what makes the test fair.
+8. **Kania looks fine on what was published** (EBIT margin 10.3%, equity ratio 30.1%, positive operating cash flow
+   48.2m zł in FY2018) two months before it missed series F: the auditor's refusal of an opinion is the signal, as
+   expected. Collected figures don't reach the scorecard (only imported reports do).
+9. **Five reds is rare among survivors** (2 of 41: BBI Development, Vehis), and Ghelamco has them on FY2025 + H1 2026
+   (on dev, FY2025 alone, published in April 2026, already gave five reds). Refinancing red alone is common (13 of 41) and weak on its own.
+10. **Recording events:** the app treats a second event of the same kind on the same date (and bonds) as a duplicate,
+    so two missed payments on one day need distinct bonds (`isins`) or one event. The art. 233 KSH vote (Ghelamco ESPI
+    34/2026) still has no kind: stored as a document and named in the `reviewed` text.
+
 ## To resume
 
-1. **Owner:** set Capitea's kind to *debt collector* on dev; download Medius's FY2018 consolidated report from the
-   KRS repository (it's on the checklist).
-2. GetBack: the FY2016 report as published in 2017, then the scorecard on collector rules.
-3. Kania: FY2018 (and FY2017) annual report; the June 2019 ESPI on series F and H; record the missed payments.
-4. Medius: FY2018 from the checklist, FY2017; record EBI 24/2019 once its date is found (NewConnect's archive).
-5. Gant: make it a company (LEI or KRS), import FY2012 and FY2011 from the reports as published.
-6. A `reviewed` event for each issuer.
-7. **The table:** for each defaulter, each dimension's colour one and two years before; for the 43 scored survivors,
-   how often the same colours appear. Then decide whether any threshold moves, and the two candidate rule changes
-   (findings 2 and 4).
+1. **Owner (prod):** set Capitea's and Kancelaria Medius's kind to *debt collector*; download from the KRS repository
+   Kania's FY2018 single report and Medius's FY2018 and FY2017 group reports (all on the checklist). Optionally
+   confirm the Ghelamco Invest and Kemberton names again (now linked to Granbero).
+2. GetBack: read the scorecard on collector rules once the kind is set; import FY2017 only as a late, after-default
+   comparison.
+3. Kania: import FY2018 from the checklist (and FY2017); find the June 2019 ESPI on series F (Bankier lists can't be
+   read; try GPW's or the company's archive) and record the missed payments.
+4. Medius: import FY2018 and FY2017; date and record EBI 24/2019.
+5. Ghelamco and Kemberton: read the bond terms and store the schedules before any judgement.
+6. Gant: make it a company (LEI or KRS), import FY2012 and FY2011 from the reports as published.
+7. **The table** once the reports are in: each defaulter's colours one and two years before, against the survivors
+   above; then decide on thresholds and the candidate rule changes (findings 2, 4 and 6).
 8. More defaulters for the sample, from the press lists (PBG, Vivid Games, Braster, Uboat-Line, Religa Development,
    GC Investment, Europejskie Centrum Odszkodowań, Fast Finance).
