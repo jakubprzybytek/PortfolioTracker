@@ -12,7 +12,7 @@
     "@aws-sdk/client-s3": "^3.1169.0",
     "@aws-sdk/lib-dynamodb": "^3.1169.0",
     "fast-xml-parser": "^5.12.1",
-    "pdfjs-dist": "^4.10.38",
+    "pdfjs-dist": "^6.4.299",
     "xlsx": "file:../../vendor/xlsx-0.20.3.tgz",
     "zod": "^4.6.7"
   }
