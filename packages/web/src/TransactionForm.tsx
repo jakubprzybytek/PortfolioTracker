@@ -178,7 +178,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
 
   // Retail bonds are bought and redeemed at 100 PLN (a rollover buy is cheaper: change it).
   useEffect(() => {
-    if (inst?.type === "BOND_RETAIL" && (type === "BUY" || type === "REDEMPTION") && !price) setPrice("100");
+    if (inst?.type === "BOND_RETAIL" && HAS_QUANTITY.has(type) && !price) setPrice("100");
   }, [inst, type, price]);
 
   const q = parseNum(quantity);
@@ -200,8 +200,10 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const taxed = TAXED.has(type);
   const taxPaid = taxed ? parseNum(tax) : undefined;
   const t = taxPaid !== undefined && Number.isFinite(taxPaid) ? Math.abs(taxPaid) : 0;
-  // A redemption with its last interest: the amount is the principal, the tax comes off the interest (a coupon).
-  const withInterest = type === "REDEMPTION" && !editing;
+  // All interest is a coupon (the Wiki's "Redemptions and interest"): a redemption, or a retail bond's early one (a
+  // sale), takes its interest here; the amount is then the principal and the tax comes off the interest.
+  const earlyRetail = type === "SELL" && inst?.type === "BOND_RETAIL";
+  const withInterest = (type === "REDEMPTION" || earlyRetail) && !editing;
   const gi = withInterest ? parseNum(interest) : undefined;
   const interestGross = gi !== undefined && Number.isFinite(gi) && gi !== 0 ? Math.abs(gi) : 0;
   const interestNet = Math.round((interestGross - t) * 100) / 100;
@@ -309,10 +311,10 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           amount: interestNet,
           currency: cur,
           ...(t ? { tax: t } : {}),
-          note: note.trim() ? `${note.trim()} (interest paid with the redemption)` : "Interest paid with the redemption",
+          note: `${note.trim() ? `${note.trim()} ` : ""}${earlyRetail ? "Interest paid with the early redemption" : "Interest paid with the redemption"}`,
         });
       } else await apiSend("POST", "/transactions", tx);
-      onSaved(editing ? "Transaction updated." : interestGross ? "Redemption and its interest added." : "Transaction added.");
+      onSaved(editing ? "Transaction updated." : interestGross ? `${earlyRetail ? "Sale" : "Redemption"} and its interest added.` : "Transaction added.");
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -361,13 +363,13 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           <Field
             label="Type"
             hint={
-              type === "REDEMPTION" || type === "COUPON" ? (
+              type === "REDEMPTION" || type === "COUPON" || earlyRetail ? (
                 <span>
                   Interest at maturity, rollovers{" "}
                   <InfoTip label="Redemptions and interest" testId="info-redemption" more="redemption">
-                    Bonds that <strong>pay interest out</strong> (COI, ROR, DOR, listed bonds): the principal as a Redemption at 100, the last interest as a coupon (the field below
-                    does both), like the earlier interest. Bonds that <strong>add interest to the bond</strong> (EDO, ROS, ROD, TOS): one Redemption, the interest in the amount. A
-                    rollover (<em>zamiana</em>): the redemption, then a Buy of the new series at the rollover price.
+                    <strong>Interest is always a coupon</strong>, whatever the bond (COI, EDO, listed …): the Redemption, or the Sale of an early redemption, is the principal at
+                    100, and the interest paid with it a coupon with its tax. The field "Interest paid with it" saves both. An early redemption's fee taken from the principal: a fee
+                    on the sale. A rollover (<em>zamiana</em>): the redemption, then a Buy of the new series at the rollover price.
                   </InfoTip>
                 </span>
               ) : undefined
@@ -541,8 +543,10 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 label={
                   type === "BUY"
                     ? "Amount paid (without the fee)"
-                    : type === "SELL"
-                      ? `Amount received (after the fee${t ? ", before tax" : ""})`
+                    : type === "SELL" && interestGross
+                      ? "Principal (without the interest, after the fee)"
+                      : type === "SELL"
+                        ? `Amount received (after the fee${t ? ", before tax" : ""})`
                       : type === "EXCHANGE"
                         ? "You gave"
                         : interestGross
@@ -581,7 +585,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
               {withInterest && (
                 <Field
                   label={`Interest paid with it, gross, ${cur} (optional)`}
-                  hint={interestGross ? "Saved as a coupon of its own; the tax below comes off it" : "COI, ROR, DOR, listed bonds: the last interest. Saved as a coupon, like the earlier ones"}
+                  hint={interestGross ? "Saved as a coupon of its own; the tax below comes off it" : "The interest the statement shows (after an early redemption's fee). Saved as a coupon"}
                 >
                   <input inputMode="decimal" value={interest} onChange={(e) => setInterest(e.target.value)} data-testid="tx-interest" />
                 </Field>

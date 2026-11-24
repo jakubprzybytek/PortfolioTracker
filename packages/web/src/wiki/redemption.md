@@ -1,39 +1,41 @@
 # Redemptions and interest
 
-When a bond matures, its owner gets the principal back plus the last interest. This page explains how to enter that. Whichever way you choose, the portfolio's value, profit and XIRR come out the same. The only difference is where the interest shows: in the holding's **Coupons**, or as a **realised gain** in Sales. Choose by the kind of bond, so each holding's interest stays in one place.
+When a bond matures, or you redeem it early, you get the principal back with the interest still owed. The app records these two separately, the same way for every bond:
 
-## Bonds that pay interest out: COI, ROR, DOR, listed bonds
+- **the principal**: a **Redemption** at maturity, or a **Sell** when redeemed early. Price 100, the amount is number of bonds × nominal, no tax;
+- **the interest**: a **Coupon** with the gross amount and the tax withheld (none on IKE/IKZE).
 
-These pay interest every month or year, and you enter each payment as a **Coupon**. Enter the last payment the same way:
+On a new Redemption, or a Sell of a retail bond, the **Interest paid with it** field saves both at once.
 
-- a **Redemption** of the principal: the number of bonds, price 100, no tax;
-- a **Coupon** with the last interest: the gross amount and the tax withheld.
+## Why interest is always a coupon
 
-On a new Redemption, the **Interest paid with it** field saves both at once.
+- **It is income, not a gain on the bond.** Coupons go into the holding's Coupons column, Income by year and the income part of the profit breakdown. A bond bought at 100 and paid back at 100 has no capital gain. If the interest were inside the redemption, it would show in Sales as a realised gain instead.
+- **One rule for every bond.** COI, ROR and DOR pay interest every month or year, and the last payment is no different. EDO, ROS, ROD and TOS pay all their interest at the end: it is still interest, taxed at source like the rest. Listed bonds have always worked this way: coupons, then the redemption at 100.
+- **Sales then shows only real capital results**: an early redemption's fee, or the 10 grosz of a rollover discount.
 
-This keeps all of the holding's interest under Coupons. The redemption has no gain, because the bonds were bought at 100 and are redeemed at 100. If you put the interest inside the Redemption instead, the last year's interest would show as a realised gain in Sales, apart from the earlier years'.
+Profit, value and XIRR don't depend on the choice; only where the interest shows does. The interest of an EDO, ROS, ROD or TOS counts as income in the year it is paid out, which is when you get it and pay its tax. Until then it is part of the holding's unrealised gain.
 
-Example: 236 COI bonds redeemed on 14 November 2026. Redemption 236 × 100 = 23,600 zł. Interest 920.40 zł, tax 174.88 zł: the Coupon saved is 745.52 zł.
+## Examples
 
-## Bonds that add interest to the bond: EDO, ROS, ROD, TOS
+**COI at maturity**: 236 bonds redeemed on 14 November 2026, interest 920.40 zł, tax 174.88 zł.
+- Redemption: 236 × 100 = 23,600 zł.
+- Coupon: 920.40 zł gross, 174.88 zł tax, so 745.52 zł is saved.
 
-These pay nothing until the end, and the bank pays the bond's grown value in one sum. Enter it as one **Redemption**:
-
-- the number of bonds;
-- the price: the value per bond, e.g. 131.52;
-- the amount: the gross total, with the tax in the tax field.
-
-The interest is the redemption's gain over the cost. It shows in Sales, marked as not in PIT-38, because the tax was withheld at source.
+**EDO redeemed early on IKE**: 1,202 bonds paid out at 131.52 zł each.
+- Sell: 1,202 × 100 = 120,200 zł.
+- Coupon: 37,887.04 zł, no tax.
 
 ## Early redemption
 
-Before maturity, the bank deducts a fee per bond from the interest. Enter it as above, by the kind of bond, with the interest the statement shows after the fee. The fee is already deducted, so leave the fee field empty. A **Sell** at the same values works too: the app treats a sell and a redemption alike.
+The bank deducts a fee per bond from the interest. The Coupon is the interest as the statement shows it, after the fee.
+
+If the interest was smaller than the fee, the rest comes out of the principal: the statement pays, for example, 99.50 zł a bond. Enter that as a Sell at 100 with the difference in the **fee** field (0.50 × number of bonds). The cash is the same, and the fee shows as a cost.
 
 ## Rollover (zamiana)
 
-A rollover pays the old series out and buys a new one with the money, at the rollover price (*cena zamiany*). This is 99.90 zł for EDO instead of 100 zł. Enter two things:
+A rollover pays the old series out and buys a new one with the money, at the rollover price (*cena zamiany*). This is 99.90 zł for EDO instead of 100 zł. Enter it in two steps:
 
-1. the redemption of the old series, as above;
+1. the redemption of the old series and its interest, as above;
 2. a **Buy** of the new series:
    - the date: the day the old series matured, which is also when the new one starts earning interest;
    - the price: the rollover price;
@@ -41,7 +43,7 @@ A rollover pays the old series out and buys a new one with the money, at the rol
 
 The new bonds can't cost more than the money paid out, so a few złoty are left over. The bank pays them to your account. If the app keeps cash for that account, enter a **Withdrawal** of what's left.
 
-Example: 236 COI bonds rolled over into 243 EDO on 14 November 2026. 23,600 zł principal + 745.52 zł interest after tax = 24,345.52 zł. The buy is 243 × 99.90 = 24,275.70 zł, and 69.82 zł is left over.
+Example: 236 COI rolled over into 243 EDO on 14 November 2026. 23,600 zł + 745.52 zł = 24,345.52 zł paid out. The buy is 243 × 99.90 = 24,275.70 zł, and 69.82 zł is left over.
 
 ## A new month's series
 

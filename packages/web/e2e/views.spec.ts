@@ -605,6 +605,12 @@ test.describe("adding transactions", () => {
     await page.getByTestId("tx-tax").fill("174,88");
     await expect(page.getByTestId("tx-summary")).toContainText("24 345,52 zł");
     await expect(page.getByTestId("tx-summary")).toContainText("23 600,00 principal + 920,40 interest − 174,88 tax");
+    // An early redemption of a retail bond (a sale) takes its interest the same way; a listed bond's sale doesn't.
+    await page.getByTestId("tx-type").selectOption("SELL");
+    await expect(page.getByTestId("tx-interest")).toBeVisible();
+    await expect(page.getByTestId("info-redemption")).toBeVisible();
+    await page.getByTestId("tx-instrument").selectOption({ label: "DS0432 · Obligacje skarbowe DS0432 (stałe 1,75 %)" });
+    await expect(page.getByTestId("tx-interest")).toHaveCount(0);
 
     // Server-side check: a deposit with nothing in it.
     await page.getByTestId("tx-type").selectOption("DEPOSIT");
