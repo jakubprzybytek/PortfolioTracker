@@ -1,6 +1,7 @@
 import { valueBondAtSettlement } from "@portfolio/core/bonds/accrued";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, apiSend } from "./api.ts";
+import { InfoTip } from "./InfoTip.tsx";
 import { InstrumentPicker } from "./InstrumentPicker.tsx";
 import { TX_TYPE_LABELS, addDays, fmtMoney, fmtNum, parseNum, today, typeLabel } from "./format.ts";
 import type { AccountSummary, Instrument, Transaction, TransactionRow } from "./types.ts";
@@ -98,6 +99,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   // With tax withheld the field shows the gross: the stored (net) amount plus the tax.
   const [amount, setAmount] = useState(editing ? str(Math.round((Math.abs(editing.amount) + (editing.tax ?? 0)) * 100) / 100) : "");
   const [tax, setTax] = useState(str(editing?.tax));
+  // A redemption's last interest, gross (new ones only): saved as a coupon of its own, the tax withheld from it.
+  const [interest, setInterest] = useState("");
   const [amountTouched, setAmountTouched] = useState(!!editing);
   const [ratio, setRatio] = useState(str(editing?.ratio));
   // The currency of the amount and the fee (an account's own currency by default); an exchange's other side.
@@ -113,6 +116,8 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const [kind, setKind] = useState<NewKind>("treasury");
   const [fields, setFields] = useState({ code: "", isin: "", ticker: "", name: "", currency: "EUR", nominal: "1000" });
   const [found, setFound] = useState<{ text: string; ok: boolean } | null>(null);
+  // The treasury series "Find" found, not tracked yet (added on save): it drives the price, amount and interest date.
+  const [pending, setPending] = useState<Instrument | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -147,7 +152,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   // Loading until both the instruments and the account's own are known, so the list never shows every instrument for
   // a moment before narrowing (if the transactions fail to load, every instrument, as before).
   const listLoading = (instruments.loading && !instruments.data) || (!onAccount && txs.loading);
-  const inst = list.find((i) => i.isin === isin);
+  const inst = list.find((i) => i.isin === isin) ?? (isin === NEW && kind === "treasury" && pending?.code === fields.code.trim().toUpperCase() ? pending : undefined);
   const retailBuy = inst?.type === "BOND_RETAIL" && type === "BUY";
   const needsInstrument = NEEDS_INSTRUMENT.has(type);
   // Default currency: in an account kept in several currencies (IBKR), a trade in the instrument's currency and the
@@ -171,9 +176,9 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
     };
   }, [foreign, inst, date, fxRate, editing]);
 
-  // Retail bonds are bought at 100 PLN.
+  // Retail bonds are bought and redeemed at 100 PLN (a rollover buy is cheaper: change it).
   useEffect(() => {
-    if (inst?.type === "BOND_RETAIL" && type === "BUY" && !price) setPrice("100");
+    if (inst?.type === "BOND_RETAIL" && (type === "BUY" || type === "REDEMPTION") && !price) setPrice("100");
   }, [inst, type, price]);
 
   const q = parseNum(quantity);
@@ -195,14 +200,19 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
   const taxed = TAXED.has(type);
   const taxPaid = taxed ? parseNum(tax) : undefined;
   const t = taxPaid !== undefined && Number.isFinite(taxPaid) ? Math.abs(taxPaid) : 0;
+  // A redemption with its last interest: the amount is the principal, the tax comes off the interest (a coupon).
+  const withInterest = type === "REDEMPTION" && !editing;
+  const gi = withInterest ? parseNum(interest) : undefined;
+  const interestGross = gi !== undefined && Number.isFinite(gi) && gi !== 0 ? Math.abs(gi) : 0;
+  const interestNet = Math.round((interestGross - t) * 100) / 100;
   const signed = NO_AMOUNT.has(type)
     ? 0
     : size === undefined
       ? undefined
       : MONEY_OUT.has(type)
         ? -Math.abs(size)
-        : Math.round((Math.abs(size) - t) * 100) / 100;
-  const cashEffect = signed === undefined ? undefined : type === "BUY" ? signed - f : signed;
+        : Math.round((Math.abs(size) - (interestGross ? 0 : t)) * 100) / 100;
+  const cashEffect = signed === undefined ? undefined : type === "BUY" ? signed - f : interestGross ? Math.round((signed + interestNet) * 100) / 100 : signed;
   // The accrued interest per bond the amount implies (amount less the clean value), to check against the calculation.
   const impliedAccrued =
     accrued && size !== undefined && q && p !== undefined && inst
@@ -220,16 +230,26 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
 
   async function lookup() {
     setFound(null);
+    setPending(null);
     try {
-      const r = await api<{ tracked: boolean; instrument: Instrument }>("/instruments/lookup", { code: fields.code });
+      const r = await api<{ tracked: boolean; instrument: Instrument }>("/instruments/lookup", { code: fields.code.trim() });
       if (r.tracked) {
         setIsin(r.instrument.isin);
         setFound({ text: `${r.instrument.code} is already tracked: selected.`, ok: true });
-      } else setFound({ text: `${r.instrument.name} · ${r.instrument.isin} · added when you save`, ok: true });
+      } else {
+        // Not saved yet: valued like a tracked one in the form (active: what a new instrument starts as).
+        setPending({ ...r.instrument, active: true });
+        setFound({ text: `${r.instrument.name} · ${r.instrument.isin} · added when you save`, ok: true });
+      }
     } catch (e) {
       setFound({ text: (e as Error).message, ok: false });
     }
   }
+  /** Quantity, price or rate changed: the amount follows the trade again (type over it last to set your own). */
+  const tradeInput = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setter(e.target.value);
+    setAmountTouched(false);
+  };
 
   async function save() {
     setError(null);
@@ -240,6 +260,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
       if (v !== undefined && !Number.isFinite(v)) return setError(`${label}: not a number`);
     if (!NO_AMOUNT.has(type) && signed === undefined) return setError("Enter the amount");
     if (t && signed !== undefined && signed < 0) return setError("Tax paid is more than the gross amount");
+    if (interestGross && interestNet < 0) return setError("Tax paid is more than the interest");
     if (type === "WRITE_OFF" && !(q !== undefined && q > 0)) return setError("Enter how many units are written off");
     const got = parseNum(toAmount);
     if (type === "EXCHANGE" && (got === undefined || !Number.isFinite(got) || got <= 0)) return setError("Enter what you got");
@@ -276,8 +297,22 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
         ...(note.trim() ? { note: note.trim() } : {}),
       };
       if (editing) await apiSend("PUT", `/transactions/${editing.id}`, tx, { account: editing.account, date: editing.date });
-      else await apiSend("POST", "/transactions", tx);
-      onSaved(editing ? "Transaction updated." : "Transaction added.");
+      else if (interestGross) {
+        // Two transactions: the principal back (no tax), and the interest as a coupon with the tax withheld from it.
+        const { tax: _t, ...principal } = tx;
+        await apiSend("POST", "/transactions", principal);
+        await apiSend("POST", "/transactions", {
+          date,
+          account: acct,
+          type: "COUPON",
+          isin: instrumentIsin,
+          amount: interestNet,
+          currency: cur,
+          ...(t ? { tax: t } : {}),
+          note: note.trim() ? `${note.trim()} (interest paid with the redemption)` : "Interest paid with the redemption",
+        });
+      } else await apiSend("POST", "/transactions", tx);
+      onSaved(editing ? "Transaction updated." : interestGross ? "Redemption and its interest added." : "Transaction added.");
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -323,7 +358,21 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           <Field label="Date">
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required data-testid="tx-date" />
           </Field>
-          <Field label="Type">
+          <Field
+            label="Type"
+            hint={
+              type === "REDEMPTION" || type === "COUPON" ? (
+                <span>
+                  Interest at maturity, rollovers{" "}
+                  <InfoTip label="Redemptions and interest" testId="info-redemption" more="redemption">
+                    Bonds that <strong>pay interest out</strong> (COI, ROR, DOR, listed bonds): the principal as a Redemption at 100, the last interest as a coupon (the field below
+                    does both), like the earlier interest. Bonds that <strong>add interest to the bond</strong> (EDO, ROS, ROD, TOS): one Redemption, the interest in the amount. A
+                    rollover (<em>zamiana</em>): the redemption, then a Buy of the new series at the rollover price.
+                  </InfoTip>
+                </span>
+              ) : undefined
+            }
+          >
             <select value={type} onChange={(e) => setType(e.target.value as TxType)} data-testid="tx-type">
               {TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -411,7 +460,18 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
               </select>
               {kind === "treasury" && (
                 <div className="inline">
-                  <input value={fields.code} onChange={set("code")} placeholder="Code, e.g. EDO1036" data-testid="tx-new-code" />
+                  <input
+                    value={fields.code}
+                    onChange={set("code")}
+                    onBlur={() => fields.code.trim() && pending?.code !== fields.code.trim().toUpperCase() && void lookup()}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return;
+                      e.preventDefault();
+                      if (fields.code.trim()) void lookup();
+                    }}
+                    placeholder="Code, e.g. EDO1036"
+                    data-testid="tx-new-code"
+                  />
                   <button type="button" onClick={() => void lookup()} disabled={!fields.code.trim()} data-testid="tx-lookup">
                     Find
                   </button>
@@ -449,10 +509,10 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           {HAS_QUANTITY.has(type) && (
             <>
               <Field label="Quantity">
-                <input inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} data-testid="tx-quantity" />
+                <input inputMode="decimal" value={quantity} onChange={tradeInput(setQuantity)} data-testid="tx-quantity" />
               </Field>
               <Field label={priceLabel(inst)}>
-                <input inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} data-testid="tx-price" />
+                <input inputMode="decimal" value={price} onChange={tradeInput(setPrice)} data-testid="tx-price" />
               </Field>
             </>
           )}
@@ -463,7 +523,7 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
           )}
           {foreign && HAS_QUANTITY.has(type) && (
             <Field label={`Rate, PLN per ${inst!.currency}`} hint="Your broker's rate (prefilled: NBP)">
-              <input inputMode="decimal" value={fxRate} onChange={(e) => setFxRate(e.target.value)} data-testid="tx-fx" />
+              <input inputMode="decimal" value={fxRate} onChange={tradeInput(setFxRate)} data-testid="tx-fx" />
             </Field>
           )}
           {type === "WRITE_OFF" && (
@@ -485,9 +545,11 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                       ? `Amount received (after the fee${t ? ", before tax" : ""})`
                       : type === "EXCHANGE"
                         ? "You gave"
-                        : t
-                          ? "Gross amount (before tax)"
-                          : "Amount"
+                        : interestGross
+                          ? "Principal (without the interest)"
+                          : t
+                            ? "Gross amount (before tax)"
+                            : "Amount"
                 }
                 hint={bondHint && <span data-testid="tx-accrued-hint">{bondHint}</span>}
               >
@@ -516,8 +578,19 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                   </select>
                 </div>
               </Field>
+              {withInterest && (
+                <Field
+                  label={`Interest paid with it, gross, ${cur} (optional)`}
+                  hint={interestGross ? "Saved as a coupon of its own; the tax below comes off it" : "COI, ROR, DOR, listed bonds: the last interest. Saved as a coupon, like the earlier ones"}
+                >
+                  <input inputMode="decimal" value={interest} onChange={(e) => setInterest(e.target.value)} data-testid="tx-interest" />
+                </Field>
+              )}
               {taxed && (
-                <Field label={`Tax paid, ${cur} (optional)`} hint={t ? "Saved: the amount less the tax, and the tax itself" : "Withheld at source: give it, and the amount above is the gross"}>
+                <Field
+                  label={`Tax paid, ${cur} (optional)`}
+                  hint={interestGross ? "Withheld from the interest" : t ? "Saved: the amount less the tax, and the tax itself" : "Withheld at source: give it, and the amount above is the gross"}
+                >
                   <input inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} data-testid="tx-tax" />
                 </Field>
               )}
@@ -557,11 +630,19 @@ export function TransactionForm({ editing, onClose, onSaved }: { editing?: Trans
                 </>
               )}
               {(type === "BUY" || type === "EXCHANGE") && f > 0 && <span className="faint"> (incl. fee {fmtNum(f)})</span>}
-              {t > 0 && size !== undefined && (
+              {interestGross > 0 && size !== undefined ? (
                 <span className="faint">
                   {" "}
-                  ({fmtNum(Math.abs(size))} gross − {fmtNum(t)} tax)
+                  ({fmtNum(Math.abs(size))} principal + {fmtNum(interestGross)} interest{t ? ` − ${fmtNum(t)} tax` : ""})
                 </span>
+              ) : (
+                t > 0 &&
+                size !== undefined && (
+                  <span className="faint">
+                    {" "}
+                    ({fmtNum(Math.abs(size))} gross − {fmtNum(t)} tax)
+                  </span>
+                )
               )}
             </>
           ) : (

@@ -35,7 +35,7 @@ A job run is: pick the instruments (`active = true` and matching source) → run
 | `eod-ibkr` | 07:05 Tue–Sat (dev and prod) | IBKR Flex positions statement for the last 14 days (data-sources.md, "IBKR Flex Web Service"): IBKR's mark price of every instrument with venue `IBKR`; the onvista-priced EUR bonds checked against IBKR's marks, unknown positions listed (job note). The morning valuation picks the prices up | `PX#IBKR#…` |
 | `eod-gpw-recheck` | 07:15 (next day) | re-runs `eod-gpw` for D-1 | overwrites, sets `status = final` |
 | `valuation` | 07:30 (next day), Tuesday to Sunday | DynamoDB only | final snapshot for D-1; Saturday's and Sunday's runs give the weekend's days their point (every day has one: a missing day shows as 0 in a position's chart) |
-| `monthly` | 16th, 10:00, retry daily until success (any day) | GUS CPI (monthly CSV: m/m, since December, year on year); new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `CPI_YTD/<month>`, `CPI_YOY/<month>`, `SERIES#…/RATE#…` |
+| `monthly` | 16th, 10:00; a run that couldn't load the Ministry retail file fails (Lambda retries twice, then the Status page and the alert show it). A retail series not stored yet is also loaded on demand by the instrument lookup | GUS CPI (monthly CSV: m/m, since December, year on year); new retail bond series / rate resets; next IZ reference index `W(n)`; cross-check against the MF index ratio page | `CPI/<month>`, `CPI_REF/<month>`, `CPI_YTD/<month>`, `CPI_YOY/<month>`, `SERIES#…/RATE#…` |
 
 The jobs group into a few short windows a day. With DynamoDB this doesn't matter for cost; it keeps the schedule easy to follow.
 

@@ -2,9 +2,8 @@
 // index ratio against the Ministry of Finance page, and refresh the retail-bond rates from the Ministry file.
 
 import { buildReferenceIndex, indexRatioAt, shiftMonth, toReferenceIndex, today } from "@portfolio/core";
-import { archiveRaw, queueValuation, repo, runJob } from "../lib/context.ts";
-import { fetchRetailFile } from "../lib/mfRetail.ts";
-import { importRetailRates } from "./import.ts";
+import { archiveRaw, repo, runJob } from "../lib/context.ts";
+import { refreshRetailRates } from "./import.ts";
 import { decodeCpiCsv, fetchGusCpiFile, parseCpiCsv, parseCpiYoyCsv, parseCpiYtdCsv } from "../lib/gus.ts";
 import { fetchMfIndexRatios } from "../lib/mfPage.ts";
 
@@ -89,18 +88,19 @@ export async function handler() {
       notes.push(`${bond.code}: ${theirs.size} MF ratios checked, ${mismatches.length} mismatches${mismatches.length ? " " + JSON.stringify(mismatches.slice(0, 3)) : ""}`);
       if (mismatches.length > 0) console.error(`${bond.code}: index ratio mismatch vs MF`, mismatches);
     }
-    // 3. Retail bonds: newly published rates (a series' new interest year) → refresh and revalue the history.
+    // 3. Retail bonds: newly published rates (a series' new interest year) and new series → refresh and revalue.
+    // A failure fails the run (after the rest is done), so the schedule's retries try again and the Status page and
+    // the alert show it: a run reported "ok" without the file left November 2026's series unknown for weeks.
+    let retailFailed: string | undefined;
     try {
-      const { url, content } = await fetchRetailFile();
-      const day = today();
-      await archiveRaw("mf-retail", day, "Dane_dotyczace_obligacji_detalicznych.xls", content);
-      const r = await importRetailRates(content, url);
+      const r = await refreshRetailRates();
       itemsWritten += r.series + r.refreshed;
       notes.push(`retail: ${r.series} series, ${r.refreshed} instruments refreshed`);
-      if (r.refreshed > 0) await queueValuation({ reason: "retail-rates", isins: r.refreshedIsins });
     } catch (err) {
-      notes.push(`retail file failed: ${(err as Error).message}`);
+      retailFailed = `retail file failed: ${(err as Error).message}`;
+      notes.push(retailFailed);
     }
+    if (retailFailed) throw new Error(notes.join("; "));
 
     return { itemsWritten, note: notes.join("; ") };
   });

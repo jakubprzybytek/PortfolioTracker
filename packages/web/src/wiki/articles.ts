@@ -6,7 +6,7 @@ const FILES = import.meta.glob<string>("./*.md", { query: "?raw", import: "defau
 
 export const SECTIONS: { name: string; slugs: string[] }[] = [
   { name: "Returns", slugs: ["xirr"] },
-  { name: "Bonds", slugs: ["accrued-interest", "interest-period"] },
+  { name: "Bonds", slugs: ["accrued-interest", "interest-period", "redemption"] },
   { name: "Tax", slugs: ["coupon-tax"] },
 ];
 

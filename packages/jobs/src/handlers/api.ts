@@ -36,6 +36,7 @@ import {
   listedTreasuryInstrument,
   newTransactionId,
   parseManualPrices,
+  RETAIL_KINDS,
   retailInstrument,
   addDays,
   adjustForSplits,
@@ -88,7 +89,7 @@ import { hasAnyGroup } from "../lib/access.ts";
 import { FEED_TOKEN_SETTING, newFeedToken, type FeedToken } from "../lib/feedToken.ts";
 import { invokeAsync, jobRuns, queueValuation, repo } from "../lib/context.ts";
 import { JOB_NAMES } from "../lib/jobs.ts";
-import { importInstruments, mfTermsByCode } from "./import.ts";
+import { importInstruments, mfTermsByCode, refreshRetailRates } from "./import.ts";
 
 const json = (status: number, body: unknown): APIGatewayProxyResultV2 => ({
   statusCode: status,
@@ -223,8 +224,23 @@ async function treasurySeries(code: string): Promise<InstrumentInput | undefined
   const retail = await repo.getRetailSeries(code);
   if (retail) return retailInstrument(retail);
   const listed = (await mfTermsByCode()).get(code);
-  return listed ? listedTreasuryInstrument(listed) : undefined;
+  if (listed) return listedTreasuryInstrument(listed);
+  // A retail series not stored yet (this month's, before the monthly job loaded the Ministry file, or after a run
+  // that couldn't reach it): load the file now and look again. Only for codes shaped like one (EDO1136), so a typo
+  // like "NOPE123" doesn't download it; a failed download is just "not found".
+  if (!RETAIL_CODE.test(code)) return undefined;
+  try {
+    await refreshRetailRates();
+  } catch (err) {
+    console.warn(`${code}: Ministry retail file not loaded on demand: ${(err as Error).message}`);
+    return undefined;
+  }
+  const fresh = await repo.getRetailSeries(code);
+  return fresh ? retailInstrument(fresh) : undefined;
 }
+
+/** A retail series' code: its kind, then the month and year it matures (EDO1136). */
+const RETAIL_CODE = new RegExp(`^(${RETAIL_KINDS.join("|")})(0[1-9]|1[0-2])\\d{2}$`);
 
 /** A corporate bond by ISIN, or the error response. */
 /** Where the hold-or-sell assumptions are kept (settings). */

@@ -26,8 +26,10 @@ import {
   type InstrumentItem,
   type IsoDate,
   type RetailTerms,
+  today,
 } from "@portfolio/core";
-import { invokeAsync, queueValuation, repo, runJob } from "../lib/context.ts";
+import { archiveRaw, invokeAsync, queueValuation, repo, runJob } from "../lib/context.ts";
+import { fetchRetailFile } from "../lib/mfRetail.ts";
 import type { BackfillEvent } from "./backfill.ts";
 import type { ValuationEvent } from "./valuation.ts";
 
@@ -80,6 +82,19 @@ export async function importRetailRates(content: Uint8Array, source: string) {
     refreshedIsins.push(inst.isin);
   }
   return { series: stored, refreshed: refreshedIsins.length, refreshedIsins };
+}
+
+/**
+ * Downloads the Ministry retail-bond file, archives it and imports it (importRetailRates), queueing a revaluation of
+ * the instruments whose rates changed. Used by the monthly job and, for a series not stored yet (a new month's
+ * EDO, COI …), by the instrument lookup. Throws when the file can't be fetched or read.
+ */
+export async function refreshRetailRates(): Promise<{ series: number; refreshed: number; url: string }> {
+  const { url, content } = await fetchRetailFile();
+  await archiveRaw("mf-retail", today(), "Dane_dotyczace_obligacji_detalicznych.xls", content);
+  const r = await importRetailRates(content, url);
+  if (r.refreshed > 0) await queueValuation({ reason: "retail-rates", isins: r.refreshedIsins });
+  return { series: r.series, refreshed: r.refreshed, url };
 }
 
 export async function importInstruments(json: string) {

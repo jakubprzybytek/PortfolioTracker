@@ -585,6 +585,26 @@ test.describe("adding transactions", () => {
     await page.getByTestId("tx-new-code").fill("EDO1036");
     await page.getByTestId("tx-lookup").click();
     await expect(page.getByTestId("tx-new-instrument")).toContainText("Obligacje skarbowe EDO1036 (emerytalne 10-letnie)");
+    // The series found (not saved yet) prices the buy as a tracked one would: a rollover at 99,90 a bond.
+    await expect(page.getByTestId("tx-interest-from")).toBeVisible();
+    await page.getByTestId("tx-quantity").fill("243");
+    await page.getByTestId("tx-price").fill("99,9");
+    await expect(page.getByTestId("tx-amount")).toHaveValue("24275,7");
+    // An amount typed by hand gives way when the quantity or price changes again.
+    await page.getByTestId("tx-amount").fill("24000");
+    await page.getByTestId("tx-quantity").fill("10");
+    await expect(page.getByTestId("tx-amount")).toHaveValue("999");
+
+    // A redemption with its last interest: the principal, plus the interest less the tax (saved as a coupon).
+    await page.getByTestId("tx-type").selectOption("REDEMPTION");
+    await expect(page.getByTestId("info-redemption")).toBeVisible();
+    await page.getByTestId("tx-quantity").fill("236");
+    await page.getByTestId("tx-price").fill("100");
+    await expect(page.getByTestId("tx-amount")).toHaveValue("23600");
+    await page.getByTestId("tx-interest").fill("920,40");
+    await page.getByTestId("tx-tax").fill("174,88");
+    await expect(page.getByTestId("tx-summary")).toContainText("24 345,52 zł");
+    await expect(page.getByTestId("tx-summary")).toContainText("23 600,00 principal + 920,40 interest − 174,88 tax");
 
     // Server-side check: a deposit with nothing in it.
     await page.getByTestId("tx-type").selectOption("DEPOSIT");
