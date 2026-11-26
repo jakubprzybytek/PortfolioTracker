@@ -342,6 +342,7 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 - **The CLI:** every command of the table but `filings sort` and `filings check` (the check stays `scripts/catalyst-filings-check.ts`, inside the stage's shell). A dry run of an import uploads the file (7-day area) so the server checks the same things it would store.
 - **The skill:** `.claude/skills/catalyst-analyst/SKILL.md`; at most 5 companies a session.
 - **The app:** the token in the Catalyst settings, "needs work" and the reports checklist in the Issuers view.
+- **A lender's kind** (2026-11-26): the issuer dialog of a Finance company has a Kind select (debt collector, leasing and factoring, investment firm, or not set), saved at once through `PUT /catalyst/entities/{id}` `{ financeRuleSet }`; not set, a lender is scored only when its name is on the list of known lenders.
 - **Known answers** (`catalyst known put`) are also open to the token: they only feed `filings check`.
 - **Documents** (N8): `catalyst documents put <id> <file> --kind … --date …` keeps what a judgement rests on beside the statements (auditor's and management reports, interim and current reports, bond terms); one already held isn't uploaded again. The issuer dialog's Documents tab lists them with the statements.
 

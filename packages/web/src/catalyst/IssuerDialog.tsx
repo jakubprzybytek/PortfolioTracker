@@ -35,7 +35,10 @@ const periodLabel = (periodEnd: string, months: number) => {
   return months === 6 ? `H1 ${year}` : months === 3 ? `Q1 ${year}` : months === 9 ? `Q1–Q3 ${year}` : `${months} m to ${periodEnd}`;
 };
 
+const LENDER_KINDS = ["collector", "leasing", "investment"];
+
 /** `onOpenBond`: a bond's code in the Bonds tab opens its panel. */
+
 export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds, onOpenBond, viewToggle }: { entityId: string; rows: BondRow[]; tab: string; setTab: (t: string) => void; onClose: () => void; onShowBonds: () => void; onOpenBond: (isin: string) => void; viewToggle?: { label: string; on: boolean; title: string; toggle: () => void } }) {
   const detail = useApi<CompanyDetail>(`/catalyst/entities/${encodeURIComponent(entityId)}`);
   const d = detail.data;
@@ -52,6 +55,19 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
     try {
       const res = await apiSend<{ aiAnalysis: AiSwitch }>("PUT", `/catalyst/entities/${encodeURIComponent(entityId)}/ai`, { on });
       detail.update((x) => (x ? { ...x, company: { ...x.company, aiAnalysis: res.aiAnalysis } } : x));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  // A lender's kind picks its rule set; "" clears it. The scorecard is worked out again on the next read.
+  const setKind = async (kind: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiSend("PUT", `/catalyst/entities/${encodeURIComponent(entityId)}`, { financeRuleSet: kind || null });
+      detail.reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -77,6 +93,19 @@ export function IssuerDialog({ entityId, rows, tab, setTab, onClose, onShowBonds
                 {a && ` · ${RULE_SETS[a.ruleSet] ?? a.ruleSet} rules`}
                 {a?.scorecard?.confidence && ` · ${a.scorecard.confidence.level} confidence`}
               </p>
+            )}
+            {c?.industry === "Finance" && (
+              <label className="cat-kind" title="Which lender's rules score this company (saved at once). Not set: scored only if its name is on the list of known lenders.">
+                Kind{" "}
+                <select value={c.financeRuleSet ?? ""} disabled={busy} onChange={(e) => void setKind(e.target.value)} data-testid="issuer-kind">
+                  <option value="">{!c.financeRuleSet && a && LENDER_KINDS.includes(a.ruleSet) ? `not set (by name: ${RULE_SETS[a.ruleSet]})` : "not set"}</option>
+                  {LENDER_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {RULE_SETS[k]}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
           </div>
           <div className="cat-issuer-actions">
@@ -202,7 +231,13 @@ const judgementLine = (md: string) => {
 
 function Scorecard({ d }: { d: CompanyDetail }) {
   const a = d.analysis;
-  if (a.state === "out-of-scope") return <p className="muted">Not scored: {d.company.industry ?? "this kind of company"} is outside the scorecard (banks, insurers, the State, municipalities, a lender of no known kind).</p>;
+  if (a.state === "out-of-scope")
+    return (
+      <p className="muted">
+        Not scored: {d.company.industry ?? "this kind of company"} is outside the scorecard (banks, insurers, the State, municipalities, a lender of no known kind).
+        {d.company.industry === "Finance" && " A lender is scored once its kind is set above."}
+      </p>
+    );
   if (!a.scorecard) return <p className="muted">No report yet: the scorecard needs a full year.</p>;
   return (
     <ul className="cat-scorecard" data-testid="issuer-scorecard">

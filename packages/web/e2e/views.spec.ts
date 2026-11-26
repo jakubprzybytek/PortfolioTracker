@@ -1802,6 +1802,7 @@ test.describe("catalyst view", () => {
     writes = [];
     review = "parsed";
     abcAi = false;
+    abcKind = null;
     await page.route(/\/catalyst\/entities/, async (r) => {
       const url = new URL(r.request().url());
       const method = r.request().method();
@@ -1811,11 +1812,15 @@ test.describe("catalyst view", () => {
         writes.push(`${url.pathname.replace(/^.*\/catalyst/, "")} ${JSON.stringify(data)}`);
         if (data.status) review = data.status;
         if (url.pathname.endsWith("/0000000001/ai")) abcAi = data.on ?? false;
+        if (url.pathname.endsWith("/entities/0000000001")) {
+          abcKind = (data as { financeRuleSet?: string | null }).financeRuleSet ?? null;
+          return body({ ...company("0000000001", "Abc", abcAi, null), financeRuleSet: abcKind });
+        }
         return body(url.pathname.endsWith("/ai") ? { aiAnalysis: { on: data.on, by: "test", at: "2026-11-08T10:00:00Z" } } : { review: { status: data.status } });
       }
       if (url.pathname.endsWith("/catalyst/entities")) return body({ entities: [company("0000533217", "Kruk", true, "2026-11-02T09:00:00Z"), company("0000000001", "Abc", abcAi, null)] });
       if (url.pathname.includes("/years/")) return body({ period: "2025-12-31#group", currency: "PLN", presentedUnit: 1000, figures: { revenue: { value: 2_900_000_000, source: ["Revenue"] } }, lines: [{ statement: "income", order: 0, label: "Revenue", value: 2_900_000_000, page: 12 }, { statement: "income", order: 1, label: "Cost of sales", value: -900_000_000, page: 12 }, { statement: "balance", order: 0, label: "Cash", value: 400_000_000, parent: 2, item: "cash" }, { statement: "balance", order: 1, label: "Goodwill", value: 0, parent: 2 }, { statement: "balance", order: 2, label: "Total assets", value: 400_000_000, item: "totalAssets" }] });
-      if (url.pathname.endsWith("/0000000001")) return body(detail(company("0000000001", "Abc", abcAi, null), { state: "no-report", ruleSet: "general" }, []));
+      if (url.pathname.endsWith("/0000000001")) return body(detail({ ...company("0000000001", "Abc", abcAi, null), financeRuleSet: abcKind }, { state: "no-report", ruleSet: abcKind ?? "general" }, []));
       return body(
         detail(
           company("0000533217", "Kruk", true, "2026-11-02T09:00:00Z"),
@@ -1853,6 +1858,7 @@ test.describe("catalyst view", () => {
   let writes: string[] = [];
   let review = "parsed";
   let abcAi = false;
+  let abcKind: string | null = null;
   const company = (entityId: string, shortName: string, on: boolean, judgedAt: string | null) => ({
     entityId,
     shortName,
@@ -2265,6 +2271,18 @@ test.describe("catalyst view", () => {
     await dialog.getByTestId("issuer-ai-enable").click();
     await expect.poll(() => writes).toEqual(['/entities/0000000001/ai {"on":true}']);
     await expect(dialog.getByTestId("issuer-ai-switch")).toBeChecked();
+  });
+
+  test("a lender's kind is set from the dialog and picks its rules", async ({ page }) => {
+    await page.goto("/#/catalyst?issuer=0000000001");
+    const dialog = page.getByTestId("issuer-dialog");
+    await expect(dialog.getByTestId("issuer-kind")).toHaveValue("");
+    await dialog.getByTestId("issuer-kind").selectOption("collector");
+    await expect.poll(() => writes).toEqual(['/entities/0000000001 {"financeRuleSet":"collector"}']);
+    await expect(dialog).toContainText("debt collector rules");
+    await expect(dialog.getByTestId("issuer-kind")).toHaveValue("collector");
+    await dialog.getByTestId("issuer-kind").selectOption("");
+    await expect.poll(() => writes).toEqual(['/entities/0000000001 {"financeRuleSet":"collector"}', '/entities/0000000001 {"financeRuleSet":null}']);
   });
 
   test("the issuers view: one row per company, its switch, a row opens the dialog", async ({ page }) => {

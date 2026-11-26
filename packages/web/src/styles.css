@@ -1094,6 +1094,8 @@ tr.cat-flagged td { background: color-mix(in srgb, var(--neg) 7%, transparent); 
 .modal.cat-issuer-dialog { width: min(1040px, 100%); gap: 10px; }
 .cat-issuer-head { align-items: flex-start; gap: 12px; }
 .cat-issuer-head p { margin: 2px 0 0; }
+.cat-kind { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: var(--fs-13); color: var(--muted); }
+.cat-kind select { font: inherit; }
 .cat-issuer-actions { display: flex; align-items: center; gap: 12px; flex: none; }
 .cat-ai-off-note { margin: 0; padding: 8px 12px; border-radius: var(--radius); background: var(--band); font-size: var(--fs-14); }
 .cat-issuer-top { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; align-items: start; }
