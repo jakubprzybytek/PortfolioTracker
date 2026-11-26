@@ -95,6 +95,10 @@ through the CLI (`--stage prod`, dry run first, except one: the GetBack auditor'
 | ZM Henryk Kania | `0000053415` | Industry Manufacturing. FY2018 and FY2017 **collected figures** (the report's selected data only, from its Bankier page): they don't feed the scorecard. **Single FY2017 (+FY2016), IFRS, PDF transcript, all checks passed** (2026-11-26, from PAP Media Room's copy of the annual report published 2018-03-13, with the auditor's report, a scan, stored). FY2018 is in neither the KRS repository nor Bankier (attachments answer 404). Events: ESPI 7/2019 *bondholders' meeting* (series F, to move the maturity), ESPI 24/2020 *insolvency* (bankruptcy 2020-06-18), *reviewed* | The June 2019 ESPI on series F not redeemed and F/H interest unpaid: only press copies found, so not recorded |
 | Kancelaria Medius | `0000397680` | Industry Finance. Events: EBI 18/2020 *missed payment* (series L interest, 2020-04-06), EBI 20, 25, 26/2020 *missed payments* (M, P, O instalments), EBI 23/2020 *bondholders' meeting* (series N, event of default), ESPI 14 and 15/2020 *insolvency* (arrangement filed 11 May, opened 29 May 2020), *reviewed*. One event retracted (ESPI 7/2020 recorded as a missed payment; it is the decision to stop paying). **Single FY2018 (+FY2017 comparative), IFRS, PDF transcript, all checks passed** (2026-11-26, from the owner's KRS download; published 2019, before the default). The FY2017 report itself is a scan (65 pages, no text), not imported; the group reports weren't in the download (checklist: not available) | Kind (owner); EBI 24/2019 (M and O maturities +12 months: no date on the page); EBI 23/2020 and ESPI 15/2020 dated from their neighbours (the pages show no date) |
 | Gant Development | – | Nothing: not a company in the app | As on dev |
+| Vivid Games | `0000411156` | Made a company from its LEI (2026-11-26); industry Media (consumer rules). **Consolidated FY2018 (+FY2017), IFRS, PDF transcript, all checks passed**, from vividgames.com (published 2019-04-26). FY2019 was published 2020-06-30, after the default (series A, 10.5m zł, not redeemed 5 May 2020), so it is not the fair test | Events (the ESPI on series A not redeemed; the partial arrangement) |
+| Braster | `0000405201` | Made a company from its LEI (2026-11-26); industry Manufacturing. **Single FY2018 (+FY2017), Polish GAAP (KNF SA-R form), PDF transcript, all checks passed**, from ri.braster.eu (published 2019-04-12). The balance sheet doesn't split its liabilities: the loans and bonds were copied from notes 14a and 15a of the same report. BDO's audit report stored: **going-concern emphasis** (the bonds due 29 May 2019 and the funding). Bondholders moved series A to November 2020 the day before maturity (28 May 2019); the February 2020 interest and amortisation were missed | Events (May 2019 meeting, February 2020 missed payment, restructuring) |
+| Fast Finance | `0000299407` | Made a company from its LEI (2026-11-26; the name is `review`: "Fast Finance" vs the legal name); industry Finance. **Consolidated FY2017 (+FY2016), IFRS, PDF transcript, all checks passed**, from fastfinance.pl (published 2018-04-19). Auditor's report stored (a scan). Arrangement proceedings filed 30 November 2018 | **Kind "debt collector" (owner, in the issuer dialog)**: until then it is out of scope; the table below scores it on collector rules locally. Events |
+| EuCO (Europejskie Centrum Odszkodowań) | `0000359831` | Already a company; industry Other set (2026-11-26). Nothing imported: FY2021 (published 2022-04-29, before the October 2022 missed instalment on series B) is an ESEF file that neither the issuer's site (404), Bankier (503) nor Parkiet (403) serves. **On the owner's checklist** (KRS repository, consolidated FY2021) | FY2021 and FY2020; events |
 
 ### What the rules say (prod)
 
@@ -214,6 +218,56 @@ What it says, with four cases only:
    (Echo, Vehis and Cavatina may be the flag working, not false alarms); profit-based dimensions miss lenders' trouble
    (GetBack, finding 5).
 
+### Out of sample (2026-11-26)
+
+Three defaulters added after the flags above were chosen, scored the same way (the app's code on each stored year;
+Fast Finance on collector rules, its kind not being set yet):
+
+| Case | Report | Debt burden | Debt service | Liquidity | Profitability | Asset coverage | Reds |
+|---|---|---|---|---|---|---|---|
+| Vivid Games, default May 2020 | FY2018 (group), consumer | red | red | green | red | green | 3 |
+| | FY2017 | red | red | green | red | green | 3 |
+| Braster, terms moved May 2019, missed payment Feb 2020 | FY2018 (single), general | red | red | yellow | red | green | 3 |
+| | FY2017 | red | red | green | red | green | 3 |
+| Fast Finance, arrangement Nov 2018 | FY2017 (group), collector | green | green | red | yellow | green | 1 |
+| | FY2016 | green | yellow | yellow | yellow | yellow | 0 |
+
+**The combined flag fails the test: it catches none of the three.** Vivid Games and Braster are loss-makers with
+modest debt and equity ratios near 50%: they are red on debt service and profitability (negative EBITDA puts debt
+burden red too), and were red the same way two years before, so nothing changes in the last year. Fast Finance shows
+one red, liquidity: 0.26m zł of cash against 10.7m zł of debt due within a year (0.02×), with net debt at 0.36× equity.
+
+All seven defaulters (last report / the report before / 40 survivors flagged):
+
+| Flag | Last | Before | Survivors |
+|---|---|---|---|
+| 2+ reds | **6/7** | 3/7 | 10/40 |
+| 3+ reds | 5/7 | 3/7 | 8/40 |
+| 2+ reds, none of debt burden, liquidity, asset coverage green | 4/7 | 0/7 | 3/40 |
+| Debt service and profitability both red | 3/7 | 3/7 | 8/40 |
+| Liquidity red | 4/7 | 1/7 | 8/40 |
+
+Red rate per dimension, last report against survivors: debt burden 5/7 vs 6/40, debt service 3/7 vs 8/40, liquidity
+4/7 vs 8/40, profitability 4/7 vs 11/40, asset coverage 3/7 vs 4/40.
+
+What it says:
+1. **There are two kinds of default here, with different signals.** Leveraged balance sheets (a developer and three
+   lenders/processors: Ghelamco, GetBack, Medius, Kania) turn red on debt, liquidity and equity in the last year.
+   Loss-making operating companies (Vivid Games, Braster) are red on debt service and profitability for years before
+   they fail: the scorecard shows them as weak all along, not as getting worse.
+2. **The plain count does as well as any combination:** two or more reds catches 6 of 7 and flags 10 of 40 survivors.
+   The combined flag only looked better because it was chosen on the first four cases.
+3. **A lender can fail on one red** (Fast Finance: liquidity alone). The one-red case is why §13's liquidity metric
+   for collectors matters more than the count.
+4. **The auditor's going-concern emphasis** (Braster FY2018) is a signal the scorecard doesn't read; neither does the
+   missing figures (Kania FY2018). Both point to the events and documents side of the judgement, not the thresholds.
+5. Still no case for moving a threshold.
+
+15. **A statement with several revenue lines and no total** (Fast Finance: assignment, collection, sale of receivables,
+    other) stores the first line only as revenue (18.4m of 27.6m zł in 2017). The collector rules don't use revenue,
+    so its scorecard isn't affected; a margin would be. Candidate: sum the revenue lines when no line is a total, as for
+    debt lines.
+
 ## To resume
 
 1. Done 2026-11-26: kinds set, Medius and Kania imported (findings 12–14).
@@ -224,7 +278,9 @@ What it says, with four cases only:
 4. Medius: date and record EBI 24/2019 (reports imported).
 5. Ghelamco and Kemberton: read the bond terms and store the schedules before any judgement.
 6. Gant: make it a company (LEI or KRS), import FY2012 and FY2011 from the reports as published.
-7. **The table** is above (2026-11-26). Waiting for the owner's decisions: the combined flag, a lender trend, and the
+7. **The table** is above (2026-11-26). The combined flag failed out of sample ("Out of sample"). Waiting for the owner's decisions: a lender trend, and the
    candidate rule changes (findings 2, 4, 6) and the name confirmation (finding 11).
-8. More defaulters for the sample, from the press lists (PBG, Vivid Games, Braster, Uboat-Line, Religa Development,
-   GC Investment, Europejskie Centrum Odszkodowań, Fast Finance).
+8. More defaulters: Vivid Games, Braster and Fast Finance done (2026-11-26, "Out of sample"). EuCO waits for the
+   owner's KRS download of FY2021. Fast Finance's kind (collector) is the owner's. Left: PBG (2012), GC Investment
+   and Uboat-Line (2014–2015): before the app's archive like Gant, reports as published hard to find; Religa
+   Development: no default found in the press. Events for the three new cases are not recorded yet.
