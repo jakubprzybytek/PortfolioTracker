@@ -168,6 +168,52 @@ more reds: 4 of 41 (10%): BBI Development, Cavatina Holding, Cognor, Vehis.
     `financeRuleSet`). Capitea and Medius were set to *collector* directly in the prod table on 2026-11-26, at the
     owner's request, with a metrics recompute queued as the API does; both are now scored on collector rules.
 
+## The table (2026-11-26)
+
+Each defaulter's last report published before the trouble, and the one before it, against the 40 survivors: every
+other company with listed bonds and a scorecard on prod on 2026-11-26 (Kemberton left out: Granbero's figures again).
+Refinancing is left out of the count, because the old defaulters' bonds are no longer listed. Colours: the app's for
+the latest snapshots, the same code run locally for the earlier years (`computeScorecard` with the short-term debt
+from the stored lines). Gant: no reports.
+
+| Case | Report | Debt burden | Debt service | Liquidity | Profitability | Asset coverage | Reds |
+|---|---|---|---|---|---|---|---|
+| Ghelamco (Granbero), in trouble 2026 | FY2025 + H1 2026, developer | red | red | red | red | yellow | 4 |
+| | FY2024 | red | red | red | red | green | 4 |
+| GetBack, default April 2018 | FY2016, collector | yellow | green | red | green | red | 2 |
+| | FY2015 | green | green | yellow | green | yellow | 0 |
+| Medius, default April 2020 | FY2018 (single), collector | red | yellow | yellow | red | red | 3 |
+| | FY2017 | yellow | green | green | green | red | 1 |
+| Kania, default June 2019 | FY2017 (single), general | red | green | red | yellow | red | 3 |
+| | FY2016 | yellow | green | yellow | yellow | yellow | 0 |
+
+**Red rate per dimension**, defaulters' last report against survivors: debt burden 3/4 vs 6/40, debt service 1/4 vs
+8/40, liquidity 3/4 vs 8/40, profitability 2/4 vs 11/40, asset coverage 3/4 vs 4/40. Survivors' reds: none 25, one 5,
+two 2, three 5, four 2, five 1.
+
+**Candidate flags** (last report / the report before / survivors flagged):
+
+| Flag | Last | Before | Survivors |
+|---|---|---|---|
+| 3+ reds | 3/4 | 1/4 | 8/40 |
+| 2+ reds | 4/4 | 1/4 | 10/40 |
+| 2+ reds, and none of debt burden, liquidity, asset coverage green | **4/4** | 0/4 | **3/40** (Cavatina, Echo Investment, Vehis) |
+| Asset coverage red with debt burden or liquidity red | 3/4 | 0/4 | 2/40 (Echo, Vehis) |
+| Liquidity red with another red | 3/4 | 1/4 | 6/40 |
+
+What it says, with four cases only:
+1. **The separate thresholds already split the groups**: every dimension but debt service is red far more often
+   among defaulters. Nothing here argues for moving a threshold; four cases couldn't place one anyway.
+2. **The signal is a combination on the balance sheet**: two reds with no green on debt, liquidity and equity caught
+   all four on their last report and flags 3 of 40 survivors. It was picked after seeing these cases, so it is a
+   hypothesis to test on the next defaulters (item 8 of "To resume"), not a rule.
+3. **It is a one-year signal**: the report two years before flags none of them (Ghelamco's FY2024 has four reds but
+   green equity). Medius shows it as a change between years (net debt to equity 1.9× → 3.2×, interest cover 4.1× →
+   1.6×), which the trend dimension doesn't score for lenders.
+4. **Caveats:** survivors are measured on FY2025 and defaulters on 2015–2025; "survivor" means not in default yet
+   (Echo, Vehis and Cavatina may be the flag working, not false alarms); profit-based dimensions miss lenders' trouble
+   (GetBack, finding 5).
+
 ## To resume
 
 1. Done 2026-11-26: kinds set, Medius and Kania imported (findings 12–14).
@@ -178,8 +224,7 @@ more reds: 4 of 41 (10%): BBI Development, Cavatina Holding, Cognor, Vehis.
 4. Medius: date and record EBI 24/2019 (reports imported).
 5. Ghelamco and Kemberton: read the bond terms and store the schedules before any judgement.
 6. Gant: make it a company (LEI or KRS), import FY2012 and FY2011 from the reports as published.
-7. **The table** once the reports are in: each defaulter's colours one and two years before, against the survivors
-   above; then decide on thresholds and the candidate rule changes (findings 2, 4 and 6), and on the name
-   confirmation (finding 11).
+7. **The table** is above (2026-11-26). Waiting for the owner's decisions: the combined flag, a lender trend, and the
+   candidate rule changes (findings 2, 4, 6) and the name confirmation (finding 11).
 8. More defaulters for the sample, from the press lists (PBG, Vivid Games, Braster, Uboat-Line, Religa Development,
    GC Investment, Europejskie Centrum Odszkodowań, Fast Finance).
