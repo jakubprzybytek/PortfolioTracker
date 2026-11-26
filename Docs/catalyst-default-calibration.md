@@ -93,7 +93,7 @@ through the CLI (`--stage prod`, dry run first, except one: the GetBack auditor'
 | Kemberton | `0000690847` | Name linked to Granbero, as Ghelamco. Events: ESPI 26/2026 *covenant breach* (5m EUR from outside the group not paid by 2026-09-30), 29/2026 *waiver* (on Ghelamco Group NV's 50m EUR support), 32/2026 *waiver* (consent to sell Vibe II, proceeds to redeem K1 first), 33/2026 *terms changed* (early-redemption notice cut to 1 day), *reviewed*. Documents: those four | Terms of K1; no judgement |
 | Capitea (GetBack) | `0000413997` | Industry Finance (the kind is the owner's). **Consolidated FY2016 (+FY2015) as published 2017-03-30** (capitea.pl archive): the fair test. Auditor's report stored (scanned, not read: no page rendering on the machine). Events: ESPI 51/2018 *missed payment* (88.26m zł nominal and 3.32m zł interest unpaid at 2018-04-25), 60/2018 and 64/2018 *insolvency* (accelerated arrangement filed 2 May, opened 9 May 2018), 51/2019 *terms changed* (arrangement approved), *reviewed* | **Kind "debt collector" (owner)**: until then it is out of scope and unscored |
 | ZM Henryk Kania | `0000053415` | Industry Manufacturing. FY2018 and FY2017 **collected figures** (the report's selected data only, from its Bankier page): they don't feed the scorecard. FY2018 single on the **owner's checklist** (Bankier's attachments answer 404). Events: ESPI 7/2019 *bondholders' meeting* (series F, to move the maturity), ESPI 24/2020 *insolvency* (bankruptcy 2020-06-18), *reviewed* | The June 2019 ESPI on series F not redeemed and F/H interest unpaid: only press copies found, so not recorded |
-| Kancelaria Medius | `0000397680` | Industry Finance. Events: EBI 18/2020 *missed payment* (series L interest, 2020-04-06), EBI 20, 25, 26/2020 *missed payments* (M, P, O instalments), EBI 23/2020 *bondholders' meeting* (series N, event of default), ESPI 14 and 15/2020 *insolvency* (arrangement filed 11 May, opened 29 May 2020), *reviewed*. One event retracted (ESPI 7/2020 recorded as a missed payment; it is the decision to stop paying). FY2018 and FY2017 group on the **owner's checklist** | Kind (owner); EBI 24/2019 (M and O maturities +12 months: no date on the page); EBI 23/2020 and ESPI 15/2020 dated from their neighbours (the pages show no date) |
+| Kancelaria Medius | `0000397680` | Industry Finance. Events: EBI 18/2020 *missed payment* (series L interest, 2020-04-06), EBI 20, 25, 26/2020 *missed payments* (M, P, O instalments), EBI 23/2020 *bondholders' meeting* (series N, event of default), ESPI 14 and 15/2020 *insolvency* (arrangement filed 11 May, opened 29 May 2020), *reviewed*. One event retracted (ESPI 7/2020 recorded as a missed payment; it is the decision to stop paying). **Single FY2018 (+FY2017 comparative), IFRS, PDF transcript, all checks passed** (2026-11-26, from the owner's KRS download; published 2019, before the default). The FY2017 report itself is a scan (65 pages, no text), not imported; the group reports weren't in the download (checklist: not available) | Kind (owner); EBI 24/2019 (M and O maturities +12 months: no date on the page); EBI 23/2020 and ESPI 15/2020 dated from their neighbours (the pages show no date) |
 | Gant Development | – | Nothing: not a company in the app | As on dev |
 
 ### What the rules say (prod)
@@ -104,7 +104,9 @@ through the CLI (`--stage prod`, dry run first, except one: the GetBack auditor'
 | Kemberton | the same | red | red | red | red | yellow | **green** (its own K1 is due 2031) |
 | GetBack | FY2016, **general** rules (dry run; the kind isn't set) | red (D/E 2.35×, ND/EBITDA 3.47×) | green (ICR 5.26×) | **green** (current ratio 2.13×) | green (EBIT margin 55.5%) | yellow (equity ratio 23.7%) | green (no listed bond then) |
 | Kania | FY2018 selected data (not scored) | – | – | – | EBIT margin 10.3%, net profit 64.4m zł | equity ratio 30.1% | – |
-| Medius | none yet | | | | | | |
+| Medius | single FY2018, **collector** rules (computed locally; the kind isn't set) | red (ND/E 3.21×) | yellow (ICR 1.61×) | yellow (cash / debt due in 12 months 0.31) | red (ROE 7.8%, ROA 1.7%) | red (equity ratio 21.5%) | n/a (its bonds are no longer listed) |
+| Medius | single FY2017, collector rules (as above) | yellow (ND/E 1.94×) | green (ICR 4.12×) | green (2.82) | green (ROE 31%) | red (equity ratio 22.6%) | n/a |
+| GetBack | FY2016, **collector** rules (computed locally) | yellow (ND/E 2.08×) | green (ICR 5.26×) | red (0.17, by hand on dev) | green (ROE 70%) | red (equity ratio 23.7%) | n/a |
 
 **The survivors on prod** (41 scored issuers other than these, 2026-11-21; rule sets: 13 developer, 10 general,
 6 consumer, 5 collector, 4 leasing, 3 contractor), how often each colour appears:
@@ -146,17 +148,27 @@ more reds: 4 of 41 (10%): BBI Development, Cavatina Holding, Cognor, Vehis.
     can't (its token only gives `resolved` or `review`). Candidates: a Confirm button for names in the Issuers view;
     keep `confirmed` when the agent only adds a financing link to a confirmed name.
 
+12. **Medius turns red a year before its default, on collector rules** (2026-11-26). FY2018 (published 2019; the
+    first missed payment was April 2020) gives three reds and two yellows: net debt 3.2× equity after bonds grew from
+    74m to 101m zł, interest cover down from 4.1× to 1.6×, ROE from 31% to 8%, operating cash flow −12.8m zł. FY2017
+    gives one red (equity ratio, as for every year of both collectors). Three or more reds: 8 of the 41 survivors
+    (20%). The useful signal is the **change** between the two years, which the trend dimension doesn't score for
+    lenders yet (n/a). GetBack's FY2016 on the same rules gives two reds (liquidity, asset coverage), so the rules
+    catch it less clearly: its trouble (fraud, receivables of unlisted funds) wasn't in the figures.
+13. **Kania FY2018 is not in the KRS repository** (owner, 2026-11-26: every other year is). The auditor's refusal stays
+    known only from the press and Bankier's page. FY2017 (published 2018) is on the checklist as the last pre-default
+    report.
+
 ## To resume
 
-1. **Owner (prod):** set Capitea's and Kancelaria Medius's kind to *debt collector*; download from the KRS repository
-   (https://rdf-przegladarka.ms.gov.pl, search by KRS number) Kania's FY2018 single report (KRS 0000053415) and
-   Medius's FY2018 and FY2017 group reports (KRS 0000397680), all on the checklist. The repository was down on
-   2026-11-21. Put the files in one folder; the agent runs `catalyst filings sort` on it and imports them.
+1. **Owner (prod):** set Capitea's and Kancelaria Medius's kind to *debt collector* (then the app scores them; the
+   collector figures above were computed locally); download Kania's FY2017 single report from the KRS repository
+   (https://rdf-przegladarka.ms.gov.pl, KRS 0000053415), on the checklist. Medius done 2026-11-26 (finding 12).
 2. GetBack: read the scorecard on collector rules once the kind is set; import FY2017 only as a late, after-default
    comparison.
-3. Kania: import FY2018 from the checklist (and FY2017); find the June 2019 ESPI on series F (Bankier lists can't be
+3. Kania: import FY2017 from the checklist (FY2018 isn't in the repository, finding 13); find the June 2019 ESPI on series F (Bankier lists can't be
    read; try GPW's or the company's archive) and record the missed payments.
-4. Medius: import FY2018 and FY2017; date and record EBI 24/2019.
+4. Medius: date and record EBI 24/2019 (reports imported).
 5. Ghelamco and Kemberton: read the bond terms and store the schedules before any judgement.
 6. Gant: make it a company (LEI or KRS), import FY2012 and FY2011 from the reports as published.
 7. **The table** once the reports are in: each defaulter's colours one and two years before, against the survivors
