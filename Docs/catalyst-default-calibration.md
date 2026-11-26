@@ -104,9 +104,9 @@ through the CLI (`--stage prod`, dry run first, except one: the GetBack auditor'
 | Kemberton | the same | red | red | red | red | yellow | **green** (its own K1 is due 2031) |
 | GetBack | FY2016, **general** rules (dry run; the kind isn't set) | red (D/E 2.35×, ND/EBITDA 3.47×) | green (ICR 5.26×) | **green** (current ratio 2.13×) | green (EBIT margin 55.5%) | yellow (equity ratio 23.7%) | green (no listed bond then) |
 | Kania | FY2018 selected data (not scored) | – | – | – | EBIT margin 10.3%, net profit 64.4m zł | equity ratio 30.1% | – |
-| Medius | single FY2018, **collector** rules (computed locally; the kind isn't set) | red (ND/E 3.21×) | yellow (ICR 1.61×) | yellow (cash / debt due in 12 months 0.31) | red (ROE 7.8%, ROA 1.7%) | red (equity ratio 21.5%) | n/a (its bonds are no longer listed) |
+| Medius | single FY2018, **collector** rules | red (ND/E 3.21×) | yellow (ICR 1.81×) | yellow (cash / debt due in 12 months 0.31) | red (ROE 7.8%, ROA 1.7%) | red (equity ratio 21.5%) | n/a (its bonds are no longer listed) |
 | Medius | single FY2017, collector rules (as above) | yellow (ND/E 1.94×) | green (ICR 4.12×) | green (2.82) | green (ROE 31%) | red (equity ratio 22.6%) | n/a |
-| GetBack | FY2016, **collector** rules (computed locally) | yellow (ND/E 2.08×) | green (ICR 5.26×) | red (0.17, by hand on dev) | green (ROE 70%) | red (equity ratio 23.7%) | n/a |
+| GetBack | FY2016, **collector** rules | yellow (ND/E 2.17×) | green (ICR 5.28×) | red (cash / debt due in 12 months 0.17) | green (ROE 70%) | red (equity ratio 23.7%) | n/a |
 
 **The survivors on prod** (41 scored issuers other than these, 2026-11-21; rule sets: 13 developer, 10 general,
 6 consumer, 5 collector, 4 leasing, 3 contractor), how often each colour appears:
@@ -159,10 +159,13 @@ more reds: 4 of 41 (10%): BBI Development, Cavatina Holding, Cognor, Vehis.
     known only from the press and Bankier's page. FY2017 (published 2018) is on the checklist as the last pre-default
     report.
 
+14. **The app has no control for a lender's kind** (only `PUT /catalyst/entities/{id}` with the owner's login takes
+    `financeRuleSet`). Capitea and Medius were set to *collector* directly in the prod table on 2026-11-26, at the
+    owner's request, with a metrics recompute queued as the API does; both are now scored on collector rules.
+
 ## To resume
 
-1. **Owner (prod):** set Capitea's and Kancelaria Medius's kind to *debt collector* (then the app scores them; the
-   collector figures above were computed locally); download Kania's FY2017 single report from the KRS repository
+1. **Owner (prod):** download Kania's FY2017 single report from the KRS repository
    (https://rdf-przegladarka.ms.gov.pl, KRS 0000053415), on the checklist. Medius done 2026-11-26 (finding 12).
 2. GetBack: read the scorecard on collector rules once the kind is set; import FY2017 only as a late, after-default
    comparison.
