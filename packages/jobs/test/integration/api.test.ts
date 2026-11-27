@@ -850,8 +850,10 @@ describe(`API ${API}`, () => {
     expect((await agent("PUT", "/entities/0000000000", t, { industry: "Developer" })).status).toBe(404);
     expect((await agent("PUT", `/names/${encodeURIComponent("No Such Name S.A.")}`, t, { entityId: "0000000000" })).status).toBe(400); // no evidence
     expect((await agent("POST", "/filings", t, { entityId: "0000000000" })).status).toBe(400);
-    // Refused: the AI analysis switches, a lender's kind, year reviews, settings, views, the token itself.
-    expect((await agent("PUT", "/entities/0000000000", t, { financeRuleSet: "collector" })).status).toBe(403);
+    // A lender's kind is the agent's to set (404: no such company); refused: an override, the AI analysis switches,
+    // year reviews, settings, views, the token itself.
+    expect((await agent("PUT", "/entities/0000000000", t, { financeRuleSet: "collector" })).status).toBe(404);
+    expect((await agent("PUT", "/entities/0000000000", t, { ruleSetOverride: { ruleSet: "general", reason: "x" } })).status).toBe(403);
     for (const [method, route, body] of [
       ["PUT", "/entities/0000000000/ai", { on: true }],
       ["PUT", `/names/${encodeURIComponent("No Such Name S.A.")}/ai`, { on: true }],

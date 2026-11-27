@@ -89,18 +89,18 @@ describe("catalyst CLI", () => {
     expect(r.couponText).toBeUndefined();
   });
 
-  it("entity set: checked here first; a lender's kind is refused before anything is sent", async () => {
+  it("entity set: checked here first; an override is refused before anything is sent; a lender's kind goes", async () => {
     const { cli, sent, dir } = setup({ "PUT /entities/0000533217": (b) => ({ body: { entityId: "0000533217", ...(b as object) } }) });
-    writeFileSync(join(dir, "e.json"), JSON.stringify({ industry: "Finance", financeRuleSet: "collector" }));
+    writeFileSync(join(dir, "e.json"), JSON.stringify({ industry: "Finance", ruleSetOverride: { ruleSet: "collector", reason: "x" } }));
     const refused = await cli("entity", "set", "0000533217", "--file", join(dir, "e.json"));
     expect(refused.code).toBe(1);
     expect(refused.err).toContain("not valid");
     expect(sent).toHaveLength(0);
-    writeFileSync(join(dir, "e.json"), JSON.stringify({ industry: "Finance", businessSummary: "Buys and collects debts." }));
+    writeFileSync(join(dir, "e.json"), JSON.stringify({ industry: "Finance", financeRuleSet: "collector", businessSummary: "Buys and collects debts." }));
     expect(JSON.parse((await cli("entity", "set", "0000533217", "--file", join(dir, "e.json"), "--dry-run")).out).dryRun).toBe(true);
     expect(sent).toHaveLength(0);
     expect((await cli("entity", "set", "0000533217", "--file", join(dir, "e.json"))).code).toBe(0);
-    expect(sent[0]).toMatchObject({ method: "PUT", body: { industry: "Finance" } });
+    expect(sent[0]).toMatchObject({ method: "PUT", body: { industry: "Finance", financeRuleSet: "collector" } });
   });
 
   it("identity set: the evidence is needed; a financing vehicle points at its group", async () => {

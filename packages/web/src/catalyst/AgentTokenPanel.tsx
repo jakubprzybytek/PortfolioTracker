@@ -67,7 +67,7 @@ export function AgentTokenPanel() {
     <section className="panel cat-agent-token" data-testid="agent-token">
       <h3>AI agent's tokens</h3>
       <p className="muted">
-        What the agent uses through the <code>catalyst</code> CLI: reading the module, and writing names, company descriptions, reports, collected figures, judgements and checklist entries. Not market data, settings, a lender's kind, the AI analysis switches,
+        What the agent uses through the <code>catalyst</code> CLI: reading the module, and writing names, company descriptions (a lender's kind included), reports, collected figures, judgements and checklist entries. Not market data, settings, rule-set overrides, the AI analysis switches,
         year reviews, or anything of the portfolio. One token per machine or routine: its name is recorded with what the agent writes.
       </p>
       {state.loading && !state.data && <p className="muted">Loading…</p>}

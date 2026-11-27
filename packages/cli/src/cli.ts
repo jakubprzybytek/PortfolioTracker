@@ -33,7 +33,7 @@ Reading:
 Identity and description:
   identity resolve <name> | --lei <lei> | --krs <krs>   GLEIF (the name's bonds' ISINs, a full-text search) and the KRS register
   identity set <name> (--entity <id> | --lei <lei>) --evidence "…" [--financials <id>] [--dry-run]
-  entity set <id> --file entity.json [--dry-run]        short name, industry, summary, website (not a lender's kind)
+  entity set <id> --file entity.json [--dry-run]        short name, industry, a lender's kind, summary, website
 
 Reports:
   filings pages <pdf> [--out pages.txt]               the statement pages and the copying rules

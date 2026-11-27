@@ -74,9 +74,9 @@ describe("what needs doing", () => {
     expect(items.map((i) => [i.kind, i.who])).toEqual([["judgement", "agent"], ["checklist", "you"]]);
   });
 
-  it("a Finance company of no known kind: its kind is yours to set; no report asked for a bank-like one", () => {
+  it("a Finance company of no known kind: the agent sets its kind; no report asked for a bank-like one", () => {
     const items = workItems(input({ entities: [entity("0000533217", { industry: "Finance" })], outOfScope: () => true }));
-    expect(items.map((i) => [i.kind, i.who])).toEqual([["lender-kind", "you"]]);
+    expect(items.map((i) => [i.kind, i.who])).toEqual([["lender-kind", "agent"]]);
     expect(workItems(input({ entities: [entity("0000533217", { industry: "Finance" })], lenderByName: () => true, outOfScope: () => false })).map((i) => i.kind)).toEqual(["report"]);
   });
 
@@ -155,9 +155,12 @@ describe("the agent's inputs", () => {
     expect(AnalysisInput.safeParse({ markdown: "x".repeat(60), meta: { model: "claude", sources: [], redFlags: [] } }).success).toBe(false);
     expect(AnalysisInput.safeParse({ markdown: "x".repeat(60), meta: { model: "claude", sources: ["FY2025 annual report"], redFlags: [] } }).success).toBe(true);
   });
-  it("a company's description can't carry a lender kind or the switch", () => {
+  it("a company's description carries a lender's kind, not an override or the switch", () => {
     expect(AGENT_SCHEMAS.entity.safeParse({ industry: "Developer" }).success).toBe(true);
-    expect(AGENT_SCHEMAS.entity.safeParse({ financeRuleSet: "collector" }).success).toBe(false);
+    expect(AGENT_SCHEMAS.entity.safeParse({ financeRuleSet: "collector" }).success).toBe(true);
+    expect(AGENT_SCHEMAS.entity.safeParse({ financeRuleSet: null }).success).toBe(true);
+    expect(AGENT_SCHEMAS.entity.safeParse({ financeRuleSet: "bank" }).success).toBe(false);
+    expect(AGENT_SCHEMAS.entity.safeParse({ ruleSetOverride: { ruleSet: "general", reason: "x" } }).success).toBe(false);
     expect(AGENT_SCHEMAS.entity.safeParse({ aiAnalysis: { on: true } }).success).toBe(false);
   });
   it("an upload URL is asked for the file's size, at most 50 MB", () => {

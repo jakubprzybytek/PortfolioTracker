@@ -29,7 +29,7 @@ analysis, end to end".
 ## The steps
 
 1. **Pick an item:** `catalyst work`. It lists only companies (and names) with AI analysis on; the owner switches
-   it on in the app. Items marked `who: "you"` are the owner's (a lender's kind, a download, a link to confirm):
+   it on in the app. Items marked `who: "you"` are the owner's (a download, a link to confirm):
    tell them, don't do them. Take one company and do its items in this order.
 
 2. **Identity (§5):** `catalyst identity resolve "<listed name>"` (or `--lei <lei>` / `--krs <krs>`) prints GLEIF and KRS candidates with evidence
@@ -39,8 +39,10 @@ analysis, end to end".
    A legal name that differs from the listed one stays `review` until the owner confirms it; say so.
 
 3. **Description (§6):** `catalyst entity set <id> --file entity.json` (`catalyst schema entity`): short name,
-   industry from the fixed list (it picks the rule set), a two-line summary, website. A Finance company: **propose**
-   its kind (debt collector, leasing and factoring, investment firm, or a bank) to the owner; you can't set it.
+   industry from the fixed list (it picks the rule set), a two-line summary, website. A Finance company: set its kind
+   (`financeRuleSet`: `collector` for a debt collector, `leasing` for leasing and factoring, `investment` for an
+   investment firm) from what its reports and website say it earns its money on; a bank or insurer gets none. Say
+   which kind you set and why in the summary to the owner; `null` clears a wrong one.
 
 4. **Reports (§7):** what's due is in `catalyst work`; what's held is in `catalyst entity <id>` (never download a
    file already held). The latest full year first, group accounts first. Where to look: the issuer's
@@ -197,5 +199,5 @@ didn't check. Judgements are append-only: a new one doesn't erase the last.
 ## At the end
 
 Tell the owner, per company: what you stored (names, description, years, judgement), what's waiting for them
-(a link to confirm, a lender's kind, a download on the checklist, a year to mark hand-checked in the issuer dialog's
+(a link to confirm, a download on the checklist, a year to mark hand-checked in the issuer dialog's
 Financials tab), and what you couldn't do and why.

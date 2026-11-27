@@ -15,11 +15,15 @@ const webUrl = z.url({ protocol: /^https?$/, error: "an http or https address" }
 
 const entityId = z.string().regex(/^(\d{10}|LEI:[A-Z0-9]{20})$/, "a KRS number (10 digits) or LEI:<lei>");
 
-/** A company's description (`catalyst entity set`). Not its lender kind, override or AI analysis switch: those are yours. */
+/**
+ * A company's description (`catalyst entity set`), with a lender's kind (from what the company does, like its industry;
+ * null clears it). Not a rule-set override or the AI analysis switch: those are yours.
+ */
 export const AgentEntityInput = z
   .object({
     shortName: z.string().trim().min(1).max(60),
     industry: z.enum(INDUSTRIES),
+    financeRuleSet: z.enum(["collector", "leasing", "investment"]).nullable(),
     businessSummary: z.string().trim().min(1).max(1500),
     // A host with a dot, optionally after http(s)://: no other scheme (javascript:, data: …), since the app links it.
     website: z.string().trim().max(200).regex(/^(https?:\/\/)?[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)+(:\d+)?([/?#]\S*)?$/iu, "a web address (http or https)"),
@@ -347,7 +351,7 @@ export function workItems(input: WorkInput): WorkItem[] {
     const years = e.financialsEntityId ? (input.years.get(e.financialsEntityId) ?? []) : (input.years.get(e.entityId) ?? []);
     if (!e.industry || !e.businessSummary) items.push({ kind: "profile", who: "agent", entityId: e.entityId, name, detail: `no ${[!e.industry && "industry", !e.businessSummary && "summary"].filter(Boolean).join(" or ")} yet (catalyst entity set)` });
     const lender = e.industry === "Finance" && !e.financeRuleSet && !e.ruleSetOverride && !input.lenderByName(e.entityId);
-    if (lender) items.push({ kind: "lender-kind", who: "you", entityId: e.entityId, name, detail: "a Finance company of no known kind (debt collector, leasing and factoring, investment firm, or a bank): propose it; you set it in the app" });
+    if (lender) items.push({ kind: "lender-kind", who: "agent", entityId: e.entityId, name, detail: "a Finance company of no known kind: set it from what the company does (catalyst entity set, financeRuleSet: collector, leasing or investment; a bank or insurer has none)" });
     if (input.outOfScope(e) || e.financialsEntityId) {
       // Banks and the like have no scorecard; a financing vehicle's reports are its group's.
     } else {

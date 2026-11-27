@@ -272,11 +272,11 @@ const ROUTES: Record<string, Handler> = {
   "PUT /catalyst/entities/{id}": async (event) => {
     const id = pathParam(event, "id");
     const raw = parseBody(event);
-    // The agent describes a company; its lender kind and override are yours.
+    // The agent describes a company, a lender's kind included; an override and the AI analysis switch are yours.
     const body = (isAgent(event) ? AgentEntityInput : EntityInput).safeParse(raw);
     if (!body.success) {
-      const refused = isAgent(event) && raw && typeof raw === "object" && ("financeRuleSet" in raw || "ruleSetOverride" in raw || "aiAnalysis" in raw);
-      return json(refused ? 403 : 400, { error: refused ? "A lender's kind, an override and the AI analysis switch are set in the app" : `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
+      const refused = isAgent(event) && raw && typeof raw === "object" && ("ruleSetOverride" in raw || "aiAnalysis" in raw);
+      return json(refused ? 403 : 400, { error: refused ? "An override and the AI analysis switch are set in the app" : `body: ${body.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}` });
     }
     const entity = await catalystRepo.getEntity(id);
     if (!entity) return json(404, { error: `No company ${id}` });

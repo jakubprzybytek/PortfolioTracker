@@ -326,7 +326,7 @@ export interface CatalystEntityItem {
    * whose guarantee stands behind them).
    */
   financialsEntityId?: string;
-  /** A lender's kind (collector, leasing, investment): set by you; a Finance company has no scorecard without it. */
+  /** A lender's kind (collector, leasing, investment): set by the agent or you; a Finance company has no scorecard without it. */
   financeRuleSet?: "collector" | "leasing" | "investment";
   /** Rules that fit the business model better than the industry's, with the reason (yours). */
   ruleSetOverride?: { ruleSet: "general" | "developer" | "contractor" | "consumer" | "collector" | "leasing" | "investment"; reason: string };

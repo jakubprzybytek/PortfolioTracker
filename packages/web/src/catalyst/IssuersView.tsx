@@ -269,7 +269,7 @@ export function IssuersView({ params, setParams }: { params: Record<string, stri
           </tbody>
         </StickyTable>
       )}
-      <p className="muted catalyst-foot">* Also bonds in other currencies, not in the sum. "Needs work": what <code>catalyst work</code> lists (the agent's items, and yours: a lender's kind, a download).</p>
+      <p className="muted catalyst-foot">* Also bonds in other currencies, not in the sum. "Needs work": what <code>catalyst work</code> lists (the agent's items, and yours: a download, a link to confirm).</p>
       </>
       )}
 

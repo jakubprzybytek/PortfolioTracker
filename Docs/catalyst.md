@@ -225,7 +225,7 @@ The procedure is CV's (§3): bond → company → industry and rule set → repo
 |---|---|---|
 | 1 Bond, amount owed | App | Daily file + terms |
 | 2 Company | App, then agent | GLEIF ISIN mapping and exact name match in `catalyst-terms`; the rest (renames, mergers, financing vehicles, legal-name mismatches) by the agent through the CLI, confirmed by hand where §5 says so |
-| 3 Industry, rule set | Agent; finance sub-types and overrides by you | Industry from the fixed list, with a summary and website; a Finance company has no scorecard until you give its sub-type (hand-reviewed map, §6) |
+| 3 Industry, rule set | Agent; finance sub-types by the agent, overrides by you | Industry from the fixed list, with a summary and website; a Finance company has no scorecard until its sub-type is set (by the agent from what it does, or by you in the issuer dialog) |
 | 4 Getting reports | Agent; KRS repository downloads by you | `catalyst work` lists reports due (annual: year end + 5 months, Catalyst's deadline; half-year: 30 June + 3 months; quarterly, for companies with listed shares: quarter end + 2 months); the agent fetches what robots.txt allows (issuer sites, Bankier, filings.xbrl.org) and adds the rest to the checklist for you |
 | 5 Reading | Code; PDFs copied by the agent | KRS XML, ESEF package and IFRS text are parsed by code; a PDF's statement lines (annual or interim) are copied by the agent and checked by code (below) |
 | 6 Fallback figures | Agent | Only operating companies without a report; marked, confidence medium at most |
@@ -337,19 +337,19 @@ Rules:
 The app has no AI. It stores, parses, checks, computes and shows. Finding and reading documents, resolving hard identities and writing judgements is done by an AI agent (Claude Code or another chat) through the CLI.
 
 **Built (N7, 2026-11-08):**
-- **The token and the agent route:** `core/catalyst/agent.ts` (`AGENT_WRITES`, `agentMayCall`), the API's `ANY /catalyst/agent/{proxy+}` (no Cognito; the token's SHA-256, then the route if allowed, as `agent (<x-catalyst-by>)`). The agent's name links are `resolved` when the names agree, else `review`; it can make a company from its LEI (GLEIF, KRS); its company writes can't carry a lender's kind, an override or the switch (403); its imports are recorded as its own.
+- **The token and the agent route:** `core/catalyst/agent.ts` (`AGENT_WRITES`, `agentMayCall`), the API's `ANY /catalyst/agent/{proxy+}` (no Cognito; the token's SHA-256, then the route if allowed, as `agent (<x-catalyst-by>)`). The agent's name links are `resolved` when the names agree, else `review`; it can make a company from its LEI (GLEIF, KRS); its company writes can carry a lender's kind (since 2026-11-27) but not an override or the switch (403); its imports are recorded as its own.
 - **New routes** (yours and the agent's): `GET /catalyst/work`, `POST …/analyses|figures|known`, `GET /catalyst/checklist`, `PUT /catalyst/checklist/{id}/{year}/{scope}`; a filings dry run returns the scorecard it would give.
 - **The CLI:** every command of the table but `filings sort` and `filings check` (the check stays `scripts/catalyst-filings-check.ts`, inside the stage's shell). A dry run of an import uploads the file (7-day area) so the server checks the same things it would store.
 - **The skill:** `.claude/skills/catalyst-analyst/SKILL.md`; at most 5 companies a session.
 - **The app:** the token in the Catalyst settings, "needs work" and the reports checklist in the Issuers view.
-- **A lender's kind** (2026-11-26): the issuer dialog of a Finance company has a Kind select (debt collector, leasing and factoring, investment firm, or not set), saved at once through `PUT /catalyst/entities/{id}` `{ financeRuleSet }`; not set, a lender is scored only when its name is on the list of known lenders.
+- **A lender's kind** (2026-11-26): the issuer dialog of a Finance company has a Kind select (debt collector, leasing and factoring, investment firm, or not set), saved at once through `PUT /catalyst/entities/{id}` `{ financeRuleSet }`; not set, a lender is scored only when its name is on the list of known lenders. Since 2026-11-27 the agent sets it too (`catalyst entity set`, `financeRuleSet`), from what the company does: lenders that no longer have listed bonds (the defaults study) aren't in the Issuers view, so their dialog is out of reach.
 - **Known answers** (`catalyst known put`) are also open to the token: they only feed `filings check`.
 - **Documents** (N8): `catalyst documents put <id> <file> --kind … --date …` keeps what a judgement rests on beside the statements (auditor's and management reports, interim and current reports, bond terms); one already held isn't uploaded again. The issuer dialog's Documents tab lists them with the statements.
 
 - **Location:** `packages/cli` in this repo, TypeScript, run with `npx catalyst …`. It uses `core`'s zod schemas and parsers (the same ones the API uses); `catalyst schema <kind>` prints an input as JSON Schema.
 - **Where the work runs:** on your machine. The CLI imports `core`'s parsers, checks, scorecard and identity clients, so none of these needs the backend: sorting files, finding PDF pages, parsing, the checks, GLEIF and KRS lookups, and a dry run (with the scorecard the import would give). The app is called only to read a company's stored rows and to write results.
 - **Transport:** only the API (`/api/catalyst/agent/*`), never DynamoDB directly. The server checks what it receives (the zod schemas, the arithmetic checks re-run on the submitted lines, the original's SHA-256) and stores the original; it doesn't parse files. `filings check` re-parses the stored originals locally against the known answers at any time. JSON output by default, `--table` for people, `--dry-run` on every write.
-- **Auth:** an agent token (same pattern as the spreadsheet feed token: 32 random bytes shown once, only the SHA-256 stored, revocable), made in the Catalyst view: several at once, one per machine or routine, each with a name; what the agent writes records `agent (<model>; <token name>)`. It allows reads of `/api/catalyst/*` and writes of names, companies (not finance sub-types, overrides or the AI analysis switch), filings, collected figures, analyses and checklist entries; not market data, settings or anything of PT. `catalyst login --stage <stage>` stores it outside the repo. Tests use the test user on `int`, never prod.
+- **Auth:** an agent token (same pattern as the spreadsheet feed token: 32 random bytes shown once, only the SHA-256 stored, revocable), made in the Catalyst view: several at once, one per machine or routine, each with a name; what the agent writes records `agent (<model>; <token name>)`. It allows reads of `/api/catalyst/*` and writes of names, companies (with finance sub-types; not overrides or the AI analysis switch), filings, collected figures, analyses and checklist entries; not market data, settings or anything of PT. `catalyst login --stage <stage>` stores it outside the repo. Tests use the test user on `int`, never prod.
 - **Review:** everything the agent writes records `enteredBy` and keeps history (analyses are append-only; a replaced financial year keeps the previous version). Imported years start as `parsed`; you mark them `hand-checked` or `flagged`. Identities whose legal name differs from the listed name stay `review` until you confirm them.
 
 | Command | Purpose |
@@ -377,7 +377,7 @@ The app has no AI. It stores, parses, checks, computes and shows. Finding and re
 
 1. `catalyst work` → pick an item.
 2. Identity: `identity resolve`; renames, mergers, financing vehicles (guarantee in the bond terms?) by the §5 rules; `identity set`.
-3. Industry and summary: `entity set`. A Finance company: propose the sub-type to you, don't set it.
+3. Industry, summary and, for a Finance company, its sub-type: `entity set`.
 4. Reports: latest full year, group first; then the interim reports after it (quarterly or half-year, same scope), once the annual path is in place. Issuer site, Bankier (listed), filings.xbrl.org; download into a new directory, 2 s apart; the KRS repository only through `checklist --add` for you.
 5. `filings import --dry-run`, then import; a PDF via `filings pages` → transcript (copy, never compute) → import. Refused? Read the checks, fix the transcript, never `--force` without asking.
 6. No report available and an operating company: `figures put`, avoiding §9's failure modes (part years, today's date, units, the wrong company).
@@ -399,7 +399,7 @@ How one company goes from "analyse it" to a scorecard in the app. The example is
 2. In Claude Code you type `! npx catalyst login --stage prod` and paste the token at a hidden prompt. The CLI stores it in your user profile, outside the repo, and prints only its last four characters, so the agent never sees it.
 3. Every call the CLI makes sends `Authorization: Bearer <token>` to `/api/catalyst/agent/…`. The function compares the hash and applies an allow-list:
    - **allowed:** reads, and writes of names, company descriptions, filings, collected figures, analyses and checklist entries;
-   - **refused:** market data, settings, finance sub-types and PT.
+   - **refused:** market data, settings, rule-set overrides, the AI analysis switch and PT.
 4. You can revoke a token in the settings; the others go on working. Dev and prod have separate tokens.
 
 **1. The decision.** You switch AI analysis on for the company (or its listed name) in the issuer dialog: it is off by default ("AI analysis per company"). Then you ask ("analyse the issuer of ABC1227", "work through the list"), and the agent runs one of:
@@ -420,7 +420,7 @@ It prints the candidates with the evidence. The agent applies §5 (renames, merg
 - a two-line summary;
 - website.
 
-A financial company's sub-type (collector, leasing …) is proposed to you; you set it in the app.
+A financial company's sub-type (collector, leasing …) is set by the agent from what the company does; you can change it in the issuer dialog.
 
 **4. The report.**
 - `catalyst entity 0000123456` lists the stored years and the files already held. These include CatalystViewer's 85 originals, migrated, so they're never downloaded again.
